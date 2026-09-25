@@ -216,7 +216,7 @@ function download(blob,name,kind="generic"){
   const a=document.createElement("a");a.download=name;a.style.display="none";document.body.appendChild(a);
   if(blob.type==="application/json"){const textValue=typeof blob._assetForgeText==="string"?blob._assetForgeText:null;if(textValue!==null){a.href="data:application/json;charset=utf-8,"+encodeURIComponent(textValue)}else{a.href=URL.createObjectURL(blob)}}
   else{a.href=URL.createObjectURL(blob)}
-  const url=a.href;const record={name,href:url,type:blob.type,kind};window.__assetForgeLastDownload=record;window.__assetForgeLastDownloads=window.__assetForgeLastDownloads||{};window.__assetForgeLastDownloads[kind]=record;a.click();setTimeout(()=>{if(url.startsWith("blob:"))URL.revokeObjectURL(url);a.remove()},60000)
+  const url=a.href;const record={name,href:url,type:blob.type,kind};window.__assetForgeLastDownload=record;window.__assetForgeLastDownloads=window.__assetForgeLastDownloads||{};window.__assetForgeLastDownloads[kind]=record;if(/^image\//.test(blob.type))window.__assetForgeLastImageDownload=record;a.click();setTimeout(()=>{if(url.startsWith("blob:"))URL.revokeObjectURL(url);a.remove()},60000)
 }
 async function exportSelectedManifest(){
   const o=selected()||canvas.getObjects().at(-1);if(!o)return toast("Select an asset first");
