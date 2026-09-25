@@ -23,6 +23,39 @@ jobs:
       - run: npm install
       - run: npx playwright install chromium
       - run: npm test
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install vision dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr
+          python -m pip install -r vision-control/requirements.txt
+
+      - name: Start Asset Forge server for vision QA
+        run: |
+          nohup npm start > /tmp/asset-forge-server-vision.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:4173/ >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/asset-forge-server-vision.log
+          exit 1
+
+      - name: Run hybrid visual QA
+        run: python vision-control/qa_asset_forge.py http://127.0.0.1:4173/
+
+      - name: Upload vision evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-forge-vision-evidence
+          path: |
+            tests/vision-verified/
+            /tmp/asset-forge-server-vision.log
+          if-no-files-found: warn
+
       - uses: actions/upload-artifact@v4
         with:
           name: asset-forge-verification
