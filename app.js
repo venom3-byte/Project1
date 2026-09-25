@@ -100,13 +100,33 @@ async function getBiRefNetEngine(){
 }
 async function createBiRefNetMask(sourceBlob){
   const {RawImage}=await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm");
-  const engine=await getBiRefNetEngine(),image=await RawImage.read(sourceBlob),inputs=await engine.processor(image),output=await engine.model({input_image:inputs.pixel_values});
-  let logits=output?.logits??output?.output??output?.predictions??output?.[0];
-  if(!logits?.data||!logits?.dims)throw new Error("BiRefNet returned no Tensor output; keys: "+(output&&typeof output==="object"?Object.keys(output).join(","):"unknown"));
-  const dims=[...logits.dims],h=dims.at(-2),w=dims.at(-1);if(!h||!w)throw new Error("BiRefNet logits have invalid dimensions");
-  const mask=document.createElement("canvas");mask.width=w;mask.height=h;const ctx=mask.getContext("2d",{willReadFrequently:true}),rgba=new Uint8ClampedArray(w*h*4),data=logits.data;
-  for(let i=0;i<w*h;i++){const x=Number(data[i]);const a=Math.max(0,Math.min(1,1/(1+Math.exp(-x))));const v=Math.round(a*255);rgba[i*4]=255;rgba[i*4+1]=255;rgba[i*4+2]=255;rgba[i*4+3]=v}
-  ctx.putImageData(new ImageData(rgba,w,h),0,0);return {canvas:mask,width:w,height:h}
+  const engine=await getBiRefNetEngine();
+  const image=await RawImage.read(sourceBlob);
+  const inputs=await engine.processor(image);
+  const output=await engine.model({input_image:inputs.pixel_values});
+  let raw=output?.logits??output?.output??output?.predictions??output?.output_image??output?.[0];
+  if(!raw?.data)throw new Error("BiRefNet returned no image tensor; keys: "+(output&&typeof output==="object"?Object.keys(output).join(","):"unknown"));
+  const dims=raw.dims?[...raw.dims]:null;
+  const w=raw.width??(dims?dims.at(-1):null),h=raw.height??(dims?dims.at(-2):null);
+  if(!w||!h)throw new Error("BiRefNet output has no width/height");
+  const pixels=raw.data;
+  const sampleCount=w*h;
+  const channels=pixels.length===sampleCount?1:(pixels.length===sampleCount*4?4:Math.max(1,Math.round(pixels.length/sampleCount)));
+  const mask=document.createElement("canvas");mask.width=w;mask.height=h;
+  const ctx=mask.getContext("2d",{willReadFrequently:true});
+  const rgba=new Uint8ClampedArray(sampleCount*4);
+  for(let i=0;i<sampleCount;i++){
+    let v;
+    if(channels===1)v=Number(pixels[i]);
+    else v=Number(pixels[i*channels]);
+    if(Number.isFinite(v) && v>=-20 && v<=20 && pixels instanceof Float32Array){
+      v=255/(1+Math.exp(-v))
+    }else if(v<=1)v=v*255;
+    v=Math.max(0,Math.min(255,v));
+    rgba[i*4]=255;rgba[i*4+1]=255;rgba[i*4+2]=255;rgba[i*4+3]=Math.round(v)
+  }
+  ctx.putImageData(new ImageData(rgba,w,h),0,0);
+  return {canvas:mask,width:w,height:h}
 }
 async function composeRawMask(sourceBlob,maskImage){
   const source=await createImageBitmap(sourceBlob),w=source.width,h=source.height,out=document.createElement("canvas");out.width=w;out.height=h;
@@ -135,7 +155,7 @@ async function renderVault(){const d=await db(),r=d.transaction("assets","readon
 $("clearVaultBtn").onclick=async()=>{const d=await db();d.transaction("assets","readwrite").objectStore("assets").clear();renderVault()};
 
 async function selectedPng(){const b=await canvas.toBlob({format:"png",multiplier:1});if(!b)throw new Error("PNG export unavailable");lastBlob=b;return b}
-function download(blob,name){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500)}
+function download(blob,name){const a=document.createElement("a");const url=URL.createObjectURL(blob);a.href=url;a.download=name;a.style.display="none";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000)}
 async function exportSelectedManifest(){
   const o=selected();if(!o)return toast("Select an asset first");
   const el=imgElement(o);
