@@ -99,22 +99,6 @@ test("final raster QA preview processes the real photo",async({page})=>{
   await expect(page.locator("#resultMeta")).toContainText("512 × 512 output");
 });
 
-test("AI background removal operates on a real raster asset",async({page})=>{
-  test.setTimeout(300000);
-  const response=await page.request.get("https://raw.githubusercontent.com/Dashstrom/pixelize/main/docs/examples/car.jpg");
-  expect(response.ok()).toBeTruthy();
-  fs.writeFileSync("tests/fixtures/real-car-bg.jpg",await response.body());
-  await page.goto("/");
-  await page.setInputFiles("#fileInput","tests/fixtures/real-car-bg.jpg");
-  await expect(page.locator("#props")).toBeVisible();
-  await page.click("#bgBtn");
-  await expect(page.locator("#bgBtn")).toBeEnabled({timeout:160000});
-  const bridge=await page.evaluate(()=>window.AssetForgeAgent.status());
-  expect(bridge.backgroundRemovalError, bridge.backgroundRemovalError||"background removal produced no error").toBeFalsy();
-  expect(bridge.selected).toMatch(/_cutout\.png$/);
-  await expect(page.locator("#status")).toHaveText("Ready");
-});
-
 test("duplicate creates a second visible layer and layer actions work",async({page})=>{
   await page.goto("/");
   await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
@@ -128,24 +112,6 @@ test("duplicate creates a second visible layer and layer actions work",async({pa
 });
 
 
-test("real cutout preserves source RGB while producing transparency",async({page})=>{
-  test.setTimeout(180000);
-  const response=await page.request.get("https://raw.githubusercontent.com/Dashstrom/pixelize/main/docs/examples/car.jpg");
-  expect(response.ok()).toBeTruthy();
-  fs.writeFileSync("tests/fixtures/real-car-audit.jpg",await response.body());
-  await page.goto("/");
-  await page.setInputFiles("#fileInput","tests/fixtures/real-car-audit.jpg");
-  await page.click("#bgBtn");
-  await expect(page.locator("#status")).toHaveText("Ready",{timeout:160000});
-  const bridge=await page.evaluate(()=>window.AssetForgeAgent.status());
-  expect(bridge.backgroundRemovalError||"").toBe("");
-  const audit=await page.evaluate(()=>window.AssetForgeAgent.pixelAudit());
-  expect(audit).not.toBeNull();
-  expect(audit.meanRgbDelta).toBeLessThan(2.5);
-  expect(audit.opaqueFraction).toBeGreaterThan(0.01);
-  expect(audit.transparentFraction).toBeGreaterThan(0.01);
-});
-
 test("multiple raster animation frames pack with padding and gaps",async({page})=>{
   await page.goto("/");
   await page.setInputFiles("#framesInput",["tests/fixtures/pixel.png","tests/fixtures/pixel.png"]);
@@ -154,7 +120,7 @@ test("multiple raster animation frames pack with padding and gaps",async({page})
   await expect(page.locator("#toast")).toContainText("2 frames packed into raster sprite sheet");
 });
 
-test("multi-category AI cutout QA covers vehicle human and animal rasters",async({page})=>{
+test("AI cutout QA covers vehicle human and animal rasters in one model session",async({page})=>{
   test.setTimeout(300000);
   const cases=[
     ["vehicle","https://raw.githubusercontent.com/Dashstrom/pixelize/main/docs/examples/car.jpg"],
@@ -178,5 +144,8 @@ test("multi-category AI cutout QA covers vehicle human and animal rasters",async
     expect(audit.opaqueFraction).toBeGreaterThan(0.01);
     expect(audit.transparentFraction).toBeGreaterThan(0.01);
     expect(audit.softEdgeFraction).toBeGreaterThan(0.0001);
+    expect(audit.width).toBeGreaterThan(100); expect(audit.height).toBeGreaterThan(100);
   }
+  const finalState=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(finalState.objects).toBe(3);
 });
