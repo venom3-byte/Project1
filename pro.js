@@ -101,8 +101,8 @@ async function blobToDataUrl(blob){
   return await new Promise((resolve,reject)=>{const f=new FileReader();f.onload=()=>resolve(f.result);f.onerror=reject;f.readAsDataURL(blob)});
 }
 async function lastSpriteSheetDataUrl(){return window.__assetForgeLastSpriteSheetDataUrl||await blobToDataUrl(window.__assetForgeLastSpriteSheet)}
-async function lastDownloadDataUrl(){
-  const info=agent()?.getLastDownload?.();if(!info?.href)return null;
+async function lastDownloadDataUrl(kind=null){
+  const info=kind?(window.__assetForgeLastDownloads?.[kind]):agent()?.getLastDownload?.();if(!info?.href)return null;
   const res=await fetch(info.href),blob=await res.blob();
   return await new Promise((resolve,reject)=>{const f=new FileReader();f.onload=()=>resolve(f.result);f.onerror=reject;f.readAsDataURL(blob)});
 }
@@ -110,6 +110,9 @@ async function lastDownloadDataUrl(){
 const A=window.AssetForgeAgent;
 if(A){
   A.getLastDownloadDataUrl=lastDownloadDataUrl;
+  A.getLastExportImageDataUrl=()=>lastDownloadDataUrl("exportImage");
+  A.getLastSpriteImageDataUrl=()=>lastDownloadDataUrl("spriteImage");
+  A.getLastProjectDataUrl=()=>lastDownloadDataUrl("project");
   A.getLastSpriteSheetDataUrl=lastSpriteSheetDataUrl;
   A.execute=async(cmd={})=>{
     const op=cmd.op||cmd.action;
