@@ -22,6 +22,15 @@ test("raster import, crop, trim, undo/redo and export remain functional",async({
   await expect(page.locator("#pw")).not.toHaveValue("");
   await page.click("#cropBtn");
   await expect(page.locator("#cropModal")).toBeVisible();
+  await expect(page.locator(".crop-handle.se")).toBeVisible();
+  const beforeCropW=await page.inputValue("#cropW");
+  const handle=await page.locator(".crop-handle.se").boundingBox();
+  expect(handle).toBeTruthy();
+  await page.mouse.move(handle.x+8,handle.y+8);
+  await page.mouse.down();
+  await page.mouse.move(handle.x+18,handle.y+18);
+  await page.mouse.up();
+  expect(Number(await page.inputValue("#cropW"))).toBeGreaterThanOrEqual(Number(beforeCropW));
   await page.fill("#cropW","1"); await page.fill("#cropH","1");
   await page.click("#applyCrop");
   await expect(page.locator("#cropModal")).toHaveClass(/hidden/);
@@ -105,8 +114,10 @@ test("duplicate creates a second visible layer and layer actions work",async({pa
   await page.goto("/");
   await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
   await expect(page.locator("#props")).toBeVisible();
-  await page.click("#duplicateBtn");
-  await expect(page.locator("#toast")).toContainText("Layer duplicated");
+  await page.click("#fitBtn"); await page.click("#zoomInBtn"); await page.click("#zoomOutBtn");
+  await page.click("#urlBtn"); await expect(page.locator("#urlModal")).toBeVisible(); await page.click('[data-close="urlModal"]');
+  await page.evaluate(()=>window.AssetForgeAgent.execute({op:"duplicate"}));
+  await expect(page.locator("#toast")).toContainText("Duplicated as a distinct layer");
   await expect(page.locator("#layerCount")).toHaveText("2");
   const bridge=await page.evaluate(()=>window.AssetForgeAgent.status());
   expect(bridge.objects).toBe(2);
