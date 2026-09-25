@@ -188,7 +188,10 @@ function addAutomationPanel(){
   card.innerHTML='<span class="live-dot"></span><div><strong>PRO control bridge</strong><div class="pro-badge">automation + mobile precision</div></div>';
   parent.insertBefore(card,parent.firstElementChild?.nextElementSibling||parent.firstChild);
 }
-installSheetPolish();patchCropOpen();patchDuplicate();addAutomationPanel();installMissingActions();
-
-const mo=new MutationObserver(()=>{installSheetPolish();installCropHandles()});
-mo.observe(document.body,{subtree:true,childList:true});
+function bootPro(){
+  if(!window.AssetForgeAgent){setTimeout(bootPro,25);return}
+  installSheetPolish();patchCropOpen();patchDuplicate();addAutomationPanel();installMissingActions();
+  const mo=new MutationObserver(()=>{installSheetPolish();installCropHandles()});
+  mo.observe(document.body,{subtree:true,childList:true});
+}
+bootPro();
