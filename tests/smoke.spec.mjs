@@ -79,7 +79,8 @@ test("raster pixels survive undo/redo and project save/open",async({page})=>{
   await page.evaluate(()=>window.AssetForgeAgent.cropSelected(0,0,1,1));
   await page.click("#undoBtn");
   const afterUndo=await page.evaluate(()=>window.AssetForgeAgent.rasterSignature());
-  expect(afterUndo,JSON.stringify({before,afterUndo})).toEqual(before);
+  const undoDebug=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(afterUndo,JSON.stringify({before,afterUndo,undoDebug})).toEqual(before);
   await page.click("#redoBtn");
   const afterRedo=await page.evaluate(()=>window.AssetForgeAgent.status());
   expect(afterRedo.selectedSize).toEqual({width:1,height:1});
@@ -246,7 +247,8 @@ test("AI cutout QA covers vehicle human and animal rasters in one model session"
       await page.click("#undoBtn");await page.click("#redoBtn");
       await expect(page.locator("#props")).toBeVisible();
       await page.click("#refineMaskBtn");
-      await expect(page.locator("#maskModal")).toBeVisible({timeout:5000});
+      const maskDebug=await page.evaluate(()=>window.AssetForgeAgent.status());
+      await expect(page.locator("#maskModal"),JSON.stringify(maskDebug)).toBeVisible({timeout:5000});
       await page.click('[data-close="maskModal"]');
     }
     expect(audit.width).toBeGreaterThan(100); expect(audit.height).toBeGreaterThan(100);
