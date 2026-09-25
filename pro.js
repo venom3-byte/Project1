@@ -100,7 +100,7 @@ async function blobToDataUrl(blob){
   if(!blob)return null;
   return await new Promise((resolve,reject)=>{const f=new FileReader();f.onload=()=>resolve(f.result);f.onerror=reject;f.readAsDataURL(blob)});
 }
-async function lastSpriteSheetDataUrl(){return blobToDataUrl(window.__assetForgeLastSpriteSheet)}
+async function lastSpriteSheetDataUrl(){return window.__assetForgeLastSpriteSheetDataUrl||await blobToDataUrl(window.__assetForgeLastSpriteSheet)}
 async function lastDownloadDataUrl(){
   const info=agent()?.getLastDownload?.();if(!info?.href)return null;
   const res=await fetch(info.href),blob=await res.blob();
