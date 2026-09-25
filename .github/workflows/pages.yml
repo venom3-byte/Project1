@@ -1,4 +1,4 @@
-name: Asset Forge CI
+name: Asset Forge CI & Pages
 on:
   push:
     branches: [main]
@@ -6,6 +6,8 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  pages: write
+  id-token: write
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -17,3 +19,19 @@ jobs:
       - run: npm install
       - run: npx playwright install chromium
       - run: npm test
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4
