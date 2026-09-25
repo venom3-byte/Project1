@@ -31,7 +31,7 @@ def main():
         agent.wait(1200)
 
         first = agent.inspect("asset-forge-mobile")
-        assert first["analysis"]["black_ratio"] < 0.90, "Visual agent detected a black/blank screen"
+        assert not first["analysis"]["signals"]["possible_blank_or_black_screen"], "Visual agent detected a black/blank screen"
         assert not first["analysis"]["page_errors"], "Page error detected: " + repr(first["analysis"]["page_errors"][:3])
 
         agent.click_selector("#fitBtn")
@@ -47,7 +47,7 @@ def main():
         missing = sorted(required - interactive_ids)
         assert not missing, f"Required editor controls missing: {missing}"
 
-        report = {
+        if first["analysis"]["signals"]["console_errors"]:\n        raise AssertionError("Console errors detected: " + repr(first["analysis"]["console_errors"][:3]))\n\n    report = {
             "ok": True,
             "url": agent.page.url,
             "mobile_initial": first,
