@@ -23,7 +23,7 @@
   .sheet-scroll-shadow{top:47px}
   .sidebar.open{will-change:transform}
   .mobile-dock{height:70px;padding-top:7px}
-  .mobile-dock button{flex-basis:60px}
+  .mobile-dock button{flex:1 1 0;min-width:50px;max-width:60px;flex-basis:0}
   .crop-card{width:min(96vw,760px);max-height:94dvh}
   .crop-preview{height:min(52dvh,520px)}
   .crop-handle{width:22px;height:22px}
