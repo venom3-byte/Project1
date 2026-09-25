@@ -34,7 +34,7 @@ test("frame extraction creates actual frame assets and sheet packing uses extrac
   await page.fill("#cols","2");
   await page.fill("#rows","1");
   await page.click("#framesBtn");
-  await expect(page.locator("#toast")).toContainText("2 frame(s) extracted and ready to pack");
+  await expect(page.locator("#toast")).toContainText("2 frames extracted and ready to pack");
   await page.click("#sheetBtn");
   await expect(page.locator("#toast")).toContainText("2 frame(s) packed into raster sheet");
 });
@@ -56,4 +56,28 @@ test("mobile drawers open and close without layout errors",async({page})=>{
   await expect(page.locator("#propsPanel")).toHaveClass(/open/);
   await page.click("#propsToggle");
   await expect(page.locator("#propsPanel")).not.toHaveClass(/open/);
+});
+
+test("real public-domain photo can be imported, cropped and exported as a game asset",async({page})=>{
+  const url="https://upload.wikimedia.org/wikipedia/commons/d/db/Chrysler_Crossfire_Red_Coupe2.JPG";
+  const response=await page.request.get(url);
+  expect(response.ok()).toBeTruthy();
+  const bytes=await response.body();
+  expect(bytes.length).toBeGreaterThan(100000);
+  fs.writeFileSync("tests/fixtures/real-car.jpg",bytes);
+  await page.goto("/");
+  await page.setInputFiles("#fileInput","tests/fixtures/real-car.jpg");
+  await expect(page.locator("#props")).toBeVisible();
+  await page.click("#cropBtn");
+  await page.fill("#cropX","120");
+  await page.fill("#cropY","100");
+  await page.fill("#cropW","1900");
+  await page.fill("#cropH","850");
+  await page.click("#applyCrop");
+  await expect(page.locator("#cropModal")).toHaveClass(/hidden/);
+  await page.click("#exportBtn");
+  await expect(page.locator("#toast")).toContainText("PNG exported");
+  const bridge=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(bridge.objects).toBe(1);
+  expect(bridge.selected).toMatch(/_crop\.png$/);
 });
