@@ -89,7 +89,7 @@ async function blobFromObject(o){
   return new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(new Error("Could not encode source image")),"image/png",1))
 }
 async function detectInferenceConfig(){
-  if(!navigator.gpu||!window.isSecureContext)return {device:"wasm",dtype:"fp32"};
+  if(!navigator.gpu||!window.isSecureContext)return {device:"wasm",dtype:"q8"};
   try{const adapter=await navigator.gpu.requestAdapter();if(!adapter)return{device:"wasm",dtype:"fp32"};return{device:"webgpu",dtype:adapter.features?.has?.("shader-f16")?"fp16":"fp32"}}catch{return{device:"wasm",dtype:"fp32"}}
 }
 async function getBackgroundPipeline(){
@@ -98,13 +98,13 @@ async function getBackgroundPipeline(){
   backgroundPipelinePromise=(async()=>{
     const {pipeline}=await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm");
     const cfg=await detectInferenceConfig();
-    setStatus("Loading MVANet background-removal model ("+cfg.device+" / "+cfg.dtype+")…");
+    setStatus("Loading ISNet INT8 background-removal model ("+cfg.device+" / "+cfg.dtype+")…");
     try{
-      const pipe=await pipeline("background-removal","onnx-community/MVANet-ONNX",{device:cfg.device,dtype:cfg.dtype});
+      const pipe=await pipeline("background-removal","xrds/isnet-general-onnx-int8",{device:cfg.device,dtype:cfg.device==="webgpu"?"q8":"q8"});
       backgroundPipeline=pipe;return pipe
     }catch(e){
       if(cfg.device==="webgpu"){
-        const pipe=await pipeline("background-removal","onnx-community/MVANet-ONNX",{device:"wasm",dtype:"fp32"});
+        const pipe=await pipeline("background-removal","xrds/isnet-general-onnx-int8",{device:"wasm",dtype:"fp32"});
         backgroundPipeline=pipe;return pipe
       }
       throw e
@@ -124,7 +124,7 @@ async function removeBg(){
   const o=selected();if(!o||o.type!=="image")return toast("Select an image first");
   $("bgBtn").disabled=true;$("mobileBgBtn").disabled=true;setStatus("Preparing original pixels…");
   try{
-    const sourceBlob=await blobFromObject(o);setStatus("MVANet high-quality segmentation…");
+    const sourceBlob=await blobFromObject(o);setStatus("ISNet high-quality segmentation…");
     const pipe=await getBackgroundPipeline();const rawResult=await pipe(sourceBlob);const result=Array.isArray(rawResult)?rawResult[0]:rawResult;
     const {maskCanvas}=await extractAlphaFromRawImage(result);setStatus("Applying original RGB + BEN2 alpha matte…");
     const source=await createImageBitmap(sourceBlob),w=source.width,h=source.height,out=document.createElement("canvas");out.width=w;out.height=h;
@@ -136,8 +136,8 @@ async function removeBg(){
     const blob=await new Promise((resolve,reject)=>out.toBlob(b=>b?resolve(b):reject(new Error("Could not encode cutout")),"image/png",1));
     const n=await addReplacement(blob,o,(o.name||"asset").replace(/\.[^.]+$/,"")+"_cutout.png",{cutoutSource:true});
     const finalCanvas=document.createElement("canvas");finalCanvas.width=w;finalCanvas.height=h;const fc=finalCanvas.getContext("2d",{willReadFrequently:true});fc.drawImage(scaled,0,0);cutoutRecords.set(n,{sourceBlob,maskCanvas:finalCanvas});
-    backgroundRemovalError=null;toast("MVANet high-quality cutout created — original RGB preserved");setStatus("Ready")
-  }catch(e){backgroundRemovalError=e?.stack||e?.message||String(e);console.error("[AssetForge MVANet]",e);toast("AI cutout failed — original kept");setStatus("Ready")}
+    backgroundRemovalError=null;toast("ISNet high-quality cutout created — original RGB preserved");setStatus("Ready")
+  }catch(e){backgroundRemovalError=e?.stack||e?.message||String(e);console.error("[AssetForge ISNet]",e);toast("AI cutout failed — original kept");setStatus("Ready")}
   finally{$("bgBtn").disabled=false;$("mobileBgBtn").disabled=false}
 }
 $("bgBtn").onclick=removeBg;$("mobileBgBtn").onclick=removeBg;
