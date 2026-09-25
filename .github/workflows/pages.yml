@@ -23,17 +23,33 @@ jobs:
       - run: npm install
       - run: npx playwright install chromium
       - run: npm test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: asset-forge-verification
+          path: tests/verified/
+          if-no-files-found: error
+
+  vision:
+    if: always()
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
+      - run: npm install
+      - run: npx playwright install chromium
       - name: Install vision dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y tesseract-ocr
           python -m pip install -r vision-control/requirements.txt
-
-      - name: Start Asset Forge server for vision QA
+      - name: Start Asset Forge server
         run: |
           nohup npm start > /tmp/asset-forge-server-vision.log 2>&1 &
           for i in $(seq 1 30); do
@@ -42,10 +58,8 @@ jobs:
           done
           cat /tmp/asset-forge-server-vision.log
           exit 1
-
       - name: Run hybrid visual QA
         run: python vision-control/qa_asset_forge.py http://127.0.0.1:4173/
-
       - name: Upload vision evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -55,12 +69,6 @@ jobs:
             tests/vision-verified/
             /tmp/asset-forge-server-vision.log
           if-no-files-found: warn
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: asset-forge-verification
-          path: tests/verified/
-          if-no-files-found: error
 
   publish-verification:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
