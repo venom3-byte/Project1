@@ -47,11 +47,11 @@
 
     <div class="tool-section-title">SPRITE LAB</div>
     <button id="framesInputBtn">＋ <span>Add animation frames</span></button>
-    <div class="grid2"><label class="field">Columns<input id="cols" type="number" min="1" max="32" value="6"></label><label class="field">Rows<input id="rows" type="number" min="1" max="32" value="1"></label></div>
+    <div class="grid2"><label class="field">Columns<input id="cols" type="number" min="1" max="32" value="6"></label><label class="field">Rows<input id="rows" type="number" min="1" max="32" value="1"></label><label class="field">FPS<input id="fps" type="number" min="1" max="240" value="12"></label></div>
     <div class="grid2"><label class="field">Cell W<input id="frameW" type="number" min="1" max="4096" placeholder="auto"></label><label class="field">Cell H<input id="frameH" type="number" min="1" max="4096" placeholder="auto"></label></div>
     <div class="grid2"><label class="field">Gap<input id="frameGap" type="number" min="0" max="256" value="0"></label><label class="field">Padding<input id="framePadding" type="number" min="0" max="256" value="0"></label></div>
     <button id="framesBtn">Extract sheet → frames</button>
-    <button id="sheetBtn">Pack frames → sprite sheet</button>
+    <button id="sheetBtn">Pack frames → sprite sheet + manifest</button>
     <div id="frameCount" class="subtle">No animation frames loaded</div>
 
     <div class="tool-section-title">DOCUMENT</div>
@@ -79,8 +79,8 @@
     <div id="propsEmpty" class="empty-state">Select an object to inspect it.</div>
     <div id="props" class="hidden">
       <div class="subsection-title">TRANSFORM</div>
-      <div class="grid2"><label class="field">X<input id="px" type="number"></label><label class="field">Y<input id="py" type="number"></label><label class="field">W<input id="pw" type="number"></label><label class="field">H<input id="ph" type="number"></label></div>
-      <div class="grid2"><label class="field">Rotation<input id="prot" type="number"></label><label class="field">Opacity<input id="pop" type="range" min="0" max="1" step=".01"></label></div>
+      <label class="field">Layer name<input id="layerName" type="text" maxlength="120"></label><div class="grid2"><label class="field">X<input id="px" type="number"></label><label class="field">Y<input id="py" type="number"></label><label class="field">W<input id="pw" type="number"></label><label class="field">H<input id="ph" type="number"></label></div>
+      <div class="grid2"><label class="field">Rotation<input id="prot" type="number"></label><label class="field">Opacity<input id="pop" type="range" min="0" max="1" step=".01"></label></div><div class="grid2"><label class="field">Pivot X<input id="pivotX" type="number" min="0" max="1" step=".001" value=".5"></label><label class="field">Pivot Y<input id="pivotY" type="number" min="0" max="1" step=".001" value=".5"></label></div>
       <div class="layer-actions">
         <button id="frontBtn">Bring front</button><button id="backBtn">Send back</button>
         <button id="upBtn">Move up</button><button id="downBtn">Move down</button>
