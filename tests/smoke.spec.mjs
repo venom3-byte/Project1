@@ -23,12 +23,12 @@ test("raster history and saved project preserve actual image data",async({page})
   await page.click("#cropBtn");
   await page.fill("#cropW","1"); await page.fill("#cropH","1"); await page.click("#applyCrop");
   expect((await page.evaluate(()=>window.AssetForgeAgent.status())).objects).toBe(1);
-  await page.click("#undoBtn");
+  await page.click("#undoBtn");await page.evaluate(()=>window.AssetForgeAgent.waitForHistoryIdle());
   const afterUndo=await page.evaluate(()=>window.AssetForgeAgent.status());
   expect(afterUndo.objects).toBe(1);
   expect(afterUndo.selectedType).toBe("image");
   expect(afterUndo.selectedSize.width).toBeGreaterThan(0);
-  await page.click("#redoBtn");
+  await page.click("#redoBtn");await page.evaluate(()=>window.AssetForgeAgent.waitForHistoryIdle());
   const afterRedo=await page.evaluate(()=>window.AssetForgeAgent.status());
   expect(afterRedo.objects).toBe(1);
   expect(afterRedo.selectedType,JSON.stringify(afterRedo)).toBe("image");
@@ -66,7 +66,7 @@ test("raster import, crop, trim, undo/redo and export remain functional",async({
   await page.click("#applyCrop");
   await expect(page.locator("#cropModal")).toHaveClass(/hidden/);
   await expect(page.locator("#props")).toBeVisible();
-  await page.click("#undoBtn"); await page.click("#redoBtn");
+  await page.click("#undoBtn");await page.evaluate(()=>window.AssetForgeAgent.waitForHistoryIdle()); await page.click("#redoBtn");await page.evaluate(()=>window.AssetForgeAgent.waitForHistoryIdle());
   await page.click("#exportBtn");
   await expect(page.locator("#toast")).toContainText("PNG exported");
 });
@@ -77,13 +77,13 @@ test("raster pixels survive undo/redo and project save/open",async({page})=>{
   const before=await page.evaluate(()=>window.AssetForgeAgent.rasterSignature());
   expect(before?.nonZeroPixels).toBeGreaterThan(0);
   await page.evaluate(()=>window.AssetForgeAgent.cropSelected(0,0,1,1));
-  await page.click("#undoBtn");
+  await page.click("#undoBtn");await page.evaluate(()=>window.AssetForgeAgent.waitForHistoryIdle());
   const afterUndo=await page.evaluate(()=>window.AssetForgeAgent.rasterSignature());
   expect(afterUndo,JSON.stringify({before,afterUndo})).toEqual(before);
-  await page.click("#redoBtn");
+  await page.click("#redoBtn");await page.evaluate(()=>window.AssetForgeAgent.waitForHistoryIdle());
   const afterRedo=await page.evaluate(()=>window.AssetForgeAgent.status());
   expect(afterRedo.selectedSize).toEqual({width:1,height:1});
-  await page.click("#undoBtn");
+  await page.click("#undoBtn");await page.evaluate(()=>window.AssetForgeAgent.waitForHistoryIdle());
   await page.click("#saveBtn");
   const projectData=await page.evaluate(()=>window.AssetForgeAgent.getLastProjectDataUrl());
   expect(projectData).toMatch(/^data:application\/json/);
@@ -243,7 +243,7 @@ test("AI cutout QA covers vehicle human and animal rasters in one model session"
     expect(audit.softEdgeFraction).toBeGreaterThan(0.0001);
     expect(audit.meanRgbDelta, JSON.stringify(audit)).toBeLessThan(2.5);
     if(kind==="vehicle"){
-      await page.click("#undoBtn");await page.click("#redoBtn");
+      await page.click("#undoBtn");await page.evaluate(()=>window.AssetForgeAgent.waitForHistoryIdle());await page.click("#redoBtn");await page.evaluate(()=>window.AssetForgeAgent.waitForHistoryIdle());
       await expect(page.locator("#props")).toBeVisible();
       await page.click("#refineMaskBtn");
       await expect(page.locator("#maskModal")).toBeVisible({timeout:5000});
