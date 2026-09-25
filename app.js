@@ -101,7 +101,8 @@ async function getBiRefNetEngine(){
 async function createBiRefNetMask(sourceBlob){
   const {RawImage}=await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm");
   const engine=await getBiRefNetEngine(),image=await RawImage.read(sourceBlob),inputs=await engine.processor(image),output=await engine.model({input_image:inputs.pixel_values});
-  const logits=output?.logits;if(!logits?.data||!logits?.dims)throw new Error("BiRefNet returned no logits");
+  let logits=output?.logits??output?.output??output?.predictions??output?.[0];
+  if(!logits?.data||!logits?.dims)throw new Error("BiRefNet returned no Tensor output; keys: "+(output&&typeof output==="object"?Object.keys(output).join(","):"unknown"));
   const dims=[...logits.dims],h=dims.at(-2),w=dims.at(-1);if(!h||!w)throw new Error("BiRefNet logits have invalid dimensions");
   const mask=document.createElement("canvas");mask.width=w;mask.height=h;const ctx=mask.getContext("2d",{willReadFrequently:true}),rgba=new Uint8ClampedArray(w*h*4),data=logits.data;
   for(let i=0;i<w*h;i++){const x=Number(data[i]);const a=Math.max(0,Math.min(1,1/(1+Math.exp(-x))));const v=Math.round(a*255);rgba[i*4]=255;rgba[i*4+1]=255;rgba[i*4+2]=255;rgba[i*4+3]=v}
