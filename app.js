@@ -358,7 +358,7 @@ function zoomBy(mult){
 }
 function refreshVault(){return renderVault()}
 window.AssetForgeAgent={
-  status:()=>{const o=canvas.getActiveObject(),el=o?.type==="image"?o.getElement():null;return {canvas:{width:canvas.width,height:canvas.height},objects:canvas.getObjects().length,selected:o?.name||null,selectedType:o?.type||null,selectedSize:el?{width:el.naturalWidth||o.width,height:el.naturalHeight||o.height}:null,zoom:canvas.getZoom(),github:!!github,backgroundRemovalError,frameSource:activeFrameSource};},
+  status:()=>{const o=canvas.getActiveObject(),el=o?.type==="image"?o.getElement():null;return {canvas:{width:canvas.width,height:canvas.height},objects:canvas.getObjects().length,selected:o?.name||null,selectedType:o?.type||null,selectedSize:el?{width:el.naturalWidth||o.width,height:el.naturalHeight||o.height}:null,selectedAssetId:o?.assetId||null,zoom:canvas.getZoom(),github:!!github,backgroundRemovalError,frameSource:activeFrameSource,historyDepth:history.length};},
   upload:addRasterBlob,
   removeBackground:removeBg,
   cropSelected:async(x,y,w,h)=>{const o=canvas.getActiveObject();if(!o||o.type!=="image")throw new Error("Select image");return imageFromCrop(o,x,y,w,h)},
