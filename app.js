@@ -114,13 +114,18 @@ async function getBiRefNetPipeline(){
 }
 async function createBiRefNetMask(sourceBlob){
   const pipe=await getBiRefNetPipeline();
-  const rgba=await pipe(sourceBlob);
-  if(!rgba?.data||!rgba.width||!rgba.height||rgba.channels!==4)throw new Error("Background-removal pipeline returned an invalid RGBA mask image");
+  const result=await pipe(sourceBlob);
+  const rgba=result?.channels===4?result:(typeof result?.rgba==="function"?result.rgba():result);
+  if(!rgba?.data||!rgba.width||!rgba.height)throw new Error("Background-removal pipeline returned no usable image");
+  const stride=Math.max(1,Math.floor(rgba.data.length/(rgba.width*rgba.height)));
+  if(stride<1)throw new Error("Background-removal pipeline returned an empty image");
   const mask=document.createElement("canvas");mask.width=rgba.width;mask.height=rgba.height;
-  const ctx=mask.getContext("2d",{willReadFrequently:true}),src=new Uint8ClampedArray(rgba.data),alpha=new Uint8ClampedArray(rgba.width*rgba.height);
-  for(let i=0,p=0;i<alpha.length;i++,p+=4)alpha[i]=src[p+3];
+  const ctx=mask.getContext("2d",{willReadFrequently:true}),src=new Uint8ClampedArray(rgba.data);
   const out=new ImageData(rgba.width,rgba.height),od=out.data;
-  for(let i=0,p=0;i<alpha.length;i++,p+=4){od[p]=255;od[p+1]=255;od[p+2]=255;od[p+3]=alpha[i]}
+  for(let i=0,p=0;i<rgba.width*rgba.height;i++,p+=4){
+    const si=i*stride;const a=stride>=4?src[si+3]:(stride===1?src[si]:Math.round((0.299*src[si]+0.587*src[si+Math.min(1,stride-1)]+0.114*src[si+Math.min(2,stride-1)])));
+    od[p]=255;od[p+1]=255;od[p+2]=255;od[p+3]=a
+  }
   ctx.putImageData(out,0,0);return{canvas:mask,width:rgba.width,height:rgba.height}
 }
 async function composeRawMask(sourceBlob,maskImage){
@@ -150,12 +155,17 @@ async function renderVault(){const d=await db(),r=d.transaction("assets","readon
 $("clearVaultBtn").onclick=async()=>{const d=await db();d.transaction("assets","readwrite").objectStore("assets").clear();renderVault()};
 
 async function selectedPng(){const b=await canvas.toBlob({format:"png",multiplier:1});if(!b)throw new Error("PNG export unavailable");lastBlob=b;return b}
-function download(blob,name){const a=document.createElement("a");const url=URL.createObjectURL(blob);a.href=url;a.download=name;a.style.display="none";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000)}
+function download(blob,name){
+  const a=document.createElement("a");a.download=name;a.style.display="none";document.body.appendChild(a);
+  if(blob.type==="application/json"){const textValue=typeof blob._assetForgeText==="string"?blob._assetForgeText:null;if(textValue!==null){a.href="data:application/json;charset=utf-8,"+encodeURIComponent(textValue)}else{a.href=URL.createObjectURL(blob)}}
+  else{a.href=URL.createObjectURL(blob)}
+  a.click();const url=a.href;a.remove();if(url.startsWith("blob:"))setTimeout(()=>URL.revokeObjectURL(url),3000)
+}
 async function exportSelectedManifest(){
   const o=selected();if(!o)return toast("Select an asset first");
   const el=imgElement(o);
   const meta={version:1,type:"game-asset",name:o.name||"asset",width:el?.naturalWidth||Math.round(o.getScaledWidth?.()||0),height:el?.naturalHeight||Math.round(o.getScaledHeight?.()||0),pivotX:o.pivotX??.5,pivotY:o.pivotY??.5,rotation:o.angle||0,opacity:o.opacity??1,tags:o.assetTags||[],sourceType:o.type};
-  download(new Blob([JSON.stringify(meta,null,2)],{type:"application/json"}),"asset-manifest.json");toast("Asset manifest exported")
+  const json=JSON.stringify(meta,null,2);const blob=new Blob([json],{type:"application/json"});Object.defineProperty(blob,"_assetForgeText",{value:json});download(blob,"asset-manifest.json");toast("Asset manifest exported")
 }
 $("exportBtn").onclick=async()=>{try{const b=await selectedPng(),o=canvas.getActiveObject(),name=((o?.name||"asset").replace(/\.[^.]+$/,"")||"asset")+".png";download(b,name);await vaultPut(b,name);toast("PNG exported")}catch(e){console.error(e);toast("Export failed")}};$("assetManifestBtn").onclick=exportSelectedManifest;
 
@@ -186,7 +196,7 @@ async function packFrames(){
  const blob=await new Promise(res=>out.toBlob(res,"image/png",1));download(blob,"sprite-sheet.png");await vaultPut(blob,"sprite-sheet.png");const fps=Math.max(1,+$("fps").value||12);await exportSpriteManifest({version:1,type:"sprite-sheet",columns:cols,rows,frameCount:count,frameWidth:cw,frameHeight:ch,gap,padding:pad,fps,frameDurationMs:1000/fps,frames:Array.from({length:count},(_,i)=>({index:i,x:pad+(i%cols)*(cw+gap),y:pad+Math.floor(i/cols)*(ch+gap),width:cw,height:ch,durationMs:1000/fps}))});toast(count+" frames packed into raster sprite sheet")
 }
 async function exportSpriteManifest(meta){
-  const blob=new Blob([JSON.stringify(meta,null,2)],{type:"application/json"});download(blob,"sprite-sheet.json")
+  const json=JSON.stringify(meta,null,2);const blob=new Blob([json],{type:"application/json"});Object.defineProperty(blob,"_assetForgeText",{value:json});download(blob,"sprite-sheet.json")
 }
 $("sheetBtn").onclick=async()=>{try{await packFrames()}catch(e){console.error(e);toast(e.message||"Sprite sheet packing failed")}};
 $("undoBtn").onclick=async()=>{if(history.length<2)return;future.push(history.pop());await restore(history.at(-1))};$("redoBtn").onclick=async()=>{const n=future.pop();if(n){history.push(n);await restore(n)}};
