@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https:; font-src 'self' data:; media-src 'self' blob:;">
 <meta name="theme-color" content="#0a0f1a">
 <meta name="description" content="Asset Forge Studio — professional raster game-asset editor"><link rel="manifest" href="./manifest.webmanifest">
 <title>Asset Forge Studio</title>
@@ -131,7 +133,7 @@
 
 <div id="maskModal" class="modal hidden"><div class="modal-card mask-card"><div class="modal-head"><h3>Refine cutout mask</h3><button data-close="maskModal">×</button></div><div class="mask-toolbar"><button id="maskEraseBtn" class="mask-mode active">Erase</button><button id="maskRestoreBtn" class="mask-mode">Restore</button><label>Size<input id="maskSize" type="range" min="4" max="240" value="50"></label><label>Softness<input id="maskSoft" type="range" min="0" max="40" value="12"></label></div><div class="mask-stage"><canvas id="maskCanvas"></canvas></div><div class="modal-help">Paint over the mask. Erase removes pixels; Restore brings the original image back. The original raster is preserved underneath.</div><div class="modal-actions"><button data-close="maskModal">Cancel</button><button id="applyMask" class="primary">Apply mask</button></div></div></div>
 
-<div id="githubModal" class="modal hidden"><div class="modal-card"><div class="modal-head"><h3>GitHub Asset Vault</h3><button data-close="githubModal">×</button></div><p class="modal-help">Token stays in memory only. Fine-grained token: Contents → Read and write.</p><label class="field">Repository<input id="repoName" value="venom3-byte/Project1"></label><div class="grid2"><label class="field">Branch<input id="repoBranch" value="main"></label><label class="field">Folder<input id="repoFolder" value="assets"></label></div><label class="field">Token<input id="repoToken" type="password" autocomplete="off"></label><div class="modal-actions"><button data-close="githubModal">Cancel</button><button id="refreshRepoBtn">Load repository assets</button><button id="connectRepoBtn" class="primary">Connect</button></div></div></div>
+<div id="githubModal" class="modal hidden"><div class="modal-card"><div class="modal-head"><h3>GitHub Asset Vault</h3><button data-close="githubModal">×</button></div><p class="modal-help">GitHub access is handled by the local Asset Forge server. The browser never receives a GitHub token. Start the server with <code>GITHUB_TOKEN</code> configured.</p><label class="field">Repository<input id="repoName" value="venom3-byte/Project1"></label><div class="grid2"><label class="field">Branch<input id="repoBranch" value="main"></label><label class="field">Folder<input id="repoFolder" value="assets"></label></div><div class="modal-actions"><button data-close="githubModal">Cancel</button><button id="refreshRepoBtn">Load repository assets</button><button id="connectRepoBtn" class="primary">Connect</button></div></div></div>
 
 <div id="toast"></div>
 <script type="module" src="./app.js?v=5"></script>
