@@ -157,6 +157,9 @@ test("game asset manifest export works",async({page})=>{
   await page.goto("/");
   await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
   await expect(page.locator("#props")).toBeVisible();
-  const [download]=await Promise.all([page.waitForEvent("download",{timeout:30000}),page.click("#assetManifestBtn")]);
-  expect(download.suggestedFilename()).toBe("asset-manifest.json");
+  await page.click("#assetManifestBtn");
+  const dl=await page.evaluate(()=>window.AssetForgeAgent.getLastDownload());
+  expect(dl?.name).toBe("asset-manifest.json");
+  expect(dl?.type).toBe("application/json");
+  expect(dl?.href.startsWith("data:application/json")).toBeTruthy();
 });
