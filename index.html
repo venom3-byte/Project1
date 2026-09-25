@@ -7,6 +7,7 @@
 <meta name="description" content="Asset Forge Studio — professional raster game-asset editor"><link rel="manifest" href="./manifest.webmanifest">
 <title>Asset Forge Studio</title>
 <link rel="stylesheet" href="./styles.css?v=5">
+<link rel="stylesheet" href="./pro.css?v=1">
 <script src="https://cdn.jsdelivr.net/npm/fabric@7.4.0/dist/index.min.js"></script>
 </head>
 <body>
@@ -35,7 +36,7 @@
     <button class="tool" id="cropBtn">⌗ <span>Crop image</span></button>
     <button class="tool" id="trimBtn">◩ <span>Trim transparency</span></button>
     <button class="tool" id="duplicateBtn">▣ <span>Duplicate layer</span></button>
-    <button class="tool" id="deleteBtn" class="danger">⌫ <span>Delete layer</span></button>
+    <button class="tool danger" id="deleteBtn">⌫ <span>Delete layer</span></button>
 
     <div class="tool-section-title">ADD</div>
     <button class="tool" id="textBtn">T <span>Text layer</span></button>
@@ -134,6 +135,7 @@
 
 <div id="toast"></div>
 <script type="module" src="./app.js?v=5"></script>
+<script type="module" src="./pro.js?v=1"></script>
 </div>
 </body>
 </html>
