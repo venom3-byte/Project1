@@ -9,7 +9,17 @@ const githubToken=()=>String(process.env.GITHUB_TOKEN||"").trim();
 const types={".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".json":"application/json; charset=utf-8",".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg",".webp":"image/webp",".avif":"image/avif"};
 
 function headers(extra={}){
-  return {"Cache-Control":"no-store","Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"content-type","Access-Control-Allow-Methods":"GET,PUT,OPTIONS",...extra};
+  return {"Cache-Control":"no-store",...extra};
+}
+function sameOrigin(req){
+  const origin=req.headers.origin;
+  if(!origin)return true;
+  try{
+    const u=new URL(origin);
+    const host=req.headers.host||"";
+    const h=new URL("http://"+host);
+    return u.hostname===h.hostname&&(u.port||"")===((h.port)||"");
+  }catch{return false}
 }
 function json(res,status,data){res.writeHead(status,headers({"Content-Type":"application/json; charset=utf-8"}));res.end(JSON.stringify(data))}
 function validRepo(repo){return typeof repo==="string"&&/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)}
@@ -31,7 +41,8 @@ async function bodyJson(req){
 const server=createServer(async(req,res)=>{
   try{
     const url=new URL(req.url||"/","http://127.0.0.1");
-    if(req.method==="OPTIONS"){res.writeHead(204,headers());return res.end()}
+    if(req.method==="OPTIONS"){if(!sameOrigin(req))return json(res,403,{message:"Cross-origin access denied"});res.writeHead(204,headers({"Allow":"GET,PUT,OPTIONS"}));return res.end()}
+    if(url.pathname.startsWith("/api/")&&!sameOrigin(req))return json(res,403,{message:"Cross-origin access denied"});
     if(url.pathname==="/api/github/status"){
       return json(res,200,{configured:Boolean(githubToken()),provider:"github",serverSideToken:true});
     }
