@@ -13,7 +13,7 @@ function fit(){const st=$("stage"),z=Math.min((st.clientWidth-48)/canvas.width,(
 window.addEventListener("resize",fit);
 
 async function addRasterBlob(blob,name="asset.png"){const url=URL.createObjectURL(blob);try{return await addRasterUrl(url,name)}finally{URL.revokeObjectURL(url)}}
-async function addRasterUrl(url,name="asset.png"){const img=await fabric.FabricImage.fromURL(url,{crossOrigin:"anonymous"}),w=+$("cw").value||1024,h=+$("ch").value||1024,s=Math.min((w*.82)/img.width,(h*.82)/img.height,1);img.set({left:(w-img.width*s)/2,top:(h-img.height*s)/2,scaleX:s,scaleY:s,name,angle:0});canvas.add(img);canvas.setActiveObject(img);canvas.renderAll();$("dropHint").style.display="none";snapshot();syncProps();return img}
+async function addRasterUrl(url,name="asset.png"){const img=await fabric.FabricImage.fromURL(url,{crossOrigin:"anonymous"}),w=+$("cw").value||1024,h=+$("ch").value||1024,s=Math.min((w*.82)/img.width,(h*.82)/img.height,1);img.set({left:(w-img.width*s)/2,top:(h-img.height*s)/2,scaleX:s,scaleY:s,name,angle:0,pivotX:.5,pivotY:.5,assetTags:[]});canvas.add(img);canvas.setActiveObject(img);canvas.renderAll();$("dropHint").style.display="none";snapshot();syncProps();return img}
 async function upload(file){if(!file)return;setStatus("Loading image…");try{await addRasterBlob(file,file.name);setStatus("Ready")}catch(e){console.error(e);toast("Image import failed");setStatus("Ready")}}
 $("uploadBtn").onclick=()=>$("fileInput").click();$("fileInput").onchange=e=>upload(e.target.files[0]);
 $("stage").ondragover=e=>{e.preventDefault();$("stage").classList.add("drop-active")};$("stage").ondragleave=()=>$("stage").classList.remove("drop-active");$("stage").ondrop=e=>{e.preventDefault();$("stage").classList.remove("drop-active");upload(e.dataTransfer.files[0])};
@@ -32,11 +32,11 @@ function renderLayers(){
     row.append(eye,name,pick);box.append(row)
   })
 }
-function syncProps(){const o=canvas.getActiveObject();$("propsEmpty").classList.toggle("hidden",!!o);$("props").classList.toggle("hidden",!o);if(!o){$("selectionInfo").textContent="No selection";return;}for(const [id,v] of [["px",o.left||0],["py",o.top||0],["pw",o.getScaledWidth()||0],["ph",o.getScaledHeight()||0],["prot",o.angle||0],["pop",o.opacity??1]])$(id).value=Math.round(v*100)/100;$("imageControls").classList.toggle("hidden",o.type!=="image")}
-function updateProps(){const o=canvas.getActiveObject();if(!o)return;o.set({left:+$("px").value||0,top:+$("py").value||0,angle:+$("prot").value||0,opacity:+$("pop").value});const w=+$("pw").value,h=+$("ph").value;if(w>0&&o.width)o.scaleX=w/o.width;if(h>0&&o.height)o.scaleY=h/o.height;canvas.requestRenderAll();snapshot()}
-["px","py","pw","ph","prot","pop"].forEach(id=>$(id).onchange=updateProps);
+function syncProps(){const o=canvas.getActiveObject();$("propsEmpty").classList.toggle("hidden",!!o);$("props").classList.toggle("hidden",!o);if(!o){$("selectionInfo").textContent="No selection";return;}$("layerName").value=o.name||"";for(const [id,v] of [["px",o.left||0],["py",o.top||0],["pw",o.getScaledWidth()||0],["ph",o.getScaledHeight()||0],["prot",o.angle||0],["pop",o.opacity??1],["pivotX",o.pivotX??.5],["pivotY",o.pivotY??.5]])$(id).value=Math.round(v*1000)/1000;$("imageControls").classList.toggle("hidden",o.type!=="image")}
+function updateProps(){const o=canvas.getActiveObject();if(!o)return;o.set({left:+$("px").value||0,top:+$("py").value||0,angle:+$("prot").value||0,opacity:+$("pop").value,pivotX:Math.max(0,Math.min(1,+$("pivotX").value??.5)),pivotY:Math.max(0,Math.min(1,+$("pivotY").value??.5))});const w=+$("pw").value,h=+$("ph").value;if(w>0&&o.width)o.scaleX=w/o.width;if(h>0&&o.height)o.scaleY=h/o.height;canvas.requestRenderAll();snapshot()}
+["px","py","pw","ph","prot","pop","pivotX","pivotY"].forEach(id=>$(id).onchange=updateProps);$("layerName").onchange=()=>{const o=selected();if(!o)return;o.name=$("layerName").value.trim()||"Layer";snapshot();renderLayers()};
 $("deleteBtn").onclick=()=>{const o=canvas.getActiveObject();if(o){canvas.remove(o);snapshot();syncProps()}};
-$("duplicateBtn").onclick=async()=>{const o=canvas.getActiveObject();if(!o)return toast("Select a layer first");$("duplicateBtn").disabled=true;try{const c=await o.clone(["name","assetId"]);c.set({left:(o.left||0)+20,top:(o.top||0)+20,name:(o.name||"asset")+"_copy",assetId:crypto.randomUUID()});canvas.add(c);canvas.setActiveObject(c);canvas.requestRenderAll();snapshot();syncProps();renderLayers();toast("Layer duplicated")}catch(e){console.error(e);toast("Duplicate failed: "+e.message)}finally{$("duplicateBtn").disabled=false}};
+$("duplicateBtn").onclick=async()=>{const o=canvas.getActiveObject();if(!o)return toast("Select a layer first");$("duplicateBtn").disabled=true;try{const c=await o.clone(["name","assetId"]);c.set({left:(o.left||0)+20,top:(o.top||0)+20,name:(o.name||"asset")+"_copy",assetId:crypto.randomUUID(),pivotX:o.pivotX??.5,pivotY:o.pivotY??.5});canvas.add(c);canvas.setActiveObject(c);canvas.requestRenderAll();snapshot();syncProps();renderLayers();toast("Layer duplicated")}catch(e){console.error(e);toast("Duplicate failed: "+e.message)}finally{$("duplicateBtn").disabled=false}};
 $("textBtn").onclick=()=>{const t=new fabric.IText("Game Asset",{left:100,top:100,fill:"#fff",fontSize:64,fontFamily:"Arial",fontWeight:"700"});canvas.add(t);canvas.setActiveObject(t);snapshot()};
 $("rectBtn").onclick=()=>{const r=new fabric.Rect({left:100,top:100,width:240,height:160,fill:"#3b82f6",rx:16,ry:16});canvas.add(r);canvas.setActiveObject(r);snapshot()};
 
@@ -157,7 +157,10 @@ async function packFrames(){
  if(!cw)cw=Math.max(...bitmaps.map(b=>b.width));if(!ch)ch=Math.max(...bitmaps.map(b=>b.height));
  const out=document.createElement("canvas");out.width=pad*2+cols*cw+(cols-1)*gap;out.height=pad*2+rows*ch+(rows-1)*gap;const ctx=out.getContext("2d");
  for(let i=0;i<count;i++){const b=bitmaps[i],s=Math.min(cw/b.width,ch/b.height,1),w=b.width*s,h=b.height*s,x=pad+(i%cols)*(cw+gap)+(cw-w)/2,y=pad+Math.floor(i/cols)*(ch+gap)+(ch-h)/2;ctx.drawImage(b,x,y,w,h);b.close()}
- const blob=await new Promise(res=>out.toBlob(res,"image/png",1));download(blob,"sprite-sheet.png");await vaultPut(blob,"sprite-sheet.png");toast(count+" frames packed into raster sprite sheet")
+ const blob=await new Promise(res=>out.toBlob(res,"image/png",1));download(blob,"sprite-sheet.png");await vaultPut(blob,"sprite-sheet.png");const fps=Math.max(1,+$("fps").value||12);await exportSpriteManifest({version:1,type:"sprite-sheet",columns:cols,rows,frameCount:count,frameWidth:cw,frameHeight:ch,gap,padding:pad,fps,frameDurationMs:1000/fps,frames:Array.from({length:count},(_,i)=>({index:i,x:pad+(i%cols)*(cw+gap),y:pad+Math.floor(i/cols)*(ch+gap),width:cw,height:ch,durationMs:1000/fps}))});toast(count+" frames packed into raster sprite sheet")
+}
+async function exportSpriteManifest(meta){
+  const blob=new Blob([JSON.stringify(meta,null,2)],{type:"application/json"});download(blob,"sprite-sheet.json");await vaultPut(blob,"sprite-sheet.json")
 }
 $("sheetBtn").onclick=async()=>{try{await packFrames()}catch(e){console.error(e);toast(e.message||"Sprite sheet packing failed")}};
 $("undoBtn").onclick=async()=>{if(history.length<2)return;future.push(history.pop());await restore(history.at(-1))};$("redoBtn").onclick=async()=>{const n=future.pop();if(n){history.push(n);await restore(n)}};
