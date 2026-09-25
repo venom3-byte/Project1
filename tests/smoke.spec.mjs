@@ -105,6 +105,7 @@ test("AI background removal operates on a real raster asset",async({page})=>{
   await page.click("#bgBtn");
   await expect(page.locator("#bgBtn")).toBeEnabled({timeout:160000});
   const bridge=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(bridge.backgroundRemovalError, bridge.backgroundRemovalError||"background removal produced no error").toBeFalsy();
   expect(bridge.selected).toMatch(/_cutout\.png$/);
   await expect(page.locator("#status")).toHaveText("Ready");
 });
