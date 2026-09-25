@@ -31,7 +31,7 @@ function installCropHandles(){
       e.preventDefault();e.stopPropagation();h.setPointerCapture(e.pointerId);
       const r=preview.getBoundingClientRect(),iw=+q("#cropW").dataset.iw||1,ih=+q("#cropH").dataset.ih||1;
       const sx=preview.clientWidth/iw,sy=preview.clientHeight/ih;
-      const x0=+$("cropX").value||0,y0=+$("cropY").value||0,w0=+$("cropW").value||iw,h0=+$("cropH").value||ih;
+      const x0=+q("#cropX").value||0,y0=+q("#cropY").value||0,w0=+q("#cropW").value||iw,h0=+q("#cropH").value||ih;
       const start={px:e.clientX,py:e.clientY,x:x0,y:y0,w:w0,h:h0};
       const move=ev=>{
         let dx=(ev.clientX-start.px)/Math.max(.0001,sx),dy=(ev.clientY-start.py)/Math.max(.0001,sy);
