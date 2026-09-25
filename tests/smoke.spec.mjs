@@ -14,6 +14,37 @@ test("editor boots without runtime console errors",async({page})=>{
   expect(bridge?.objects).toBe(0);
   expect(errors).toEqual([]);
 });
+test("raster history and saved project preserve actual image data",async({page})=>{
+  await page.goto("/");
+  await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
+  const before=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(before.objects).toBe(1);
+  expect(before.selectedType).toBe("image");
+  await page.click("#cropBtn");
+  await page.fill("#cropW","1"); await page.fill("#cropH","1"); await page.click("#applyCrop");
+  expect((await page.evaluate(()=>window.AssetForgeAgent.status())).objects).toBe(1);
+  await page.click("#undoBtn");
+  const afterUndo=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(afterUndo.objects).toBe(1);
+  expect(afterUndo.selectedType).toBe("image");
+  expect(afterUndo.selectedSize.width).toBeGreaterThan(0);
+  await page.click("#redoBtn");
+  const afterRedo=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(afterRedo.objects).toBe(1);
+  expect(afterRedo.selectedType).toBe("image");
+  await page.click("#saveBtn");
+  const projectData=await page.evaluate(()=>window.AssetForgeAgent.getLastProjectDataUrl());
+  expect(projectData).toMatch(/^data:application\/json/);
+  const projectBuffer=Buffer.from(projectData.split(",")[1],"base64");
+  await page.setInputFiles("#projectInput",{name:"roundtrip.asset-forge.json",mimeType:"application/json",buffer:projectBuffer});
+  await expect(page.locator("#toast")).toContainText("Project opened");
+  const reopened=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(reopened.objects).toBe(1);
+  expect(reopened.selectedType).toBe("image");
+  expect(reopened.selectedSize.width).toBe(1);
+  expect(reopened.selectedSize.height).toBe(1);
+});
+
 test("raster import, crop, trim, undo/redo and export remain functional",async({page})=>{
   await page.goto("/");
   await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
