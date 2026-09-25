@@ -124,7 +124,6 @@ $("newBtn").onclick=()=>{canvas.clear();history=[];future=[];snapshot();$("dropH
 $("saveBtn").onclick=()=>{const data={version:2,width:+$("cw").value,height:+$("ch").value,canvas:canvas.toJSON(["name","assetId"])};download(new Blob([JSON.stringify(data)],{type:"application/json"}),"asset-forge-project.json");toast("Project saved")};
 $("openBtn").onclick=()=>$("projectInput").click();$("projectInput").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());$("cw").value=d.width;$("ch").value=d.height;resizeEditor();await restore(JSON.stringify(d.canvas));$("dropHint").style.display="none";toast("Project opened")}catch(err){console.error(err);toast("Project file invalid")}};
 $("applySize").onclick=()=>{resizeEditor();snapshot()};
-function togglePanel(id){$(id).classList.toggle("open")};$("toolsToggle").onclick=()=>togglePanel("toolPanel");$("propsToggle").onclick=()=>togglePanel("propsPanel");
 
 function closeSheets(){document.querySelectorAll(".sidebar.open").forEach(x=>x.classList.remove("open"))}
 function toggleSheet(id){$(id)?.classList.toggle("open")}
