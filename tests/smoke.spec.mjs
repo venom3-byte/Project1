@@ -36,14 +36,14 @@ test("frame extraction creates actual frame assets and sheet packing uses extrac
   await page.click("#framesBtn");
   await expect(page.locator("#toast")).toContainText("2 frames extracted and ready to pack");
   await page.click("#sheetBtn");
-  await expect(page.locator("#toast")).toContainText("2 frame(s) packed into raster sheet");
+  await expect(page.locator("#toast")).toContainText("2 frames packed into raster sprite sheet");
 });
 test("missing sprite selection is rejected cleanly",async({page})=>{
   await page.goto("/");
   await page.click("#framesBtn");
   await expect(page.locator("#toast")).toContainText("Select a sprite sheet image first");
   await page.click("#sheetBtn");
-  await expect(page.locator("#toast")).toContainText("Extract frames first");
+  await expect(page.locator("#toast")).toContainText("Add animation frames or extract frames first");
 });
 test("mobile bottom sheets scroll and open without layout errors",async({page})=>{
   await page.setViewportSize({width:390,height:844});
@@ -51,7 +51,7 @@ test("mobile bottom sheets scroll and open without layout errors",async({page})=
   await page.click('button[data-sheet="toolPanel"]');
   await expect(page.locator("#toolPanel")).toHaveClass(/open/);
   await page.locator("#toolPanel").evaluate(el=>{el.scrollTop=el.scrollHeight});
-  const scroll=await page.locator("#toolPanel").evaluate(el=>({top:el.scrollTop,height:el.scrollHeight-clientHeight}));
+  const scroll=await page.locator("#toolPanel").evaluate(el=>({top:el.scrollTop,height:el.scrollHeight-el.clientHeight}));
   expect(scroll.top).toBeGreaterThan(0);
   await page.click('button[data-sheet="propsPanel"]');
   await expect(page.locator("#propsPanel")).toHaveClass(/open/);
@@ -116,9 +116,9 @@ test("duplicate creates a second visible layer and layer actions work",async({pa
   await page.goto("/");
   await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
   await page.click("#duplicateBtn");
+  await expect(page.locator("#layerCount")).toHaveText("2");
   const bridge=await page.evaluate(()=>window.AssetForgeAgent.status());
   expect(bridge.objects).toBe(2);
-  expect(await page.locator("#layerCount").textContent()).toBe("2");
   await page.click("#frontBtn");
   await page.click("#downBtn");
   expect((await page.evaluate(()=>window.AssetForgeAgent.status())).objects).toBe(2);
