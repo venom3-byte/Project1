@@ -103,6 +103,7 @@ test("final raster QA preview processes the real photo",async({page})=>{
 test("duplicate creates a second visible layer and layer actions work",async({page})=>{
   await page.goto("/");
   await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
+  await expect(page.locator("#props")).toBeVisible();
   await page.click("#duplicateBtn");
   await expect(page.locator("#layerCount")).toHaveText("2");
   const bridge=await page.evaluate(()=>window.AssetForgeAgent.status());
@@ -154,6 +155,7 @@ test("AI cutout QA covers vehicle human and animal rasters in one model session"
 test("game asset manifest export works",async({page})=>{
   await page.goto("/");
   await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
+  await expect(page.locator("#props")).toBeVisible();
   const [download]=await Promise.all([page.waitForEvent("download"),page.click("#assetManifestBtn")]);
   expect(download.suggestedFilename()).toBe("asset-manifest.json");
 });
