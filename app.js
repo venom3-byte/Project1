@@ -4,6 +4,7 @@ const selected=()=>canvas.getActiveObject();
 const cutoutRecordsById=new Map();
 const canvas=new fabric.Canvas("editorCanvas",{preserveObjectStacking:true,selection:true,allowTouchScrolling:false,enableRetinaScaling:true,stopContextMenu:true});
 let history=[],future=[],restoring=false,cropTarget=null,github=null,lastBlob=null,recentFrames=[],frameLibrary=[],activeFrameSource=null,backgroundRemovalError=null;
+let historyBusyPromise=Promise.resolve();
 const state={name:"Untitled Asset",canvasWidth:1024,canvasHeight:1024};
 let pivotTransformGuard=false;
 const degRad=d=>d*Math.PI/180;
@@ -272,13 +273,22 @@ async function exportSpriteManifest(meta){
   const json=JSON.stringify(meta,null,2);const blob=new Blob([json],{type:"application/json"});Object.defineProperty(blob,"_assetForgeText",{value:json});download(blob,"sprite-sheet.json","spriteManifest")
 }
 $("sheetBtn").onclick=async()=>{try{await packFrames()}catch(e){console.error(e);toast(e.message||"Sprite sheet packing failed")}};
-$("undoBtn").onclick=async()=>{
-  if(history.length<2)return;
-  const current=history.pop();
-  while(history.length>1&&history.at(-1)===current)history.pop();
-  future.push(current);
-  await restore(history.at(-1));
-};$("redoBtn").onclick=async()=>{const n=future.pop();if(n){history.push(n);await restore(n)}};
+$("undoBtn").onclick=()=>{
+  historyBusyPromise=(async()=>{
+    if(history.length<2)return;
+    const current=history.pop();
+    while(history.length>1&&history.at(-1)===current)history.pop();
+    future.push(current);
+    await restore(history.at(-1));
+  })();
+  return historyBusyPromise;
+};$("redoBtn").onclick=()=>{
+  historyBusyPromise=(async()=>{
+    const n=future.pop();
+    if(n){history.push(n);await restore(n)}
+  })();
+  return historyBusyPromise;
+};
 $("newBtn").onclick=()=>{canvas.clear();history=[];future=[];snapshot();$("dropHint").style.display="block";$("docName").textContent="Untitled Asset";toast("New asset")};
 $("saveBtn").onclick=()=>{const data={version:3,width:+$("cw").value,height:+$("ch").value,canvas:canvas.toJSON(["name","assetId","pivotX","pivotY","assetTags","cutoutRecordId","cutoutSourceDataUrl","cutoutMaskDataUrl"])};const projectBlob=new Blob([JSON.stringify(data)],{type:"application/json"});download(projectBlob,"asset-forge-project.json","project");toast("Project saved")};
 $("openBtn").onclick=()=>$("projectInput").click();$("projectInput").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());$("cw").value=d.width;$("ch").value=d.height;resizeEditor();await restore(JSON.stringify(d.canvas));$("dropHint").style.display="none";toast("Project opened")}catch(err){console.error(err);toast("Project file invalid")}};
@@ -412,6 +422,7 @@ function zoomBy(mult){
 }
 function refreshVault(){return renderVault()}
 window.AssetForgeAgent={
+  waitForHistoryIdle:()=>historyBusyPromise,
   status:()=>{const o=canvas.getActiveObject(),el=o?.type==="image"?o.getElement():null;return {canvas:{width:canvas.width,height:canvas.height},objects:canvas.getObjects().length,selected:o?.name||null,selectedType:o?.type||null,selectedSize:el?{width:el.naturalWidth||o.width,height:el.naturalHeight||o.height}:null,selectedAssetId:o?.assetId||null,selectedCutoutRecordId:o?.cutoutRecordId||null,recordAvailable:o?.cutoutRecordId?cutoutRecordsById.has(o.cutoutRecordId):false,zoom:canvas.getZoom(),github:!!github,backgroundRemovalError,frameSource:activeFrameSource,historyDepth:history.length,historyStateSummary:history.slice(-5).map(j=>{try{const d=JSON.parse(j),objs=d.objects||[];return objs.map(x=>({type:x.type,name:x.name,width:x.width,height:x.height,assetId:x.assetId,srcLength:(x.src||"").length}))}catch{return []}})}},
   upload:addRasterBlob,
   removeBackground:removeBg,
