@@ -261,7 +261,13 @@ async function exportSpriteManifest(meta){
   const json=JSON.stringify(meta,null,2);const blob=new Blob([json],{type:"application/json"});Object.defineProperty(blob,"_assetForgeText",{value:json});download(blob,"sprite-sheet.json","spriteManifest")
 }
 $("sheetBtn").onclick=async()=>{try{await packFrames()}catch(e){console.error(e);toast(e.message||"Sprite sheet packing failed")}};
-$("undoBtn").onclick=async()=>{if(history.length<2)return;future.push(history.pop());await restore(history.at(-1))};$("redoBtn").onclick=async()=>{const n=future.pop();if(n){history.push(n);await restore(n)}};
+$("undoBtn").onclick=async()=>{
+  if(history.length<2)return;
+  const current=history.pop();
+  while(history.length>1&&history.at(-1)===current)history.pop();
+  future.push(current);
+  await restore(history.at(-1));
+};$("redoBtn").onclick=async()=>{const n=future.pop();if(n){history.push(n);await restore(n)}};
 $("newBtn").onclick=()=>{canvas.clear();history=[];future=[];snapshot();$("dropHint").style.display="block";$("docName").textContent="Untitled Asset";toast("New asset")};
 $("saveBtn").onclick=()=>{const data={version:3,width:+$("cw").value,height:+$("ch").value,canvas:canvas.toJSON(["name","assetId","pivotX","pivotY","assetTags","cutoutRecordId","cutoutSourceDataUrl","cutoutMaskDataUrl"])};const projectBlob=new Blob([JSON.stringify(data)],{type:"application/json"});download(projectBlob,"asset-forge-project.json","project");toast("Project saved")};
 $("openBtn").onclick=()=>$("projectInput").click();$("projectInput").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());$("cw").value=d.width;$("ch").value=d.height;resizeEditor();await restore(JSON.stringify(d.canvas));$("dropHint").style.display="none";toast("Project opened")}catch(err){console.error(err);toast("Project file invalid")}};
@@ -278,8 +284,27 @@ $("mobileImportBtn")?.addEventListener("click",()=>$("fileInput").click());
 $("mobileSpriteBtn")?.addEventListener("click",()=>{toggleSheet("toolPanel");setTimeout(()=>$("framesInput")?.click(),120)});
 let maskEditor=null,maskMode="erase";
 async function hydrateCutoutRecords(){cutoutRecordsById.clear();for(const o of canvas.getObjects()){if(!o.cutoutRecordId||!o.cutoutSourceDataUrl||!o.cutoutMaskDataUrl)continue;try{const sourceBlob=await dataUrlToBlob(o.cutoutSourceDataUrl),img=await createImageBitmap(sourceBlob),maskImg=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=o.cutoutMaskDataUrl}),maskCanvas=document.createElement("canvas");maskCanvas.width=maskImg.naturalWidth||maskImg.width;maskCanvas.height=maskImg.naturalHeight||maskImg.height;maskCanvas.getContext("2d").drawImage(maskImg,0,0);img.close();cutoutRecordsById.set(o.cutoutRecordId,{sourceBlob,maskCanvas})}catch(e){console.warn("Could not restore cutout metadata",e)}}}
+async function ensureCutoutRecord(o){
+  if(!o?.cutoutRecordId||!o.cutoutSourceDataUrl||!o.cutoutMaskDataUrl)return null;
+  const existing=cutoutRecordsById.get(o.cutoutRecordId);
+  if(existing)return existing;
+  try{
+    const sourceBlob=await dataUrlToBlob(o.cutoutSourceDataUrl);
+    const maskImg=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=o.cutoutMaskDataUrl});
+    const maskCanvas=document.createElement("canvas");
+    maskCanvas.width=maskImg.naturalWidth||maskImg.width;
+    maskCanvas.height=maskImg.naturalHeight||maskImg.height;
+    maskCanvas.getContext("2d").drawImage(maskImg,0,0);
+    const record={sourceBlob,maskCanvas};
+    cutoutRecordsById.set(o.cutoutRecordId,record);
+    return record;
+  }catch(e){
+    console.warn("Could not rebuild cutout record",e);
+    return null;
+  }
+}
 async function openMaskRefine(){
- const o=selected(),rec=o&&cutoutRecordsById.get(o.cutoutRecordId);if(!rec)return toast("Select an AI cutout layer first");
+ const o=selected(),rec=await ensureCutoutRecord(o);if(!rec)return toast("Select an AI cutout layer first");
  const src=await createImageBitmap(rec.sourceBlob);maskEditor={source:src,mask:rec.maskCanvas,scale:1,drawing:false};
  const view=$("maskCanvas"),max=760,scale=Math.min(max/src.width,max/src.height,1);maskEditor.scale=scale;view.width=Math.max(1,Math.round(src.width*scale));view.height=Math.max(1,Math.round(src.height*scale));
  renderMaskEditor();$("maskModal").classList.remove("hidden")
