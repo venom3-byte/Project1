@@ -1,11 +1,24 @@
 # Asset Forge Studio
 
-Raster-first browser asset editor and game-asset pipeline.
+Raster-first game asset editor and asset pipeline.
 
-Current build: raster import, drag/drop, canvas resize, selection, transform properties, opacity, text, shape primitives, duplicate, undo/redo, raster filters, browser AI background removal, local Asset Vault using IndexedDB, project JSON save/open, PNG export and raster sprite-sheet export.
+Implemented in this build:
+- Raster PNG/JPEG/WebP/AVIF import and drag/drop.
+- Real crop applied to the selected source image.
+- Real transparent-pixel trimming.
+- AI background removal through the browser.
+- Non-destructive visual filters with reset.
+- Transform, opacity, duplication, text and shape layers.
+- Undo/redo and project JSON save/open.
+- Local Asset Vault with persistent IndexedDB storage.
+- Raster frame extraction from a selected sprite sheet.
+- Raster sprite-sheet export.
+- GitHub Contents API vault synchronization using a fine-grained token held in memory only.
+- Responsive mobile layout with side drawers.
+- No SVG artwork or programmatic SVG drawing.
 
-No SVG artwork is used or generated.
+The editor intentionally keeps artwork raster-based. Fabric.js is used for the interactive canvas model; it is MIT licensed. citeturn961956search1
 
-Research basis: Canva editing APIs, Photopea scripting/API, Fabric.js, PixiJS, browser OffscreenCanvas/Web Workers, WebGPU, and current browser background-removal implementations.
+Background-removal licensing is deliberately not hidden: the current browser provider is included as a functional integration for testing, but its model/package licensing must be cleared before commercial distribution. BRIA's RMBG 1.4 is non-commercial by default, and rembg itself is MIT while model licenses can differ. citeturn811845search1turn827818search0
 
-Commercial note: the current AI background-removal dependency is @imgly/background-removal and its package is AGPL-licensed. Replace it with a commercially compatible model/library before commercial distribution unless the distribution model complies with that license.
+ONNX Runtime Web supports browser WASM and WebGPU execution paths for local inference, which is the intended direction for a production-cleared segmentation backend. citeturn654473search0turn654473search4
