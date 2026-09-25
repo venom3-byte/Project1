@@ -90,7 +90,7 @@ async function blobFromObject(o){
 }
 async function detectInferenceConfig(){
   if(!navigator.gpu||!window.isSecureContext)return {device:"wasm",dtype:"q8"};
-  try{const adapter=await navigator.gpu.requestAdapter();if(!adapter)return{device:"wasm",dtype:"fp32"};return{device:"webgpu",dtype:adapter.features?.has?.("shader-f16")?"fp16":"fp32"}}catch{return{device:"wasm",dtype:"fp32"}}
+  try{const adapter=await navigator.gpu.requestAdapter();if(!adapter)return{device:"wasm",dtype:"q8"};return{device:"webgpu",dtype:adapter.features?.has?.("shader-f16")?"fp16":"fp32"}}catch{return{device:"wasm",dtype:"fp32"}}
 }
 async function getBackgroundPipeline(){
   if(backgroundPipeline)return backgroundPipeline;
@@ -126,7 +126,7 @@ async function removeBg(){
   try{
     const sourceBlob=await blobFromObject(o);setStatus("ISNet high-quality segmentation…");
     const pipe=await getBackgroundPipeline();const rawResult=await pipe(sourceBlob);const result=Array.isArray(rawResult)?rawResult[0]:rawResult;
-    const {maskCanvas}=await extractAlphaFromRawImage(result);setStatus("Applying original RGB + BEN2 alpha matte…");
+    const {maskCanvas}=await extractAlphaFromRawImage(result);setStatus("Applying original RGB + ISNet alpha matte…");
     const source=await createImageBitmap(sourceBlob),w=source.width,h=source.height,out=document.createElement("canvas");out.width=w;out.height=h;
     const octx=out.getContext("2d",{willReadFrequently:true}),mctx=maskCanvas.getContext("2d",{willReadFrequently:true});
     const scaled=document.createElement("canvas");scaled.width=w;scaled.height=h;const sctx=scaled.getContext("2d",{willReadFrequently:true});sctx.drawImage(maskCanvas,0,0,w,h);
