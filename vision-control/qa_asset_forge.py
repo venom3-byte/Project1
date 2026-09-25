@@ -47,7 +47,10 @@ def main():
         missing = sorted(required - interactive_ids)
         assert not missing, f"Required editor controls missing: {missing}"
 
-        if first["analysis"]["signals"]["console_errors"]:\n        raise AssertionError("Console errors detected: " + repr(first["analysis"]["console_errors"][:3]))\n\n    report = {
+        if first["analysis"]["signals"]["console_errors"]:
+            raise AssertionError("Console errors detected: " + repr(first["analysis"]["signals"]["console_errors"][:3]))
+
+        report = {
             "ok": True,
             "url": agent.page.url,
             "mobile_initial": first,
