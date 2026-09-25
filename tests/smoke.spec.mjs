@@ -165,3 +165,41 @@ test("game asset manifest export works",async({page})=>{
   expect(dl?.type).toBe("application/json");
   expect(dl?.href.startsWith("data:application/json")).toBeTruthy();
 });
+
+test("real sprite sheet remote import background trim and exact crop",async({page})=>{
+  test.setTimeout(300000);
+  const url="https://raw.githubusercontent.com/Aelof3/sprite-sheet-generator/main/docs/images/06-fullsheet.png";
+  await page.goto("/");
+  await page.click("#urlBtn");
+  await page.fill("#imageUrl",url);
+  await page.click("#loadUrlBtn");
+  await expect(page.locator("#props")).toBeVisible({timeout:30000});
+  let status=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(status.selectedType).toBe("image");
+  expect(status.selectedSize.width).toBeGreaterThan(100);
+  expect(status.selectedSize.height).toBeGreaterThan(100);
+
+  await page.click("#bgBtn");
+  await expect(page.locator("#status")).toHaveText("Ready",{timeout:240000});
+  const afterBg=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(afterBg.backgroundRemovalError||"").toBe("");
+
+  await page.click("#trimBtn");
+  await expect(page.locator("#toast")).toContainText("Transparent bounds trimmed");
+  const trimmed=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(trimmed.selectedSize.width).toBeGreaterThan(20);
+  expect(trimmed.selectedSize.height).toBeGreaterThan(20);
+
+  const cropW=Math.floor(trimmed.selectedSize.width/2);
+  const cropH=Math.floor(trimmed.selectedSize.height/2);
+  await page.evaluate(({w,h})=>window.AssetForgeAgent.cropSelected(0,0,w,h),{w:cropW,h:cropH});
+  const cropped=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(cropped.selectedSize.width).toBe(cropW);
+  expect(cropped.selectedSize.height).toBe(cropH);
+
+  await page.fill("#cols","2");await page.fill("#rows","2");
+  await page.click("#framesBtn");
+  await expect(page.locator("#toast")).toContainText("4 frames extracted and ready");
+  await page.click("#sheetBtn");
+  await expect(page.locator("#toast")).toContainText("4 frames packed into raster sprite sheet");
+});
