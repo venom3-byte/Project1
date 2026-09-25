@@ -149,3 +149,10 @@ test("AI cutout QA covers vehicle human and animal rasters in one model session"
   const finalState=await page.evaluate(()=>window.AssetForgeAgent.status());
   expect(finalState.objects).toBe(3);
 });
+
+test("game asset manifest export works",async({page})=>{
+  await page.goto("/");
+  await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
+  const [download]=await Promise.all([page.waitForEvent("download"),page.click("#assetManifestBtn")]);
+  expect(download.suggestedFilename()).toBe("asset-manifest.json");
+});
