@@ -108,14 +108,8 @@ jobs:
             echo 'CI prerequisite jobs: SUCCESS'
             echo 'This file is generated from the tracked text source files. Binary/generated outputs are excluded.'
             echo
-            for f in \\
-              .github/workflows/pages.yml \\
-              .github/workflows/proof.yml \\
-              README.md app.js demo.html index.html live-vision.css live-vision.js \\
-              manifest.webmanifest package.json playwright.config.mjs pro.css pro.js server.mjs styles.css \\
-              tests/smoke.spec.mjs vision-control/README.md vision-control/qa_asset_forge.py \\
-              vision-control/requirements.txt vision-control/vision_agent.py
-            do
+            for f in .github/workflows/pages.yml .github/workflows/proof.yml README.md app.js demo.html index.html live-vision.css live-vision.js manifest.webmanifest package.json playwright.config.mjs pro.css pro.js server.mjs styles.css tests/smoke.spec.mjs vision-control/README.md vision-control/qa_asset_forge.py vision-control/requirements.txt vision-control/vision_agent.py
+          do
               echo "===== FILE: $f ====="
               cat "$f"
               echo
