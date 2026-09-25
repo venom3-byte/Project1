@@ -63,6 +63,8 @@ test("mobile bottom sheets scroll and open without layout errors",async({page})=
   await page.locator("#toolPanel").evaluate(el=>{el.scrollTop=el.scrollHeight});
   const scroll=await page.locator("#toolPanel").evaluate(el=>({top:el.scrollTop,height:el.scrollHeight-el.clientHeight}));
   expect(scroll.top).toBeGreaterThan(0);
+  await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
+  await page.click("#mobileExportBtn"); await expect(page.locator("#toast")).toContainText("PNG exported");
   await page.click('button[data-sheet="propsPanel"]');
   await expect(page.locator("#propsPanel")).toHaveClass(/open/);
   await page.locator("#propsPanel").evaluate(el=>{el.scrollTop=el.scrollHeight});
@@ -115,7 +117,6 @@ test("duplicate creates a second visible layer and layer actions work",async({pa
   await expect(page.locator("#props")).toBeVisible();
   await page.click("#fitBtn"); await page.click("#zoomInBtn"); await page.click("#zoomOutBtn");
   await page.click("#urlBtn"); await expect(page.locator("#urlModal")).toBeVisible(); await page.click('[data-close="urlModal"]');
-  await page.click("#mobileExportBtn"); await expect(page.locator("#toast")).toContainText("PNG exported");
   await page.evaluate(()=>window.AssetForgeAgent.execute({op:"duplicate"}));
   await expect(page.locator("#toast")).toContainText("Duplicated as a distinct layer");
   await expect(page.locator("#layerCount")).toHaveText("2");
@@ -216,7 +217,7 @@ test("real white-background sprite sheet import background removal trim and exac
   await expect(page.locator("#toast")).toContainText("4 frames extracted and ready");
   await page.click("#sheetBtn");
   await expect(page.locator("#toast")).toContainText("4 frames packed into raster sprite sheet");
-  const spriteData=await page.evaluate(()=>window.AssetForgeAgent.getLastDownloadDataUrl());
+  const spriteData=await page.evaluate(()=>window.AssetForgeAgent.getLastSpriteSheetDataUrl());
   expect(spriteData).toMatch(/^data:image\/png;base64,/);
   fs.writeFileSync("tests/verified/real-sprite-sheet.png",Buffer.from(spriteData.split(",")[1],"base64"));
   fs.writeFileSync("tests/verified/real-sprite-sheet.json",JSON.stringify({
