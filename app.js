@@ -1,18 +1,20 @@
 const $=id=>document.getElementById(id);
 const selected=()=>canvas.getActiveObject();
-const cutoutRecords=new WeakMap();
+const cutoutRecordsById=new Map();
 const canvas=new fabric.Canvas("editorCanvas",{preserveObjectStacking:true,selection:true,allowTouchScrolling:false,enableRetinaScaling:true,stopContextMenu:true});
 let history=[],future=[],restoring=false,cropTarget=null,github=null,lastBlob=null,recentFrames=[],frameLibrary=[],backgroundRemovalError=null;
 const state={name:"Untitled Asset",canvasWidth:1024,canvasHeight:1024};
 const setStatus=s=>$("status").textContent=s;
 const toast=s=>{const t=$("toast");t.textContent=s;t.className="show";clearTimeout(window.__toast);window.__toast=setTimeout(()=>t.className="",2200)};
-function snapshot(){if(restoring)return;const j=JSON.stringify(canvas.toJSON(["name","assetId"]));if(history.at(-1)!==j){history.push(j);if(history.length>80)history.shift();future=[]}}
-async function restore(j){restoring=true;await canvas.loadFromJSON(JSON.parse(j));canvas.renderAll();syncProps();restoring=false}
+function snapshot(){if(restoring)return;const j=JSON.stringify(canvas.toJSON(["name","assetId","pivotX","pivotY","assetTags","cutoutRecordId","cutoutSourceDataUrl","cutoutMaskDataUrl"]));if(history.at(-1)!==j){history.push(j);if(history.length>80)history.shift();future=[]}}
+async function restore(j){restoring=true;await canvas.loadFromJSON(JSON.parse(j));await hydrateCutoutRecords();canvas.renderAll();syncProps();renderLayers();restoring=false}
 function resizeEditor(){const w=+$("cw").value||1024,h=+$("ch").value||1024;state.canvasWidth=w;state.canvasHeight=h;canvas.setDimensions({width:w,height:h});$("dimensions").textContent=w+" × "+h;fit()}
 function fit(){const st=$("stage"),z=Math.min((st.clientWidth-48)/canvas.width,(st.clientHeight-48)/canvas.height,1);canvas.setZoom(z);canvas.setDimensions({width:canvas.width*z,height:canvas.height*z},"cssOnly");$("zoomLabel").textContent=Math.round(z*100)+"%"}
 window.addEventListener("resize",fit);
 
-async function addRasterBlob(blob,name="asset.png"){const url=URL.createObjectURL(blob);try{return await addRasterUrl(url,name)}finally{URL.revokeObjectURL(url)}}
+async function blobToDataUrl(blob){return await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(blob)})}
+async function dataUrlToBlob(dataUrl){const r=await fetch(dataUrl);return r.blob()}
+async function addRasterBlob(blob,name="asset.png"){return addRasterUrl(await blobToDataUrl(blob),name)}
 async function addRasterUrl(url,name="asset.png"){const img=await fabric.FabricImage.fromURL(url,{crossOrigin:"anonymous"}),w=+$("cw").value||1024,h=+$("ch").value||1024,s=Math.min((w*.82)/img.width,(h*.82)/img.height,1);img.set({left:(w-img.width*s)/2,top:(h-img.height*s)/2,scaleX:s,scaleY:s,name,angle:0,pivotX:.5,pivotY:.5,assetTags:[]});canvas.add(img);canvas.setActiveObject(img);canvas.renderAll();$("dropHint").style.display="none";snapshot();syncProps();return img}
 async function upload(file){if(!file)return;setStatus("Loading image…");try{await addRasterBlob(file,file.name);setStatus("Ready")}catch(e){console.error(e);toast("Image import failed");setStatus("Ready")}}
 $("uploadBtn").onclick=()=>$("fileInput").click();$("fileInput").onchange=e=>upload(e.target.files[0]);
@@ -71,7 +73,7 @@ function applyFilters(){const o=canvas.getActiveObject();if(!o||o.type!=="image"
 ["brightness","contrast","saturation","blur"].forEach(id=>$(id).oninput=applyFilters);
 $("resetFilters").onclick=()=>{const o=canvas.getActiveObject();if(o?.type!=="image")return;o.filters=[];o.applyFilters();["brightness","contrast","saturation","blur"].forEach(id=>$(id).value=0);canvas.requestRenderAll();snapshot()};
 
-async function addReplacement(blob,old,name){const url=URL.createObjectURL(blob);try{const n=await fabric.FabricImage.fromURL(url);n.set({left:old.left,top:old.top,angle:old.angle,opacity:old.opacity,scaleX:old.scaleX,scaleY:old.scaleY,name});canvas.remove(old);canvas.add(n);canvas.setActiveObject(n);canvas.renderAll();snapshot();syncProps();await vaultPut(blob,name);lastBlob=blob;return n}finally{URL.revokeObjectURL(url)}}
+async function addReplacement(blob,old,name,meta={}){const dataUrl=await blobToDataUrl(blob),n=await fabric.FabricImage.fromURL(dataUrl);n.set({left:old.left,top:old.top,angle:old.angle,opacity:old.opacity,scaleX:old.scaleX,scaleY:old.scaleY,name,...meta});canvas.remove(old);canvas.add(n);canvas.setActiveObject(n);canvas.renderAll();snapshot();syncProps();await vaultPut(blob,name);lastBlob=blob;return n}
 async function imageFromCrop(obj,x,y,w,h){const src=obj.getElement(),out=document.createElement("canvas");out.width=w;out.height=h;out.getContext("2d").drawImage(src,x,y,w,h,0,0,w,h);const blob=await new Promise(r=>out.toBlob(r,"image/png",1));return addReplacement(blob,obj,(obj.name||"asset").replace(/\.[^.]+$/,"")+"_crop.png")}
 function updateCropBox(){if(!cropTarget)return;const img=$("cropPreview"),box=$("cropBox"),x=+$("cropX").value||0,y=+$("cropY").value||0,w=+$("cropW").value||1,h=+$("cropH").value||1,iw=cropTarget.getElement().naturalWidth||cropTarget.width,ih=cropTarget.getElement().naturalHeight||cropTarget.height,rw=img.clientWidth||1,rh=img.clientHeight||1,ox=(img.parentElement.clientWidth-rw)/2,oy=(img.parentElement.clientHeight-rh)/2;box.style.left=(ox+x/iw*rw)+"px";box.style.top=(oy+y/ih*rh)+"px";box.style.width=(w/iw*rw)+"px";box.style.height=(h/ih*rh)+"px"}
 function openCrop(){const o=canvas.getActiveObject();if(!o||o.type!=="image")return toast("Select an image first");cropTarget=o;const src=o.getElement();$("cropPreview").src=src.currentSrc||src.src;const iw=src.naturalWidth||o.width,ih=src.naturalHeight||o.height;$("cropX").value=0;$("cropY").value=0;$("cropW").value=iw;$("cropH").value=ih;$("cropModal").classList.remove("hidden");setTimeout(updateCropBox,50)}
@@ -100,7 +102,7 @@ async function getBackgroundPipeline(){
     const cfg=await detectInferenceConfig();
     setStatus("Loading ISNet INT8 background-removal model ("+cfg.device+" / "+cfg.dtype+")…");
     try{
-      const pipe=await pipeline("background-removal","xrds/isnet-general-onnx-int8",{device:cfg.device,dtype:cfg.device==="webgpu"?"q8":"q8"});
+      const pipe=await pipeline("background-removal","xrds/isnet-general-onnx-int8",{device:cfg.device,dtype:cfg.dtype});
       backgroundPipeline=pipe;return pipe
     }catch(e){
       if(cfg.device==="webgpu"){
@@ -114,7 +116,7 @@ async function getBackgroundPipeline(){
 }
 async function extractAlphaFromRawImage(raw){
   const rgba=typeof raw?.rgba==="function"?raw.rgba():raw;
-  if(!rgba?.width||!rgba?.height||!rgba?.data)throw new Error("BEN2 returned no usable RGBA image");
+  if(!rgba?.width||!rgba?.height||!rgba?.data)throw new Error("ISNet background-removal model returned no usable RGBA image");
   const w=rgba.width,h=rgba.height,stride=Math.max(1,Math.floor(rgba.data.length/(w*h))),data=new Uint8ClampedArray(rgba.data);
   const mask=document.createElement("canvas");mask.width=w;mask.height=h;const ctx=mask.getContext("2d",{willReadFrequently:true}),out=new ImageData(w,h),od=out.data;
   for(let i=0,p=0;i<w*h;i++,p+=4){let a=stride>=4?data[i*stride+3]:data[i*stride];if(a<=1)a*=255;a=Math.max(0,Math.min(255,a));od[p]=255;od[p+1]=255;od[p+2]=255;od[p+3]=a}
@@ -147,38 +149,38 @@ async function removeBg(){
     octx.putImageData(od,0,0);source.close();
     const blob=await new Promise((resolve,reject)=>out.toBlob(b=>b?resolve(b):reject(new Error("Could not encode cutout")),"image/png",1));
     const n=await addReplacement(blob,o,(o.name||"asset").replace(/\.[^.]+$/,"")+"_cutout.png",{cutoutSource:true});
-    const finalCanvas=document.createElement("canvas");finalCanvas.width=w;finalCanvas.height=h;const fc=finalCanvas.getContext("2d",{willReadFrequently:true});fc.drawImage(scaled,0,0);cutoutRecords.set(n,{sourceBlob,maskCanvas:finalCanvas});
+    const finalCanvas=document.createElement("canvas");finalCanvas.width=w;finalCanvas.height=h;const fc=finalCanvas.getContext("2d",{willReadFrequently:true});fc.drawImage(scaled,0,0);const sourceDataUrl=await blobToDataUrl(sourceBlob),maskDataUrl=finalCanvas.toDataURL("image/png"),recordId=crypto.randomUUID();n.set({cutoutRecordId:recordId,cutoutSourceDataUrl:sourceDataUrl,cutoutMaskDataUrl:maskDataUrl});cutoutRecordsById.set(recordId,{sourceBlob,maskCanvas:finalCanvas});snapshot();
     backgroundRemovalError=null;toast("ISNet high-quality cutout created — original RGB preserved");setStatus("Ready")
   }catch(e){backgroundRemovalError=e?.stack||e?.message||String(e);console.error("[AssetForge ISNet]",e);toast("AI cutout failed — original kept");setStatus("Ready")}
   finally{$("bgBtn").disabled=false;$("mobileBgBtn").disabled=false}
 }
 $("bgBtn").onclick=removeBg;$("mobileBgBtn").onclick=removeBg;
-function db(){return new Promise((res,rej)=>{const r=indexedDB.open("asset-forge-v2",1);r.onupgradeneeded=()=>r.result.createObjectStore("assets",{keyPath:"id"});r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+let dbPromise=null;function db(){if(dbPromise)return dbPromise;dbPromise=new Promise((res,rej)=>{const r=indexedDB.open("asset-forge-v2",1);r.onupgradeneeded=()=>r.result.createObjectStore("assets",{keyPath:"id"});r.onsuccess=()=>res(r.result);r.onerror=()=>{dbPromise=null;rej(r.error)}});return dbPromise}
 async function vaultPut(blob,name,remote=false){const d=await db(),tx=d.transaction("assets","readwrite");tx.objectStore("assets").put({id:crypto.randomUUID(),name,blob,remote,created:Date.now()});tx.oncomplete=renderVault}
-async function renderVault(){const d=await db(),r=d.transaction("assets","readonly").objectStore("assets").getAll();r.onsuccess=()=>{$("vault").innerHTML="";for(const a of r.result.sort((x,y)=>y.created-x.created)){const el=document.createElement("div");el.className="asset";const img=document.createElement("img");img.src=URL.createObjectURL(a.blob);const sm=document.createElement("small");sm.textContent=(a.remote?"☁ ":"")+a.name;el.append(img,sm);el.onclick=async()=>addRasterBlob(a.blob,a.name);$("vault").appendChild(el)}}}
+let activeVaultObjectUrls=[];async function renderVault(){const d=await db(),r=d.transaction("assets","readonly").objectStore("assets").getAll();r.onsuccess=()=>{activeVaultObjectUrls.forEach(u=>URL.revokeObjectURL(u));activeVaultObjectUrls=[];$("vault").innerHTML="";for(const a of r.result.sort((x,y)=>y.created-x.created)){const el=document.createElement("div");el.className="asset";const img=document.createElement("img"),url=URL.createObjectURL(a.blob);activeVaultObjectUrls.push(url);img.src=url;const sm=document.createElement("small");sm.textContent=(a.remote?"☁ ":"")+a.name;el.append(img,sm);el.onclick=async()=>addRasterBlob(a.blob,a.name);$("vault").appendChild(el)}}}
 $("clearVaultBtn").onclick=async()=>{const d=await db();d.transaction("assets","readwrite").objectStore("assets").clear();renderVault()};
 
 async function selectedPng(){const b=await canvas.toBlob({format:"png",multiplier:1});if(!b)throw new Error("PNG export unavailable");lastBlob=b;return b}
-function download(blob,name){
+function download(blob,name,kind="generic"){
   const a=document.createElement("a");a.download=name;a.style.display="none";document.body.appendChild(a);
   if(blob.type==="application/json"){const textValue=typeof blob._assetForgeText==="string"?blob._assetForgeText:null;if(textValue!==null){a.href="data:application/json;charset=utf-8,"+encodeURIComponent(textValue)}else{a.href=URL.createObjectURL(blob)}}
   else{a.href=URL.createObjectURL(blob)}
-  const url=a.href;window.__assetForgeLastDownload={name,href:url,type:blob.type};a.click();setTimeout(()=>{if(url.startsWith("blob:"))URL.revokeObjectURL(url);a.remove()},60000)
+  const url=a.href;const record={name,href:url,type:blob.type};window.__assetForgeLastDownload=record;window.__assetForgeLastDownloads=window.__assetForgeLastDownloads||{};window.__assetForgeLastDownloads[kind]=record;a.click();setTimeout(()=>{if(url.startsWith("blob:"))URL.revokeObjectURL(url);a.remove()},60000)
 }
 async function exportSelectedManifest(){
   const o=selected()||canvas.getObjects().at(-1);if(!o)return toast("Select an asset first");
   const el=o?.type==="image"?o.getElement():null;
   const meta={version:1,type:"game-asset",name:o.name||"asset",width:el?.naturalWidth||Math.round(o.getScaledWidth?.()||0),height:el?.naturalHeight||Math.round(o.getScaledHeight?.()||0),pivotX:o.pivotX??.5,pivotY:o.pivotY??.5,rotation:o.angle||0,opacity:o.opacity??1,tags:o.assetTags||[],sourceType:o.type};
-  const json=JSON.stringify(meta,null,2);const blob=new Blob([json],{type:"application/json"});Object.defineProperty(blob,"_assetForgeText",{value:json});download(blob,"asset-manifest.json");toast("Asset manifest exported")
+  const json=JSON.stringify(meta,null,2);const blob=new Blob([json],{type:"application/json"});Object.defineProperty(blob,"_assetForgeText",{value:json});download(blob,"asset-manifest.json","assetManifest");toast("Asset manifest exported")
 }
-$("exportBtn").onclick=async()=>{try{const b=await selectedPng(),o=canvas.getActiveObject(),name=((o?.name||"asset").replace(/\.[^.]+$/,"")||"asset")+".png";download(b,name);await vaultPut(b,name);toast("PNG exported")}catch(e){console.error(e);toast("Export failed")}};$("assetManifestBtn").onclick=exportSelectedManifest;
+$("exportBtn").onclick=async()=>{try{const b=await selectedPng(),o=canvas.getActiveObject(),name=((o?.name||"asset").replace(/\.[^.]+$/,"")||"asset")+".png";download(b,name,"exportImage");await vaultPut(b,name);toast("PNG exported")}catch(e){console.error(e);toast("Export failed")}};$("assetManifestBtn").onclick=exportSelectedManifest;
 
 async function getSelectedSourceBitmap(){const o=canvas.getActiveObject();if(!o||o.type!=="image")throw new Error("Select a sprite sheet image first");return{o,src:o.getElement()}}
 $("framesInputBtn")?.addEventListener("click",()=>$("framesInput")?.click());
 $("framesInput")?.addEventListener("change",e=>{frameLibrary=[...e.target.files];$("frameCount").textContent=frameLibrary.length+" animation frames loaded";toast(frameLibrary.length+" animation frames loaded")});
 async function extractFrames(){
  const {o,src}=await getSelectedSourceBitmap(),cols=Math.max(1,+$("cols").value||1),rows=Math.max(1,+$("rows").value||1),cw=Math.max(1,Math.floor((src.naturalWidth||o.width)/cols)),ch=Math.max(1,Math.floor((src.naturalHeight||o.height)/rows)),base=(o.name||"frames").replace(/\.[^.]+$/,"");
- recentFrames=[];for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const out=document.createElement("canvas");out.width=cw;out.height=ch;out.getContext("2d").drawImage(src,c*cw,r*ch,cw,ch,0,0,cw,ch);const b=await new Promise(res=>out.toBlob(res,"image/png",1));recentFrames.push(b);await vaultPut(b,base+"_"+String(recentFrames.length).padStart(3,"0")+".png")}
+ recentFrames=[];frameLibrary=[];for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const out=document.createElement("canvas");out.width=cw;out.height=ch;out.getContext("2d").drawImage(src,c*cw,r*ch,cw,ch,0,0,cw,ch);const b=await new Promise(res=>out.toBlob(res,"image/png",1));recentFrames.push(b);await vaultPut(b,base+"_"+String(recentFrames.length).padStart(3,"0")+".png")}
  $("frameCount").textContent=recentFrames.length+" extracted frames ready";toast(recentFrames.length+" frames extracted and ready to pack")
 }
 $("framesBtn").onclick=async()=>{try{await extractFrames()}catch(e){console.error(e);toast(e.message||"Frame extraction failed")}};
@@ -194,18 +196,18 @@ async function packFrames(){
  const frames=frameLibrary.length?frameLibrary:recentFrames;if(!frames.length)throw new Error("Add animation frames or extract frames first");
  const cols=Math.max(1,+$("cols").value||1),rows=Math.max(1,+$("rows").value||Math.ceil(frames.length/cols)),count=Math.min(frames.length,cols*rows),gap=Math.max(0,+$("frameGap").value||0),pad=Math.max(0,+$("framePadding").value||0);
  let cw=+$("frameW").value||0,ch=+$("frameH").value||0;const bitmaps=[];for(let i=0;i<count;i++)bitmaps.push(await loadBitmapFromRaster(frames[i]));
- if(!cw)cw=Math.max(...bitmaps.map(b=>b.width));if(!ch)ch=Math.max(...bitmaps.map(b=>b.height));
+ if(!cw)cw=Math.max(...bitmaps.map(b=>b.width));if(!ch)ch=Math.max(...bitmaps.map(b=>b.height));$("frameW").value=cw;$("frameH").value=ch;$("rows").value=rows;
  const out=document.createElement("canvas");out.width=pad*2+cols*cw+(cols-1)*gap;out.height=pad*2+rows*ch+(rows-1)*gap;const ctx=out.getContext("2d");
  for(let i=0;i<count;i++){const b=bitmaps[i],s=Math.min(cw/b.width,ch/b.height,1),w=b.width*s,h=b.height*s,x=pad+(i%cols)*(cw+gap)+(cw-w)/2,y=pad+Math.floor(i/cols)*(ch+gap)+(ch-h)/2;ctx.drawImage(b,x,y,w,h);b.close()}
- const blob=await new Promise(res=>out.toBlob(res,"image/png",1));window.__assetForgeLastSpriteSheet=blob;window.__assetForgeLastSpriteSheetDataUrl=out.toDataURL("image/png");download(blob,"sprite-sheet.png");await vaultPut(blob,"sprite-sheet.png");const fps=Math.max(1,+$("fps").value||12);await exportSpriteManifest({version:1,type:"sprite-sheet",columns:cols,rows,frameCount:count,frameWidth:cw,frameHeight:ch,gap,padding:pad,fps,frameDurationMs:1000/fps,frames:Array.from({length:count},(_,i)=>({index:i,x:pad+(i%cols)*(cw+gap),y:pad+Math.floor(i/cols)*(ch+gap),width:cw,height:ch,durationMs:1000/fps}))});toast(count+" frames packed into raster sprite sheet")
+ const blob=await new Promise(res=>out.toBlob(res,"image/png",1));window.__assetForgeLastSpriteSheet=blob;window.__assetForgeLastSpriteSheetDataUrl=out.toDataURL("image/png");download(blob,"sprite-sheet.png","spriteImage");await vaultPut(blob,"sprite-sheet.png");const fps=Math.max(1,+$("fps").value||12);await exportSpriteManifest({version:1,type:"sprite-sheet",columns:cols,rows,frameCount:count,frameWidth:cw,frameHeight:ch,gap,padding:pad,fps,frameDurationMs:1000/fps,frames:Array.from({length:count},(_,i)=>({index:i,x:pad+(i%cols)*(cw+gap),y:pad+Math.floor(i/cols)*(ch+gap),width:cw,height:ch,durationMs:1000/fps}))});toast(count+" frames packed into raster sprite sheet")
 }
 async function exportSpriteManifest(meta){
-  const json=JSON.stringify(meta,null,2);const blob=new Blob([json],{type:"application/json"});Object.defineProperty(blob,"_assetForgeText",{value:json});download(blob,"sprite-sheet.json")
+  const json=JSON.stringify(meta,null,2);const blob=new Blob([json],{type:"application/json"});Object.defineProperty(blob,"_assetForgeText",{value:json});download(blob,"sprite-sheet.json","spriteManifest")
 }
 $("sheetBtn").onclick=async()=>{try{await packFrames()}catch(e){console.error(e);toast(e.message||"Sprite sheet packing failed")}};
 $("undoBtn").onclick=async()=>{if(history.length<2)return;future.push(history.pop());await restore(history.at(-1))};$("redoBtn").onclick=async()=>{const n=future.pop();if(n){history.push(n);await restore(n)}};
 $("newBtn").onclick=()=>{canvas.clear();history=[];future=[];snapshot();$("dropHint").style.display="block";$("docName").textContent="Untitled Asset";toast("New asset")};
-$("saveBtn").onclick=()=>{const data={version:2,width:+$("cw").value,height:+$("ch").value,canvas:canvas.toJSON(["name","assetId"])};download(new Blob([JSON.stringify(data)],{type:"application/json"}),"asset-forge-project.json");toast("Project saved")};
+$("saveBtn").onclick=()=>{const data={version:3,width:+$("cw").value,height:+$("ch").value,canvas:canvas.toJSON(["name","assetId","pivotX","pivotY","assetTags","cutoutRecordId","cutoutSourceDataUrl","cutoutMaskDataUrl"])};download(new Blob([JSON.stringify(data)],{type:"application/json"}),"asset-forge-project.json");toast("Project saved")};
 $("openBtn").onclick=()=>$("projectInput").click();$("projectInput").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());$("cw").value=d.width;$("ch").value=d.height;resizeEditor();await restore(JSON.stringify(d.canvas));$("dropHint").style.display="none";toast("Project opened")}catch(err){console.error(err);toast("Project file invalid")}};
 $("applySize").onclick=()=>{resizeEditor();snapshot()};
 
@@ -219,8 +221,9 @@ $("mobileImportBtn")?.addEventListener("click",()=>$("fileInput").click());
 
 $("mobileSpriteBtn")?.addEventListener("click",()=>{toggleSheet("toolPanel");setTimeout(()=>$("framesInput")?.click(),120)});
 let maskEditor=null,maskMode="erase";
+async function hydrateCutoutRecords(){cutoutRecordsById.clear();for(const o of canvas.getObjects()){if(!o.cutoutRecordId||!o.cutoutSourceDataUrl||!o.cutoutMaskDataUrl)continue;try{const sourceBlob=await dataUrlToBlob(o.cutoutSourceDataUrl),img=await createImageBitmap(sourceBlob),maskImg=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=o.cutoutMaskDataUrl}),maskCanvas=document.createElement("canvas");maskCanvas.width=maskImg.naturalWidth||maskImg.width;maskCanvas.height=maskImg.naturalHeight||maskImg.height;maskCanvas.getContext("2d").drawImage(maskImg,0,0);img.close();cutoutRecordsById.set(o.cutoutRecordId,{sourceBlob,maskCanvas})}catch(e){console.warn("Could not restore cutout metadata",e)}}}
 async function openMaskRefine(){
- const o=selected(),rec=o&&cutoutRecords.get(o);if(!rec)return toast("Select an AI cutout layer first");
+ const o=selected(),rec=o&&cutoutRecordsById.get(o.cutoutRecordId);if(!rec)return toast("Select an AI cutout layer first");
  const src=await createImageBitmap(rec.sourceBlob);maskEditor={source:src,mask:rec.maskCanvas,scale:1,drawing:false};
  const view=$("maskCanvas"),max=760,scale=Math.min(max/src.width,max/src.height,1);maskEditor.scale=scale;view.width=Math.max(1,Math.round(src.width*scale));view.height=Math.max(1,Math.round(src.height*scale));
  renderMaskEditor();$("maskModal").classList.remove("hidden")
@@ -238,7 +241,7 @@ function paintMask(e){
 }
 $("refineMaskBtn")?.addEventListener("click",openMaskRefine);$("maskEraseBtn")?.addEventListener("click",()=>{maskMode="erase";$("maskEraseBtn").classList.add("active");$("maskRestoreBtn").classList.remove("active")});$("maskRestoreBtn")?.addEventListener("click",()=>{maskMode="restore";$("maskRestoreBtn").classList.add("active");$("maskEraseBtn").classList.remove("active")});
 $("maskCanvas")?.addEventListener("pointerdown",e=>{e.preventDefault();$("maskCanvas").setPointerCapture(e.pointerId);maskEditor.drawing=true;paintMask(e)});$("maskCanvas")?.addEventListener("pointermove",e=>{if(maskEditor?.drawing)paintMask(e)});["pointerup","pointercancel"].forEach(n=>$("maskCanvas")?.addEventListener(n,()=>{if(maskEditor)maskEditor.drawing=false}));
-$("applyMask")?.addEventListener("click",async()=>{const o=selected(),rec=o&&cutoutRecords.get(o);if(!rec||!maskEditor)return;const src=await createImageBitmap(rec.sourceBlob),m=maskEditor.mask,out=document.createElement("canvas");out.width=m.width;out.height=m.height;const ctx=out.getContext("2d",{willReadFrequently:true});ctx.drawImage(src,0,0,out.width,out.height);const od=ctx.getImageData(0,0,out.width,out.height),md=m.getContext("2d",{willReadFrequently:true}).getImageData(0,0,m.width,m.height).data;for(let i=0;i<od.data.length;i+=4)od.data[i+3]=md[i+3];ctx.putImageData(od,0,0);const blob=await new Promise(res=>out.toBlob(res,"image/png",1));const n=await addReplacement(blob,o,(o.name||"cutout").replace(/_cutout\.png$/,"")+"_refined.png",{cutoutSource:true});cutoutRecords.set(n,{sourceBlob:rec.sourceBlob,maskCanvas:m});$("maskModal").classList.add("hidden");src.close();toast("Mask refinement applied")});
+$("applyMask")?.addEventListener("click",async()=>{const o=selected(),rec=o&&cutoutRecordsById.get(o.cutoutRecordId);if(!rec||!maskEditor)return;const src=await createImageBitmap(rec.sourceBlob),m=maskEditor.mask,out=document.createElement("canvas");out.width=m.width;out.height=m.height;const ctx=out.getContext("2d",{willReadFrequently:true});ctx.drawImage(src,0,0,out.width,out.height);const od=ctx.getImageData(0,0,out.width,out.height),md=m.getContext("2d",{willReadFrequently:true}).getImageData(0,0,m.width,m.height).data;for(let i=0;i<od.data.length;i+=4)od.data[i+3]=md[i+3];ctx.putImageData(od,0,0);const blob=await new Promise(res=>out.toBlob(res,"image/png",1));const n=await addReplacement(blob,o,(o.name||"cutout").replace(/_cutout\.png$/,"")+"_refined.png",{cutoutSource:true});const sourceDataUrl=await blobToDataUrl(rec.sourceBlob),maskDataUrl=m.toDataURL("image/png"),recordId=crypto.randomUUID();n.set({cutoutRecordId:recordId,cutoutSourceDataUrl:sourceDataUrl,cutoutMaskDataUrl:maskDataUrl});cutoutRecordsById.set(recordId,{sourceBlob:rec.sourceBlob,maskCanvas:m});snapshot();$("maskModal").classList.add("hidden");src.close();toast("Mask refinement applied")});
 function b64(blob){return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result.split(",")[1]);fr.onerror=rej;fr.readAsDataURL(blob)})}
 async function githubFetch(path,options={}){if(!github)throw new Error("GitHub is not connected");const res=await fetch("https://api.github.com/repos/"+github.repo+"/contents/"+path+"?ref="+encodeURIComponent(github.branch),{...options,headers:{"Accept":"application/vnd.github+json","Authorization":"Bearer "+github.token,...(options.headers||{})}});const txt=await res.text();let data=null;try{data=JSON.parse(txt)}catch{}if(!res.ok)throw new Error(data?.message||"GitHub API "+res.status);return data}
 async function loadRepoAssets(){if(!github)return toast("Connect GitHub first");setStatus("Loading repository assets…");try{const data=await githubFetch(github.folder);const files=Array.isArray(data)?data.filter(x=>x.type==="file"&&/\.(png|jpe?g|webp|avif)$/i.test(x.name)):[];for(const f of files){const res=await fetch(f.download_url);if(res.ok){const blob=await res.blob();await vaultPut(blob,f.name,true)}}await renderVault();setStatus("Ready");toast(files.length+" repository assets loaded")}catch(e){console.error(e);setStatus("Ready");toast("Repository load failed: "+e.message)}}
@@ -263,7 +266,7 @@ window.AssetForgeAgent={
   exportPng:selectedPng,
   getLastDownload:()=>window.__assetForgeLastDownload||null,saveSelectedToGitHub:async()=>{if(!$("pushBtn").disabled)return $("pushBtn").click();throw new Error("GitHub is not connected")},
   pixelAudit:async()=>{
-    const o=selected(),rec=o&&cutoutRecords.get(o);if(!rec)return null;
+    const o=selected(),rec=o&&cutoutRecordsById.get(o.cutoutRecordId);if(!rec)return null;
     const src=await createImageBitmap(rec.sourceBlob),out=o.getElement(),w=Math.min(src.width,out.width),h=Math.min(src.height,out.height),a=document.createElement("canvas"),b=document.createElement("canvas");
     a.width=b.width=w;a.height=b.height=h;
     const ac=a.getContext("2d",{willReadFrequently:true}),bc=b.getContext("2d",{willReadFrequently:true});ac.drawImage(src,0,0,w,h);bc.drawImage(out,0,0,w,h);
