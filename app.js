@@ -1,6 +1,6 @@
 const $=id=>document.getElementById(id);
-const canvas=new fabric.Canvas("editorCanvas",{preserveObjectStacking:true,selection:true});
-let history=[],future=[],restoring=false,cropTarget=null,github=null,lastBlob=null,recentFrames=[],backgroundRemovalError=null;
+const canvas=new fabric.Canvas("editorCanvas",{preserveObjectStacking:true,selection:true,allowTouchScrolling:false,enableRetinaScaling:true,stopContextMenu:true});
+let history=[],future=[],restoring=false,cropTarget=null,github=null,lastBlob=null,recentFrames=[],frameLibrary=[],backgroundRemovalError=null;
 const state={name:"Untitled Asset",canvasWidth:1024,canvasHeight:1024};
 const setStatus=s=>$("status").textContent=s;
 const toast=s=>{const t=$("toast");t.textContent=s;t.className="show";clearTimeout(window.__toast);window.__toast=setTimeout(()=>t.className="",2200)};
@@ -16,7 +16,21 @@ async function upload(file){if(!file)return;setStatus("Loading image…");try{aw
 $("uploadBtn").onclick=()=>$("fileInput").click();$("fileInput").onchange=e=>upload(e.target.files[0]);
 $("stage").ondragover=e=>{e.preventDefault();$("stage").classList.add("drop-active")};$("stage").ondragleave=()=>$("stage").classList.remove("drop-active");$("stage").ondrop=e=>{e.preventDefault();$("stage").classList.remove("drop-active");upload(e.dataTransfer.files[0])};
 
-function syncProps(){const o=canvas.getActiveObject();$("propsEmpty").classList.toggle("hidden",!!o);$("props").classList.toggle("hidden",!o);if(!o)return;for(const [id,v] of [["px",o.left||0],["py",o.top||0],["pw",o.getScaledWidth()||0],["ph",o.getScaledHeight()||0],["prot",o.angle||0],["pop",o.opacity??1]])$(id).value=Math.round(v*100)/100;$("imageControls").classList.toggle("hidden",o.type!=="image")}
+function renderLayers(){
+  const box=$("layers"),objs=canvas.getObjects();$("layerCount").textContent=objs.length;box.innerHTML="";
+  [...objs].reverse().forEach(o=>{
+    const row=document.createElement("div");row.className="layer-row"+(o===selected()?" active":"");
+    const eye=document.createElement("button");eye.className="layer-eye";eye.textContent=o.visible===false?"○":"●";
+    const name=document.createElement("div");name.className="layer-name";name.textContent=o.name||o.type||"Layer";
+    const meta=document.createElement("div");meta.className="layer-meta";meta.textContent=(o.type==="image"?"Raster ":"")+Math.round(o.getScaledWidth?.()||0)+"×"+Math.round(o.getScaledHeight?.()||0);name.append(meta);
+    const pick=document.createElement("button");pick.className="layer-select";pick.textContent="›";
+    eye.onclick=e=>{e.stopPropagation();o.visible=!o.visible;canvas.requestRenderAll();snapshot();renderLayers()};
+    const pickLayer=()=>{canvas.setActiveObject(o);canvas.requestRenderAll();syncProps();renderLayers()};
+    row.onclick=pickLayer;pick.onclick=e=>{e.stopPropagation();pickLayer()};
+    row.append(eye,name,pick);box.append(row)
+  })
+}
+function syncProps(){const o=canvas.getActiveObject();$("propsEmpty").classList.toggle("hidden",!!o);$("props").classList.toggle("hidden",!o);if(!o){$("selectionInfo").textContent="No selection";return;}for(const [id,v] of [["px",o.left||0],["py",o.top||0],["pw",o.getScaledWidth()||0],["ph",o.getScaledHeight()||0],["prot",o.angle||0],["pop",o.opacity??1]])$(id).value=Math.round(v*100)/100;$("imageControls").classList.toggle("hidden",o.type!=="image")}
 function updateProps(){const o=canvas.getActiveObject();if(!o)return;o.set({left:+$("px").value||0,top:+$("py").value||0,angle:+$("prot").value||0,opacity:+$("pop").value});const w=+$("pw").value,h=+$("ph").value;if(w>0&&o.width)o.scaleX=w/o.width;if(h>0&&o.height)o.scaleY=h/o.height;canvas.requestRenderAll();snapshot()}
 ["px","py","pw","ph","prot","pop"].forEach(id=>$(id).onchange=updateProps);
 $("deleteBtn").onclick=()=>{const o=canvas.getActiveObject();if(o){canvas.remove(o);snapshot();syncProps()}};
@@ -24,6 +38,12 @@ $("duplicateBtn").onclick=async()=>{const o=canvas.getActiveObject();if(!o)retur
 $("textBtn").onclick=()=>{const t=new fabric.IText("Game Asset",{left:100,top:100,fill:"#fff",fontSize:64,fontFamily:"Arial",fontWeight:"700"});canvas.add(t);canvas.setActiveObject(t);snapshot()};
 $("rectBtn").onclick=()=>{const r=new fabric.Rect({left:100,top:100,width:240,height:160,fill:"#3b82f6",rx:16,ry:16});canvas.add(r);canvas.setActiveObject(r);snapshot()};
 
+function stack(action){
+ const o=selected();if(!o)return;
+ ({front:()=>canvas.bringObjectToFront(o),back:()=>canvas.sendObjectToBack(o),up:()=>canvas.bringObjectForward(o),down:()=>canvas.sendObjectBackwards(o)}[action])();
+ canvas.requestRenderAll();snapshot();renderLayers()
+}
+$("frontBtn").onclick=()=>stack("front");$("backBtn").onclick=()=>stack("back");$("upBtn").onclick=()=>stack("up");$("downBtn").onclick=()=>stack("down");
 function applyFilters(){const o=canvas.getActiveObject();if(!o||o.type!=="image")return;const vals=[+$("brightness").value,+$("contrast").value,+$("saturation").value,+$("blur").value];o.filters=[new fabric.filters.Brightness({brightness:vals[0]}),new fabric.filters.Contrast({contrast:vals[1]}),new fabric.filters.Saturation({saturation:vals[2]}),new fabric.filters.Blur({blur:vals[3]})].filter((_,i)=>vals[i]!==0);o.applyFilters();canvas.requestRenderAll();snapshot()}
 ["brightness","contrast","saturation","blur"].forEach(id=>$(id).oninput=applyFilters);
 $("resetFilters").onclick=()=>{const o=canvas.getActiveObject();if(o?.type!=="image")return;o.filters=[];o.applyFilters();["brightness","contrast","saturation","blur"].forEach(id=>$(id).value=0);canvas.requestRenderAll();snapshot()};
@@ -39,9 +59,36 @@ document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>$(b.dataset.c
 async function trimTransparent(){const o=canvas.getActiveObject();if(!o||o.type!=="image")return toast("Select a transparent image first");const src=o.getElement(),c=document.createElement("canvas");c.width=src.naturalWidth||o.width;c.height=src.naturalHeight||o.height;const ctx=c.getContext("2d",{willReadFrequently:true});ctx.drawImage(src,0,0,c.width,c.height);const d=ctx.getImageData(0,0,c.width,c.height).data;let minX=c.width,minY=c.height,maxX=-1,maxY=-1;for(let y=0;y<c.height;y++)for(let x=0;x<c.width;x++){if(d[(y*c.width+x)*4+3]>4){if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y}}if(maxX<0)return toast("No visible pixels found");const out=document.createElement("canvas");out.width=maxX-minX+1;out.height=maxY-minY+1;out.getContext("2d").drawImage(c,minX,minY,out.width,out.height,0,0,out.width,out.height);const blob=await new Promise(r=>out.toBlob(r,"image/png",1));await addReplacement(blob,o,(o.name||"asset").replace(/\.[^.]+$/,"")+"_trim.png");toast("Transparent bounds trimmed")}
 $("trimBtn").onclick=trimTransparent;
 
-async function removeBg(){const o=canvas.getActiveObject();if(!o||o.type!=="image")return toast("Select an image first");$("bgBtn").disabled=true;setStatus("AI background removal…");try{const {removeBackground}=await import("https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/+esm");const device="cpu";const proxyToWorker=false;backgroundRemovalError=null;const source=o.getElement();const sourceCanvas=document.createElement("canvas");sourceCanvas.width=source.naturalWidth||source.width;sourceCanvas.height=source.naturalHeight||source.height;const sourceCtx=sourceCanvas.getContext("2d",{willReadFrequently:false});sourceCtx.drawImage(source,0,0,sourceCanvas.width,sourceCanvas.height);const inputBlob=await new Promise((resolve,reject)=>sourceCanvas.toBlob(b=>b?resolve(b):reject(new Error("Failed to encode source image")), "image/png",1));const blob=await removeBackground(inputBlob,{debug:false,device,proxyToWorker,model:"isnet_fp16",output:{format:"image/png",quality:1},progress:(k,c,t)=>{setStatus("AI "+k+" "+c+"/"+t)}});await addReplacement(blob,o,(o.name||"asset").replace(/\.[^.]+$/,"")+"_cutout.png");toast("Background removed");setStatus("Ready")}catch(e){backgroundRemovalError=e?.stack||e?.message||String(e);console.error("[AssetForge background removal]",e);toast("Background removal failed — original kept");setStatus("Ready")}finally{$("bgBtn").disabled=false}}
-$("bgBtn").onclick=removeBg;
-
+async function blobFromObject(o){
+  const el=o?.type==="image"?o.getElement():null;if(!el)throw new Error("Select a raster image first");
+  const c=document.createElement("canvas");c.width=el.naturalWidth||el.width;c.height=el.naturalHeight||el.height;c.getContext("2d").drawImage(el,0,0,c.width,c.height);
+  return new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(new Error("Could not encode source image")),"image/png",1))
+}
+async function composeWithMask(sourceBlob,maskBlob){
+  const source=await createImageBitmap(sourceBlob),mask=await createImageBitmap(maskBlob),w=source.width,h=source.height,out=document.createElement("canvas");
+  out.width=w;out.height=h;const octx=out.getContext("2d",{willReadFrequently:true}),mcanvas=document.createElement("canvas");mcanvas.width=w;mcanvas.height=h;
+  const mctx=mcanvas.getContext("2d",{willReadFrequently:true});mctx.drawImage(mask,0,0,w,h);octx.drawImage(source,0,0,w,h);
+  const od=octx.getImageData(0,0,w,h),md=mctx.getImageData(0,0,w,h).data;
+  for(let i=0;i<od.data.length;i+=4){let a=md[i+3];if(a<12)a=0;else if(a>243)a=255;od.data[i+3]=a}
+  octx.putImageData(od,0,0);source.close();mask.close();
+  const blob=await new Promise((resolve,reject)=>out.toBlob(b=>b?resolve(b):reject(new Error("Could not encode cutout")),"image/png",1));
+  return {blob,maskCanvas:mcanvas}
+}
+async function removeBg(){
+  const o=selected();if(!o||o.type!=="image")return toast("Select an image first");
+  $("bgBtn").disabled=true;$("mobileBgBtn").disabled=true;setStatus("Preparing original pixels…");
+  try{
+    const {segmentForeground}=await import("https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/+esm");
+    const sourceBlob=await blobFromObject(o);setStatus("AI segmentation…");
+    const maskBlob=await segmentForeground(sourceBlob,{device:"cpu",proxyToWorker:false,model:"isnet_fp16",output:{format:"image/png",quality:1},progress:(k,c,t)=>setStatus("AI "+k+" "+c+"/"+t)});
+    setStatus("Preserving original RGB + applying alpha mask…");
+    const composed=await composeWithMask(sourceBlob,maskBlob);
+    const n=await addReplacement(composed.blob,o,(o.name||"asset").replace(/\.[^.]+$/,"")+"_cutout.png",{cutoutSource:true});
+    cutoutRecords.set(n,{sourceBlob,maskCanvas:composed.maskCanvas});backgroundRemovalError=null;toast("Professional cutout created — original pixels preserved");setStatus("Ready");
+  }catch(e){backgroundRemovalError=e?.stack||e?.message||String(e);console.error("[AssetForge background removal]",e);toast("Background removal failed — original kept");setStatus("Ready")}
+  finally{$("bgBtn").disabled=false;$("mobileBgBtn").disabled=false}
+}
+$("bgBtn").onclick=removeBg;$("mobileBgBtn").onclick=removeBg;
 function db(){return new Promise((res,rej)=>{const r=indexedDB.open("asset-forge-v2",1);r.onupgradeneeded=()=>r.result.createObjectStore("assets",{keyPath:"id"});r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
 async function vaultPut(blob,name,remote=false){const d=await db(),tx=d.transaction("assets","readwrite");tx.objectStore("assets").put({id:crypto.randomUUID(),name,blob,remote,created:Date.now()});tx.oncomplete=renderVault}
 async function renderVault(){const d=await db(),r=d.transaction("assets","readonly").objectStore("assets").getAll();r.onsuccess=()=>{$("vault").innerHTML="";for(const a of r.result.sort((x,y)=>y.created-x.created)){const el=document.createElement("div");el.className="asset";const img=document.createElement("img");img.src=URL.createObjectURL(a.blob);const sm=document.createElement("small");sm.textContent=(a.remote?"☁ ":"")+a.name;el.append(img,sm);el.onclick=async()=>addRasterBlob(a.blob,a.name);$("vault").appendChild(el)}}}
@@ -81,7 +128,7 @@ window.AssetForgeAgent={
   loadGitHubAssets:loadRepoAssets
 };
 
-canvas.on("object:added",()=>{if(!restoring)snapshot();syncProps()});canvas.on("object:modified",()=>{if(!restoring)snapshot();syncProps()});canvas.on("selection:created",syncProps);canvas.on("selection:updated",syncProps);canvas.on("selection:cleared",syncProps);
+canvas.on("object:added",()=>{if(!restoring)snapshot();syncProps();renderLayers()});canvas.on("object:modified",()=>{if(!restoring)snapshot();syncProps();renderLayers()});canvas.on("selection:created",()=>{syncProps();renderLayers()});canvas.on("selection:updated",()=>{syncProps();renderLayers()});canvas.on("selection:cleared",()=>{syncProps();renderLayers()});
 document.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){e.preventDefault();$("undoBtn").click()}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="y"){e.preventDefault();$("redoBtn").click()}if(e.key==="Delete"&&document.querySelector(".modal:not(.hidden)")===null)$("deleteBtn").click()};
 $("brightness").value=$("contrast").value=$("saturation").value=$("blur").value=0;
-resizeEditor();snapshot();renderVault();
+resizeEditor();snapshot();renderLayers();renderVault();
