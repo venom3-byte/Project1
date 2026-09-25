@@ -47,7 +47,8 @@ test("raster history and saved project preserve actual image data",async({page})
 
 test("raster import, crop, trim, undo/redo and export remain functional",async({page})=>{
   await page.goto("/");
-  await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
+  const largeData=await page.evaluate(async()=>{const img=new Image();img.src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAFUlEQVR4nGO846bxnwEJMDGgAcICAJbcAlFKnQqxAAAAAElFTkSuQmCC";await img.decode();const c=document.createElement("canvas");c.width=128;c.height=128;c.getContext("2d").drawImage(img,0,0,128,128);return c.toDataURL("image/png")});
+  await page.setInputFiles("#fileInput",{name:"pixel-large.png",mimeType:"image/png",buffer:Buffer.from(largeData.split(",")[1],"base64")});
   await expect(page.locator("#props")).toBeVisible();
   await expect(page.locator("#pw")).not.toHaveValue("");
   await page.click("#cropBtn");
