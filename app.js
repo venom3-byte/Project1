@@ -120,13 +120,25 @@ async function extractAlphaFromRawImage(raw){
   for(let i=0,p=0;i<w*h;i++,p+=4){let a=stride>=4?data[i*stride+3]:data[i*stride];if(a<=1)a*=255;a=Math.max(0,Math.min(255,a));od[p]=255;od[p+1]=255;od[p+2]=255;od[p+3]=a}
   ctx.putImageData(out,0,0);return{maskCanvas:mask,width:w,height:h}
 }
+function cleanAlphaMatte(maskCanvas){
+  const ctx=maskCanvas.getContext("2d",{willReadFrequently:true}),img=ctx.getImageData(0,0,maskCanvas.width,maskCanvas.height),d=img.data,w=maskCanvas.width,h=maskCanvas.height;
+  const alpha=new Uint8ClampedArray(w*h);
+  for(let i=0,p=0;i<alpha.length;i++,p+=4){const a=d[p+3];alpha[i]=a<5?0:a}
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const i=y*w+x,a=alpha[i];if(a===0||a>=28)continue;
+    let n=0;for(let yy=-1;yy<=1;yy++)for(let xx=-1;xx<=1;xx++){if(!xx&&!yy)continue;const nx=x+xx,ny=y+yy;if(nx>=0&&nx<w&&ny>=0&&ny<h&&alpha[ny*w+nx]>=28)n++}
+    if(n<2)alpha[i]=0;
+  }
+  for(let i=0,p=0;i<alpha.length;i++,p+=4)d[p+3]=alpha[i];
+  ctx.putImageData(img,0,0);return maskCanvas;
+}
 async function removeBg(){
   const o=selected();if(!o||o.type!=="image")return toast("Select an image first");
   $("bgBtn").disabled=true;$("mobileBgBtn").disabled=true;setStatus("Preparing original pixels…");
   try{
     const sourceBlob=await blobFromObject(o);setStatus("ISNet high-quality segmentation…");
     const pipe=await getBackgroundPipeline();const rawResult=await pipe(sourceBlob);const result=Array.isArray(rawResult)?rawResult[0]:rawResult;
-    const {maskCanvas}=await extractAlphaFromRawImage(result);setStatus("Applying original RGB + ISNet alpha matte…");
+    const {maskCanvas}=await extractAlphaFromRawImage(result);cleanAlphaMatte(maskCanvas);setStatus("Applying original RGB + cleaned ISNet alpha matte…");
     const source=await createImageBitmap(sourceBlob),w=source.width,h=source.height,out=document.createElement("canvas");out.width=w;out.height=h;
     const octx=out.getContext("2d",{willReadFrequently:true}),mctx=maskCanvas.getContext("2d",{willReadFrequently:true});
     const scaled=document.createElement("canvas");scaled.width=w;scaled.height=h;const sctx=scaled.getContext("2d",{willReadFrequently:true});sctx.drawImage(maskCanvas,0,0,w,h);
