@@ -69,12 +69,39 @@ test("raster import, crop, trim, undo/redo and export remain functional",async({
   await page.click("#exportBtn");
   await expect(page.locator("#toast")).toContainText("PNG exported");
 });
+test("raster pixels survive undo/redo and project save/open",async({page})=>{
+  await page.goto("/");
+  await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
+  await expect(page.locator("#props")).toBeVisible();
+  const before=await page.evaluate(()=>window.AssetForgeAgent.rasterSignature());
+  expect(before?.nonZeroPixels).toBeGreaterThan(0);
+  await page.evaluate(()=>window.AssetForgeAgent.cropSelected(0,0,1,1));
+  await page.click("#undoBtn");
+  const afterUndo=await page.evaluate(()=>window.AssetForgeAgent.rasterSignature());
+  expect(afterUndo).toEqual(before);
+  await page.click("#redoBtn");
+  const afterRedo=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(afterRedo.selectedSize).toEqual({width:1,height:1});
+  await page.click("#undoBtn");
+  await page.click("#saveBtn");
+  const projectData=await page.evaluate(()=>window.AssetForgeAgent.getLastProjectDataUrl());
+  expect(projectData).toMatch(/^data:application\/json/);
+  fs.writeFileSync("tests/fixtures/roundtrip-project.json",Buffer.from(projectData.split(",")[1],"base64"));
+  await page.click("#newBtn");
+  await page.setInputFiles("#projectInput","tests/fixtures/roundtrip-project.json");
+  await expect(page.locator("#props")).toBeVisible();
+  await page.evaluate(()=>window.AssetForgeAgent.execute({op:"select",name:"pixel.png"}));
+  const reopened=await page.evaluate(()=>window.AssetForgeAgent.rasterSignature());
+  expect(reopened).toEqual(before);
+});
+
 test("frame extraction creates actual frame assets and sheet packing uses extracted frames",async({page})=>{
   await page.goto("/");
   await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
   await page.fill("#cols","2");
   await page.fill("#rows","1");
   await page.click("#framesBtn");
+  expect((await page.evaluate(()=>window.AssetForgeAgent.status())).frameSource).toBe("extracted");
   await expect(page.locator("#toast")).toContainText("2 frames extracted and ready to pack");
   await page.click("#sheetBtn");
   await expect(page.locator("#toast")).toContainText("2 frames packed into raster sprite sheet");
@@ -166,11 +193,24 @@ test("duplicate creates a second visible layer and layer actions work",async({pa
 test("multiple raster animation frames pack with padding and gaps",async({page})=>{
   await page.goto("/");
   await page.setInputFiles("#framesInput",["tests/fixtures/pixel.png","tests/fixtures/pixel.png"]);
+  expect((await page.evaluate(()=>window.AssetForgeAgent.status())).frameSource).toBe("manual");
   await page.fill("#cols","2"); await page.fill("#rows","1"); await page.fill("#frameGap","4"); await page.fill("#framePadding","8");
   await page.click("#sheetBtn");
   await expect(page.locator("#toast")).toContainText("2 frames packed into raster sprite sheet");
 });
 
+test("custom pivot keeps its world position during numeric rotation",async({page})=>{
+  await page.goto("/");
+  await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
+  await expect(page.locator("#props")).toBeVisible();
+  await page.fill("#pivotX","0.2");await page.fill("#pivotY","0.8");
+  const before=await page.evaluate(()=>window.AssetForgeAgent.pivotWorldPoint());
+  await page.fill("#prot","90");
+  const after=await page.evaluate(()=>window.AssetForgeAgent.pivotWorldPoint());
+  expect(Math.abs(after.x-before.x)).toBeLessThan(1);
+  expect(Math.abs(after.y-before.y)).toBeLessThan(1);
+});
+ 
 test("AI cutout QA covers vehicle human and animal rasters in one model session",async({page})=>{
   test.setTimeout(300000);
   const cases=[
@@ -197,6 +237,13 @@ test("AI cutout QA covers vehicle human and animal rasters in one model session"
     expect(audit.transparentFraction).toBeGreaterThan(0.01);
     expect(audit.softEdgeFraction).toBeGreaterThan(0.0001);
     expect(audit.meanRgbDelta, JSON.stringify(audit)).toBeLessThan(2.5);
+    if(kind==="vehicle"){
+      await page.click("#undoBtn");await page.click("#redoBtn");
+      await expect(page.locator("#props")).toBeVisible();
+      await page.click("#refineMaskBtn");
+      await expect(page.locator("#maskModal")).toBeVisible({timeout:5000});
+      await page.click('[data-close="maskModal"]');
+    }
     expect(audit.width).toBeGreaterThan(100); expect(audit.height).toBeGreaterThan(100);
   }
   const finalState=await page.evaluate(()=>window.AssetForgeAgent.status());
