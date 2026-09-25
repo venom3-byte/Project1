@@ -1,6 +1,6 @@
 import {test,expect} from "@playwright/test";
 import fs from "node:fs";
-const tinyPng=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR42mNk+M/wHwAE/wJ/lqX5AAAAAElFTkSuQmCC","base64");
+const tinyPng=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAFUlEQVR4nGO846bxnwEJMDGgAcICAJbcAlFKnQqxAAAAAElFTkSuQmCC","base64");
 test.beforeAll(()=>{fs.mkdirSync("tests/fixtures",{recursive:true});fs.mkdirSync("tests/verified",{recursive:true});fs.writeFileSync("tests/fixtures/pixel.png",tinyPng)});
 test("editor boots without runtime console errors",async({page})=>{
   const errors=[];
@@ -177,6 +177,8 @@ test("duplicate creates a second visible layer and layer actions work",async({pa
   await page.evaluate(()=>window.AssetForgeAgent.execute({op:"fit"}));
   await page.evaluate(()=>window.AssetForgeAgent.execute({op:"zoom",mult:1.2}));
   await page.evaluate(()=>window.AssetForgeAgent.execute({op:"zoom",mult:1/1.2}));
+  await page.click('button[data-sheet="toolPanel"]');
+  await expect(page.locator("#toolPanel")).toHaveClass(/open/);
   await page.click("#urlBtn"); await expect(page.locator("#urlModal")).toBeVisible(); await page.click('[data-close="urlModal"]');
   await page.evaluate(()=>window.scrollTo(0,0));
   await page.evaluate(()=>window.AssetForgeAgent.execute({op:"duplicate"}));
