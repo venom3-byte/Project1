@@ -8,7 +8,7 @@ concurrency:
   group: asset-forge-run-${{ github.run_id }}
   cancel-in-progress: false
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 jobs:
@@ -23,6 +23,32 @@ jobs:
       - run: npm install
       - run: npx playwright install chromium
       - run: npm test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: asset-forge-verification
+          path: tests/verified/
+          if-no-files-found: error
+
+  publish-verification:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.ENABLE_GITHUB_PAGES == 'true'
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: asset-forge-verification
+          path: tests/verified
+      - name: Publish verified raster outputs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C verification-artifacts
+          git add tests/verified
+          git diff --cached --quiet || git commit -m "Publish verified raster outputs"
+          git push --force origin verification-artifacts
 
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
