@@ -40,7 +40,24 @@ function deleteSelected(){
   canvas.remove(o);canvas.discardActiveObject();snapshot();syncProps();renderLayers();toast("Layer deleted")
 }
 $("deleteBtn").onclick=deleteSelected;
-$("duplicateBtn").onclick=async()=>{const o=canvas.getActiveObject();if(!o)return toast("Select a layer first");$("duplicateBtn").disabled=true;try{const c=await o.clone(["name","assetId"]);c.set({left:(o.left||0)+20,top:(o.top||0)+20,name:(o.name||"asset")+"_copy",assetId:crypto.randomUUID(),pivotX:o.pivotX??.5,pivotY:o.pivotY??.5});canvas.add(c);canvas.setActiveObject(c);canvas.requestRenderAll();snapshot();syncProps();renderLayers();toast("Layer duplicated")}catch(e){console.error(e);toast("Duplicate failed: "+e.message)}finally{$("duplicateBtn").disabled=false}};
+$("duplicateBtn").onclick=async()=>{
+  const o=selected();if(!o)return toast("Select a layer first");
+  $("duplicateBtn").disabled=true;
+  try{
+    let c;
+    if(o.type==="image"){
+      const el=o.getElement(),tmp=document.createElement("canvas");tmp.width=el.naturalWidth||el.width;tmp.height=el.naturalHeight||el.height;tmp.getContext("2d").drawImage(el,0,0);
+      const dataUrl=tmp.toDataURL("image/png");
+      c=await fabric.FabricImage.fromURL(dataUrl);
+    }else{
+      c=await o.clone(["name","assetId"]);
+    }
+    c.set({left:(o.left||0)+20,top:(o.top||0)+20,name:(o.name||"asset")+"_copy",assetId:crypto.randomUUID(),pivotX:o.pivotX??.5,pivotY:o.pivotY??.5,angle:o.angle||0,opacity:o.opacity??1,filters:o.filters||[]});
+    canvas.add(c);canvas.setActiveObject(c);canvas.requestRenderAll();snapshot();syncProps();renderLayers();toast("Layer duplicated")
+  }catch(e){console.error(e);toast("Duplicate failed: "+e.message)}
+  finally{$("duplicateBtn").disabled=false}
+};
+
 $("textBtn").onclick=()=>{const t=new fabric.IText("Game Asset",{left:100,top:100,fill:"#fff",fontSize:64,fontFamily:"Arial",fontWeight:"700"});canvas.add(t);canvas.setActiveObject(t);snapshot()};
 $("rectBtn").onclick=()=>{const r=new fabric.Rect({left:100,top:100,width:240,height:160,fill:"#3b82f6",rx:16,ry:16});canvas.add(r);canvas.setActiveObject(r);snapshot()};
 
@@ -65,59 +82,52 @@ document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>$(b.dataset.c
 async function trimTransparent(){const o=canvas.getActiveObject();if(!o||o.type!=="image")return toast("Select a transparent image first");const src=o.getElement(),c=document.createElement("canvas");c.width=src.naturalWidth||o.width;c.height=src.naturalHeight||o.height;const ctx=c.getContext("2d",{willReadFrequently:true});ctx.drawImage(src,0,0,c.width,c.height);const d=ctx.getImageData(0,0,c.width,c.height).data;let minX=c.width,minY=c.height,maxX=-1,maxY=-1;for(let y=0;y<c.height;y++)for(let x=0;x<c.width;x++){if(d[(y*c.width+x)*4+3]>4){if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y}}if(maxX<0)return toast("No visible pixels found");const out=document.createElement("canvas");out.width=maxX-minX+1;out.height=maxY-minY+1;out.getContext("2d").drawImage(c,minX,minY,out.width,out.height,0,0,out.width,out.height);const blob=await new Promise(r=>out.toBlob(r,"image/png",1));await addReplacement(blob,o,(o.name||"asset").replace(/\.[^.]+$/,"")+"_trim.png");toast("Transparent bounds trimmed")}
 $("trimBtn").onclick=trimTransparent;
 
-let birefnetEngine=null,birefnetEnginePromise=null;
+let birefnetPipeline=null,birefnetPipelinePromise=null;
 async function blobFromObject(o){
   const el=o?.type==="image"?o.getElement():null;if(!el)throw new Error("Select a raster image first");
   const c=document.createElement("canvas");c.width=el.naturalWidth||el.width;c.height=el.naturalHeight||el.height;c.getContext("2d").drawImage(el,0,0,c.width,c.height);
   return new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(new Error("Could not encode source image")),"image/png",1))
 }
-async function detectInferenceConfig(){
+async function detectPipelineConfig(){
   if(!navigator.gpu||!window.isSecureContext)return {device:"wasm",dtype:"fp32"};
-  try{const adapter=await navigator.gpu.requestAdapter();if(!adapter)return {device:"wasm",dtype:"fp32"};return {device:"webgpu",dtype:adapter.features?.has?.("shader-f16")?"fp16":"fp32"}}
-  catch{return {device:"wasm",dtype:"fp32"}}
+  try{const adapter=await navigator.gpu.requestAdapter();if(!adapter)return {device:"wasm",dtype:"fp32"};return{device:"webgpu",dtype:adapter.features?.has?.("shader-f16")?"fp16":"fp32"}}catch{return{device:"wasm",dtype:"fp32"}}
 }
-async function getBiRefNetEngine(){
-  if(birefnetEngine)return birefnetEngine;
-  if(birefnetEnginePromise)return birefnetEnginePromise;
-  birefnetEnginePromise=(async()=>{
+async function getBiRefNetPipeline(){
+  if(birefnetPipeline)return birefnetPipeline;
+  if(birefnetPipelinePromise)return birefnetPipelinePromise;
+  birefnetPipelinePromise=(async()=>{
     const {pipeline}=await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm");
-    const preferred=await detectInferenceConfig();
-    const attempts=[preferred,...(preferred.device==="webgpu"?[{device:"wasm",dtype:"fp32"}]:[])];
-    let lastError=null;
-    for(const cfg of attempts){
-      try{
-        setStatus("Loading BiRefNet Lite ("+cfg.device+" / "+cfg.dtype+")…");
-        const pipe=await pipeline("image-segmentation","studioludens/birefnet-lite-512",{device:cfg.device,dtype:cfg.dtype});
-        birefnetEngine={pipe,config:cfg};return birefnetEngine
-      }catch(e){lastError=e}
+    const cfg=await detectPipelineConfig();
+    setStatus("Loading BiRefNet Lite ("+cfg.device+" / "+cfg.dtype+")…");
+    try{
+      const pipe=await pipeline("background-removal","studioludens/birefnet-lite-512",{device:cfg.device,dtype:cfg.dtype});
+      birefnetPipeline=pipe;return pipe
+    }catch(e){
+      if(cfg.device==="webgpu"){
+        const pipe=await pipeline("background-removal","studioludens/birefnet-lite-512",{device:"wasm",dtype:"fp32"});
+        birefnetPipeline=pipe;return pipe
+      }
+      throw e
     }
-    throw lastError||new Error("BiRefNet could not initialize")
-  })().catch(e=>{birefnetEnginePromise=null;throw e});
-  return birefnetEnginePromise
+  })().catch(e=>{birefnetPipelinePromise=null;throw e});
+  return birefnetPipelinePromise
 }
 async function createBiRefNetMask(sourceBlob){
-  const {RawImage}=await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm");
-  const engine=await getBiRefNetEngine(),image=await RawImage.read(sourceBlob),result=await engine.pipe(image);
-  const item=Array.isArray(result)?(result.find(x=>x?.mask)||result[0]):result;
-  const raw=item?.mask??item?.segmentation??item?.output_image??item;
-  if(!raw?.data)throw new Error("BiRefNet segmentation returned no mask");
-  const w=raw.width??raw.dims?.at(-1),h=raw.height??raw.dims?.at(-2);
-  if(!w||!h)throw new Error("BiRefNet mask has no dimensions");
-  const count=w*h,pixels=raw.data,channels=pixels.length===count?1:(pixels.length===count*4?4:Math.max(1,Math.round(pixels.length/count)));
-  const mask=document.createElement("canvas");mask.width=w;mask.height=h;const ctx=mask.getContext("2d",{willReadFrequently:true}),rgba=new Uint8ClampedArray(count*4);
-  for(let i=0;i<count;i++){
-    let v=Number(channels===1?pixels[i]:pixels[i*channels]);
-    if(v<=1)v*=255;
-    v=Math.max(0,Math.min(255,v));
-    rgba[i*4]=255;rgba[i*4+1]=255;rgba[i*4+2]=255;rgba[i*4+3]=Math.round(v)
-  }
-  ctx.putImageData(new ImageData(rgba,w,h),0,0);return{canvas:mask,width:w,height:h}
+  const pipe=await getBiRefNetPipeline();
+  const rgba=await pipe(sourceBlob);
+  if(!rgba?.data||!rgba.width||!rgba.height||rgba.channels!==4)throw new Error("Background-removal pipeline returned an invalid RGBA mask image");
+  const mask=document.createElement("canvas");mask.width=rgba.width;mask.height=rgba.height;
+  const ctx=mask.getContext("2d",{willReadFrequently:true}),src=new Uint8ClampedArray(rgba.data),alpha=new Uint8ClampedArray(rgba.width*rgba.height);
+  for(let i=0,p=0;i<alpha.length;i++,p+=4)alpha[i]=src[p+3];
+  const out=new ImageData(rgba.width,rgba.height),od=out.data;
+  for(let i=0,p=0;i<alpha.length;i++,p+=4){od[p]=255;od[p+1]=255;od[p+2]=255;od[p+3]=alpha[i]}
+  ctx.putImageData(out,0,0);return{canvas:mask,width:rgba.width,height:rgba.height}
 }
 async function composeRawMask(sourceBlob,maskImage){
   const source=await createImageBitmap(sourceBlob),w=source.width,h=source.height,out=document.createElement("canvas");out.width=w;out.height=h;
   const maskCanvas=document.createElement("canvas");maskCanvas.width=w;maskCanvas.height=h;const mctx=maskCanvas.getContext("2d",{willReadFrequently:true});mctx.drawImage(maskImage.canvas,0,0,w,h);
   const octx=out.getContext("2d",{willReadFrequently:true});octx.drawImage(source,0,0,w,h);const od=octx.getImageData(0,0,w,h),aData=mctx.getImageData(0,0,w,h).data;
-  for(let i=0;i<od.data.length;i+=4){let a=aData[i+3];if(a<8)a=0;else if(a>247)a=255;od.data[i+3]=a}
+  for(let i=0;i<od.data.length;i+=4){od.data[i+3]=aData[i+3]}
   octx.putImageData(od,0,0);source.close();
   const blob=await new Promise((resolve,reject)=>out.toBlob(b=>b?resolve(b):reject(new Error("Could not encode cutout")),"image/png",1));return{blob,maskCanvas}
 }
