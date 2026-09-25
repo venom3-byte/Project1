@@ -44,6 +44,8 @@ async function restore(j){
     if(selectedId){
       const next=canvas.getObjects().find(o=>o.assetId===selectedId);
       if(next)canvas.setActiveObject(next);
+    }else if(canvas.getObjects().length===1){
+      canvas.setActiveObject(canvas.getObjects()[0]);
     }
     canvas.renderAll();syncProps();renderLayers();
   }finally{restoring=false}
