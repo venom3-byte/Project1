@@ -82,6 +82,9 @@ test("real public-domain photo can be imported, cropped and exported as a game a
   await expect(page.locator("#cropModal")).toHaveClass(/hidden/);
   await page.click("#exportBtn");
   await expect(page.locator("#toast")).toContainText("PNG exported");
+  await page.fill("#cols","2"); await page.fill("#rows","2");
+  await page.click("#framesBtn"); await expect(page.locator("#toast")).toContainText("4 frames extracted and ready to pack");
+  await page.click("#sheetBtn"); await expect(page.locator("#toast")).toContainText("4 frames packed into raster sprite sheet");
   const bridge=await page.evaluate(()=>window.AssetForgeAgent.status());
   expect(bridge.objects).toBe(1);
   expect(bridge.selected).toMatch(/_crop\.png$/);
@@ -149,4 +152,31 @@ test("multiple raster animation frames pack with padding and gaps",async({page})
   await page.fill("#cols","2"); await page.fill("#rows","1"); await page.fill("#frameGap","4"); await page.fill("#framePadding","8");
   await page.click("#sheetBtn");
   await expect(page.locator("#toast")).toContainText("2 frames packed into raster sprite sheet");
+});
+
+test("multi-category AI cutout QA covers vehicle human and animal rasters",async({page})=>{
+  test.setTimeout(300000);
+  const cases=[
+    ["vehicle","https://raw.githubusercontent.com/Dashstrom/pixelize/main/docs/examples/car.jpg"],
+    ["human","https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/portrait-of-woman_small.jpg"],
+    ["animal","https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/tiger.jpg"]
+  ];
+  await page.goto("/");
+  for(const [kind,url] of cases){
+    const response=await page.request.get(url);expect(response.ok(),kind).toBeTruthy();
+    const bytes=await response.body();const path="tests/fixtures/"+kind+".jpg";fs.writeFileSync(path,bytes);
+    await page.setInputFiles("#fileInput",path);
+    await expect(page.locator("#props")).toBeVisible();
+    await page.click("#bgBtn");
+    await expect(page.locator("#status")).toHaveText("Ready",{timeout:240000});
+    const bridge=await page.evaluate(()=>window.AssetForgeAgent.status());
+    expect(bridge.backgroundRemovalError||"").toBe("");
+    expect(bridge.selected).toMatch(/_cutout\.png$/);
+    const audit=await page.evaluate(()=>window.AssetForgeAgent.pixelAudit());
+    expect(audit).not.toBeNull();
+    expect(audit.meanRgbDelta).toBeLessThan(2.5);
+    expect(audit.opaqueFraction).toBeGreaterThan(0.01);
+    expect(audit.transparentFraction).toBeGreaterThan(0.01);
+    expect(audit.softEdgeFraction).toBeGreaterThan(0.0001);
+  }
 });
