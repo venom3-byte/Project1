@@ -93,3 +93,18 @@ test("final raster QA preview processes the real photo",async({page})=>{
   expect(result).toEqual({w:512,h:512});
   await expect(page.locator("#resultMeta")).toContainText("512 × 512 output");
 });
+
+test("AI background removal operates on a real raster asset",async({page})=>{
+  test.setTimeout(180000);
+  const response=await page.request.get("https://raw.githubusercontent.com/Dashstrom/pixelize/main/docs/examples/car.jpg");
+  expect(response.ok()).toBeTruthy();
+  fs.writeFileSync("tests/fixtures/real-car-bg.jpg",await response.body());
+  await page.goto("/");
+  await page.setInputFiles("#fileInput","tests/fixtures/real-car-bg.jpg");
+  await expect(page.locator("#props")).toBeVisible();
+  await page.click("#bgBtn");
+  await expect(page.locator("#bgBtn")).toBeEnabled({timeout:160000});
+  const bridge=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(bridge.selected).toMatch(/_cutout\.png$/);
+  await expect(page.locator("#status")).toHaveText("Ready");
+});
