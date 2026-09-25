@@ -303,6 +303,10 @@ test("real white-background sprite sheet import background removal trim and exac
   await expect(page.locator("#toast")).toContainText("4 frames packed into raster sprite sheet");
   const spriteData=await page.evaluate(()=>window.AssetForgeAgent.getLastSpriteSheetDataUrl());
   expect(spriteData).toMatch(/^data:image\/png;base64,/);
+  const spriteDownload=await page.evaluate(()=>window.AssetForgeAgent.getLastSpriteImageDataUrl());
+  expect(spriteDownload).toMatch(/^data:image\/png;base64,/);
+  const spriteManifest=await page.evaluate(()=>window.AssetForgeAgent.getLastDownloadDataUrl("spriteManifest"));
+  expect(spriteManifest).toMatch(/^data:application\/json/);
   fs.writeFileSync("tests/verified/real-sprite-sheet.png",Buffer.from(spriteData.split(",")[1],"base64"));
   fs.writeFileSync("tests/verified/real-sprite-sheet.json",JSON.stringify({
     source:url,
