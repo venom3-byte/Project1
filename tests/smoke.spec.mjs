@@ -7,7 +7,7 @@ test("editor boots without runtime console errors",async({page})=>{
   page.on("pageerror",e=>errors.push(e.message));
   page.on("console",m=>{if(m.type()==="error")errors.push(m.text())});
   await page.goto("/");
-  await expect(page.locator("text=Asset Forge")).toBeVisible();
+  await expect(page.locator(".brand strong")).toHaveText("Asset Forge");
   await expect(page.locator("#editorCanvas")).toBeVisible();
   const bridge=await page.evaluate(()=>window.AssetForgeAgent?.status());
   expect(bridge, errors.join("\n")).toBeTruthy();
