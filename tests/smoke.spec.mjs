@@ -1,7 +1,7 @@
 import {test,expect} from "@playwright/test";
 import fs from "node:fs";
 const tinyPng=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR42mNk+M/wHwAE/wJ/lqX5AAAAAElFTkSuQmCC","base64");
-test.beforeAll(()=>{fs.mkdirSync("tests/fixtures",{recursive:true});fs.writeFileSync("tests/fixtures/pixel.png",tinyPng)});
+test.beforeAll(()=>{fs.mkdirSync("tests/fixtures",{recursive:true});fs.mkdirSync("tests/verified",{recursive:true});fs.writeFileSync("tests/fixtures/pixel.png",tinyPng)});
 test("editor boots without runtime console errors",async({page})=>{
   const errors=[];
   page.on("pageerror",e=>errors.push(e.message));
@@ -193,7 +193,7 @@ test("real white-background sprite sheet import background removal trim and exac
   const cropW=Math.floor(trimmed.selectedSize.width/2);
   const cropH=Math.floor(trimmed.selectedSize.height/2);
   await page.evaluate(({w,h})=>window.AssetForgeAgent.cropSelected(0,0,w,h),{w:cropW,h:cropH});
-  const cropped=await page.evaluate(()=>window.AssetForgeAgent.status());
+  const cropped=await page.evaluate(()=>window.AssetForgeAgent.status());\n  await page.click("#exportBtn");\n  await expect(page.locator("#toast")).toContainText("PNG exported");\n  const croppedData=await page.evaluate(()=>window.AssetForgeAgent.getLastDownloadDataUrl());\n  expect(croppedData).toMatch(/^data:image\/png;base64,/);\n  fs.writeFileSync("tests/verified/real-sprite-cropped.png",Buffer.from(croppedData.split(",")[1],"base64"));
   expect(cropped.selectedSize.width).toBe(cropW);
   expect(cropped.selectedSize.height).toBe(cropH);
 
