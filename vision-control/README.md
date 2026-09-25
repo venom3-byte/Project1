@@ -22,3 +22,6 @@ python vision-control/vision_agent.py --url http://127.0.0.1:4173/ --action insp
 - asset-forge.json: تقرير الرؤية + DOM + أخطاء الصفحة.
 
 لا يسجل الجسر cookies أو Authorization أو قيم الحقول الحساسة.
+
+
+CI verification hook: visual QA is executed on this pull request after the bridge was merged.
