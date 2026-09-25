@@ -10,8 +10,7 @@ test("editor boots without runtime console errors",async({page})=>{
   await expect(page.locator("text=Asset Forge")).toBeVisible();
   await expect(page.locator("#editorCanvas")).toBeVisible();
   const bridge=await page.evaluate(()=>window.AssetForgeAgent?.status());
-  expect(bridge, errors.join("
-")).toBeTruthy();
+  expect(bridge, errors.join("\n")).toBeTruthy();
   expect(bridge?.objects).toBe(0);
   expect(errors).toEqual([]);
 });
