@@ -31,6 +31,8 @@ test("raster import, crop, trim, undo/redo and export remain functional",async({
 test("frame extraction creates actual frame assets and sheet packing uses extracted frames",async({page})=>{
   await page.goto("/");
   await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
+  await page.fill("#cols","2");
+  await page.fill("#rows","1");
   await page.click("#framesBtn");
   await expect(page.locator("#toast")).toContainText("2 frame(s) extracted and ready to pack");
   await page.click("#sheetBtn");
