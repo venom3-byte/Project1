@@ -105,6 +105,7 @@ test("duplicate creates a second visible layer and layer actions work",async({pa
   await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
   await expect(page.locator("#props")).toBeVisible();
   await page.click("#duplicateBtn");
+  await expect(page.locator("#toast")).toContainText("Layer duplicated");
   await expect(page.locator("#layerCount")).toHaveText("2");
   const bridge=await page.evaluate(()=>window.AssetForgeAgent.status());
   expect(bridge.objects).toBe(2);
@@ -156,6 +157,6 @@ test("game asset manifest export works",async({page})=>{
   await page.goto("/");
   await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
   await expect(page.locator("#props")).toBeVisible();
-  const [download]=await Promise.all([page.waitForEvent("download"),page.click("#assetManifestBtn")]);
+  const [download]=await Promise.all([page.waitForEvent("download",{timeout:30000}),page.click("#assetManifestBtn")]);
   expect(download.suggestedFilename()).toBe("asset-manifest.json");
 });
