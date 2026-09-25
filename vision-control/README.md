@@ -22,3 +22,6 @@ python vision-control/vision_agent.py --url http://127.0.0.1:4173/ --action insp
 - asset-forge.json: تقرير الرؤية + DOM + أخطاء الصفحة.
 
 لا يسجل الجسر cookies أو Authorization أو قيم الحقول الحساسة.
+
+
+Final verification cycle enabled.
