@@ -114,7 +114,8 @@ async function getBiRefNetPipeline(){
 }
 async function createBiRefNetMask(sourceBlob){
   const pipe=await getBiRefNetPipeline();
-  const result=await pipe(sourceBlob);
+  const rawResult=await pipe(sourceBlob);
+  const result=Array.isArray(rawResult)?rawResult[0]:rawResult;
   const rgba=result?.channels===4?result:(typeof result?.rgba==="function"?result.rgba():result);
   if(!rgba?.data||!rgba.width||!rgba.height)throw new Error("Background-removal pipeline returned no usable image");
   const stride=Math.max(1,Math.floor(rgba.data.length/(rgba.width*rgba.height)));
@@ -159,7 +160,7 @@ function download(blob,name){
   const a=document.createElement("a");a.download=name;a.style.display="none";document.body.appendChild(a);
   if(blob.type==="application/json"){const textValue=typeof blob._assetForgeText==="string"?blob._assetForgeText:null;if(textValue!==null){a.href="data:application/json;charset=utf-8,"+encodeURIComponent(textValue)}else{a.href=URL.createObjectURL(blob)}}
   else{a.href=URL.createObjectURL(blob)}
-  a.click();const url=a.href;a.remove();if(url.startsWith("blob:"))setTimeout(()=>URL.revokeObjectURL(url),3000)
+  const url=a.href;a.click();setTimeout(()=>{if(url.startsWith("blob:"))URL.revokeObjectURL(url);a.remove()},60000)
 }
 async function exportSelectedManifest(){
   const o=selected();if(!o)return toast("Select an asset first");
