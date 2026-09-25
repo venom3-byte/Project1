@@ -1,7 +1,13 @@
 {
-  "name":"asset-forge-studio",
-  "private":true,
-  "type":"module",
-  "scripts":{"test":"playwright test"},
-  "devDependencies":{"@playwright/test":"^1.55.0"}
+  "name": "asset-forge-studio",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "start": "node server.mjs",
+    "dev": "node server.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0"
+  }
 }
