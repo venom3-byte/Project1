@@ -148,7 +148,7 @@ test("AI cutout QA covers vehicle human and animal rasters in one model session"
     expect(audit.opaqueFraction).toBeGreaterThan(0.001);
     expect(audit.transparentFraction).toBeGreaterThan(0.01);
     expect(audit.softEdgeFraction).toBeGreaterThan(0.0001);
-    expect(audit.meanRgbDelta).toBeLessThan(2.5);
+    expect(audit.meanRgbDelta, JSON.stringify(audit)).toBeLessThan(2.5);
     expect(audit.width).toBeGreaterThan(100); expect(audit.height).toBeGreaterThan(100);
   }
   const finalState=await page.evaluate(()=>window.AssetForgeAgent.status());
