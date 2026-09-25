@@ -171,13 +171,16 @@ test("final raster QA preview processes the real photo",async({page})=>{
 });
 
 test("duplicate creates a second visible layer and layer actions work",async({page})=>{
+  await page.setViewportSize({width:390,height:844});
   await page.goto("/");
   await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
   await expect(page.locator("#props")).toBeVisible();
-  await page.setViewportSize({width:390,height:844});
+  await expect(page.locator("#mobileExportBtn")).toBeVisible();
   await page.evaluate(()=>window.AssetForgeAgent.execute({op:"fit"}));
   await page.evaluate(()=>window.AssetForgeAgent.execute({op:"zoom",mult:1.2}));
   await page.evaluate(()=>window.AssetForgeAgent.execute({op:"zoom",mult:1/1.2}));
+  await page.click("#mobileExportBtn");
+  await expect(page.locator("#toast")).toContainText("PNG exported");
   await page.click('button[data-sheet="toolPanel"]');
   await expect(page.locator("#toolPanel")).toHaveClass(/open/);
   await page.click("#urlBtn"); await expect(page.locator("#urlModal")).toBeVisible(); await page.click('[data-close="urlModal"]');
