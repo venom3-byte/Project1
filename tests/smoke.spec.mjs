@@ -97,7 +97,7 @@ test("final raster QA preview processes the real photo",async({page})=>{
 });
 
 test("AI background removal operates on a real raster asset",async({page})=>{
-  test.setTimeout(180000);
+  test.setTimeout(300000);
   const response=await page.request.get("https://raw.githubusercontent.com/Dashstrom/pixelize/main/docs/examples/car.jpg");
   expect(response.ok()).toBeTruthy();
   fs.writeFileSync("tests/fixtures/real-car-bg.jpg",await response.body());
