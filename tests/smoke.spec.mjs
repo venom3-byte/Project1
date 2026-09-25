@@ -59,7 +59,7 @@ test("mobile drawers open and close without layout errors",async({page})=>{
 });
 
 test("real public-domain photo can be imported, cropped and exported as a game asset",async({page})=>{
-  const url="https://upload.wikimedia.org/wikipedia/commons/d/db/Chrysler_Crossfire_Red_Coupe2.JPG";
+  const url="https://raw.githubusercontent.com/Dashstrom/pixelize/main/docs/examples/car.jpg";
   const response=await page.request.get(url);
   expect(response.ok()).toBeTruthy();
   const bytes=await response.body();
@@ -68,11 +68,14 @@ test("real public-domain photo can be imported, cropped and exported as a game a
   await page.goto("/");
   await page.setInputFiles("#fileInput","tests/fixtures/real-car.jpg");
   await expect(page.locator("#props")).toBeVisible();
+  const dims=await page.evaluate(()=>window.AssetForgeAgent.status().selectedSize);
+  expect(dims.width).toBeGreaterThan(100);
+  expect(dims.height).toBeGreaterThan(100);
   await page.click("#cropBtn");
-  await page.fill("#cropX","120");
-  await page.fill("#cropY","100");
-  await page.fill("#cropW","1900");
-  await page.fill("#cropH","850");
+  await page.fill("#cropX",String(Math.floor(dims.width*0.1)));
+  await page.fill("#cropY",String(Math.floor(dims.height*0.1)));
+  await page.fill("#cropW",String(Math.floor(dims.width*0.8)));
+  await page.fill("#cropH",String(Math.floor(dims.height*0.8)));
   await page.click("#applyCrop");
   await expect(page.locator("#cropModal")).toHaveClass(/hidden/);
   await page.click("#exportBtn");
