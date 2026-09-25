@@ -1,0 +1,1147 @@
+ASSET FORGE STUDIO — FULL SOURCE SNAPSHOT
+Generated from repository venom3-byte/Project1
+Commit tested: ce466dd52e9730a1f704ec9476f1ba9f9672768a
+Workflow run: 36122855423
+CI RESULT: FAILED — 10 passed, 2 failed
+
+CONFIRMED ERRORS
+1) tests/smoke.spec.mjs:118
+   page.click("#mobileExportBtn") timed out because the element is not visible on the current desktop-sized viewport.
+   Cause: the test attempts a mobile-only hidden control without switching back to a mobile viewport.
+   Fix: either set a mobile viewport before clicking #mobileExportBtn, or test export via #exportBtn on desktop.
+
+2) tests/smoke.spec.mjs:220
+   Expected a PNG data URL from getLastDownloadDataUrl(), but received:
+   data:application/json;base64,...
+   Cause: packing a sprite sheet also creates/records the JSON manifest, and getLastDownloadDataUrl() returns the most recent download rather than the sprite PNG.
+   Fix: capture the PNG data URL returned by the sprite-pack path directly, or track last image download separately from last JSON download.
+
+These are test/verification defects confirmed by CI. The log did NOT report a core runtime crash in the 10 passing tests.
+
+===== FILE: index.html =====
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0a0f1a">
+<meta name="description" content="Asset Forge Studio — professional raster game-asset editor"><link rel="manifest" href="./manifest.webmanifest">
+<title>Asset Forge Studio</title>
+<link rel="stylesheet" href="./styles.css?v=5">
+<link rel="stylesheet" href="./pro.css?v=1">
+<script src="https://cdn.jsdelivr.net/npm/fabric@7.4.0/dist/index.min.js"></script>
+</head>
+<body>
+<div id="app">
+<header class="topbar">
+  <div class="brand"><span class="brandmark">AF</span><div><strong>Asset Forge</strong><small>PRO GAME ASSET STUDIO</small></div></div>
+  <div class="docname" id="docName">Untitled Asset</div>
+  <div class="top-actions">
+    <button id="undoBtn" class="top-icon" title="Undo">↶</button>
+    <button id="redoBtn" class="top-icon" title="Redo">↷</button>
+    <button id="fitBtn">Fit</button>
+    <button id="zoomOutBtn" class="desktop-only">−</button><span id="zoomLabel">100%</span><button id="zoomInBtn" class="desktop-only">＋</button>
+    <button id="newBtn" class="desktop-only">New</button><button id="openBtn" class="desktop-only">Open</button><button id="saveBtn" class="desktop-only">Save</button>
+    <button id="exportBtn" class="primary">Export</button>
+  </div>
+</header>
+
+<main class="workspace">
+  <aside class="sidebar left" id="toolPanel">
+    <div class="sheet-head"><div><b>Tools</b><small>Raster workflow</small></div><button class="mobile-close" data-sheet-close="toolPanel">×</button></div>
+    <div class="tool-section-title">EDIT</div>
+    <button class="tool active" id="selectTool">↖ <span>Select / transform</span></button>
+    <button class="tool" id="uploadBtn">＋ <span>Import raster</span></button>
+    <button class="tool" id="urlBtn">↗ <span>Import from URL</span></button>
+    <button class="tool" id="bgBtn">✦ <span>Remove background</span></button>
+    <button class="tool" id="cropBtn">⌗ <span>Crop image</span></button>
+    <button class="tool" id="trimBtn">◩ <span>Trim transparency</span></button>
+    <button class="tool" id="duplicateBtn">▣ <span>Duplicate layer</span></button>
+    <button class="tool danger" id="deleteBtn">⌫ <span>Delete layer</span></button>
+
+    <div class="tool-section-title">ADD</div>
+    <button class="tool" id="textBtn">T <span>Text layer</span></button>
+    <button class="tool" id="rectBtn">□ <span>Shape layer</span></button>
+
+    <div class="tool-section-title">CANVAS</div>
+    <div class="grid2"><label class="field">Width<input id="cw" type="number" min="1" max="8000" value="1024"></label><label class="field">Height<input id="ch" type="number" min="1" max="8000" value="1024"></label></div>
+    <button id="applySize">Apply canvas size</button>
+
+    <div class="tool-section-title">SPRITE LAB</div>
+    <button id="framesInputBtn">＋ <span>Add animation frames</span></button>
+    <div class="grid3"><label class="field">Columns<input id="cols" type="number" min="1" max="32" value="6"></label><label class="field">Rows<input id="rows" type="number" min="1" max="32" value="1"></label><label class="field">FPS<input id="fps" type="number" min="1" max="240" value="12"></label></div>
+    <div class="grid2"><label class="field">Cell W<input id="frameW" type="number" min="1" max="4096" placeholder="auto"></label><label class="field">Cell H<input id="frameH" type="number" min="1" max="4096" placeholder="auto"></label></div>
+    <div class="grid2"><label class="field">Gap<input id="frameGap" type="number" min="0" max="256" value="0"></label><label class="field">Padding<input id="framePadding" type="number" min="0" max="256" value="0"></label></div>
+    <button id="framesBtn">Extract sheet → frames</button>
+    <button id="sheetBtn">Pack frames → sprite sheet + manifest</button>
+    <div id="frameCount" class="subtle">No animation frames loaded</div>
+
+    <div class="tool-section-title">DOCUMENT</div>
+    <button id="repoBtn">☁ <span>GitHub Asset Vault</span></button>
+    <button id="assetManifestBtn">☷ <span>Export asset manifest</span></button><button id="clearVaultBtn">⌫ <span>Clear local vault</span></button>
+  </aside>
+
+  <section class="stage-wrap">
+    <div class="contextbar">
+      <div class="context-left"><span class="live-dot"></span><span id="status">Ready</span></div>
+      <div class="context-right"><span id="dimensions">1024 × 1024</span><span class="hint desktop-only">1 finger: select · 2 fingers: pan/zoom</span></div>
+    </div>
+    <div class="stage" id="stage">
+      <div class="checker"></div>
+      <div class="canvas-shadow"></div>
+      <canvas id="editorCanvas"></canvas>
+      <div id="dropHint"><b>Drop a raster image</b><span>PNG · JPEG · WebP · AVIF</span></div>
+      <div id="gestureHint" class="gesture-hint">Pinch to zoom · two-finger drag to pan</div>
+    </div>
+    <div class="canvas-footer"><span id="canvasPosition">0, 0</span><span>Raster canvas</span><span id="selectionInfo">No selection</span></div>
+  </section>
+
+  <aside class="sidebar right" id="propsPanel">
+    <div class="sheet-head"><div><b>Inspector</b><small>Selected object</small></div><button class="mobile-close" data-sheet-close="propsPanel">×</button></div>
+    <div id="propsEmpty" class="empty-state">Select an object to inspect it.</div>
+    <div id="props" class="hidden">
+      <div class="subsection-title">TRANSFORM</div>
+      <label class="field">Layer name<input id="layerName" type="text" maxlength="120"></label><div class="grid2"><label class="field">X<input id="px" type="number"></label><label class="field">Y<input id="py" type="number"></label><label class="field">W<input id="pw" type="number"></label><label class="field">H<input id="ph" type="number"></label></div>
+      <div class="grid2"><label class="field">Rotation<input id="prot" type="number"></label><label class="field">Opacity<input id="pop" type="range" min="0" max="1" step=".01"></label></div><div class="grid2"><label class="field">Pivot X<input id="pivotX" type="number" min="0" max="1" step=".001" value=".5"></label><label class="field">Pivot Y<input id="pivotY" type="number" min="0" max="1" step=".001" value=".5"></label></div>
+      <div class="layer-actions">
+        <button id="frontBtn">Bring front</button><button id="backBtn">Send back</button>
+        <button id="upBtn">Move up</button><button id="downBtn">Move down</button>
+      </div>
+      <div id="imageControls">
+        <div class="subsection-title">COLOR</div>
+        <label class="field">Brightness<input id="brightness" type="range" min="-1" max="1" step=".01" value="0"></label>
+        <label class="field">Contrast<input id="contrast" type="range" min="-1" max="1" step=".01" value="0"></label>
+        <label class="field">Saturation<input id="saturation" type="range" min="-1" max="1" step=".01" value="0"></label>
+        <label class="field">Blur<input id="blur" type="range" min="0" max=".5" step=".01" value="0"></label>
+        <button id="resetFilters">Reset image adjustments</button>
+        <button id="refineMaskBtn" class="secondary">Refine cutout mask</button>
+      </div>
+      <button id="deleteBtnInspector" class="danger">Delete selected layer</button>
+    </div>
+
+    <div class="subsection-title layers-title">LAYERS <span id="layerCount">0</span></div>
+    <div id="layers" class="layers"></div>
+
+    <div class="subsection-title">ASSET VAULT</div>
+    <div class="vault-actions"><button id="refreshVaultBtn">Refresh</button><button id="clearVaultBtn2">Clear</button></div>
+    <div id="vault" class="vault"></div>
+
+    <div class="subsection-title">GITHUB</div>
+    <div class="repo-status" id="repoStatus">Not connected</div>
+    <button id="pushBtn" disabled>Save selected asset to GitHub</button>
+  </aside>
+</main>
+
+<nav class="mobile-dock" id="mobileDock">
+  <button data-sheet="toolPanel">☷<span>Tools</span></button>
+  <button id="mobileImportBtn">＋<span>Import</span></button>
+  <button id="mobileBgBtn">✦<span>Cutout</span></button>
+  <button id="mobileCropBtn">⌗<span>Crop</span></button>
+  <button id="mobileSpriteBtn">▦<span>Sprite</span></button>
+  <button data-sheet="propsPanel">☰<span>Layers</span></button>
+  <button id="mobileExportBtn" class="primary">↧<span>Export</span></button>
+</nav>
+
+<input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp,image/avif" hidden>
+<input id="framesInput" type="file" accept="image/png,image/jpeg,image/webp,image/avif" multiple hidden>
+<input id="projectInput" type="file" accept=".json,application/json" hidden>
+
+<div id="urlModal" class="modal hidden"><div class="modal-card"><div class="modal-head"><h3>Import raster from URL</h3><button data-close="urlModal">×</button></div><p class="modal-help">The image is downloaded into the editor as a raster asset. Remote servers must allow browser access (CORS).</p><label class="field">Image URL<input id="imageUrl" type="url" placeholder="https://…"></label><div class="modal-actions"><button data-close="urlModal">Cancel</button><button id="loadUrlBtn" class="primary">Import image</button></div></div></div>
+
+<div id="cropModal" class="modal hidden"><div class="modal-card crop-card"><div class="modal-head"><h3>Crop raster image</h3><button data-close="cropModal">×</button></div><div class="crop-preview"><img id="cropPreview" alt="Crop preview"><div id="cropBox"></div></div><div class="grid4"><label class="field">X<input id="cropX" type="number" min="0"></label><label class="field">Y<input id="cropY" type="number" min="0"></label><label class="field">Width<input id="cropW" type="number" min="1"></label><label class="field">Height<input id="cropH" type="number" min="1"></label></div><div class="modal-actions"><button data-close="cropModal">Cancel</button><button id="applyCrop" class="primary">Apply crop</button></div></div></div>
+
+<div id="maskModal" class="modal hidden"><div class="modal-card mask-card"><div class="modal-head"><h3>Refine cutout mask</h3><button data-close="maskModal">×</button></div><div class="mask-toolbar"><button id="maskEraseBtn" class="mask-mode active">Erase</button><button id="maskRestoreBtn" class="mask-mode">Restore</button><label>Size<input id="maskSize" type="range" min="4" max="240" value="50"></label><label>Softness<input id="maskSoft" type="range" min="0" max="40" value="12"></label></div><div class="mask-stage"><canvas id="maskCanvas"></canvas></div><div class="modal-help">Paint over the mask. Erase removes pixels; Restore brings the original image back. The original raster is preserved underneath.</div><div class="modal-actions"><button data-close="maskModal">Cancel</button><button id="applyMask" class="primary">Apply mask</button></div></div></div>
+
+<div id="githubModal" class="modal hidden"><div class="modal-card"><div class="modal-head"><h3>GitHub Asset Vault</h3><button data-close="githubModal">×</button></div><p class="modal-help">Token stays in memory only. Fine-grained token: Contents → Read and write.</p><label class="field">Repository<input id="repoName" value="venom3-byte/Project1"></label><div class="grid2"><label class="field">Branch<input id="repoBranch" value="main"></label><label class="field">Folder<input id="repoFolder" value="assets"></label></div><label class="field">Token<input id="repoToken" type="password" autocomplete="off"></label><div class="modal-actions"><button data-close="githubModal">Cancel</button><button id="refreshRepoBtn">Load repository assets</button><button id="connectRepoBtn" class="primary">Connect</button></div></div></div>
+
+<div id="toast"></div>
+<script type="module" src="./app.js?v=5"></script>
+<script type="module" src="./pro.js?v=1"></script>
+</div>
+</body>
+</html>
+
+===== FILE: styles.css =====
+:root{--bg:#080d16;--panel:#101722;--panel2:#151f2d;--line:#243246;--text:#edf3fb;--muted:#8fa1b9;--accent:#72a9ff;--accent2:#3f82f6;--good:#32d69c;--danger:#ff6f7c;--shadow:0 24px 70px #000b}
+*{box-sizing:border-box}html,body,#app{margin:0;width:100%;height:100%;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
+body{-webkit-tap-highlight-color:transparent}button,input{font:inherit}button{border:1px solid var(--line);background:#182334;color:var(--text);border-radius:9px;padding:8px 10px;cursor:pointer;touch-action:manipulation}button:hover{background:#22324a}button:disabled{opacity:.45;cursor:not-allowed}button.primary{background:#2868d7;border-color:#4b91ff}.secondary{background:#1a2a40}.danger{border-color:#5d2630;color:#ff9ba6;background:#21151b}
+.topbar{height:58px;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 12px;gap:16px;background:linear-gradient(#0f1725,#0c1320);position:relative;z-index:20}.brand{display:flex;align-items:center;gap:9px;min-width:190px}.brandmark{display:grid;place-items:center;width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#387eff,#184db5);font-weight:900}.brand small{display:block;color:#72859e;font-size:9px;letter-spacing:.09em}.docname{flex:1;text-align:center;color:#b8c7da;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.top-actions{display:flex;align-items:center;gap:6px}.top-icon{width:36px;padding:7px}.top-actions #zoomLabel{min-width:44px;text-align:center;color:#aebed2;font-size:11px}
+.workspace{height:calc(100% - 58px);display:grid;grid-template-columns:220px minmax(0,1fr) 285px;min-width:0}.sidebar{background:#0f1622;padding:11px;border-right:1px solid var(--line);overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;z-index:12}.sidebar.right{border-left:1px solid var(--line);border-right:0}.sheet-head{display:flex;justify-content:space-between;align-items:center;position:sticky;top:-11px;background:#0f1622;padding:3px 0 9px;z-index:2}.sheet-head b{font-size:13px}.sheet-head small{display:block;color:#70829b;font-size:9px;margin-top:2px}.mobile-close{display:none}.tool-section-title,.subsection-title{font-size:9px;letter-spacing:.14em;color:#6f829c;font-weight:900;margin:13px 2px 7px}.subsection-title{display:flex;justify-content:space-between}.tool{width:100%;text-align:left;background:transparent;border-color:transparent;margin:2px 0;min-height:38px}.tool span{margin-left:7px;color:#c6d4e5}.tool.active{background:#1a3154;border-color:#31558d}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:7px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.field{display:block;color:#9fb0c6;font-size:10px;margin:7px 0}.field input{width:100%;margin-top:4px;background:#0b121e;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px;min-width:0}.field input[type=range]{padding:0;accent-color:var(--accent)}.subtle{font-size:10px;color:#6f839d;line-height:1.4;margin:8px 2px}
+.stage-wrap{display:flex;flex-direction:column;min-width:0;min-height:0}.contextbar{height:41px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 11px;background:#0b121d;font-size:10px;color:var(--muted);z-index:5}.context-left,.context-right{display:flex;align-items:center;gap:10px}.live-dot{width:6px;height:6px;border-radius:50%;background:var(--good);box-shadow:0 0 10px #32d69c88}.stage{position:relative;flex:1;min-height:0;overflow:hidden;display:grid;place-items:center;background:#070b13;touch-action:none;overscroll-behavior:none;user-select:none}.checker{position:absolute;inset:0;background-image:linear-gradient(45deg,#111a28 25%,transparent 25%),linear-gradient(-45deg,#111a28 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#111a28 75%),linear-gradient(-45deg,transparent 75%,#111a28 75%);background-size:28px 28px;background-position:0 0,0 14px,14px -14px,-14px 0;opacity:.75}.canvas-shadow{position:absolute;width:min(80%,900px);height:min(80%,900px);box-shadow:0 25px 100px #000c;border-radius:2px;pointer-events:none}.stage canvas{position:relative;z-index:2}.gesture-hint{position:absolute;right:12px;bottom:12px;z-index:4;padding:7px 9px;border:1px solid #ffffff12;background:#07101ccc;color:#8398b3;border-radius:8px;font-size:9px;pointer-events:none;opacity:.75;transition:.3s}.gesture-hint.hide{opacity:0}.canvas-footer{height:27px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 10px;color:#667b96;font-size:9px;background:#0a101a}.drop-active{outline:2px solid var(--accent)}#dropHint{position:absolute;z-index:1;display:grid;gap:4px;place-items:center;color:#a0b2c9;font-size:11px;pointer-events:none;text-align:center}#dropHint span{font-size:9px;color:#61738a}
+.empty-state{padding:20px 8px;text-align:center;color:#71849d;font-size:11px;border:1px dashed #27364c;border-radius:9px}.layer-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}.layer-actions button{font-size:10px;padding:7px}
+.layers{display:grid;gap:5px;max-height:260px;overflow:auto;overscroll-behavior:contain;touch-action:pan-y}.layer-row{display:grid;grid-template-columns:26px 1fr 26px;align-items:center;gap:6px;padding:5px;border:1px solid #1f2b3e;background:#0b121e;border-radius:8px}.layer-row.active{border-color:#3767a7;background:#14253e}.layer-thumb{width:26px;height:26px;border-radius:5px;object-fit:contain;background:#0b0f18}.layer-name{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.layer-meta{font-size:8px;color:#60738d;margin-top:2px}.layer-eye,.layer-select{border:0;background:transparent;padding:3px;width:26px}.vault-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}.vault{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}.asset{background:#0b121e;border:1px solid var(--line);border-radius:8px;padding:5px;cursor:pointer}.asset img{width:100%;aspect-ratio:1;object-fit:contain;background:#070b12;border-radius:5px}.asset small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px;color:#91a3bb;font-size:9px}.repo-status{font-size:10px;color:#8699b1;margin:0 0 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.modal{position:fixed;inset:0;background:#000b;display:grid;place-items:center;z-index:100;padding:14px}.modal-card{background:#111b2b;border:1px solid #2a3a52;border-radius:14px;padding:17px;width:min(620px,96vw);max-height:92vh;overflow:auto;box-shadow:var(--shadow);touch-action:pan-y}.modal-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.modal-head h3{margin:0;font-size:15px}.modal-help{color:#a2b1c5;font-size:10px;line-height:1.55}.modal-actions{display:flex;justify-content:flex-end;gap:7px;margin-top:12px}.crop-preview{position:relative;width:100%;height:min(46vh,420px);display:grid;place-items:center;overflow:hidden;background:#090e17;border:1px solid var(--line);border-radius:8px;margin:12px 0}.crop-preview img{display:block;max-width:100%;max-height:100%;object-fit:contain}.crop-preview #cropBox{position:absolute;border:2px solid var(--accent);box-shadow:0 0 0 9999px #0007;pointer-events:none}.mask-card{width:min(900px,98vw)}.mask-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0}.mask-toolbar label{font-size:9px;color:#9cafc7;display:flex;align-items:center;gap:6px}.mask-toolbar input{accent-color:var(--accent)}.mask-mode.active{background:#204a86;border-color:#5d9eff}.mask-stage{height:min(64vh,620px);display:grid;place-items:center;overflow:hidden;background:#0a0f18;border:1px solid var(--line);border-radius:9px;touch-action:none}.mask-stage canvas{max-width:100%;max-height:100%;image-rendering:auto}
+.hidden{display:none!important}
+#toast{position:fixed;left:50%;bottom:max(20px,calc(20px + env(safe-area-inset-bottom)));transform:translate(-50%,20px);opacity:0;z-index:130;background:#101b2c;border:1px solid #2c405c;padding:10px 14px;border-radius:10px;color:#dce7f5;font-size:10px;transition:.2s;pointer-events:none;max-width:min(92vw,520px);text-align:center}#toast.show{opacity:1;transform:translate(-50%,0)}
+.mobile-dock{display:none}
+
+@media(max-width:900px){
+  .topbar{height:54px;padding:0 8px;gap:7px}.brand{min-width:auto}.brand small,.docname{display:none}.top-actions{margin-left:auto}.top-actions .desktop-only{display:none}.top-actions #zoomLabel{min-width:35px}.workspace{display:block;height:calc(100% - 54px)}.contextbar{height:34px}.sidebar{position:fixed;left:0;right:0;bottom:0;top:auto;width:auto;max-height:68dvh;border:1px solid #2b3b53;border-bottom:0;border-radius:18px 18px 0 0;padding:12px 12px calc(76px + env(safe-area-inset-bottom));box-shadow:0 -25px 70px #000c;transform:translateY(105%);transition:transform .22s ease;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y}.sidebar.right{left:0;right:0;border-left:1px solid #2b3b53}.sidebar.open{transform:translateY(0)}.sheet-head{top:-12px;padding-top:3px}.mobile-close{display:block;border:0;background:transparent;font-size:22px;padding:0 5px}.mobile-dock{position:fixed;display:flex;left:0;right:0;bottom:0;height:64px;padding:6px max(7px,env(safe-area-inset-left)) calc(6px + env(safe-area-inset-bottom)) max(7px,env(safe-area-inset-right));background:#0c1421f5;border-top:1px solid #26364d;z-index:40;gap:5px;overflow-x:auto;overscroll-behavior-x:contain;touch-action:pan-x}.mobile-dock button{flex:0 0 62px;display:grid;place-items:center;gap:2px;padding:4px 6px;border:0;background:transparent;color:#a9bad0;font-size:18px}.mobile-dock button span{font-size:8px}.mobile-dock button.primary{background:#205fce;color:#fff;border-radius:9px}.stage-wrap{height:100%}.stage{height:calc(100% - 61px);min-height:0}.canvas-footer{display:none}.gesture-hint{bottom:12px;right:12px;font-size:8px}.desktop-only{display:none!important}.context-right .hint{display:none}.layers{max-height:34vh}.vault{grid-template-columns:repeat(4,1fr)}.grid4{grid-template-columns:repeat(2,1fr)}.grid3{grid-template-columns:1fr 1fr}.mask-stage{height:55dvh}
+}
+@media(max-width:420px){.mobile-dock button{flex-basis:56px}.mobile-dock{gap:2px}.top-actions button{padding:6px 7px}.brandmark{width:29px;height:29px}.contextbar{font-size:9px}}
+
+
+===== FILE: pro.css =====
+/* Asset Forge Studio PRO interaction layer — inspired by established mobile editor patterns without copying proprietary UI. */
+.sheet-grip{display:none}
+.sheet-scroll-shadow{position:sticky;top:38px;height:12px;margin:-12px 0 0;pointer-events:none;z-index:3;background:linear-gradient(#0f1622,transparent);opacity:0;transition:opacity .18s}
+.mobile-dock{scrollbar-width:none;scroll-snap-type:x proximity}
+.mobile-dock::-webkit-scrollbar{display:none}
+.mobile-dock button{min-width:58px;min-height:50px;scroll-snap-align:center}
+.tool,.sidebar button,.modal button{min-height:40px}
+.crop-handle{position:absolute;width:18px;height:18px;border:2px solid #fff;background:#2d72e8;border-radius:5px;box-shadow:0 2px 9px #000b;pointer-events:auto;touch-action:none}
+.crop-handle.nw{left:-9px;top:-9px;cursor:nwse-resize}
+.crop-handle.ne{right:-9px;top:-9px;cursor:nesw-resize}
+.crop-handle.sw{left:-9px;bottom:-9px;cursor:nesw-resize}
+.crop-handle.se{right:-9px;bottom:-9px;cursor:nwse-resize}
+.crop-drag-label{position:absolute;left:50%;top:-28px;transform:translateX(-50%);padding:4px 7px;border-radius:6px;border:1px solid #ffffff20;background:#0c1524e8;color:#e8f0fa;font-size:9px;white-space:nowrap;pointer-events:none;box-shadow:0 4px 16px #0008}
+.pro-status{display:flex;align-items:center;gap:7px;margin:8px 0;padding:8px 10px;border:1px solid #25354b;background:#0b1421;border-radius:10px;color:#a9b9cd;font-size:10px}
+.pro-status strong{color:#e5edf7}
+.pro-action-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:8px 0}
+.pro-action-row button{font-size:10px}
+.pro-badge{font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:#87a1c1}
+@media(max-width:900px){
+  .sidebar{max-height:76dvh;padding-bottom:calc(88px + env(safe-area-inset-bottom));overscroll-behavior-y:contain}
+  .sheet-head{padding-bottom:12px}
+  .sheet-grip{display:block;width:42px;height:4px;border-radius:999px;background:#60738b;opacity:.72;margin:0 auto 9px}
+  .sheet-scroll-shadow{top:47px}
+  .sidebar.open{will-change:transform}
+  .mobile-dock{height:70px;padding-top:7px}
+  .mobile-dock button{flex-basis:60px}
+  .crop-card{width:min(96vw,760px);max-height:94dvh}
+  .crop-preview{height:min(52dvh,520px)}
+  .crop-handle{width:22px;height:22px}
+  .mask-toolbar{position:sticky;top:0;z-index:2;padding:6px 0;background:#111b2b}
+}
+@media(pointer:coarse){
+  button{min-width:44px}
+  .field input{min-height:40px}
+}
+
+
+===== FILE: app.js =====
+const $=id=>document.getElementById(id);
+const selected=()=>canvas.getActiveObject();
+const cutoutRecords=new WeakMap();
+const canvas=new fabric.Canvas("editorCanvas",{preserveObjectStacking:true,selection:true,allowTouchScrolling:false,enableRetinaScaling:true,stopContextMenu:true});
+let history=[],future=[],restoring=false,cropTarget=null,github=null,lastBlob=null,recentFrames=[],frameLibrary=[],backgroundRemovalError=null;
+const state={name:"Untitled Asset",canvasWidth:1024,canvasHeight:1024};
+const setStatus=s=>$("status").textContent=s;
+const toast=s=>{const t=$("toast");t.textContent=s;t.className="show";clearTimeout(window.__toast);window.__toast=setTimeout(()=>t.className="",2200)};
+function snapshot(){if(restoring)return;const j=JSON.stringify(canvas.toJSON(["name","assetId"]));if(history.at(-1)!==j){history.push(j);if(history.length>80)history.shift();future=[]}}
+async function restore(j){restoring=true;await canvas.loadFromJSON(JSON.parse(j));canvas.renderAll();syncProps();restoring=false}
+function resizeEditor(){const w=+$("cw").value||1024,h=+$("ch").value||1024;state.canvasWidth=w;state.canvasHeight=h;canvas.setDimensions({width:w,height:h});$("dimensions").textContent=w+" × "+h;fit()}
+function fit(){const st=$("stage"),z=Math.min((st.clientWidth-48)/canvas.width,(st.clientHeight-48)/canvas.height,1);canvas.setZoom(z);canvas.setDimensions({width:canvas.width*z,height:canvas.height*z},"cssOnly");$("zoomLabel").textContent=Math.round(z*100)+"%"}
+window.addEventListener("resize",fit);
+
+async function addRasterBlob(blob,name="asset.png"){const url=URL.createObjectURL(blob);try{return await addRasterUrl(url,name)}finally{URL.revokeObjectURL(url)}}
+async function addRasterUrl(url,name="asset.png"){const img=await fabric.FabricImage.fromURL(url,{crossOrigin:"anonymous"}),w=+$("cw").value||1024,h=+$("ch").value||1024,s=Math.min((w*.82)/img.width,(h*.82)/img.height,1);img.set({left:(w-img.width*s)/2,top:(h-img.height*s)/2,scaleX:s,scaleY:s,name,angle:0,pivotX:.5,pivotY:.5,assetTags:[]});canvas.add(img);canvas.setActiveObject(img);canvas.renderAll();$("dropHint").style.display="none";snapshot();syncProps();return img}
+async function upload(file){if(!file)return;setStatus("Loading image…");try{await addRasterBlob(file,file.name);setStatus("Ready")}catch(e){console.error(e);toast("Image import failed");setStatus("Ready")}}
+$("uploadBtn").onclick=()=>$("fileInput").click();$("fileInput").onchange=e=>upload(e.target.files[0]);
+$("stage").ondragover=e=>{e.preventDefault();$("stage").classList.add("drop-active")};$("stage").ondragleave=()=>$("stage").classList.remove("drop-active");$("stage").ondrop=e=>{e.preventDefault();$("stage").classList.remove("drop-active");upload(e.dataTransfer.files[0])};
+
+function renderLayers(){
+  const box=$("layers"),objs=canvas.getObjects();$("layerCount").textContent=objs.length;box.innerHTML="";
+  [...objs].reverse().forEach(o=>{
+    const row=document.createElement("div");row.className="layer-row"+(o===selected()?" active":"");
+    const eye=document.createElement("button");eye.className="layer-eye";eye.textContent=o.visible===false?"○":"●";
+    const name=document.createElement("div");name.className="layer-name";name.textContent=o.name||o.type||"Layer";
+    const meta=document.createElement("div");meta.className="layer-meta";meta.textContent=(o.type==="image"?"Raster ":"")+Math.round(o.getScaledWidth?.()||0)+"×"+Math.round(o.getScaledHeight?.()||0);name.append(meta);
+    const pick=document.createElement("button");pick.className="layer-select";pick.textContent="›";
+    eye.onclick=e=>{e.stopPropagation();o.visible=!o.visible;canvas.requestRenderAll();snapshot();renderLayers()};
+    const pickLayer=()=>{canvas.setActiveObject(o);canvas.requestRenderAll();syncProps();renderLayers()};
+    row.onclick=pickLayer;pick.onclick=e=>{e.stopPropagation();pickLayer()};
+    row.append(eye,name,pick);box.append(row)
+  })
+}
+function syncProps(){const o=canvas.getActiveObject();$("propsEmpty").classList.toggle("hidden",!!o);$("props").classList.toggle("hidden",!o);if(!o){$("selectionInfo").textContent="No selection";return;}$("layerName").value=o.name||"";for(const [id,v] of [["px",o.left||0],["py",o.top||0],["pw",o.getScaledWidth()||0],["ph",o.getScaledHeight()||0],["prot",o.angle||0],["pop",o.opacity??1],["pivotX",o.pivotX??.5],["pivotY",o.pivotY??.5]])$(id).value=Math.round(v*1000)/1000;$("imageControls").classList.toggle("hidden",o.type!=="image")}
+function updateProps(){const o=canvas.getActiveObject();if(!o)return;o.set({left:+$("px").value||0,top:+$("py").value||0,angle:+$("prot").value||0,opacity:+$("pop").value,pivotX:Number.isFinite(+$("pivotX").value)?Math.max(0,Math.min(1,+$("pivotX").value)):.5,pivotY:Number.isFinite(+$("pivotY").value)?Math.max(0,Math.min(1,+$("pivotY").value)):.5});const w=+$("pw").value,h=+$("ph").value;if(w>0&&o.width)o.scaleX=w/o.width;if(h>0&&o.height)o.scaleY=h/o.height;canvas.requestRenderAll();snapshot()}
+["px","py","pw","ph","prot","pop","pivotX","pivotY"].forEach(id=>$(id).onchange=updateProps);$("layerName").onchange=()=>{const o=selected();if(!o)return;o.name=$("layerName").value.trim()||"Layer";snapshot();renderLayers()};
+function deleteSelected(){
+  const o=selected();if(!o)return toast("Select a layer first");
+  canvas.remove(o);canvas.discardActiveObject();snapshot();syncProps();renderLayers();toast("Layer deleted")
+}
+$("deleteBtn").onclick=deleteSelected;
+$("duplicateBtn").onclick=async()=>{
+  const o=selected();if(!o)return toast("Select a layer first");
+  $("duplicateBtn").disabled=true;
+  try{
+    let c;
+    if(o.type==="image"){
+      const el=o.getElement(),tmp=document.createElement("canvas");tmp.width=el.naturalWidth||el.width;tmp.height=el.naturalHeight||el.height;tmp.getContext("2d").drawImage(el,0,0);
+      const dataUrl=tmp.toDataURL("image/png");
+      c=await fabric.FabricImage.fromURL(dataUrl);
+    }else{
+      c=await o.clone(["name","assetId"]);
+    }
+    c.set({left:(o.left||0)+20,top:(o.top||0)+20,name:(o.name||"asset")+"_copy",assetId:crypto.randomUUID(),pivotX:o.pivotX??.5,pivotY:o.pivotY??.5,angle:o.angle||0,opacity:o.opacity??1,filters:o.filters||[]});
+    canvas.add(c);canvas.setActiveObject(c);canvas.requestRenderAll();snapshot();syncProps();renderLayers();toast("Layer duplicated")
+  }catch(e){console.error(e);toast("Duplicate failed: "+e.message)}
+  finally{$("duplicateBtn").disabled=false}
+};
+
+$("textBtn").onclick=()=>{const t=new fabric.IText("Game Asset",{left:100,top:100,fill:"#fff",fontSize:64,fontFamily:"Arial",fontWeight:"700"});canvas.add(t);canvas.setActiveObject(t);snapshot()};
+$("rectBtn").onclick=()=>{const r=new fabric.Rect({left:100,top:100,width:240,height:160,fill:"#3b82f6",rx:16,ry:16});canvas.add(r);canvas.setActiveObject(r);snapshot()};
+
+function stack(action){
+ const o=selected();if(!o)return;
+ ({front:()=>canvas.bringObjectToFront(o),back:()=>canvas.sendObjectToBack(o),up:()=>canvas.bringObjectForward(o),down:()=>canvas.sendObjectBackwards(o)}[action])();
+ canvas.requestRenderAll();snapshot();renderLayers()
+}
+$("frontBtn").onclick=()=>stack("front");$("backBtn").onclick=()=>stack("back");$("upBtn").onclick=()=>stack("up");$("downBtn").onclick=()=>stack("down");
+function applyFilters(){const o=canvas.getActiveObject();if(!o||o.type!=="image")return;const vals=[+$("brightness").value,+$("contrast").value,+$("saturation").value,+$("blur").value];o.filters=[new fabric.filters.Brightness({brightness:vals[0]}),new fabric.filters.Contrast({contrast:vals[1]}),new fabric.filters.Saturation({saturation:vals[2]}),new fabric.filters.Blur({blur:vals[3]})].filter((_,i)=>vals[i]!==0);o.applyFilters();canvas.requestRenderAll();snapshot()}
+["brightness","contrast","saturation","blur"].forEach(id=>$(id).oninput=applyFilters);
+$("resetFilters").onclick=()=>{const o=canvas.getActiveObject();if(o?.type!=="image")return;o.filters=[];o.applyFilters();["brightness","contrast","saturation","blur"].forEach(id=>$(id).value=0);canvas.requestRenderAll();snapshot()};
+
+async function addReplacement(blob,old,name){const url=URL.createObjectURL(blob);try{const n=await fabric.FabricImage.fromURL(url);n.set({left:old.left,top:old.top,angle:old.angle,opacity:old.opacity,scaleX:old.scaleX,scaleY:old.scaleY,name});canvas.remove(old);canvas.add(n);canvas.setActiveObject(n);canvas.renderAll();snapshot();syncProps();await vaultPut(blob,name);lastBlob=blob;return n}finally{URL.revokeObjectURL(url)}}
+async function imageFromCrop(obj,x,y,w,h){const src=obj.getElement(),out=document.createElement("canvas");out.width=w;out.height=h;out.getContext("2d").drawImage(src,x,y,w,h,0,0,w,h);const blob=await new Promise(r=>out.toBlob(r,"image/png",1));return addReplacement(blob,obj,(obj.name||"asset").replace(/\.[^.]+$/,"")+"_crop.png")}
+function updateCropBox(){if(!cropTarget)return;const img=$("cropPreview"),box=$("cropBox"),x=+$("cropX").value||0,y=+$("cropY").value||0,w=+$("cropW").value||1,h=+$("cropH").value||1,iw=cropTarget.getElement().naturalWidth||cropTarget.width,ih=cropTarget.getElement().naturalHeight||cropTarget.height,rw=img.clientWidth||1,rh=img.clientHeight||1,ox=(img.parentElement.clientWidth-rw)/2,oy=(img.parentElement.clientHeight-rh)/2;box.style.left=(ox+x/iw*rw)+"px";box.style.top=(oy+y/ih*rh)+"px";box.style.width=(w/iw*rw)+"px";box.style.height=(h/ih*rh)+"px"}
+function openCrop(){const o=canvas.getActiveObject();if(!o||o.type!=="image")return toast("Select an image first");cropTarget=o;const src=o.getElement();$("cropPreview").src=src.currentSrc||src.src;const iw=src.naturalWidth||o.width,ih=src.naturalHeight||o.height;$("cropX").value=0;$("cropY").value=0;$("cropW").value=iw;$("cropH").value=ih;$("cropModal").classList.remove("hidden");setTimeout(updateCropBox,50)}
+["cropX","cropY","cropW","cropH"].forEach(id=>$(id).oninput=updateCropBox);$("cropBtn").onclick=openCrop;
+$("applyCrop").onclick=async()=>{if(!cropTarget)return;const src=cropTarget.getElement(),maxW=src.naturalWidth||cropTarget.width,maxH=src.naturalHeight||cropTarget.height;let x=Math.max(0,Math.min(maxW-1,+$("cropX").value||0)),y=Math.max(0,Math.min(maxH-1,+$("cropY").value||0)),w=Math.max(1,Math.min(maxW-x,+$("cropW").value||maxW-x)),h=Math.max(1,Math.min(maxH-y,+$("cropH").value||maxH-y));$("applyCrop").disabled=true;try{await imageFromCrop(cropTarget,x,y,w,h);$("cropModal").classList.add("hidden");toast("Crop applied")}catch(e){console.error(e);toast("Crop failed")}finally{$("applyCrop").disabled=false;cropTarget=null}};
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>$(b.dataset.close).classList.add("hidden"));
+
+async function trimTransparent(){const o=canvas.getActiveObject();if(!o||o.type!=="image")return toast("Select a transparent image first");const src=o.getElement(),c=document.createElement("canvas");c.width=src.naturalWidth||o.width;c.height=src.naturalHeight||o.height;const ctx=c.getContext("2d",{willReadFrequently:true});ctx.drawImage(src,0,0,c.width,c.height);const d=ctx.getImageData(0,0,c.width,c.height).data;let minX=c.width,minY=c.height,maxX=-1,maxY=-1;for(let y=0;y<c.height;y++)for(let x=0;x<c.width;x++){if(d[(y*c.width+x)*4+3]>4){if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y}}if(maxX<0)return toast("No visible pixels found");const out=document.createElement("canvas");out.width=maxX-minX+1;out.height=maxY-minY+1;out.getContext("2d").drawImage(c,minX,minY,out.width,out.height,0,0,out.width,out.height);const blob=await new Promise(r=>out.toBlob(r,"image/png",1));await addReplacement(blob,o,(o.name||"asset").replace(/\.[^.]+$/,"")+"_trim.png");toast("Transparent bounds trimmed")}
+$("trimBtn").onclick=trimTransparent;
+
+let backgroundPipeline=null,backgroundPipelinePromise=null;
+async function blobFromObject(o){
+  const el=o?.type==="image"?o.getElement():null;if(!el)throw new Error("Select a raster image first");
+  const c=document.createElement("canvas");c.width=el.naturalWidth||el.width;c.height=el.naturalHeight||el.height;c.getContext("2d").drawImage(el,0,0,c.width,c.height);
+  return new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(new Error("Could not encode source image")),"image/png",1))
+}
+async function detectInferenceConfig(){
+  if(!navigator.gpu||!window.isSecureContext)return {device:"wasm",dtype:"q8"};
+  try{const adapter=await navigator.gpu.requestAdapter();if(!adapter)return{device:"wasm",dtype:"q8"};return{device:"webgpu",dtype:adapter.features?.has?.("shader-f16")?"fp16":"fp32"}}catch{return{device:"wasm",dtype:"fp32"}}
+}
+async function getBackgroundPipeline(){
+  if(backgroundPipeline)return backgroundPipeline;
+  if(backgroundPipelinePromise)return backgroundPipelinePromise;
+  backgroundPipelinePromise=(async()=>{
+    const {pipeline}=await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm");
+    const cfg=await detectInferenceConfig();
+    setStatus("Loading ISNet INT8 background-removal model ("+cfg.device+" / "+cfg.dtype+")…");
+    try{
+      const pipe=await pipeline("background-removal","xrds/isnet-general-onnx-int8",{device:cfg.device,dtype:cfg.device==="webgpu"?"q8":"q8"});
+      backgroundPipeline=pipe;return pipe
+    }catch(e){
+      if(cfg.device==="webgpu"){
+        const pipe=await pipeline("background-removal","xrds/isnet-general-onnx-int8",{device:"wasm",dtype:"fp32"});
+        backgroundPipeline=pipe;return pipe
+      }
+      throw e
+    }
+  })().catch(e=>{backgroundPipelinePromise=null;throw e});
+  return backgroundPipelinePromise
+}
+async function extractAlphaFromRawImage(raw){
+  const rgba=typeof raw?.rgba==="function"?raw.rgba():raw;
+  if(!rgba?.width||!rgba?.height||!rgba?.data)throw new Error("BEN2 returned no usable RGBA image");
+  const w=rgba.width,h=rgba.height,stride=Math.max(1,Math.floor(rgba.data.length/(w*h))),data=new Uint8ClampedArray(rgba.data);
+  const mask=document.createElement("canvas");mask.width=w;mask.height=h;const ctx=mask.getContext("2d",{willReadFrequently:true}),out=new ImageData(w,h),od=out.data;
+  for(let i=0,p=0;i<w*h;i++,p+=4){let a=stride>=4?data[i*stride+3]:data[i*stride];if(a<=1)a*=255;a=Math.max(0,Math.min(255,a));od[p]=255;od[p+1]=255;od[p+2]=255;od[p+3]=a}
+  ctx.putImageData(out,0,0);return{maskCanvas:mask,width:w,height:h}
+}
+function cleanAlphaMatte(maskCanvas){
+  const ctx=maskCanvas.getContext("2d",{willReadFrequently:true}),img=ctx.getImageData(0,0,maskCanvas.width,maskCanvas.height),d=img.data,w=maskCanvas.width,h=maskCanvas.height;
+  const alpha=new Uint8ClampedArray(w*h);
+  for(let i=0,p=0;i<alpha.length;i++,p+=4){const a=d[p+3];alpha[i]=a<5?0:a}
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const i=y*w+x,a=alpha[i];if(a===0||a>=28)continue;
+    let n=0;for(let yy=-1;yy<=1;yy++)for(let xx=-1;xx<=1;xx++){if(!xx&&!yy)continue;const nx=x+xx,ny=y+yy;if(nx>=0&&nx<w&&ny>=0&&ny<h&&alpha[ny*w+nx]>=28)n++}
+    if(n<2)alpha[i]=0;
+  }
+  for(let i=0,p=0;i<alpha.length;i++,p+=4)d[p+3]=alpha[i];
+  ctx.putImageData(img,0,0);return maskCanvas;
+}
+async function removeBg(){
+  const o=selected();if(!o||o.type!=="image")return toast("Select an image first");
+  $("bgBtn").disabled=true;$("mobileBgBtn").disabled=true;setStatus("Preparing original pixels…");
+  try{
+    const sourceBlob=await blobFromObject(o);setStatus("ISNet high-quality segmentation…");
+    const pipe=await getBackgroundPipeline();const rawResult=await pipe(sourceBlob);const result=Array.isArray(rawResult)?rawResult[0]:rawResult;
+    const {maskCanvas}=await extractAlphaFromRawImage(result);cleanAlphaMatte(maskCanvas);setStatus("Applying original RGB + cleaned ISNet alpha matte…");
+    const source=await createImageBitmap(sourceBlob),w=source.width,h=source.height,out=document.createElement("canvas");out.width=w;out.height=h;
+    const octx=out.getContext("2d",{willReadFrequently:true}),mctx=maskCanvas.getContext("2d",{willReadFrequently:true});
+    const scaled=document.createElement("canvas");scaled.width=w;scaled.height=h;const sctx=scaled.getContext("2d",{willReadFrequently:true});sctx.drawImage(maskCanvas,0,0,w,h);
+    octx.drawImage(source,0,0,w,h);const od=octx.getImageData(0,0,w,h),md=sctx.getImageData(0,0,w,h).data;
+    for(let i=0;i<od.data.length;i+=4)od.data[i+3]=md[i+3];
+    octx.putImageData(od,0,0);source.close();
+    const blob=await new Promise((resolve,reject)=>out.toBlob(b=>b?resolve(b):reject(new Error("Could not encode cutout")),"image/png",1));
+    const n=await addReplacement(blob,o,(o.name||"asset").replace(/\.[^.]+$/,"")+"_cutout.png",{cutoutSource:true});
+    const finalCanvas=document.createElement("canvas");finalCanvas.width=w;finalCanvas.height=h;const fc=finalCanvas.getContext("2d",{willReadFrequently:true});fc.drawImage(scaled,0,0);cutoutRecords.set(n,{sourceBlob,maskCanvas:finalCanvas});
+    backgroundRemovalError=null;toast("ISNet high-quality cutout created — original RGB preserved");setStatus("Ready")
+  }catch(e){backgroundRemovalError=e?.stack||e?.message||String(e);console.error("[AssetForge ISNet]",e);toast("AI cutout failed — original kept");setStatus("Ready")}
+  finally{$("bgBtn").disabled=false;$("mobileBgBtn").disabled=false}
+}
+$("bgBtn").onclick=removeBg;$("mobileBgBtn").onclick=removeBg;
+function db(){return new Promise((res,rej)=>{const r=indexedDB.open("asset-forge-v2",1);r.onupgradeneeded=()=>r.result.createObjectStore("assets",{keyPath:"id"});r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+async function vaultPut(blob,name,remote=false){const d=await db(),tx=d.transaction("assets","readwrite");tx.objectStore("assets").put({id:crypto.randomUUID(),name,blob,remote,created:Date.now()});tx.oncomplete=renderVault}
+async function renderVault(){const d=await db(),r=d.transaction("assets","readonly").objectStore("assets").getAll();r.onsuccess=()=>{$("vault").innerHTML="";for(const a of r.result.sort((x,y)=>y.created-x.created)){const el=document.createElement("div");el.className="asset";const img=document.createElement("img");img.src=URL.createObjectURL(a.blob);const sm=document.createElement("small");sm.textContent=(a.remote?"☁ ":"")+a.name;el.append(img,sm);el.onclick=async()=>addRasterBlob(a.blob,a.name);$("vault").appendChild(el)}}}
+$("clearVaultBtn").onclick=async()=>{const d=await db();d.transaction("assets","readwrite").objectStore("assets").clear();renderVault()};
+
+async function selectedPng(){const b=await canvas.toBlob({format:"png",multiplier:1});if(!b)throw new Error("PNG export unavailable");lastBlob=b;return b}
+function download(blob,name){
+  const a=document.createElement("a");a.download=name;a.style.display="none";document.body.appendChild(a);
+  if(blob.type==="application/json"){const textValue=typeof blob._assetForgeText==="string"?blob._assetForgeText:null;if(textValue!==null){a.href="data:application/json;charset=utf-8,"+encodeURIComponent(textValue)}else{a.href=URL.createObjectURL(blob)}}
+  else{a.href=URL.createObjectURL(blob)}
+  const url=a.href;window.__assetForgeLastDownload={name,href:url,type:blob.type};a.click();setTimeout(()=>{if(url.startsWith("blob:"))URL.revokeObjectURL(url);a.remove()},60000)
+}
+async function exportSelectedManifest(){
+  const o=selected()||canvas.getObjects().at(-1);if(!o)return toast("Select an asset first");
+  const el=o?.type==="image"?o.getElement():null;
+  const meta={version:1,type:"game-asset",name:o.name||"asset",width:el?.naturalWidth||Math.round(o.getScaledWidth?.()||0),height:el?.naturalHeight||Math.round(o.getScaledHeight?.()||0),pivotX:o.pivotX??.5,pivotY:o.pivotY??.5,rotation:o.angle||0,opacity:o.opacity??1,tags:o.assetTags||[],sourceType:o.type};
+  const json=JSON.stringify(meta,null,2);const blob=new Blob([json],{type:"application/json"});Object.defineProperty(blob,"_assetForgeText",{value:json});download(blob,"asset-manifest.json");toast("Asset manifest exported")
+}
+$("exportBtn").onclick=async()=>{try{const b=await selectedPng(),o=canvas.getActiveObject(),name=((o?.name||"asset").replace(/\.[^.]+$/,"")||"asset")+".png";download(b,name);await vaultPut(b,name);toast("PNG exported")}catch(e){console.error(e);toast("Export failed")}};$("assetManifestBtn").onclick=exportSelectedManifest;
+
+async function getSelectedSourceBitmap(){const o=canvas.getActiveObject();if(!o||o.type!=="image")throw new Error("Select a sprite sheet image first");return{o,src:o.getElement()}}
+$("framesInputBtn")?.addEventListener("click",()=>$("framesInput")?.click());
+$("framesInput")?.addEventListener("change",e=>{frameLibrary=[...e.target.files];$("frameCount").textContent=frameLibrary.length+" animation frames loaded";toast(frameLibrary.length+" animation frames loaded")});
+async function extractFrames(){
+ const {o,src}=await getSelectedSourceBitmap(),cols=Math.max(1,+$("cols").value||1),rows=Math.max(1,+$("rows").value||1),cw=Math.max(1,Math.floor((src.naturalWidth||o.width)/cols)),ch=Math.max(1,Math.floor((src.naturalHeight||o.height)/rows)),base=(o.name||"frames").replace(/\.[^.]+$/,"");
+ recentFrames=[];for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const out=document.createElement("canvas");out.width=cw;out.height=ch;out.getContext("2d").drawImage(src,c*cw,r*ch,cw,ch,0,0,cw,ch);const b=await new Promise(res=>out.toBlob(res,"image/png",1));recentFrames.push(b);await vaultPut(b,base+"_"+String(recentFrames.length).padStart(3,"0")+".png")}
+ $("frameCount").textContent=recentFrames.length+" extracted frames ready";toast(recentFrames.length+" frames extracted and ready to pack")
+}
+$("framesBtn").onclick=async()=>{try{await extractFrames()}catch(e){console.error(e);toast(e.message||"Frame extraction failed")}};
+async function loadBitmapFromRaster(blob){
+  try{return await createImageBitmap(blob)}
+  catch{
+    const url=URL.createObjectURL(blob);try{
+      const img=await new Promise((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(i);i.onerror=()=>reject(new Error("The source image could not be decoded."));i.src=url});const c=document.createElement("canvas");c.width=img.naturalWidth||img.width;c.height=img.naturalHeight||img.height;c.getContext("2d").drawImage(img,0,0);return await createImageBitmap(c)
+    }finally{URL.revokeObjectURL(url)}
+  }
+}
+async function packFrames(){
+ const frames=frameLibrary.length?frameLibrary:recentFrames;if(!frames.length)throw new Error("Add animation frames or extract frames first");
+ const cols=Math.max(1,+$("cols").value||1),rows=Math.max(1,+$("rows").value||Math.ceil(frames.length/cols)),count=Math.min(frames.length,cols*rows),gap=Math.max(0,+$("frameGap").value||0),pad=Math.max(0,+$("framePadding").value||0);
+ let cw=+$("frameW").value||0,ch=+$("frameH").value||0;const bitmaps=[];for(let i=0;i<count;i++)bitmaps.push(await loadBitmapFromRaster(frames[i]));
+ if(!cw)cw=Math.max(...bitmaps.map(b=>b.width));if(!ch)ch=Math.max(...bitmaps.map(b=>b.height));
+ const out=document.createElement("canvas");out.width=pad*2+cols*cw+(cols-1)*gap;out.height=pad*2+rows*ch+(rows-1)*gap;const ctx=out.getContext("2d");
+ for(let i=0;i<count;i++){const b=bitmaps[i],s=Math.min(cw/b.width,ch/b.height,1),w=b.width*s,h=b.height*s,x=pad+(i%cols)*(cw+gap)+(cw-w)/2,y=pad+Math.floor(i/cols)*(ch+gap)+(ch-h)/2;ctx.drawImage(b,x,y,w,h);b.close()}
+ const blob=await new Promise(res=>out.toBlob(res,"image/png",1));window.__assetForgeLastSpriteSheet=blob;window.__assetForgeLastSpriteSheetDataUrl=out.toDataURL("image/png");download(blob,"sprite-sheet.png");await vaultPut(blob,"sprite-sheet.png");const fps=Math.max(1,+$("fps").value||12);await exportSpriteManifest({version:1,type:"sprite-sheet",columns:cols,rows,frameCount:count,frameWidth:cw,frameHeight:ch,gap,padding:pad,fps,frameDurationMs:1000/fps,frames:Array.from({length:count},(_,i)=>({index:i,x:pad+(i%cols)*(cw+gap),y:pad+Math.floor(i/cols)*(ch+gap),width:cw,height:ch,durationMs:1000/fps}))});toast(count+" frames packed into raster sprite sheet")
+}
+async function exportSpriteManifest(meta){
+  const json=JSON.stringify(meta,null,2);const blob=new Blob([json],{type:"application/json"});Object.defineProperty(blob,"_assetForgeText",{value:json});download(blob,"sprite-sheet.json")
+}
+$("sheetBtn").onclick=async()=>{try{await packFrames()}catch(e){console.error(e);toast(e.message||"Sprite sheet packing failed")}};
+$("undoBtn").onclick=async()=>{if(history.length<2)return;future.push(history.pop());await restore(history.at(-1))};$("redoBtn").onclick=async()=>{const n=future.pop();if(n){history.push(n);await restore(n)}};
+$("newBtn").onclick=()=>{canvas.clear();history=[];future=[];snapshot();$("dropHint").style.display="block";$("docName").textContent="Untitled Asset";toast("New asset")};
+$("saveBtn").onclick=()=>{const data={version:2,width:+$("cw").value,height:+$("ch").value,canvas:canvas.toJSON(["name","assetId"])};download(new Blob([JSON.stringify(data)],{type:"application/json"}),"asset-forge-project.json");toast("Project saved")};
+$("openBtn").onclick=()=>$("projectInput").click();$("projectInput").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());$("cw").value=d.width;$("ch").value=d.height;resizeEditor();await restore(JSON.stringify(d.canvas));$("dropHint").style.display="none";toast("Project opened")}catch(err){console.error(err);toast("Project file invalid")}};
+$("applySize").onclick=()=>{resizeEditor();snapshot()};
+
+function closeSheets(){document.querySelectorAll(".sidebar.open").forEach(x=>x.classList.remove("open"))}
+function toggleSheet(id){$(id)?.classList.toggle("open")}
+document.querySelectorAll("[data-sheet]").forEach(b=>b.onclick=()=>toggleSheet(b.dataset.sheet));
+document.querySelectorAll("[data-sheet-close]").forEach(b=>b.onclick=()=>$(b.dataset.sheetClose)?.classList.remove("open"));
+$("mobileCropBtn")?.addEventListener("click",()=>{if(typeof openCrop==="function")openCrop()});
+$("mobileBgBtn")?.addEventListener("click",()=>removeBg());
+$("mobileImportBtn")?.addEventListener("click",()=>$("fileInput").click());
+
+$("mobileSpriteBtn")?.addEventListener("click",()=>{toggleSheet("toolPanel");setTimeout(()=>$("framesInput")?.click(),120)});
+let maskEditor=null,maskMode="erase";
+async function openMaskRefine(){
+ const o=selected(),rec=o&&cutoutRecords.get(o);if(!rec)return toast("Select an AI cutout layer first");
+ const src=await createImageBitmap(rec.sourceBlob);maskEditor={source:src,mask:rec.maskCanvas,scale:1,drawing:false};
+ const view=$("maskCanvas"),max=760,scale=Math.min(max/src.width,max/src.height,1);maskEditor.scale=scale;view.width=Math.max(1,Math.round(src.width*scale));view.height=Math.max(1,Math.round(src.height*scale));
+ renderMaskEditor();$("maskModal").classList.remove("hidden")
+}
+function renderMaskEditor(){
+ if(!maskEditor)return;const view=$("maskCanvas"),v=view.getContext("2d"),src=maskEditor.source,mask=maskEditor.mask,tmp=document.createElement("canvas");tmp.width=view.width;tmp.height=view.height;const tc=tmp.getContext("2d",{willReadFrequently:true});tc.drawImage(src,0,0,tmp.width,tmp.height);const a=tc.getImageData(0,0,tmp.width,tmp.height),md=mask.getContext("2d",{willReadFrequently:true}).getImageData(0,0,mask.width,mask.height).data,s=maskEditor.scale;
+ for(let y=0;y<tmp.height;y++)for(let x=0;x<tmp.width;x++){const sx=Math.min(mask.width-1,Math.floor(x/s)),sy=Math.min(mask.height-1,Math.floor(y/s));a.data[(y*tmp.width+x)*4+3]=md[(sy*mask.width+sx)*4+3]}
+ v.clearRect(0,0,view.width,view.height);v.putImageData(a,0,0)
+}
+function paintMask(e){
+ if(!maskEditor)return;const r=$("maskCanvas").getBoundingClientRect(),x=(e.clientX-r.left)/maskEditor.scale,y=(e.clientY-r.top)/maskEditor.scale,ctx=maskEditor.mask.getContext("2d"),rad=(+$("maskSize").value||50)/2,soft=(+$("maskSoft").value||0)/40;
+ const edge=Math.max(.01,1-soft),g=ctx.createRadialGradient(x,y,0,x,y,rad);
+ if(maskMode==="erase"){g.addColorStop(0,"rgba(0,0,0,1)");g.addColorStop(edge,"rgba(0,0,0,1)");g.addColorStop(1,"rgba(0,0,0,0)");ctx.globalCompositeOperation="destination-out"}else{g.addColorStop(0,"rgba(255,255,255,1)");g.addColorStop(edge,"rgba(255,255,255,1)");g.addColorStop(1,"rgba(255,255,255,0)");ctx.globalCompositeOperation="source-over"}
+ ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,rad,0,Math.PI*2);ctx.fill();ctx.globalCompositeOperation="source-over";renderMaskEditor()
+}
+$("refineMaskBtn")?.addEventListener("click",openMaskRefine);$("maskEraseBtn")?.addEventListener("click",()=>{maskMode="erase";$("maskEraseBtn").classList.add("active");$("maskRestoreBtn").classList.remove("active")});$("maskRestoreBtn")?.addEventListener("click",()=>{maskMode="restore";$("maskRestoreBtn").classList.add("active");$("maskEraseBtn").classList.remove("active")});
+$("maskCanvas")?.addEventListener("pointerdown",e=>{e.preventDefault();$("maskCanvas").setPointerCapture(e.pointerId);maskEditor.drawing=true;paintMask(e)});$("maskCanvas")?.addEventListener("pointermove",e=>{if(maskEditor?.drawing)paintMask(e)});["pointerup","pointercancel"].forEach(n=>$("maskCanvas")?.addEventListener(n,()=>{if(maskEditor)maskEditor.drawing=false}));
+$("applyMask")?.addEventListener("click",async()=>{const o=selected(),rec=o&&cutoutRecords.get(o);if(!rec||!maskEditor)return;const src=await createImageBitmap(rec.sourceBlob),m=maskEditor.mask,out=document.createElement("canvas");out.width=m.width;out.height=m.height;const ctx=out.getContext("2d",{willReadFrequently:true});ctx.drawImage(src,0,0,out.width,out.height);const od=ctx.getImageData(0,0,out.width,out.height),md=m.getContext("2d",{willReadFrequently:true}).getImageData(0,0,m.width,m.height).data;for(let i=0;i<od.data.length;i+=4)od.data[i+3]=md[i+3];ctx.putImageData(od,0,0);const blob=await new Promise(res=>out.toBlob(res,"image/png",1));const n=await addReplacement(blob,o,(o.name||"cutout").replace(/_cutout\.png$/,"")+"_refined.png",{cutoutSource:true});cutoutRecords.set(n,{sourceBlob:rec.sourceBlob,maskCanvas:m});$("maskModal").classList.add("hidden");src.close();toast("Mask refinement applied")});
+function b64(blob){return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result.split(",")[1]);fr.onerror=rej;fr.readAsDataURL(blob)})}
+async function githubFetch(path,options={}){if(!github)throw new Error("GitHub is not connected");const res=await fetch("https://api.github.com/repos/"+github.repo+"/contents/"+path+"?ref="+encodeURIComponent(github.branch),{...options,headers:{"Accept":"application/vnd.github+json","Authorization":"Bearer "+github.token,...(options.headers||{})}});const txt=await res.text();let data=null;try{data=JSON.parse(txt)}catch{}if(!res.ok)throw new Error(data?.message||"GitHub API "+res.status);return data}
+async function loadRepoAssets(){if(!github)return toast("Connect GitHub first");setStatus("Loading repository assets…");try{const data=await githubFetch(github.folder);const files=Array.isArray(data)?data.filter(x=>x.type==="file"&&/\.(png|jpe?g|webp|avif)$/i.test(x.name)):[];for(const f of files){const res=await fetch(f.download_url);if(res.ok){const blob=await res.blob();await vaultPut(blob,f.name,true)}}await renderVault();setStatus("Ready");toast(files.length+" repository assets loaded")}catch(e){console.error(e);setStatus("Ready");toast("Repository load failed: "+e.message)}}
+$("repoBtn").onclick=()=>{$("githubModal").classList.remove("hidden");if(github){$("repoName").value=github.repo;$("repoBranch").value=github.branch;$("repoFolder").value=github.folder}};
+$("connectRepoBtn").onclick=async()=>{const token=$("repoToken").value.trim(),repoName=$("repoName").value.trim(),branch=$("repoBranch").value.trim()||"main",folder=($("repoFolder").value.trim()||"assets").replace(/^\/+|\/+$/g,"");if(!token||!repoName)return toast("Repository and token are required");github={token,repo:repoName,branch,folder};$("repoStatus").textContent="Connected: "+repoName+" @ "+branch;$("pushBtn").disabled=false;$("githubModal").classList.add("hidden");toast("GitHub connected");await loadRepoAssets()};
+$("refreshRepoBtn").onclick=async()=>{const token=$("repoToken").value.trim();if(!github&&token){github={token,repo:$("repoName").value.trim(),branch:$("repoBranch").value.trim()||"main",folder:($("repoFolder").value.trim()||"assets").replace(/^\/+|\/+$/g,"")}}if(!github)return toast("Connect GitHub first");await loadRepoAssets()};
+$("pushBtn").onclick=async()=>{const o=canvas.getActiveObject();if(!o||o.type!=="image")return toast("Select an image asset first");const b=await selectedPng(),safe=((o.name||"asset").replace(/[^a-z0-9._-]+/gi,"_")||"asset").replace(/\.png$/i,"")+".png",path=github.folder+"/"+safe;setStatus("Saving to GitHub…");try{let sha;try{const old=await githubFetch(path);sha=old.sha}catch{}const body=JSON.stringify({message:"Asset Forge: save "+safe,content:await b64(b),branch:github.branch,...(sha?{sha}:{})});const res=await fetch("https://api.github.com/repos/"+github.repo+"/contents/"+path,{method:"PUT",headers:{"Accept":"application/vnd.github+json","Authorization":"Bearer "+github.token,"Content-Type":"application/json"},body});const data=await res.json();if(!res.ok)throw new Error(data?.message||"Upload failed");setStatus("Ready");toast("Saved to GitHub: "+path);await loadRepoAssets()}catch(e){console.error(e);setStatus("Ready");toast("GitHub save failed: "+e.message)}};
+
+function fitCanvas(){fit();canvas.requestRenderAll();return {zoom:canvas.getZoom()}}
+function zoomBy(mult){
+  const z=Math.max(.1,Math.min(4,canvas.getZoom()*mult));
+  const st=$("stage"),p=new fabric.Point(st.clientWidth/2,st.clientHeight/2);
+  canvas.zoomToPoint(p,z);canvas.requestRenderAll();$("zoomLabel").textContent=Math.round(z*100)+"%";return {zoom:z}
+}
+function refreshVault(){return renderVault()}
+window.AssetForgeAgent={
+  status:()=>{const o=canvas.getActiveObject(),el=o?.type==="image"?o.getElement():null;return {canvas:{width:canvas.width,height:canvas.height},objects:canvas.getObjects().length,selected:o?.name||null,selectedType:o?.type||null,selectedSize:el?{width:el.naturalWidth||o.width,height:el.naturalHeight||o.height}:null,zoom:canvas.getZoom(),github:!!github,backgroundRemovalError};},
+  upload:addRasterBlob,
+  removeBackground:removeBg,
+  cropSelected:async(x,y,w,h)=>{const o=canvas.getActiveObject();if(!o||o.type!=="image")throw new Error("Select image");return imageFromCrop(o,x,y,w,h)},
+  trimSelected:trimTransparent,
+  exportPng:selectedPng,
+  getLastDownload:()=>window.__assetForgeLastDownload||null,saveSelectedToGitHub:async()=>{if(!$("pushBtn").disabled)return $("pushBtn").click();throw new Error("GitHub is not connected")},
+  pixelAudit:async()=>{
+    const o=selected(),rec=o&&cutoutRecords.get(o);if(!rec)return null;
+    const src=await createImageBitmap(rec.sourceBlob),out=o.getElement(),w=Math.min(src.width,out.width),h=Math.min(src.height,out.height),a=document.createElement("canvas"),b=document.createElement("canvas");
+    a.width=b.width=w;a.height=b.height=h;
+    const ac=a.getContext("2d",{willReadFrequently:true}),bc=b.getContext("2d",{willReadFrequently:true});ac.drawImage(src,0,0,w,h);bc.drawImage(out,0,0,w,h);
+    const A=ac.getImageData(0,0,w,h).data,B=bc.getImageData(0,0,w,h).data;
+    let sum=0,count=0,opaque=0,transparent=0,soft=0,maxAlpha=0,alphaSum=0,nonzero=0;
+    for(let i=0;i<A.length;i+=4){
+      const alpha=B[i+3];maxAlpha=Math.max(maxAlpha,alpha);alphaSum+=alpha;if(alpha>0)nonzero++;
+      if(alpha>240){sum+=Math.abs(A[i]-B[i])+Math.abs(A[i+1]-B[i+1])+Math.abs(A[i+2]-B[i+2]);count++;opaque++}
+      else if(alpha<20)transparent++;else soft++;
+    }
+    src.close();
+    return{meanRgbDelta:count?sum/(count*3):999,opaqueFraction:opaque/(w*h),transparentFraction:transparent/(w*h),softEdgeFraction:soft/(w*h),nonzeroFraction:nonzero/(w*h),meanAlpha:alphaSum/(w*h),maxAlpha,width:w,height:h}
+  },
+  exportSelectedManifest,fit:fitCanvas,zoomBy,refreshVault,deleteSelected,
+  loadGitHubAssets:loadRepoAssets
+};
+
+function installTouchGestures(){
+ const stage=$("stage"),points=new Map();let g=null;
+ stage.addEventListener("pointerdown",e=>{points.set(e.pointerId,{x:e.clientX,y:e.clientY});if(points.size===2){const p=[...points.values()];g={dist:Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y),zoom:canvas.getZoom(),cx:(p[0].x+p[1].x)/2,cy:(p[0].y+p[1].y)/2,tx:canvas.viewportTransform[4],ty:canvas.viewportTransform[5]};canvas.skipTargetFind=true}}, {passive:false});
+ stage.addEventListener("pointermove",e=>{if(points.has(e.pointerId))points.set(e.pointerId,{x:e.clientX,y:e.clientY});if(points.size!==2||!g)return;const p=[...points.values()],dist=Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y),z=Math.max(.1,Math.min(4,g.zoom*dist/g.dist)),cx=(p[0].x+p[1].x)/2,cy=(p[0].y+p[1].y)/2;canvas.zoomToPoint(new fabric.Point(g.cx,g.cy),z);canvas.viewportTransform[4]=g.tx+(cx-g.cx);canvas.viewportTransform[5]=g.ty+(cy-g.cy);canvas.requestRenderAll();$("zoomLabel").textContent=Math.round(z*100)+"%";e.preventDefault()},{passive:false});
+ const up=e=>{points.delete(e.pointerId);if(points.size<2){g=null;canvas.skipTargetFind=false}};stage.addEventListener("pointerup",up);stage.addEventListener("pointercancel",up);window.addEventListener("resize",fit)
+}
+installTouchGestures();
+canvas.on("object:added",()=>{if(!restoring)snapshot();syncProps();renderLayers()});canvas.on("object:modified",()=>{if(!restoring)snapshot();syncProps();renderLayers()});canvas.on("selection:created",()=>{syncProps();renderLayers()});canvas.on("selection:updated",()=>{syncProps();renderLayers()});canvas.on("selection:cleared",()=>{syncProps();renderLayers()});canvas.on("object:removed",()=>{syncProps();renderLayers()});
+document.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){e.preventDefault();$("undoBtn").click()}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="y"){e.preventDefault();$("redoBtn").click()}if(e.key==="Delete"&&document.querySelector(".modal:not(.hidden)")===null)$("deleteBtn").click()};
+$("brightness").value=$("contrast").value=$("saturation").value=$("blur").value=0;
+resizeEditor();snapshot();renderLayers();renderVault();
+
+===== FILE: pro.js =====
+/* Asset Forge Studio PRO interaction/automation bridge.
+   The bridge is intentionally DOM/API based so Playwright, local agents and future MCP browser
+   controllers can drive the same actions a human uses. */
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const q=s=>document.querySelector(s);
+const qa=s=>[...document.querySelectorAll(s)];
+const toastPro=s=>q("#toast")&&((q("#toast").textContent=s,q("#toast").className="show",clearTimeout(window.__toastPro),window.__toastPro=setTimeout(()=>q("#toast").className="",2400)));
+const agent=()=>window.AssetForgeAgent;
+
+function installSheetPolish(){
+  qa(".sidebar .sheet-head").forEach(head=>{
+    if(!head.querySelector(".sheet-grip")){
+      const grip=document.createElement("div");grip.className="sheet-grip";head.prepend(grip);
+    }
+    if(!head.nextElementSibling?.classList.contains("sheet-scroll-shadow")){
+      const shadow=document.createElement("div");shadow.className="sheet-scroll-shadow";head.after(shadow);
+    }
+    const panel=head.closest(".sidebar"),shadow=head.nextElementSibling;
+    const update=()=>shadow.style.opacity=panel.scrollTop>8?"1":"0";
+    panel.addEventListener("scroll",update,{passive:true});update();
+  });
+}
+
+function installCropHandles(){
+  const box=q("#cropBox"),preview=q("#cropPreview");
+  if(!box||!preview||box.dataset.proReady==="1")return;
+  box.dataset.proReady="1";
+  ["nw","ne","sw","se"].forEach(cls=>{
+    const h=document.createElement("div");h.className="crop-handle "+cls;h.dataset.handle=cls;box.appendChild(h);
+    h.addEventListener("pointerdown",e=>{
+      e.preventDefault();e.stopPropagation();h.setPointerCapture(e.pointerId);
+      const r=preview.getBoundingClientRect(),iw=+q("#cropW").dataset.iw||1,ih=+q("#cropH").dataset.ih||1;
+      const sx=preview.clientWidth/iw,sy=preview.clientHeight/ih;
+      const x0=+q("#cropX").value||0,y0=+q("#cropY").value||0,w0=+q("#cropW").value||iw,h0=+q("#cropH").value||ih;
+      const start={px:e.clientX,py:e.clientY,x:x0,y:y0,w:w0,h:h0};
+      const move=ev=>{
+        let dx=(ev.clientX-start.px)/Math.max(.0001,sx),dy=(ev.clientY-start.py)/Math.max(.0001,sy);
+        let x=start.x,y=start.y,w=start.w,h=start.h;
+        if(cls.includes("n")){y=Math.max(0,Math.min(ih-1,start.y+dy));h=Math.max(1,start.h-(y-start.y))}
+        if(cls.includes("s")){h=Math.max(1,Math.min(ih-start.y,start.h+dy))}
+        if(cls.includes("w")){x=Math.max(0,Math.min(iw-1,start.x+dx));w=Math.max(1,start.w-(x-start.x))}
+        if(cls.includes("e")){w=Math.max(1,Math.min(iw-start.x,start.w+dx))}
+        q("#cropX").value=Math.round(x);q("#cropY").value=Math.round(y);q("#cropW").value=Math.round(w);q("#cropH").value=Math.round(h);
+        q("#cropX").dispatchEvent(new Event("input",{bubbles:true}));
+      };
+      const up=()=>{window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",up)};
+      window.addEventListener("pointermove",move,{passive:false});window.addEventListener("pointerup",up,{once:true});
+    });
+  });
+  box.addEventListener("pointerdown",e=>{
+    if(e.target.classList.contains("crop-handle"))return;
+    e.preventDefault();box.setPointerCapture?.(e.pointerId);
+    const iw=+q("#cropW").dataset.iw||1,ih=+q("#cropH").dataset.ih||1;
+    const sx=preview.clientWidth/iw,sy=preview.clientHeight/ih;
+    const start={px:e.clientX,py:e.clientY,x:+q("#cropX").value||0,y:+q("#cropY").value||0,w:+q("#cropW").value||iw,h:+q("#cropH").value||ih};
+    const move=ev=>{
+      const nx=Math.max(0,Math.min(iw-start.w,start.x+(ev.clientX-start.px)/Math.max(.0001,sx)));
+      const ny=Math.max(0,Math.min(ih-start.h,start.y+(ev.clientY-start.py)/Math.max(.0001,sy)));
+      q("#cropX").value=Math.round(nx);q("#cropY").value=Math.round(ny);q("#cropX").dispatchEvent(new Event("input",{bubbles:true}));
+    };
+    const up=()=>{window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",up)};
+    window.addEventListener("pointermove",move,{passive:false});window.addEventListener("pointerup",up,{once:true});
+  });
+}
+
+function patchCropOpen(){
+  const btn=q("#cropBtn");if(!btn||btn.dataset.proCrop==="1")return;
+  btn.dataset.proCrop="1";
+  const original=btn.onclick;
+  btn.onclick=async e=>{
+    if(original)await original.call(btn,e);
+    await sleep(40);
+    const iw=+q("#cropW").value||1,ih=+q("#cropH").value||1;
+    q("#cropW").dataset.iw=iw;q("#cropH").dataset.ih=ih;
+    installCropHandles();
+  };
+  const m=q("#mobileCropBtn");
+  if(m&&!m.dataset.proCrop){
+    m.dataset.proCrop="1";m.addEventListener("click",async()=>{await sleep(50);const iw=+q("#cropW").value||1,ih=+q("#cropH").value||1;q("#cropW").dataset.iw=iw;q("#cropH").dataset.ih=ih;installCropHandles()});
+  }
+}
+
+function patchDuplicate(){
+  const btn=q("#duplicateBtn");if(!btn||btn.dataset.proDup==="1")return;
+  btn.dataset.proDup="1";
+  const prior=btn.onclick;
+  btn.onclick=async e=>{
+    if(prior)await prior.call(btn,e);
+    await sleep(90);
+    const sx=q("#px"),sy=q("#py");
+    if(sx&&sy&&agent()?.status()?.selected){
+      sx.value=(+sx.value||0)+40;sy.value=(+sy.value||0)+40;
+      sx.dispatchEvent(new Event("change",{bubbles:true}));sy.dispatchEvent(new Event("change",{bubbles:true}));
+    }
+    toastPro("Duplicated as a distinct layer");
+  };
+}
+
+async function blobToDataUrl(blob){
+  if(!blob)return null;
+  return await new Promise((resolve,reject)=>{const f=new FileReader();f.onload=()=>resolve(f.result);f.onerror=reject;f.readAsDataURL(blob)});
+}
+async function lastSpriteSheetDataUrl(){return window.__assetForgeLastSpriteSheetDataUrl||await blobToDataUrl(window.__assetForgeLastSpriteSheet)}
+async function lastDownloadDataUrl(){
+  const info=agent()?.getLastDownload?.();if(!info?.href)return null;
+  const res=await fetch(info.href),blob=await res.blob();
+  return await new Promise((resolve,reject)=>{const f=new FileReader();f.onload=()=>resolve(f.result);f.onerror=reject;f.readAsDataURL(blob)});
+}
+
+const A=window.AssetForgeAgent;
+if(A){
+  A.getLastDownloadDataUrl=lastDownloadDataUrl;
+  A.getLastSpriteSheetDataUrl=lastSpriteSheetDataUrl;
+  A.execute=async(cmd={})=>{
+    const op=cmd.op||cmd.action;
+    if(op==="status")return A.status();
+    if(op==="fit")return A.fit?.();
+    if(op==="zoom"){return A.zoomBy?.(+cmd.mult||1.2)}
+    if(op==="wait")return sleep(Math.max(0,+cmd.ms||0));
+    if(op==="removeBackground"){await A.removeBackground();return A.status()}
+    if(op==="trim"){await A.trimSelected();return A.status()}
+    if(op==="crop"){await A.cropSelected(+cmd.x||0,+cmd.y||0,+cmd.w||1,+cmd.h||1);return A.status()}
+    if(op==="export"){await A.exportPng();return A.getLastDownload?.()}
+    if(op==="manifest"){await A.exportSelectedManifest();return A.getLastDownload?.()}
+    if(op==="duplicate"){q("#duplicateBtn")?.click();await sleep(180);return A.status()}
+    if(op==="select"){
+      const name=String(cmd.name||"");
+      const row=qa(".layer-row").find(r=>(r.querySelector(".layer-name")?.textContent||"").includes(name));
+      if(!row)throw new Error("Layer not found: "+name);row.click();return A.status()
+    }
+    if(op==="openTools"){q('button[data-sheet="toolPanel"]')?.click();return true}
+    if(op==="openLayers"){q('button[data-sheet="propsPanel"]')?.click();return true}
+    if(op==="closeSheets"){qa(".sidebar.open").forEach(x=>x.classList.remove("open"));return true}
+    if(op==="spritePack"){q("#sheetBtn")?.click();await sleep(Math.max(200,+cmd.wait||300));return A.getLastDownload?.()}
+    if(op==="spriteExtract"){q("#framesBtn")?.click();await sleep(Math.max(200,+cmd.wait||300));return A.status()}
+    if(op==="setCropFields"){
+      for(const k of ["x","y","w","h"]){if(cmd[k]!==undefined)q("#crop"+k.toUpperCase()).value=cmd[k]}
+      q("#cropX")?.dispatchEvent(new Event("input",{bubbles:true}));return true
+    }
+    throw new Error("Unknown AssetForgeAgent command: "+op);
+  };
+}
+
+window.addEventListener("message",async e=>{
+  const d=e.data;
+  if(!d||d.source!=="asset-forge-studio"||!window.AssetForgeAgent?.execute)return;
+  try{
+    const result=await window.AssetForgeAgent.execute(d.command||d);
+    e.source?.postMessage({source:"asset-forge-studio",requestId:d.requestId||null,ok:true,result},"*");
+  }catch(err){
+    e.source?.postMessage({source:"asset-forge-studio",requestId:d.requestId||null,ok:false,error:err?.message||String(err)},"*");
+  }
+});
+
+
+function installMissingActions(){
+  const A=window.AssetForgeAgent;
+  q("#fitBtn")?.addEventListener("click",()=>A?.fit?.());
+  q("#zoomInBtn")?.addEventListener("click",()=>A?.zoomBy?.(1.2));
+  q("#zoomOutBtn")?.addEventListener("click",()=>A?.zoomBy?.(1/1.2));
+  q("#deleteBtnInspector")?.addEventListener("click",()=>q("#deleteBtn")?.click());
+  q("#mobileExportBtn")?.addEventListener("click",()=>q("#exportBtn")?.click());
+  q("#refreshVaultBtn")?.addEventListener("click",()=>A?.refreshVault?.());
+  q("#clearVaultBtn2")?.addEventListener("click",()=>q("#clearVaultBtn")?.click());
+  q("#urlBtn")?.addEventListener("click",()=>q("#urlModal")?.classList.remove("hidden"));
+  q("#loadUrlBtn")?.addEventListener("click",async()=>{
+    const input=q("#imageUrl"),url=input?.value?.trim();
+    if(!url)return toastPro("Paste an image URL first");
+    const b=q("#loadUrlBtn");b.disabled=true;
+    try{
+      const res=await fetch(url,{mode:"cors"});if(!res.ok)throw new Error("HTTP "+res.status);
+      const blob=await res.blob();if(!blob.type.startsWith("image/"))throw new Error("URL is not an image");
+      await A.upload(blob,url.split("/").pop()?.split("?")[0]||"remote-image.png");
+      q("#urlModal").classList.add("hidden");input.value="";toastPro("Raster imported from URL");
+    }catch(e){toastPro("URL import failed: "+e.message)}
+    finally{b.disabled=false}
+  });
+  A.execute= A.execute || (async(cmd)=>{throw new Error("Bridge not ready")});
+}
+function addAutomationPanel(){
+  if(q("#proStatus"))return;
+  const parent=q("#propsPanel")||q("#toolPanel");if(!parent)return;
+  const card=document.createElement("div");card.className="pro-status";card.id="proStatus";
+  card.innerHTML='<span class="live-dot"></span><div><strong>PRO control bridge</strong><div class="pro-badge">automation + mobile precision</div></div>';
+  parent.insertBefore(card,parent.firstElementChild?.nextElementSibling||parent.firstChild);
+}
+installSheetPolish();patchCropOpen();patchDuplicate();addAutomationPanel();installMissingActions();
+
+const mo=new MutationObserver(()=>{installSheetPolish();installCropHandles()});
+mo.observe(document.body,{subtree:true,childList:true});
+
+
+===== FILE: demo.html =====
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Asset Forge — Final Raster QA</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1020;--panel:#121b2c;--line:#263247;--text:#e8eef9;--muted:#93a4bd;--accent:#6ea8fe}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}
+header{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;background:#0d1424}
+main{max-width:1180px;margin:auto;padding:20px;display:grid;gap:16px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}.card h2{font-size:14px;margin:0 0 10px}.stage{min-height:320px;display:grid;place-items:center;border-radius:10px;overflow:hidden;background:#080c16}.stage img{max-width:100%;max-height:520px;display:block}.stage canvas{width:100%;height:auto;max-height:520px;object-fit:contain;background-image:linear-gradient(45deg,#111827 25%,transparent 25%),linear-gradient(-45deg,#111827 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#111827 75%),linear-gradient(-45deg,transparent 75%,#111827 75%);background-size:24px 24px;background-position:0 0,0 12px,12px -12px,-12px 0}
+.actions{display:flex;gap:8px;flex-wrap:wrap}.actions a,.actions button{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);background:#182236;color:var(--text);border-radius:8px;padding:9px 12px;text-decoration:none}.actions .primary{background:#2563eb;border-color:#3b82f6}
+.status{font-size:12px;color:var(--muted);line-height:1.5}.meta{display:flex;gap:18px;color:var(--muted);font-size:11px;margin-top:10px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><div><strong>Asset Forge Studio</strong><div class="status">Final raster QA preview — no SVG artwork</div></div><div id="status">Loading real image…</div></header>
+<main>
+<section class="grid">
+<div class="card"><h2>Source — real raster photo</h2><div class="stage"><img id="source" alt="Real car source"></div><div class="meta"><span id="sourceMeta">—</span></div></div>
+<div class="card"><h2>Prepared game-asset crop</h2><div class="stage"><canvas id="result" width="512" height="512"></canvas></div><div class="meta"><span id="resultMeta">—</span></div></div>
+</section>
+<section class="card"><div class="actions"><button id="download" class="primary">Download prepared PNG</button><a href="./index.html">Open full editor</a></div><p class="status">The result is produced from the real raster source at runtime: centered crop to 80% of the original bounds, then fitted into a 512×512 PNG canvas without generating SVG artwork.</p></section>
+</main>
+<script>
+const PHOTO_URL="https://raw.githubusercontent.com/Dashstrom/pixelize/main/docs/examples/car.jpg";
+const source=document.getElementById("source"),result=document.getElementById("result"),ctx=result.getContext("2d");
+const status=document.getElementById("status"),sourceMeta=document.getElementById("sourceMeta"),resultMeta=document.getElementById("resultMeta");
+async function load(){
+  try{
+    const response=await fetch(PHOTO_URL,{cache:"no-store"});
+    if(!response.ok)throw new Error("Image HTTP "+response.status);
+    const blob=await response.blob();const url=URL.createObjectURL(blob);
+    source.src=url;await source.decode();
+    const img=await createImageBitmap(blob);
+    sourceMeta.textContent=img.width+" × "+img.height+" px · "+Math.round(blob.size/1024)+" KB";
+    const cropW=Math.floor(img.width*.8),cropH=Math.floor(img.height*.8),sx=Math.floor((img.width-cropW)/2),sy=Math.floor((img.height-cropH)/2);
+    const scale=Math.min(480/cropW,480/cropH),dw=Math.floor(cropW*scale),dh=Math.floor(cropH*scale);
+    ctx.clearRect(0,0,result.width,result.height);
+    ctx.drawImage(img,sx,sy,cropW,cropH,(512-dw)/2,(512-dh)/2,dw,dh);
+    resultMeta.textContent=cropW+" × "+cropH+" px crop → 512 × 512 output";
+    img.close();status.textContent="Ready — real raster processed";
+  }catch(e){console.error(e);status.textContent="QA preview failed: "+e.message}
+}
+document.getElementById("download").onclick=()=>result.toBlob(b=>{const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="asset-forge-final-qa.png";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500)},"image/png");
+load();
+</script>
+</body>
+</html>
+
+===== FILE: manifest.webmanifest =====
+{
+  "name":"Asset Forge Studio",
+  "short_name":"Asset Forge",
+  "start_url":"./",
+  "display":"standalone",
+  "background_color":"#080d16",
+  "theme_color":"#0a0f1a",
+  "orientation":"any",
+  "description":"Professional raster-first game asset editor.",
+  "icons":[]
+}
+
+
+===== FILE: package.json =====
+{
+  "name": "asset-forge-studio",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "start": "node server.mjs",
+    "dev": "node server.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0"
+  }
+}
+
+
+===== FILE: README.md =====
+# Asset Forge Studio
+
+Professional raster-first game-asset editor and preparation pipeline.
+
+## Core workflow
+
+- Raster PNG/JPEG/WebP/AVIF import, drag/drop, and remote URL import.
+- Real crop and transparent-pixel trimming.
+- Non-destructive image adjustments: brightness, contrast, saturation, blur.
+- Real layer stack with visibility, selection, duplicate, delete, and Z-order controls.
+- Layer naming plus game-asset pivot metadata.
+- High-quality browser background removal with the MIT ISNet General INT8 ONNX model through Transformers.js.
+- Background removal preserves the original RGB pixels and applies the AI result as an alpha matte.
+- Manual mask refinement with erase/restore brush, brush size, and softness.
+- Local persistent Asset Vault using IndexedDB.
+- GitHub Asset Vault sync using the GitHub Contents API and a fine-grained token held in memory only.
+- Sprite-sheet extraction into individual frames.
+- Multi-frame sprite packing with rows, columns, cell size, gap, padding, and FPS.
+- Automatic sprite manifest JSON export with frame geometry and timing.
+- Individual game-asset manifest JSON export containing dimensions and pivot metadata.
+- Project JSON save/open.
+- Professional mobile workflow: bottom action dock, scrollable bottom sheets, one-finger selection, two-finger pan/zoom, and pinch zoom.
+- Desktop workflow with side inspectors, canvas zoom, fit, keyboard shortcuts, and responsive panels.
+- No SVG artwork or programmatic SVG asset generation.
+
+## AI cutout engine
+
+The production path uses `xrds/isnet-general-onnx-int8`. The model card identifies it as MIT-licensed, Transformers.js-compatible, WebGPU-capable, and a 42 MB weight-only INT8 QDQ model. The model card documents that only convolution weights are quantized while activations remain fp32, with output quality intended to match the fp32 base model. citeturn517553search1turn517553search11
+
+The editor selects WebGPU when available and falls back to WASM, while preserving the original raster RGB and replacing only the alpha channel with the segmentation mask. The manual mask editor can refine the result afterwards.
+
+The mobile interaction model was cross-checked against browser editor workflows and current tutorial material: compact persistent actions, layer-oriented editing, and a separate mobile tool surface are used instead of squeezing a desktop sidebar onto a phone. Photopea's mobile tutorial demonstrates adjustment editing on a mobile browser, while Canva's video editor tutorial shows a layer/overlay-oriented editing workflow; the asset pipeline also follows the usual sprite-sheet/texture-atlas workflow used in game development. citeturn183734youtube29turn981227search22turn183734youtube28
+
+## Mobile interaction model
+
+The mobile UI uses a bottom action dock and scrollable bottom sheets rather than a scaled desktop sidebar. The editor reserves one-finger touch for normal selection/manipulation and uses two fingers for pan/zoom. This follows standard mobile interaction expectations for tap, drag, swipe, and pinch/zoom, while keeping important actions available through buttons rather than custom gestures alone. citeturn690505search0turn579687search4
+
+## QA
+
+The repository contains Playwright browser tests covering boot/runtime errors, real raster import, crop, trim, filters, undo/redo, export, mobile scrolling, duplicate/layer stack behavior, real car photo processing, AI cutout execution, original-RGB preservation audit, real sprite extraction/packing, manifest generation, and the final raster QA preview.
+
+The AI tests use a real raster car image downloaded during the test run. The repository CI runs the browser suite before deployment.
+
+## Commercial note
+
+The current segmentation model is MIT-licensed. Keep third-party license notices with distributed software and re-check dependency/model licenses before each release.
+
+===== FILE: .github/workflows/pages.yml =====
+name: Asset Forge CI & Pages
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+concurrency:
+  group: asset-forge-run-${{ github.run_id }}
+  cancel-in-progress: false
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npx playwright install chromium
+      - run: npm test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: asset-forge-verification
+          path: tests/verified/
+          if-no-files-found: error
+
+  publish-verification:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: asset-forge-verification
+          path: tests/verified
+      - name: Publish verified raster outputs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C verification-artifacts
+          git add tests/verified
+          git diff --cached --quiet || git commit -m "Publish verified raster outputs"
+          git push --force origin verification-artifacts
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.ENABLE_GITHUB_PAGES == 'true'
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+
+===== FILE: tests/smoke.spec.mjs =====
+import {test,expect} from "@playwright/test";
+import fs from "node:fs";
+const tinyPng=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR42mNk+M/wHwAE/wJ/lqX5AAAAAElFTkSuQmCC","base64");
+test.beforeAll(()=>{fs.mkdirSync("tests/fixtures",{recursive:true});fs.mkdirSync("tests/verified",{recursive:true});fs.writeFileSync("tests/fixtures/pixel.png",tinyPng)});
+test("editor boots without runtime console errors",async({page})=>{
+  const errors=[];
+  page.on("pageerror",e=>errors.push(e.message));
+  page.on("console",m=>{if(m.type()==="error")errors.push(m.text())});
+  await page.goto("/");
+  await expect(page.locator("text=Asset Forge")).toBeVisible();
+  await expect(page.locator("#editorCanvas")).toBeVisible();
+  const bridge=await page.evaluate(()=>window.AssetForgeAgent?.status());
+  expect(bridge, errors.join("\n")).toBeTruthy();
+  expect(bridge?.objects).toBe(0);
+  expect(errors).toEqual([]);
+});
+test("raster import, crop, trim, undo/redo and export remain functional",async({page})=>{
+  await page.goto("/");
+  await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
+  await expect(page.locator("#props")).toBeVisible();
+  await expect(page.locator("#pw")).not.toHaveValue("");
+  await page.click("#cropBtn");
+  await expect(page.locator("#cropModal")).toBeVisible();
+  await expect(page.locator(".crop-handle.se")).toBeVisible();
+  const beforeCropW=await page.inputValue("#cropW");
+  const handle=await page.locator(".crop-handle.se").boundingBox();
+  expect(handle).toBeTruthy();
+  await page.mouse.move(handle.x+8,handle.y+8);
+  await page.mouse.down();
+  await page.mouse.move(handle.x+18,handle.y+18);
+  await page.mouse.up();
+  expect(Number(await page.inputValue("#cropW"))).toBeGreaterThanOrEqual(Number(beforeCropW));
+  await page.fill("#cropW","1"); await page.fill("#cropH","1");
+  await page.click("#applyCrop");
+  await expect(page.locator("#cropModal")).toHaveClass(/hidden/);
+  await expect(page.locator("#props")).toBeVisible();
+  await page.click("#undoBtn"); await page.click("#redoBtn");
+  await page.click("#exportBtn");
+  await expect(page.locator("#toast")).toContainText("PNG exported");
+});
+test("frame extraction creates actual frame assets and sheet packing uses extracted frames",async({page})=>{
+  await page.goto("/");
+  await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
+  await page.fill("#cols","2");
+  await page.fill("#rows","1");
+  await page.click("#framesBtn");
+  await expect(page.locator("#toast")).toContainText("2 frames extracted and ready to pack");
+  await page.click("#sheetBtn");
+  await expect(page.locator("#toast")).toContainText("2 frames packed into raster sprite sheet");
+});
+test("missing sprite selection is rejected cleanly",async({page})=>{
+  await page.goto("/");
+  await page.click("#framesBtn");
+  await expect(page.locator("#toast")).toContainText("Select a sprite sheet image first");
+  await page.click("#sheetBtn");
+  await expect(page.locator("#toast")).toContainText("Add animation frames or extract frames first");
+});
+test("mobile bottom sheets scroll and open without layout errors",async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto("/");
+  await page.click('button[data-sheet="toolPanel"]');
+  await expect(page.locator("#toolPanel")).toHaveClass(/open/);
+  await page.locator("#toolPanel").evaluate(el=>{el.scrollTop=el.scrollHeight});
+  const scroll=await page.locator("#toolPanel").evaluate(el=>({top:el.scrollTop,height:el.scrollHeight-el.clientHeight}));
+  expect(scroll.top).toBeGreaterThan(0);
+  await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
+  await page.click("#mobileExportBtn"); await expect(page.locator("#toast")).toContainText("PNG exported");
+  await page.click('button[data-sheet="propsPanel"]');
+  await expect(page.locator("#propsPanel")).toHaveClass(/open/);
+  await page.locator("#propsPanel").evaluate(el=>{el.scrollTop=el.scrollHeight});
+  const pscroll=await page.locator("#propsPanel").evaluate(el=>el.scrollTop);
+  expect(pscroll).toBeGreaterThanOrEqual(0);
+});
+
+test("real public-domain photo can be imported, cropped and exported as a game asset",async({page})=>{
+  const url="https://raw.githubusercontent.com/Dashstrom/pixelize/main/docs/examples/car.jpg";
+  const response=await page.request.get(url);
+  expect(response.ok()).toBeTruthy();
+  const bytes=await response.body();
+  expect(bytes.length).toBeGreaterThan(20000);
+  fs.writeFileSync("tests/fixtures/real-car.jpg",bytes);
+  await page.goto("/");
+  await page.setInputFiles("#fileInput","tests/fixtures/real-car.jpg");
+  await expect(page.locator("#props")).toBeVisible();
+  const dims=await page.evaluate(()=>window.AssetForgeAgent.status().selectedSize);
+  expect(dims.width).toBeGreaterThan(100);
+  expect(dims.height).toBeGreaterThan(100);
+  await page.click("#cropBtn");
+  await page.fill("#cropX",String(Math.floor(dims.width*0.1)));
+  await page.fill("#cropY",String(Math.floor(dims.height*0.1)));
+  await page.fill("#cropW",String(Math.floor(dims.width*0.8)));
+  await page.fill("#cropH",String(Math.floor(dims.height*0.8)));
+  await page.click("#applyCrop");
+  await expect(page.locator("#cropModal")).toHaveClass(/hidden/);
+  await page.click("#exportBtn");
+  await expect(page.locator("#toast")).toContainText("PNG exported");
+  await page.fill("#cols","2"); await page.fill("#rows","2");
+  await page.click("#framesBtn"); await expect(page.locator("#toast")).toContainText("4 frames extracted and ready to pack");
+  await page.click("#sheetBtn"); await expect(page.locator("#toast")).toContainText("4 frames packed into raster sprite sheet");
+  const bridge=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(bridge.objects).toBe(1);
+  expect(bridge.selected).toMatch(/_crop\.png$/);
+});
+
+test("final raster QA preview processes the real photo",async({page})=>{
+  await page.goto("/demo.html");
+  await expect(page.locator("#status")).toContainText("Ready — real raster processed");
+  await expect(page.locator("#source")).toBeVisible();
+  const result=await page.locator("#result").evaluate(c=>({w:c.width,h:c.height}));
+  expect(result).toEqual({w:512,h:512});
+  await expect(page.locator("#resultMeta")).toContainText("512 × 512 output");
+});
+
+test("duplicate creates a second visible layer and layer actions work",async({page})=>{
+  await page.goto("/");
+  await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
+  await expect(page.locator("#props")).toBeVisible();
+  await page.setViewportSize({width:390,height:844});
+  await page.evaluate(()=>window.AssetForgeAgent.execute({op:"fit"}));
+  await page.evaluate(()=>window.AssetForgeAgent.execute({op:"zoom",mult:1.2}));
+  await page.evaluate(()=>window.AssetForgeAgent.execute({op:"zoom",mult:1/1.2}));
+  await page.click("#urlBtn"); await expect(page.locator("#urlModal")).toBeVisible(); await page.click('[data-close="urlModal"]');
+  await page.evaluate(()=>window.scrollTo(0,0));
+  await page.evaluate(()=>window.AssetForgeAgent.execute({op:"duplicate"}));
+  await expect(page.locator("#toast")).toContainText("Duplicated as a distinct layer");
+  await expect(page.locator("#layerCount")).toHaveText("2");
+  const bridge=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(bridge.objects).toBe(2);
+  await page.click("#frontBtn");
+  await page.click("#downBtn");
+  expect((await page.evaluate(()=>window.AssetForgeAgent.status())).objects).toBe(2);
+});
+
+
+test("multiple raster animation frames pack with padding and gaps",async({page})=>{
+  await page.goto("/");
+  await page.setInputFiles("#framesInput",["tests/fixtures/pixel.png","tests/fixtures/pixel.png"]);
+  await page.fill("#cols","2"); await page.fill("#rows","1"); await page.fill("#frameGap","4"); await page.fill("#framePadding","8");
+  await page.click("#sheetBtn");
+  await expect(page.locator("#toast")).toContainText("2 frames packed into raster sprite sheet");
+});
+
+test("AI cutout QA covers vehicle human and animal rasters in one model session",async({page})=>{
+  test.setTimeout(300000);
+  const cases=[
+    ["vehicle","https://raw.githubusercontent.com/Dashstrom/pixelize/main/docs/examples/car.jpg"],
+    ["human","https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/portrait-of-woman_small.jpg"],
+    ["animal","https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/tiger.jpg"]
+  ];
+  await page.goto("/");
+  for(const [kind,url] of cases){
+    const response=await page.request.get(url);expect(response.ok(),kind).toBeTruthy();
+    const bytes=await response.body();const path="tests/fixtures/"+kind+".jpg";fs.writeFileSync(path,bytes);
+    await page.setInputFiles("#fileInput",path);
+    await expect(page.locator("#props")).toBeVisible();
+    await page.click("#bgBtn");
+    await expect(page.locator("#status")).toHaveText("Ready",{timeout:240000});
+    const bridge=await page.evaluate(()=>window.AssetForgeAgent.status());
+    expect(bridge.backgroundRemovalError||"").toBe("");
+    expect(bridge.selected).toMatch(/_cutout\.png$/);
+    const audit=await page.evaluate(()=>window.AssetForgeAgent.pixelAudit());
+    expect(audit).not.toBeNull();
+    expect(audit.maxAlpha).toBeGreaterThan(200);
+    expect(audit.nonzeroFraction).toBeGreaterThan(0.01);
+    expect(audit.opaqueFraction).toBeGreaterThan(0.001);
+    expect(audit.transparentFraction).toBeGreaterThan(0.01);
+    expect(audit.softEdgeFraction).toBeGreaterThan(0.0001);
+    expect(audit.meanRgbDelta, JSON.stringify(audit)).toBeLessThan(2.5);
+    expect(audit.width).toBeGreaterThan(100); expect(audit.height).toBeGreaterThan(100);
+  }
+  const finalState=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(finalState.objects).toBe(3);
+});
+
+test("game asset manifest export works",async({page})=>{
+  await page.goto("/");
+  await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
+  await expect(page.locator("#props")).toBeVisible();
+  await page.evaluate(()=>window.AssetForgeAgent.exportSelectedManifest());
+  const dl=await page.evaluate(()=>window.AssetForgeAgent.getLastDownload());
+  expect(dl?.name).toBe("asset-manifest.json");
+  expect(dl?.type).toBe("application/json");
+  expect(dl?.href.startsWith("data:application/json")).toBeTruthy();
+});
+
+test("real white-background sprite sheet import background removal trim and exact crop",async({page})=>{
+  test.setTimeout(300000);
+  const url="https://raw.githubusercontent.com/osmanvision/OsCrop/main/samples/white_bg.png";
+  const response=await page.request.get(url);expect(response.ok()).toBeTruthy();
+  fs.writeFileSync("tests/fixtures/real-sprite-sheet.png",await response.body());
+  await page.goto("/");
+  await page.setInputFiles("#fileInput","tests/fixtures/real-sprite-sheet.png");
+  await expect(page.locator("#props")).toBeVisible({timeout:30000});
+  let status=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(status.selectedType).toBe("image");
+  expect(status.selectedSize.width).toBeGreaterThan(100);
+  expect(status.selectedSize.height).toBeGreaterThan(100);
+
+  await page.click("#bgBtn");
+  await expect(page.locator("#status")).toHaveText("Ready",{timeout:240000});
+  const afterBg=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(afterBg.backgroundRemovalError||"").toBe("");
+
+  await page.click("#trimBtn");
+  await expect(page.locator("#toast")).toContainText("Transparent bounds trimmed");
+  const trimmed=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(trimmed.selectedSize.width).toBeGreaterThan(20);
+  expect(trimmed.selectedSize.height).toBeGreaterThan(20);
+
+  const cropW=Math.floor(trimmed.selectedSize.width/2);
+  const cropH=Math.floor(trimmed.selectedSize.height/2);
+  await page.evaluate(({w,h})=>window.AssetForgeAgent.cropSelected(0,0,w,h),{w:cropW,h:cropH});
+  const cropped=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(cropped.selectedSize.width).toBe(cropW);
+  expect(cropped.selectedSize.height).toBe(cropH);
+  await page.click("#exportBtn");
+  await expect(page.locator("#toast")).toContainText("PNG exported");
+  const croppedData=await page.evaluate(()=>window.AssetForgeAgent.getLastDownloadDataUrl());
+  expect(croppedData).toMatch(/^data:image\/png;base64,/);
+  fs.writeFileSync("tests/verified/real-sprite-cropped.png",Buffer.from(croppedData.split(",")[1],"base64"));
+  await page.fill("#cols","2");await page.fill("#rows","2");
+  await page.click("#framesBtn");
+  await expect(page.locator("#toast")).toContainText("4 frames extracted and ready");
+  await page.click("#sheetBtn");
+  await expect(page.locator("#toast")).toContainText("4 frames packed into raster sprite sheet");
+  const spriteData=await page.evaluate(()=>window.AssetForgeAgent.getLastSpriteSheetDataUrl());
+  expect(spriteData).toMatch(/^data:image\/png;base64,/);
+  fs.writeFileSync("tests/verified/real-sprite-sheet.png",Buffer.from(spriteData.split(",")[1],"base64"));
+  fs.writeFileSync("tests/verified/real-sprite-sheet.json",JSON.stringify({
+    source:url,
+    workflow:["download","import","AI background removal","transparent trim","exact crop","4-frame extract","sprite pack"]
+  },null,2));
+});
