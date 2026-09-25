@@ -9,7 +9,7 @@ Professional raster-first game-asset editor and preparation pipeline.
 - Non-destructive image adjustments: brightness, contrast, saturation, blur.
 - Real layer stack with visibility, selection, duplicate, delete, and Z-order controls.
 - Layer naming plus game-asset pivot metadata.
-- High-quality browser background removal with BiRefNet Lite 512 through Transformers.js.
+- High-quality browser background removal with the MIT ISNet General INT8 ONNX model through Transformers.js.
 - Background removal preserves the original RGB pixels and applies the AI result as an alpha matte.
 - Manual mask refinement with erase/restore brush, brush size, and softness.
 - Local persistent Asset Vault using IndexedDB.
@@ -25,11 +25,11 @@ Professional raster-first game-asset editor and preparation pipeline.
 
 ## AI cutout engine
 
-The production path uses studioludens/birefnet-lite-512, an MIT-licensed browser-ready BiRefNet Lite ONNX model. Its model card documents a 512×512 browser export, an FP16 model around 94 MB, and WebGPU/WASM execution through Transformers.js. The model card also documents pixel-level validation of the browser export against its reference implementation. citeturn690505search1turn995272search6
+The production path uses `xrds/isnet-general-onnx-int8`. The model card identifies it as MIT-licensed, Transformers.js-compatible, WebGPU-capable, and a 42 MB weight-only INT8 QDQ model. The model card documents that only convolution weights are quantized while activations remain fp32, with output quality intended to match the fp32 base model. citeturn517553search1turn517553search11
 
-The editor probes the browser GPU. It uses WebGPU+FP16 when the adapter exposes the required shader-f16 feature, otherwise it falls back to WebGPU+FP32 or WASM+FP32 rather than failing on a GPU that lacks FP16. This follows the documented WebGPU capability split in Transformers.js. citeturn690505search3
+The editor selects WebGPU when available and falls back to WASM, while preserving the original raster RGB and replacing only the alpha channel with the segmentation mask. The manual mask editor can refine the result afterwards.
 
-The AI result is converted into an alpha matte and applied to the original raster pixels, avoiding a color-reconstruction step. The manual mask editor can refine the result afterwards.
+The mobile interaction model was cross-checked against browser editor workflows and current tutorial material: compact persistent actions, layer-oriented editing, and a separate mobile tool surface are used instead of squeezing a desktop sidebar onto a phone. Photopea's mobile tutorial demonstrates adjustment editing on a mobile browser, while Canva's video editor tutorial shows a layer/overlay-oriented editing workflow; the asset pipeline also follows the usual sprite-sheet/texture-atlas workflow used in game development. citeturn183734youtube29turn981227search22turn183734youtube28
 
 ## Mobile interaction model
 
