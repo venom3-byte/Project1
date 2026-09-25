@@ -42,10 +42,12 @@ async function restore(j){
     await canvas.loadFromJSON(JSON.parse(j));
     await hydrateCutoutRecords();
     const objects=canvas.getObjects();
-    const next=selectedId
-      ? objects.find(o=>o.assetId===selectedId)
-      : (objects.find(o=>o.type==="image")||objects.at(-1));
-    if(next)canvas.setActiveObject(next);
+    const matched=selectedId?objects.find(o=>o.assetId===selectedId):null;
+    const next=matched||(objects.find(o=>o.type==="image")||objects.at(-1));
+    if(next){
+      canvas.discardActiveObject();
+      canvas.setActiveObject(next);
+    }
 
     canvas.renderAll();syncProps();renderLayers();
   }finally{restoring=false}
@@ -130,7 +132,7 @@ $("resetFilters").onclick=()=>{const o=canvas.getActiveObject();if(o?.type!=="im
 async function addReplacement(blob,old,name,meta={}){const dataUrl=await blobToDataUrl(blob),n=await fabric.FabricImage.fromURL(dataUrl);n.set({left:old.left,top:old.top,angle:old.angle,opacity:old.opacity,scaleX:old.scaleX,scaleY:old.scaleY,name,assetId:old.assetId||makeId(),pivotX:old.pivotX??.5,pivotY:old.pivotY??.5,assetTags:Array.isArray(old.assetTags)?[...old.assetTags]:[],...meta});n.__pivotLastAngle=n.angle||0;const wasRestoring=restoring;restoring=true;try{canvas.remove(old);canvas.add(n);canvas.setActiveObject(n);canvas.renderAll()}finally{restoring=wasRestoring}snapshot();syncProps();renderLayers();await vaultPut(blob,name);lastBlob=blob;return n}
 async function imageFromCrop(obj,x,y,w,h){const src=obj.getElement(),out=document.createElement("canvas");out.width=w;out.height=h;out.getContext("2d").drawImage(src,x,y,w,h,0,0,w,h);const blob=await new Promise(r=>out.toBlob(r,"image/png",1));return addReplacement(blob,obj,(obj.name||"asset").replace(/\.[^.]+$/,"")+"_crop.png")}
 function updateCropBox(){if(!cropTarget)return;const img=$("cropPreview"),box=$("cropBox"),x=+$("cropX").value||0,y=+$("cropY").value||0,w=+$("cropW").value||1,h=+$("cropH").value||1,iw=cropTarget.getElement().naturalWidth||cropTarget.width,ih=cropTarget.getElement().naturalHeight||cropTarget.height,rw=img.clientWidth||1,rh=img.clientHeight||1,ox=(img.parentElement.clientWidth-rw)/2,oy=(img.parentElement.clientHeight-rh)/2;box.style.left=(ox+x/iw*rw)+"px";box.style.top=(oy+y/ih*rh)+"px";box.style.width=(w/iw*rw)+"px";box.style.height=(h/ih*rh)+"px"}
-function openCrop(){const o=canvas.getActiveObject();if(!o||o.type!=="image")return toast("Select an image first");cropTarget=o;const src=o.getElement();$("cropPreview").src=src.currentSrc||src.src;const iw=src.naturalWidth||o.width,ih=src.naturalHeight||o.height;$("cropX").value=0;$("cropY").value=0;$("cropW").value=iw;$("cropH").value=ih;$("cropModal").classList.remove("hidden");setTimeout(updateCropBox,50)}
+function openCrop(){const o=canvas.getActiveObject();if(!o||o.type!=="image")return toast("Select an image first");cropTarget=o;const src=o.getElement();$("cropPreview").src=src.currentSrc||src.src;const iw=src.naturalWidth||o.width,ih=src.naturalHeight||o.height;$("cropX").value=0;$("cropY").value=0;$("cropW").value=iw;$("cropH").value=ih;$("cropW").dataset.iw=iw;$("cropH").dataset.ih=ih;$("cropModal").classList.remove("hidden");setTimeout(updateCropBox,50)}
 ["cropX","cropY","cropW","cropH"].forEach(id=>$(id).oninput=updateCropBox);$("cropBtn").onclick=openCrop;
 $("applyCrop").onclick=async()=>{if(!cropTarget)return;const src=cropTarget.getElement(),maxW=src.naturalWidth||cropTarget.width,maxH=src.naturalHeight||cropTarget.height;let x=Math.max(0,Math.min(maxW-1,+$("cropX").value||0)),y=Math.max(0,Math.min(maxH-1,+$("cropY").value||0)),w=Math.max(1,Math.min(maxW-x,+$("cropW").value||maxW-x)),h=Math.max(1,Math.min(maxH-y,+$("cropH").value||maxH-y));$("applyCrop").disabled=true;try{await imageFromCrop(cropTarget,x,y,w,h);$("cropModal").classList.add("hidden");toast("Crop applied")}catch(e){console.error(e);toast("Crop failed")}finally{$("applyCrop").disabled=false;cropTarget=null}};
 document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>$(b.dataset.close).classList.add("hidden"));
