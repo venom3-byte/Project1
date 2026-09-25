@@ -41,12 +41,12 @@ async function restore(j){
   try{
     await canvas.loadFromJSON(JSON.parse(j));
     await hydrateCutoutRecords();
-    if(selectedId){
-      const next=canvas.getObjects().find(o=>o.assetId===selectedId);
-      if(next)canvas.setActiveObject(next);
-    }else if(canvas.getObjects().length===1){
-      canvas.setActiveObject(canvas.getObjects()[0]);
-    }
+    const objects=canvas.getObjects();
+    const next=selectedId
+      ? objects.find(o=>o.assetId===selectedId)
+      : (objects.find(o=>o.type==="image")||objects.at(-1));
+    if(next)canvas.setActiveObject(next);
+
     canvas.renderAll();syncProps();renderLayers();
   }finally{restoring=false}
 }
