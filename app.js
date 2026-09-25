@@ -82,48 +82,67 @@ document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>$(b.dataset.c
 async function trimTransparent(){const o=canvas.getActiveObject();if(!o||o.type!=="image")return toast("Select a transparent image first");const src=o.getElement(),c=document.createElement("canvas");c.width=src.naturalWidth||o.width;c.height=src.naturalHeight||o.height;const ctx=c.getContext("2d",{willReadFrequently:true});ctx.drawImage(src,0,0,c.width,c.height);const d=ctx.getImageData(0,0,c.width,c.height).data;let minX=c.width,minY=c.height,maxX=-1,maxY=-1;for(let y=0;y<c.height;y++)for(let x=0;x<c.width;x++){if(d[(y*c.width+x)*4+3]>4){if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y}}if(maxX<0)return toast("No visible pixels found");const out=document.createElement("canvas");out.width=maxX-minX+1;out.height=maxY-minY+1;out.getContext("2d").drawImage(c,minX,minY,out.width,out.height,0,0,out.width,out.height);const blob=await new Promise(r=>out.toBlob(r,"image/png",1));await addReplacement(blob,o,(o.name||"asset").replace(/\.[^.]+$/,"")+"_trim.png");toast("Transparent bounds trimmed")}
 $("trimBtn").onclick=trimTransparent;
 
-let birefnetPipeline=null,birefnetPipelinePromise=null;
+let birefnetEngine=null,birefnetEnginePromise=null;
 async function blobFromObject(o){
   const el=o?.type==="image"?o.getElement():null;if(!el)throw new Error("Select a raster image first");
   const c=document.createElement("canvas");c.width=el.naturalWidth||el.width;c.height=el.naturalHeight||el.height;c.getContext("2d").drawImage(el,0,0,c.width,c.height);
   return new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(new Error("Could not encode source image")),"image/png",1))
 }
-async function detectPipelineConfig(){
+async function detectInferenceConfig(){
   if(!navigator.gpu||!window.isSecureContext)return {device:"wasm",dtype:"fp32"};
-  try{const adapter=await navigator.gpu.requestAdapter();if(!adapter)return {device:"wasm",dtype:"fp32"};return{device:"webgpu",dtype:adapter.features?.has?.("shader-f16")?"fp16":"fp32"}}catch{return{device:"wasm",dtype:"fp32"}}
+  try{const adapter=await navigator.gpu.requestAdapter();if(!adapter)return{device:"wasm",dtype:"fp32"};return{device:"webgpu",dtype:adapter.features?.has?.("shader-f16")?"fp16":"fp32"}}catch{return{device:"wasm",dtype:"fp32"}}
 }
-async function getBiRefNetPipeline(){
-  if(birefnetPipeline)return birefnetPipeline;
-  if(birefnetPipelinePromise)return birefnetPipelinePromise;
-  birefnetPipelinePromise=(async()=>{
-    const {pipeline}=await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm");
-    const cfg=await detectPipelineConfig();
+async function getBiRefNetEngine(){
+  if(birefnetEngine)return birefnetEngine;
+  if(birefnetEnginePromise)return birefnetEnginePromise;
+  birefnetEnginePromise=(async()=>{
+    const {AutoModel,AutoProcessor}=await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm");
+    const cfg=await detectInferenceConfig();
     setStatus("Loading BiRefNet Lite ("+cfg.device+" / "+cfg.dtype+")…");
     try{
-      const pipe=await pipeline("image-segmentation","studioludens/birefnet-lite-512",{device:cfg.device,dtype:cfg.dtype});
-      birefnetPipeline=pipe;return pipe
+      const [model,processor]=await Promise.all([
+        AutoModel.from_pretrained("studioludens/birefnet-lite-512",{device:cfg.device,dtype:cfg.dtype}),
+        AutoProcessor.from_pretrained("studioludens/birefnet-lite-512")
+      ]);
+      birefnetEngine={model,processor,config:cfg};return birefnetEngine
     }catch(e){
       if(cfg.device==="webgpu"){
-        const pipe=await pipeline("image-segmentation","studioludens/birefnet-lite-512",{device:"wasm",dtype:"fp32"});
-        birefnetPipeline=pipe;return pipe
+        const [model,processor]=await Promise.all([
+          AutoModel.from_pretrained("studioludens/birefnet-lite-512",{device:"wasm",dtype:"fp32"}),
+          AutoProcessor.from_pretrained("studioludens/birefnet-lite-512")
+        ]);
+        birefnetEngine={model,processor,config:{device:"wasm",dtype:"fp32"}};return birefnetEngine
       }
       throw e
     }
-  })().catch(e=>{birefnetPipelinePromise=null;throw e});
-  return birefnetPipelinePromise
+  })().catch(e=>{birefnetEnginePromise=null;throw e});
+  return birefnetEnginePromise
+}
+function rawImageToMaskCanvas(raw){
+  const mask=raw.rgba?raw.rgba():raw;
+  const width=mask.width,height=mask.height,data=new Uint8ClampedArray(mask.data),stride=Math.max(1,Math.floor(data.length/(width*height)));
+  const canvas=document.createElement("canvas");canvas.width=width;canvas.height=height;const ctx=canvas.getContext("2d",{willReadFrequently:true}),out=new ImageData(width,height),od=out.data;
+  for(let i=0,p=0;i<width*height;i++,p+=4){
+    let v=stride>=4?data[i*stride+3]:data[i*stride];
+    if(v<=1)v*=255;v=Math.max(0,Math.min(255,v));
+    od[p]=255;od[p+1]=255;od[p+2]=255;od[p+3]=v
+  }
+  ctx.putImageData(out,0,0);return{canvas,width,height}
 }
 async function createBiRefNetMask(sourceBlob){
-  const pipe=await getBiRefNetPipeline();
-  const raw=await pipe(sourceBlob,{threshold:0.0});
-  const annotations=Array.isArray(raw)?raw:[raw];
-  const best=annotations.find(x=>x?.mask?.data&&x.mask.width&&x.mask.height)||annotations[0];
-  const mask=best?.mask;
-  if(!mask?.data||!mask.width||!mask.height)throw new Error("BiRefNet returned no usable segmentation mask");
-  const single=mask.channels===1?mask:(typeof mask.grayscale==="function"?mask.grayscale():mask);
-  const canvas=document.createElement("canvas");canvas.width=single.width;canvas.height=single.height;
-  const ctx=canvas.getContext("2d",{willReadFrequently:true}),src=new Uint8ClampedArray(single.data),stride=Math.max(1,Math.floor(src.length/(single.width*single.height))),out=new ImageData(single.width,single.height),od=out.data;
-  for(let i=0,p=0;i<single.width*single.height;i++,p+=4){let v=src[i*stride];if(v<=1)v=v*255;v=Math.max(0,Math.min(255,v));od[p]=255;od[p+1]=255;od[p+2]=255;od[p+3]=Math.round(v)}
-  ctx.putImageData(out,0,0);return{canvas,width:canvas.width,height:canvas.height}
+  const {RawImage}=await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm");
+  const engine=await getBiRefNetEngine(),image=await RawImage.read(sourceBlob),inputs=await engine.processor(image),output=await engine.model({input_image:inputs.pixel_values});
+  const candidate=output?.output_image||output?.logits||output?.output||output?.[0];
+  if(candidate?.width&&candidate?.height&&candidate?.data){
+    return rawImageToMaskCanvas(candidate)
+  }
+  if(candidate?.data&&candidate?.dims){
+    const dims=[...candidate.dims],h=dims.at(-2),w=dims.at(-1);if(!w||!h)throw new Error("BiRefNet tensor has invalid dimensions");
+    const data=candidate.data;const mask=document.createElement("canvas");mask.width=w;mask.height=h;const ctx=mask.getContext("2d",{willReadFrequently:true}),out=new ImageData(w,h),od=out.data;
+    for(let i=0,p=0;i<w*h;i++,p+=4){let x=Number(data[i]);if(x<-1||x>1)x=1/(1+Math.exp(-x));else x=1/(1+Math.exp(-x));od[p]=255;od[p+1]=255;od[p+2]=255;od[p+3]=Math.round(Math.max(0,Math.min(1,x))*255)}
+    ctx.putImageData(out,0,0);return{canvas:mask,width:w,height:h}
+  }
+  throw new Error("BiRefNet returned an unsupported output: "+Object.keys(output||{}).join(","))
 }
 async function composeRawMask(sourceBlob,maskImage){
   const source=await createImageBitmap(sourceBlob),w=source.width,h=source.height,out=document.createElement("canvas");out.width=w;out.height=h;
@@ -159,7 +178,7 @@ function download(blob,name){
   const url=a.href;window.__assetForgeLastDownload={name,href:url,type:blob.type};a.click();setTimeout(()=>{if(url.startsWith("blob:"))URL.revokeObjectURL(url);a.remove()},60000)
 }
 async function exportSelectedManifest(){
-  const o=selected();if(!o)return toast("Select an asset first");
+  const o=selected()||canvas.getObjects().at(-1);if(!o)return toast("Select an asset first");
   const el=imgElement(o);
   const meta={version:1,type:"game-asset",name:o.name||"asset",width:el?.naturalWidth||Math.round(o.getScaledWidth?.()||0),height:el?.naturalHeight||Math.round(o.getScaledHeight?.()||0),pivotX:o.pivotX??.5,pivotY:o.pivotY??.5,rotation:o.angle||0,opacity:o.opacity??1,tags:o.assetTags||[],sourceType:o.type};
   const json=JSON.stringify(meta,null,2);const blob=new Blob([json],{type:"application/json"});Object.defineProperty(blob,"_assetForgeText",{value:json});download(blob,"asset-manifest.json");toast("Asset manifest exported")
