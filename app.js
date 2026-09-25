@@ -2,8 +2,35 @@ const $=id=>document.getElementById(id);
 const selected=()=>canvas.getActiveObject();
 const cutoutRecordsById=new Map();
 const canvas=new fabric.Canvas("editorCanvas",{preserveObjectStacking:true,selection:true,allowTouchScrolling:false,enableRetinaScaling:true,stopContextMenu:true});
-let history=[],future=[],restoring=false,cropTarget=null,github=null,lastBlob=null,recentFrames=[],frameLibrary=[],backgroundRemovalError=null;
+let history=[],future=[],restoring=false,cropTarget=null,github=null,lastBlob=null,recentFrames=[],frameLibrary=[],activeFrameSource=null,backgroundRemovalError=null;
 const state={name:"Untitled Asset",canvasWidth:1024,canvasHeight:1024};
+let pivotTransformGuard=false;
+const degRad=d=>d*Math.PI/180;
+function pivotLocalVector(o){
+  const w=o.getScaledWidth?.()||((o.width||0)*(o.scaleX||1)),h=o.getScaledHeight?.()||((o.height||0)*(o.scaleY||1));
+  return {x:((o.pivotX??.5)-.5)*w,y:((o.pivotY??.5)-.5)*h};
+}
+function rotateVec(v,deg){const r=degRad(deg),cos=Math.cos(r),sin=Math.sin(r);return{x:v.x*cos-v.y*sin,y:v.x*sin+v.y*cos}}
+function pivotWorldPoint(o,angle=o.angle||0){
+  const center=o.getCenterPoint();
+  const v=rotateVec(pivotLocalVector(o),angle);
+  return {x:center.x+v.x,y:center.y+v.y};
+}
+function setPivotValues(o,px,py){o.set({pivotX:Math.max(0,Math.min(1,Number.isFinite(px)?px:.5)),pivotY:Math.max(0,Math.min(1,Number.isFinite(py)?py:.5))});o.__pivotLastAngle=o.angle||0;o.setCoords()}
+function rotateAroundCustomPivot(o,newAngle){
+  if(pivotTransformGuard)return;
+  const oldAngle=Number.isFinite(o.__pivotLastAngle)?o.__pivotLastAngle:(o.angle||0);
+  const worldPivot=pivotWorldPoint(o,oldAngle);
+  const nextVec=rotateVec(pivotLocalVector(o),newAngle);
+  const nextCenter={x:worldPivot.x-nextVec.x,y:worldPivot.y-nextVec.y};
+  pivotTransformGuard=true;
+  try{
+    o.set({angle:newAngle});
+    o.setPositionByOrigin(new fabric.Point(nextCenter.x,nextCenter.y),"center","center");
+    o.setCoords();
+    o.__pivotLastAngle=newAngle;
+  }finally{pivotTransformGuard=false}
+}
 const setStatus=s=>$("status").textContent=s;
 const toast=s=>{const t=$("toast");t.textContent=s;t.className="show";clearTimeout(window.__toast);window.__toast=setTimeout(()=>t.className="",2200)};
 function snapshot(){if(restoring)return;const j=JSON.stringify(canvas.toJSON(["name","assetId","pivotX","pivotY","assetTags","cutoutRecordId","cutoutSourceDataUrl","cutoutMaskDataUrl"]));if(history.at(-1)!==j){history.push(j);if(history.length>80)history.shift();future=[]}}
@@ -35,7 +62,19 @@ function renderLayers(){
   })
 }
 function syncProps(){const o=canvas.getActiveObject();$("propsEmpty").classList.toggle("hidden",!!o);$("props").classList.toggle("hidden",!o);if(!o){$("selectionInfo").textContent="No selection";return;}$("layerName").value=o.name||"";for(const [id,v] of [["px",o.left||0],["py",o.top||0],["pw",o.getScaledWidth()||0],["ph",o.getScaledHeight()||0],["prot",o.angle||0],["pop",o.opacity??1],["pivotX",o.pivotX??.5],["pivotY",o.pivotY??.5]])$(id).value=Math.round(v*1000)/1000;$("imageControls").classList.toggle("hidden",o.type!=="image")}
-function updateProps(){const o=canvas.getActiveObject();if(!o)return;o.set({left:+$("px").value||0,top:+$("py").value||0,angle:+$("prot").value||0,opacity:+$("pop").value,pivotX:Number.isFinite(+$("pivotX").value)?Math.max(0,Math.min(1,+$("pivotX").value)):.5,pivotY:Number.isFinite(+$("pivotY").value)?Math.max(0,Math.min(1,+$("pivotY").value)):.5});const w=+$("pw").value,h=+$("ph").value;if(w>0&&o.width)o.scaleX=w/o.width;if(h>0&&o.height)o.scaleY=h/o.height;canvas.requestRenderAll();snapshot()}
+function updateProps(){
+  const o=canvas.getActiveObject();if(!o)return;
+  const nextLeft=+$("px").value||0,nextTop=+$("py").value||0,nextOpacity=Number.isFinite(+$("pop").value)?+$("pop").value:1;
+  const nextPx=Number.isFinite(+$("pivotX").value)?Math.max(0,Math.min(1,+$("pivotX").value)):.5;
+  const nextPy=Number.isFinite(+$("pivotY").value)?Math.max(0,Math.min(1,+$("pivotY").value)):.5;
+  const nextAngle=+$("prot").value||0;
+  o.set({left:nextLeft,top:nextTop,opacity:nextOpacity});
+  const w=+$("pw").value,h=+$("ph").value;
+  if(w>0&&o.width)o.scaleX=w/o.width;if(h>0&&o.height)o.scaleY=h/o.height;
+  o.set({pivotX:nextPx,pivotY:nextPy});
+  if(Math.abs((o.angle||0)-nextAngle)>0.0001)rotateAroundCustomPivot(o,nextAngle);else o.__pivotLastAngle=nextAngle;
+  o.setCoords();canvas.requestRenderAll();snapshot();
+}
 ["px","py","pw","ph","prot","pop","pivotX","pivotY"].forEach(id=>$(id).onchange=updateProps);$("layerName").onchange=()=>{const o=selected();if(!o)return;o.name=$("layerName").value.trim()||"Layer";snapshot();renderLayers()};
 function deleteSelected(){
   const o=selected();if(!o)return toast("Select a layer first");
@@ -54,7 +93,7 @@ $("duplicateBtn").onclick=async()=>{
     }else{
       c=await o.clone(["name","assetId"]);
     }
-    c.set({left:(o.left||0)+20,top:(o.top||0)+20,name:(o.name||"asset")+"_copy",assetId:crypto.randomUUID(),pivotX:o.pivotX??.5,pivotY:o.pivotY??.5,angle:o.angle||0,opacity:o.opacity??1,filters:o.filters||[]});
+    c.set({left:(o.left||0)+20,top:(o.top||0)+20,name:(o.name||"asset")+"_copy",assetId:crypto.randomUUID(),pivotX:o.pivotX??.5,pivotY:o.pivotY??.5,angle:o.angle||0,opacity:o.opacity??1,filters:o.filters||[],assetTags:Array.isArray(o.assetTags)?[...o.assetTags]:[]});c.__pivotLastAngle=c.angle||0;
     canvas.add(c);canvas.setActiveObject(c);canvas.requestRenderAll();snapshot();syncProps();renderLayers();toast("Layer duplicated")
   }catch(e){console.error(e);toast("Duplicate failed: "+e.message)}
   finally{$("duplicateBtn").disabled=false}
@@ -73,7 +112,7 @@ function applyFilters(){const o=canvas.getActiveObject();if(!o||o.type!=="image"
 ["brightness","contrast","saturation","blur"].forEach(id=>$(id).oninput=applyFilters);
 $("resetFilters").onclick=()=>{const o=canvas.getActiveObject();if(o?.type!=="image")return;o.filters=[];o.applyFilters();["brightness","contrast","saturation","blur"].forEach(id=>$(id).value=0);canvas.requestRenderAll();snapshot()};
 
-async function addReplacement(blob,old,name,meta={}){const dataUrl=await blobToDataUrl(blob),n=await fabric.FabricImage.fromURL(dataUrl);n.set({left:old.left,top:old.top,angle:old.angle,opacity:old.opacity,scaleX:old.scaleX,scaleY:old.scaleY,name,...meta});canvas.remove(old);canvas.add(n);canvas.setActiveObject(n);canvas.renderAll();snapshot();syncProps();await vaultPut(blob,name);lastBlob=blob;return n}
+async function addReplacement(blob,old,name,meta={}){const dataUrl=await blobToDataUrl(blob),n=await fabric.FabricImage.fromURL(dataUrl);n.set({left:old.left,top:old.top,angle:old.angle,opacity:old.opacity,scaleX:old.scaleX,scaleY:old.scaleY,name,pivotX:old.pivotX??.5,pivotY:old.pivotY??.5,assetTags:Array.isArray(old.assetTags)?[...old.assetTags]:[],...meta});n.__pivotLastAngle=n.angle||0;canvas.remove(old);canvas.add(n);canvas.setActiveObject(n);canvas.renderAll();snapshot();syncProps();await vaultPut(blob,name);lastBlob=blob;return n}
 async function imageFromCrop(obj,x,y,w,h){const src=obj.getElement(),out=document.createElement("canvas");out.width=w;out.height=h;out.getContext("2d").drawImage(src,x,y,w,h,0,0,w,h);const blob=await new Promise(r=>out.toBlob(r,"image/png",1));return addReplacement(blob,obj,(obj.name||"asset").replace(/\.[^.]+$/,"")+"_crop.png")}
 function updateCropBox(){if(!cropTarget)return;const img=$("cropPreview"),box=$("cropBox"),x=+$("cropX").value||0,y=+$("cropY").value||0,w=+$("cropW").value||1,h=+$("cropH").value||1,iw=cropTarget.getElement().naturalWidth||cropTarget.width,ih=cropTarget.getElement().naturalHeight||cropTarget.height,rw=img.clientWidth||1,rh=img.clientHeight||1,ox=(img.parentElement.clientWidth-rw)/2,oy=(img.parentElement.clientHeight-rh)/2;box.style.left=(ox+x/iw*rw)+"px";box.style.top=(oy+y/ih*rh)+"px";box.style.width=(w/iw*rw)+"px";box.style.height=(h/ih*rh)+"px"}
 function openCrop(){const o=canvas.getActiveObject();if(!o||o.type!=="image")return toast("Select an image first");cropTarget=o;const src=o.getElement();$("cropPreview").src=src.currentSrc||src.src;const iw=src.naturalWidth||o.width,ih=src.naturalHeight||o.height;$("cropX").value=0;$("cropY").value=0;$("cropW").value=iw;$("cropH").value=ih;$("cropModal").classList.remove("hidden");setTimeout(updateCropBox,50)}
@@ -165,7 +204,7 @@ function download(blob,name,kind="generic"){
   const a=document.createElement("a");a.download=name;a.style.display="none";document.body.appendChild(a);
   if(blob.type==="application/json"){const textValue=typeof blob._assetForgeText==="string"?blob._assetForgeText:null;if(textValue!==null){a.href="data:application/json;charset=utf-8,"+encodeURIComponent(textValue)}else{a.href=URL.createObjectURL(blob)}}
   else{a.href=URL.createObjectURL(blob)}
-  const url=a.href;const record={name,href:url,type:blob.type};window.__assetForgeLastDownload=record;window.__assetForgeLastDownloads=window.__assetForgeLastDownloads||{};window.__assetForgeLastDownloads[kind]=record;a.click();setTimeout(()=>{if(url.startsWith("blob:"))URL.revokeObjectURL(url);a.remove()},60000)
+  const url=a.href;const record={name,href:url,type:blob.type,kind};window.__assetForgeLastDownload=record;window.__assetForgeLastDownloads=window.__assetForgeLastDownloads||{};window.__assetForgeLastDownloads[kind]=record;a.click();setTimeout(()=>{if(url.startsWith("blob:"))URL.revokeObjectURL(url);a.remove()},60000)
 }
 async function exportSelectedManifest(){
   const o=selected()||canvas.getObjects().at(-1);if(!o)return toast("Select an asset first");
@@ -177,10 +216,10 @@ $("exportBtn").onclick=async()=>{try{const b=await selectedPng(),o=canvas.getAct
 
 async function getSelectedSourceBitmap(){const o=canvas.getActiveObject();if(!o||o.type!=="image")throw new Error("Select a sprite sheet image first");return{o,src:o.getElement()}}
 $("framesInputBtn")?.addEventListener("click",()=>$("framesInput")?.click());
-$("framesInput")?.addEventListener("change",e=>{frameLibrary=[...e.target.files];$("frameCount").textContent=frameLibrary.length+" animation frames loaded";toast(frameLibrary.length+" animation frames loaded")});
+$("framesInput")?.addEventListener("change",e=>{frameLibrary=[...e.target.files];recentFrames=[];activeFrameSource=frameLibrary.length?"manual":null;$("frameCount").textContent=frameLibrary.length+" animation frames loaded";toast(frameLibrary.length+" animation frames loaded")});
 async function extractFrames(){
  const {o,src}=await getSelectedSourceBitmap(),cols=Math.max(1,+$("cols").value||1),rows=Math.max(1,+$("rows").value||1),cw=Math.max(1,Math.floor((src.naturalWidth||o.width)/cols)),ch=Math.max(1,Math.floor((src.naturalHeight||o.height)/rows)),base=(o.name||"frames").replace(/\.[^.]+$/,"");
- recentFrames=[];frameLibrary=[];for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const out=document.createElement("canvas");out.width=cw;out.height=ch;out.getContext("2d").drawImage(src,c*cw,r*ch,cw,ch,0,0,cw,ch);const b=await new Promise(res=>out.toBlob(res,"image/png",1));recentFrames.push(b);await vaultPut(b,base+"_"+String(recentFrames.length).padStart(3,"0")+".png")}
+ recentFrames=[];frameLibrary=[];activeFrameSource="extracted";for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const out=document.createElement("canvas");out.width=cw;out.height=ch;out.getContext("2d").drawImage(src,c*cw,r*ch,cw,ch,0,0,cw,ch);const b=await new Promise(res=>out.toBlob(res,"image/png",1));recentFrames.push(b);await vaultPut(b,base+"_"+String(recentFrames.length).padStart(3,"0")+".png")}
  $("frameCount").textContent=recentFrames.length+" extracted frames ready";toast(recentFrames.length+" frames extracted and ready to pack")
 }
 $("framesBtn").onclick=async()=>{try{await extractFrames()}catch(e){console.error(e);toast(e.message||"Frame extraction failed")}};
@@ -193,7 +232,7 @@ async function loadBitmapFromRaster(blob){
   }
 }
 async function packFrames(){
- const frames=frameLibrary.length?frameLibrary:recentFrames;if(!frames.length)throw new Error("Add animation frames or extract frames first");
+ const frames=activeFrameSource==="manual"?frameLibrary:activeFrameSource==="extracted"?recentFrames:(frameLibrary.length?frameLibrary:recentFrames);if(!frames.length)throw new Error("Add animation frames or extract frames first");
  const cols=Math.max(1,+$("cols").value||1),rows=Math.max(1,+$("rows").value||Math.ceil(frames.length/cols)),count=Math.min(frames.length,cols*rows),gap=Math.max(0,+$("frameGap").value||0),pad=Math.max(0,+$("framePadding").value||0);
  let cw=+$("frameW").value||0,ch=+$("frameH").value||0;const bitmaps=[];for(let i=0;i<count;i++)bitmaps.push(await loadBitmapFromRaster(frames[i]));
  if(!cw)cw=Math.max(...bitmaps.map(b=>b.width));if(!ch)ch=Math.max(...bitmaps.map(b=>b.height));$("frameW").value=cw;$("frameH").value=ch;$("rows").value=rows;
@@ -242,13 +281,58 @@ function paintMask(e){
 $("refineMaskBtn")?.addEventListener("click",openMaskRefine);$("maskEraseBtn")?.addEventListener("click",()=>{maskMode="erase";$("maskEraseBtn").classList.add("active");$("maskRestoreBtn").classList.remove("active")});$("maskRestoreBtn")?.addEventListener("click",()=>{maskMode="restore";$("maskRestoreBtn").classList.add("active");$("maskEraseBtn").classList.remove("active")});
 $("maskCanvas")?.addEventListener("pointerdown",e=>{e.preventDefault();$("maskCanvas").setPointerCapture(e.pointerId);maskEditor.drawing=true;paintMask(e)});$("maskCanvas")?.addEventListener("pointermove",e=>{if(maskEditor?.drawing)paintMask(e)});["pointerup","pointercancel"].forEach(n=>$("maskCanvas")?.addEventListener(n,()=>{if(maskEditor)maskEditor.drawing=false}));
 $("applyMask")?.addEventListener("click",async()=>{const o=selected(),rec=o&&cutoutRecordsById.get(o.cutoutRecordId);if(!rec||!maskEditor)return;const src=await createImageBitmap(rec.sourceBlob),m=maskEditor.mask,out=document.createElement("canvas");out.width=m.width;out.height=m.height;const ctx=out.getContext("2d",{willReadFrequently:true});ctx.drawImage(src,0,0,out.width,out.height);const od=ctx.getImageData(0,0,out.width,out.height),md=m.getContext("2d",{willReadFrequently:true}).getImageData(0,0,m.width,m.height).data;for(let i=0;i<od.data.length;i+=4)od.data[i+3]=md[i+3];ctx.putImageData(od,0,0);const blob=await new Promise(res=>out.toBlob(res,"image/png",1));const n=await addReplacement(blob,o,(o.name||"cutout").replace(/_cutout\.png$/,"")+"_refined.png",{cutoutSource:true});const sourceDataUrl=await blobToDataUrl(rec.sourceBlob),maskDataUrl=m.toDataURL("image/png"),recordId=crypto.randomUUID();n.set({cutoutRecordId:recordId,cutoutSourceDataUrl:sourceDataUrl,cutoutMaskDataUrl:maskDataUrl});cutoutRecordsById.set(recordId,{sourceBlob:rec.sourceBlob,maskCanvas:m});snapshot();$("maskModal").classList.add("hidden");src.close();toast("Mask refinement applied")});
-function b64(blob){return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result.split(",")[1]);fr.onerror=rej;fr.readAsDataURL(blob)})}
-async function githubFetch(path,options={}){if(!github)throw new Error("GitHub is not connected");const res=await fetch("https://api.github.com/repos/"+github.repo+"/contents/"+path+"?ref="+encodeURIComponent(github.branch),{...options,headers:{"Accept":"application/vnd.github+json","Authorization":"Bearer "+github.token,...(options.headers||{})}});const txt=await res.text();let data=null;try{data=JSON.parse(txt)}catch{}if(!res.ok)throw new Error(data?.message||"GitHub API "+res.status);return data}
-async function loadRepoAssets(){if(!github)return toast("Connect GitHub first");setStatus("Loading repository assets…");try{const data=await githubFetch(github.folder);const files=Array.isArray(data)?data.filter(x=>x.type==="file"&&/\.(png|jpe?g|webp|avif)$/i.test(x.name)):[];for(const f of files){const res=await fetch(f.download_url);if(res.ok){const blob=await res.blob();await vaultPut(blob,f.name,true)}}await renderVault();setStatus("Ready");toast(files.length+" repository assets loaded")}catch(e){console.error(e);setStatus("Ready");toast("Repository load failed: "+e.message)}}
-$("repoBtn").onclick=()=>{$("githubModal").classList.remove("hidden");if(github){$("repoName").value=github.repo;$("repoBranch").value=github.branch;$("repoFolder").value=github.folder}};
-$("connectRepoBtn").onclick=async()=>{const token=$("repoToken").value.trim(),repoName=$("repoName").value.trim(),branch=$("repoBranch").value.trim()||"main",folder=($("repoFolder").value.trim()||"assets").replace(/^\/+|\/+$/g,"");if(!token||!repoName)return toast("Repository and token are required");github={token,repo:repoName,branch,folder};$("repoStatus").textContent="Connected: "+repoName+" @ "+branch;$("pushBtn").disabled=false;$("githubModal").classList.add("hidden");toast("GitHub connected");await loadRepoAssets()};
-$("refreshRepoBtn").onclick=async()=>{const token=$("repoToken").value.trim();if(!github&&token){github={token,repo:$("repoName").value.trim(),branch:$("repoBranch").value.trim()||"main",folder:($("repoFolder").value.trim()||"assets").replace(/^\/+|\/+$/g,"")}}if(!github)return toast("Connect GitHub first");await loadRepoAssets()};
-$("pushBtn").onclick=async()=>{const o=canvas.getActiveObject();if(!o||o.type!=="image")return toast("Select an image asset first");const b=await selectedPng(),safe=((o.name||"asset").replace(/[^a-z0-9._-]+/gi,"_")||"asset").replace(/\.png$/i,"")+".png",path=github.folder+"/"+safe;setStatus("Saving to GitHub…");try{let sha;try{const old=await githubFetch(path);sha=old.sha}catch(e){if(!/404|not found/i.test(e?.message||""))throw new Error("Could not verify existing GitHub file before save: "+(e?.message||e))}const body=JSON.stringify({message:"Asset Forge: save "+safe,content:await b64(b),branch:github.branch,...(sha?{sha}:{})});const res=await fetch("https://api.github.com/repos/"+github.repo+"/contents/"+path,{method:"PUT",headers:{"Accept":"application/vnd.github+json","Authorization":"Bearer "+github.token,"Content-Type":"application/json"},body});const data=await res.json();if(!res.ok)throw new Error(data?.message||"Upload failed");setStatus("Ready");toast("Saved to GitHub: "+path);await loadRepoAssets()}catch(e){console.error(e);setStatus("Ready");toast("GitHub save failed: "+e.message)}};
+async function githubBridgeRequest(path,options={}){
+  const base=(window.__ASSET_FORGE_GITHUB_BRIDGE||"/api/github").replace(/\/$/,"");
+  const res=await fetch(base+path,{...options,headers:{"Accept":"application/json","Content-Type":"application/json",...(options.headers||{})}});
+  const txt=await res.text();let data=null;try{data=txt?JSON.parse(txt):null}catch{data={message:txt||("HTTP "+res.status)}}
+  if(!res.ok)throw new Error(data?.message||"GitHub bridge HTTP "+res.status);
+  return data;
+}
+async function githubBridgeStatus(){try{return await githubBridgeRequest("/status")}catch{return {configured:false}}}
+async function loadRepoAssets(){
+  if(!github)return toast("Configure GitHub bridge first");
+  setStatus("Loading repository assets…");
+  try{
+    const data=await githubBridgeRequest("/contents?repo="+encodeURIComponent(github.repo)+"&branch="+encodeURIComponent(github.branch)+"&path="+encodeURIComponent(github.folder));
+    const files=Array.isArray(data)?data.filter(x=>x.type==="file"&&/\.(png|jpe?g|webp|avif)$/i.test(x.name)):[];
+    for(const f of files){const res=await fetch(f.download_url);if(res.ok){const blob=await res.blob();await vaultPut(blob,f.name,true)}}
+    await renderVault();setStatus("Ready");toast(files.length+" repository assets loaded")
+  }catch(e){console.error(e);setStatus("Ready");toast("Repository load failed: "+e.message)}
+}
+$("repoBtn").onclick=async()=>{
+  $("githubModal").classList.remove("hidden");
+  if(github){$("repoName").value=github.repo;$("repoBranch").value=github.branch;$("repoFolder").value=github.folder}
+  const s=await githubBridgeStatus();
+  $("repoStatus").textContent=s.configured?"GitHub bridge ready":"GitHub bridge not configured";
+};
+$("connectRepoBtn").onclick=async()=>{
+  const repoName=$("repoName").value.trim(),branch=$("repoBranch").value.trim()||"main",folder=($("repoFolder").value.trim()||"assets").replace(/^\/+|\/+$/g,"");
+  if(!repoName)return toast("Repository is required");
+  try{
+    const s=await githubBridgeStatus();if(!s.configured)throw new Error("Set GITHUB_TOKEN on the local Asset Forge server first");
+    github={repo:repoName,branch,folder};$("repoStatus").textContent="Connected: "+repoName+" @ "+branch;$("pushBtn").disabled=false;$("githubModal").classList.add("hidden");toast("GitHub bridge connected");await loadRepoAssets()
+  }catch(e){$("repoStatus").textContent="Bridge unavailable";toast("GitHub connection failed: "+e.message)}
+};
+$("refreshRepoBtn").onclick=async()=>{
+  if(!github){const repoName=$("repoName").value.trim();if(repoName)github={repo:repoName,branch:$("repoBranch").value.trim()||"main",folder:($("repoFolder").value.trim()||"assets").replace(/^\/+|\/+$/g,"")}}
+  if(!github)return toast("Configure repository first");await loadRepoAssets();
+};
+$("pushBtn").onclick=async()=>{
+  const o=canvas.getActiveObject();if(!o||o.type!=="image")return toast("Select an image asset first");
+  const b=await selectedPng(),safe=((o.name||"asset").replace(/[^a-z0-9._-]+/gi,"_")||"asset").replace(/\.png$/i,"")+".png",path=github.folder+"/"+safe;
+  setStatus("Saving to GitHub…");
+  try{
+    let sha;
+    try{
+      const old=await githubBridgeRequest("/contents?repo="+encodeURIComponent(github.repo)+"&branch="+encodeURIComponent(github.branch)+"&path="+encodeURIComponent(path));
+      sha=old?.sha;
+    }catch(e){
+      if(!/404|not found/i.test(e?.message||""))throw new Error("Could not verify existing GitHub file before save: "+(e?.message||e));
+    }
+    await githubBridgeRequest("/file",{method:"PUT",body:JSON.stringify({repo:github.repo,branch:github.branch,path,message:"Asset Forge: save "+safe,content:await b64(b),...(sha?{sha}:{})})});
+    setStatus("Ready");toast("Saved to GitHub: "+path);await loadRepoAssets()
+  }catch(e){console.error(e);setStatus("Ready");toast("GitHub save failed: "+e.message)}
+};
 
 function fitCanvas(){fit();canvas.requestRenderAll();return {zoom:canvas.getZoom()}}
 function zoomBy(mult){
@@ -258,7 +342,7 @@ function zoomBy(mult){
 }
 function refreshVault(){return renderVault()}
 window.AssetForgeAgent={
-  status:()=>{const o=canvas.getActiveObject(),el=o?.type==="image"?o.getElement():null;return {canvas:{width:canvas.width,height:canvas.height},objects:canvas.getObjects().length,selected:o?.name||null,selectedType:o?.type||null,selectedSize:el?{width:el.naturalWidth||o.width,height:el.naturalHeight||o.height}:null,zoom:canvas.getZoom(),github:!!github,backgroundRemovalError};},
+  status:()=>{const o=canvas.getActiveObject(),el=o?.type==="image"?o.getElement():null;return {canvas:{width:canvas.width,height:canvas.height},objects:canvas.getObjects().length,selected:o?.name||null,selectedType:o?.type||null,selectedSize:el?{width:el.naturalWidth||o.width,height:el.naturalHeight||o.height}:null,zoom:canvas.getZoom(),github:!!github,backgroundRemovalError,frameSource:activeFrameSource};},
   upload:addRasterBlob,
   removeBackground:removeBg,
   cropSelected:async(x,y,w,h)=>{const o=canvas.getActiveObject();if(!o||o.type!=="image")throw new Error("Select image");return imageFromCrop(o,x,y,w,h)},
@@ -280,6 +364,15 @@ window.AssetForgeAgent={
     src.close();
     return{meanRgbDelta:count?sum/(count*3):999,opaqueFraction:opaque/(w*h),transparentFraction:transparent/(w*h),softEdgeFraction:soft/(w*h),nonzeroFraction:nonzero/(w*h),meanAlpha:alphaSum/(w*h),maxAlpha,width:w,height:h}
   },
+  rasterSignature:async()=>{
+    const o=selected(),el=o?.type==="image"?o.getElement():null;if(!el)return null;
+    const w=el.naturalWidth||el.width,h=el.naturalHeight||el.height,c=document.createElement("canvas");c.width=w;c.height=h;
+    const ctx=c.getContext("2d",{willReadFrequently:true});ctx.drawImage(el,0,0,w,h);const d=ctx.getImageData(0,0,w,h).data;
+    let hash=2166136261>>>0,nonZero=0,alphaSum=0;
+    for(let i=0;i<d.length;i++){hash^=d[i];hash=Math.imul(hash,16777619)>>>0;if(i%4===3){if(d[i])nonZero++;alphaSum+=d[i]}}
+    return {width:w,height:h,hash,nonZeroPixels:nonZero,meanAlpha:alphaSum/(w*h)};
+  },
+  pivotWorldPoint:(name)=>{const o=name?canvas.getObjects().find(x=>(x.name||"")===name):selected();return o?pivotWorldPoint(o):null},
   exportSelectedManifest,fit:fitCanvas,zoomBy,refreshVault,deleteSelected,
   loadGitHubAssets:loadRepoAssets
 };
@@ -291,7 +384,16 @@ function installTouchGestures(){
  const up=e=>{points.delete(e.pointerId);if(points.size<2){g=null;canvas.skipTargetFind=false}};stage.addEventListener("pointerup",up);stage.addEventListener("pointercancel",up);window.addEventListener("resize",fit)
 }
 installTouchGestures();
-canvas.on("object:added",()=>{if(!restoring)snapshot();syncProps();renderLayers()});canvas.on("object:modified",()=>{if(!restoring)snapshot();syncProps();renderLayers()});canvas.on("selection:created",()=>{syncProps();renderLayers()});canvas.on("selection:updated",()=>{syncProps();renderLayers()});canvas.on("selection:cleared",()=>{syncProps();renderLayers()});canvas.on("object:removed",()=>{syncProps();renderLayers()});
+canvas.on("object:added",e=>{if(e.target){e.target.__pivotLastAngle=e.target.angle||0}if(!restoring)snapshot();syncProps();renderLayers()});
+canvas.on("object:rotating",e=>{
+  const o=e.target;if(!o||restoring||pivotTransformGuard)return;
+  const prev=Number.isFinite(o.__pivotLastAngle)?o.__pivotLastAngle:(o.angle||0);
+  if(Math.abs((o.angle||0)-prev)<0.0001)return;
+  const worldPivot=pivotWorldPoint(o,prev),nextVec=rotateVec(pivotLocalVector(o),o.angle||0);
+  const nextCenter={x:worldPivot.x-nextVec.x,y:worldPivot.y-nextVec.y};
+  pivotTransformGuard=true;try{o.setPositionByOrigin(new fabric.Point(nextCenter.x,nextCenter.y),"center","center");o.setCoords();o.__pivotLastAngle=o.angle||0}finally{pivotTransformGuard=false}
+  if(!restoring)snapshot();
+});canvas.on("object:modified",()=>{if(!restoring)snapshot();syncProps();renderLayers()});canvas.on("selection:created",()=>{syncProps();renderLayers()});canvas.on("selection:updated",()=>{syncProps();renderLayers()});canvas.on("selection:cleared",()=>{syncProps();renderLayers()});canvas.on("object:removed",()=>{syncProps();renderLayers()});
 document.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){e.preventDefault();$("undoBtn").click()}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="y"){e.preventDefault();$("redoBtn").click()}if(e.key==="Delete"&&document.querySelector(".modal:not(.hidden)")===null)$("deleteBtn").click()};
 $("brightness").value=$("contrast").value=$("saturation").value=$("blur").value=0;
 resizeEditor();snapshot();renderLayers();renderVault();
