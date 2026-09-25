@@ -173,12 +173,12 @@ window.AssetForgeAgent={
   saveSelectedToGitHub:async()=>{if(!$("pushBtn").disabled)return $("pushBtn").click();throw new Error("GitHub is not connected")},
   pixelAudit:async()=>{
     const o=selected(),rec=o&&cutoutRecords.get(o);if(!rec)return null;
-    const src=await createImageBitmap(rec.sourceBlob),out=await createImageBitmap(o.getElement().src);
+    const src=await createImageBitmap(rec.sourceBlob),out=o.getElement();
     const w=Math.min(src.width,out.width),h=Math.min(src.height,out.height),a=document.createElement("canvas"),b=document.createElement("canvas");
     a.width=b.width=w;a.height=b.height=h;const ac=a.getContext("2d",{willReadFrequently:true}),bc=b.getContext("2d",{willReadFrequently:true});ac.drawImage(src,0,0,w,h);bc.drawImage(out,0,0,w,h);
     const A=ac.getImageData(0,0,w,h).data,B=bc.getImageData(0,0,w,h).data;let sum=0,count=0,opaque=0,transparent=0;
     for(let i=0;i<A.length;i+=4){if(B[i+3]>240){sum+=Math.abs(A[i]-B[i])+Math.abs(A[i+1]-B[i+1])+Math.abs(A[i+2]-B[i+2]);count++}if(B[i+3]>240)opaque++;if(B[i+3]<20)transparent++}
-    src.close();out.close();return{meanRgbDelta:count?sum/(count*3):999,opaqueFraction:opaque/(w*h),transparentFraction:transparent/(w*h),width:w,height:h}
+    src.close();return{meanRgbDelta:count?sum/(count*3):999,opaqueFraction:opaque/(w*h),transparentFraction:transparent/(w*h),width:w,height:h}
   },
   loadGitHubAssets:loadRepoAssets
 };
