@@ -3,6 +3,12 @@ const makeId=()=>globalThis.crypto?.randomUUID?.()||`${Date.now().toString(36)}-
 const selected=()=>canvas.getActiveObject();
 const cutoutRecordsById=new Map();
 const canvas=new fabric.Canvas("editorCanvas",{preserveObjectStacking:true,selection:true,allowTouchScrolling:false,enableRetinaScaling:true,stopContextMenu:true});
+if(fabric.FabricObject){
+  fabric.FabricObject.customProperties=[
+    "name","assetId","pivotX","pivotY","assetTags",
+    "cutoutRecordId","cutoutSourceDataUrl","cutoutMaskDataUrl"
+  ];
+}
 let history=[],future=[],restoring=false,cropTarget=null,github=null,lastBlob=null,recentFrames=[],frameLibrary=[],activeFrameSource=null,backgroundRemovalError=null;
 let historyBusyPromise=Promise.resolve();
 const state={name:"Untitled Asset",canvasWidth:1024,canvasHeight:1024};
