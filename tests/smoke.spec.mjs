@@ -84,3 +84,12 @@ test("real public-domain photo can be imported, cropped and exported as a game a
   expect(bridge.objects).toBe(1);
   expect(bridge.selected).toMatch(/_crop\.png$/);
 });
+
+test("final raster QA preview processes the real photo",async({page})=>{
+  await page.goto("/demo.html");
+  await expect(page.locator("#status")).toContainText("Ready — real raster processed");
+  await expect(page.locator("#source")).toBeVisible();
+  const result=await page.locator("#result").evaluate(c=>({w:c.width,h:c.height}));
+  expect(result).toEqual({w:512,h:512});
+  await expect(page.locator("#resultMeta")).toContainText("512 × 512 output");
+});
