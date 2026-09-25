@@ -216,7 +216,7 @@ document.querySelectorAll("[data-sheet-close]").forEach(b=>b.onclick=()=>$(b.dat
 $("mobileCropBtn")?.addEventListener("click",()=>{if(typeof openCrop==="function")openCrop()});
 $("mobileBgBtn")?.addEventListener("click",()=>removeBg());
 $("mobileImportBtn")?.addEventListener("click",()=>$("fileInput").click());
-$("mobileExportBtn")?.addEventListener("click",()=>exportPng());
+
 $("mobileSpriteBtn")?.addEventListener("click",()=>{toggleSheet("toolPanel");setTimeout(()=>$("framesInput")?.click(),120)});
 let maskEditor=null,maskMode="erase";
 async function openMaskRefine(){
