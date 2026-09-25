@@ -50,7 +50,7 @@ function installCropHandles(){
   box.addEventListener("pointerdown",e=>{
     if(e.target.classList.contains("crop-handle"))return;
     e.preventDefault();box.setPointerCapture?.(e.pointerId);
-    const iw=+q("#cropW").dataset.iw||1,ih=+q("#cropH").dataset.ih||1;
+    const r=preview.getBoundingClientRect(),iw=+q("#cropW").dataset.iw||1,ih=+q("#cropH").dataset.ih||1;
     const sx=Math.max(0.0001,r.width/iw),sy=Math.max(0.0001,r.height/ih);
     const start={px:e.clientX,py:e.clientY,x:+q("#cropX").value||0,y:+q("#cropY").value||0,w:+q("#cropW").value||iw,h:+q("#cropH").value||ih};
     const move=ev=>{
