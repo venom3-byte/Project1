@@ -31,7 +31,7 @@ test("raster history and saved project preserve actual image data",async({page})
   await page.click("#redoBtn");
   const afterRedo=await page.evaluate(()=>window.AssetForgeAgent.status());
   expect(afterRedo.objects).toBe(1);
-  expect(afterRedo.selectedType).toBe("image");
+  expect(afterRedo.selectedType,JSON.stringify(afterRedo)).toBe("image");
   await page.click("#saveBtn");
   const projectData=await page.evaluate(()=>window.AssetForgeAgent.getLastProjectDataUrl());
   expect(projectData).toMatch(/^data:application\/json/);
@@ -78,7 +78,7 @@ test("raster pixels survive undo/redo and project save/open",async({page})=>{
   await page.evaluate(()=>window.AssetForgeAgent.cropSelected(0,0,1,1));
   await page.click("#undoBtn");
   const afterUndo=await page.evaluate(()=>window.AssetForgeAgent.rasterSignature());
-  expect(afterUndo).toEqual(before);
+  expect(afterUndo,JSON.stringify({before,afterUndo})).toEqual(before);
   await page.click("#redoBtn");
   const afterRedo=await page.evaluate(()=>window.AssetForgeAgent.status());
   expect(afterRedo.selectedSize).toEqual({width:1,height:1});
