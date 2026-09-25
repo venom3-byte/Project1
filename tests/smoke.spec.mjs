@@ -114,7 +114,7 @@ test("duplicate creates a second visible layer and layer actions work",async({pa
   await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
   await expect(page.locator("#props")).toBeVisible();
   await page.click("#fitBtn"); await page.click("#zoomInBtn"); await page.click("#zoomOutBtn");
-  await page.click("#urlBtn"); await expect(page.locator("#urlModal")).toBeVisible(); await page.click('[data-close="urlModal"]');
+  await page.click("#urlBtn"); await expect(page.locator("#urlModal")).toBeVisible(); await page.click('[data-close="urlModal"]');\n  await page.click("#mobileExportBtn"); await expect(page.locator("#toast")).toContainText("PNG exported");
   await page.evaluate(()=>window.AssetForgeAgent.execute({op:"duplicate"}));
   await expect(page.locator("#toast")).toContainText("Duplicated as a distinct layer");
   await expect(page.locator("#layerCount")).toHaveText("2");
@@ -216,7 +216,7 @@ test("real white-background sprite sheet import background removal trim and exac
   await page.click("#sheetBtn");
   await expect(page.locator("#toast")).toContainText("4 frames packed into raster sprite sheet");
   const spriteData=await page.evaluate(()=>window.AssetForgeAgent.getLastDownloadDataUrl());
-  expect(spriteData).toMatch(/^data:image\\/png;base64,/);
+  expect(spriteData).toMatch(/^data:image\/png;base64,/);
   fs.writeFileSync("tests/verified/real-sprite-sheet.png",Buffer.from(spriteData.split(",")[1],"base64"));
   fs.writeFileSync("tests/verified/real-sprite-sheet.json",JSON.stringify({
     source:url,
