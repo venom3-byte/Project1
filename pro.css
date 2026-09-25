@@ -1,0 +1,35 @@
+/* Asset Forge Studio PRO interaction layer — inspired by established mobile editor patterns without copying proprietary UI. */
+.sheet-grip{display:none}
+.sheet-scroll-shadow{position:sticky;top:38px;height:12px;margin:-12px 0 0;pointer-events:none;z-index:3;background:linear-gradient(#0f1622,transparent);opacity:0;transition:opacity .18s}
+.mobile-dock{scrollbar-width:none;scroll-snap-type:x proximity}
+.mobile-dock::-webkit-scrollbar{display:none}
+.mobile-dock button{min-width:58px;min-height:50px;scroll-snap-align:center}
+.tool,.sidebar button,.modal button{min-height:40px}
+.crop-handle{position:absolute;width:18px;height:18px;border:2px solid #fff;background:#2d72e8;border-radius:5px;box-shadow:0 2px 9px #000b;pointer-events:auto;touch-action:none}
+.crop-handle.nw{left:-9px;top:-9px;cursor:nwse-resize}
+.crop-handle.ne{right:-9px;top:-9px;cursor:nesw-resize}
+.crop-handle.sw{left:-9px;bottom:-9px;cursor:nesw-resize}
+.crop-handle.se{right:-9px;bottom:-9px;cursor:nwse-resize}
+.crop-drag-label{position:absolute;left:50%;top:-28px;transform:translateX(-50%);padding:4px 7px;border-radius:6px;border:1px solid #ffffff20;background:#0c1524e8;color:#e8f0fa;font-size:9px;white-space:nowrap;pointer-events:none;box-shadow:0 4px 16px #0008}
+.pro-status{display:flex;align-items:center;gap:7px;margin:8px 0;padding:8px 10px;border:1px solid #25354b;background:#0b1421;border-radius:10px;color:#a9b9cd;font-size:10px}
+.pro-status strong{color:#e5edf7}
+.pro-action-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:8px 0}
+.pro-action-row button{font-size:10px}
+.pro-badge{font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:#87a1c1}
+@media(max-width:900px){
+  .sidebar{max-height:76dvh;padding-bottom:calc(88px + env(safe-area-inset-bottom));overscroll-behavior-y:contain}
+  .sheet-head{padding-bottom:12px}
+  .sheet-grip{display:block;width:42px;height:4px;border-radius:999px;background:#60738b;opacity:.72;margin:0 auto 9px}
+  .sheet-scroll-shadow{top:47px}
+  .sidebar.open{will-change:transform}
+  .mobile-dock{height:70px;padding-top:7px}
+  .mobile-dock button{flex-basis:60px}
+  .crop-card{width:min(96vw,760px);max-height:94dvh}
+  .crop-preview{height:min(52dvh,520px)}
+  .crop-handle{width:22px;height:22px}
+  .mask-toolbar{position:sticky;top:0;z-index:2;padding:6px 0;background:#111b2b}
+}
+@media(pointer:coarse){
+  button{min-width:44px}
+  .field input{min-height:40px}
+}
