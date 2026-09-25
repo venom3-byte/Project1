@@ -166,9 +166,9 @@ test("game asset manifest export works",async({page})=>{
   expect(dl?.href.startsWith("data:application/json")).toBeTruthy();
 });
 
-test("real sprite sheet remote import background trim and exact crop",async({page})=>{
+test("real white-background sprite sheet import background removal trim and exact crop",async({page})=>{
   test.setTimeout(300000);
-  const url="https://raw.githubusercontent.com/Aelof3/sprite-sheet-generator/main/docs/images/06-fullsheet.png";
+  const url="https://raw.githubusercontent.com/osmanvision/OsCrop/main/samples/white_bg.png";
   const response=await page.request.get(url);expect(response.ok()).toBeTruthy();
   fs.writeFileSync("tests/fixtures/real-sprite-sheet.png",await response.body());
   await page.goto("/");
