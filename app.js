@@ -35,11 +35,22 @@ function rotateAroundCustomPivot(o,newAngle){
 const setStatus=s=>$("status").textContent=s;
 const toast=s=>{const t=$("toast");t.textContent=s;t.className="show";clearTimeout(window.__toast);window.__toast=setTimeout(()=>t.className="",2200)};
 function snapshot(){if(restoring)return;const j=JSON.stringify(canvas.toJSON(["name","assetId","pivotX","pivotY","assetTags","cutoutRecordId","cutoutSourceDataUrl","cutoutMaskDataUrl"]));if(history.at(-1)!==j){history.push(j);if(history.length>80)history.shift();future=[]}}
+async function waitForImageElements(){
+  const images=canvas.getObjects().filter(o=>o.type==="image");
+  await Promise.all(images.map(o=>new Promise(resolve=>{
+    const el=o.getElement?.();
+    if(!el)return resolve();
+    if((el.complete&&(el.naturalWidth||el.width))||el.naturalWidth>0)return resolve();
+    const done=()=>{el.removeEventListener("load",done);el.removeEventListener("error",done);resolve()};
+    el.addEventListener("load",done,{once:true});el.addEventListener("error",done,{once:true});
+  })));
+}
 async function restore(j){
   const selectedId=selected()?.assetId||null;
   restoring=true;
   try{
     await canvas.loadFromJSON(JSON.parse(j));
+    await waitForImageElements();
     await hydrateCutoutRecords();
     const objects=canvas.getObjects();
     const matched=selectedId?objects.find(o=>o.assetId===selectedId):null;
@@ -285,23 +296,39 @@ $("mobileSpriteBtn")?.addEventListener("click",()=>{toggleSheet("toolPanel");set
 let maskEditor=null,maskMode="erase";
 async function hydrateCutoutRecords(){cutoutRecordsById.clear();for(const o of canvas.getObjects()){if(!o.cutoutRecordId||!o.cutoutSourceDataUrl||!o.cutoutMaskDataUrl)continue;try{const sourceBlob=await dataUrlToBlob(o.cutoutSourceDataUrl),img=await createImageBitmap(sourceBlob),maskImg=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=o.cutoutMaskDataUrl}),maskCanvas=document.createElement("canvas");maskCanvas.width=maskImg.naturalWidth||maskImg.width;maskCanvas.height=maskImg.naturalHeight||maskImg.height;maskCanvas.getContext("2d").drawImage(maskImg,0,0);img.close();cutoutRecordsById.set(o.cutoutRecordId,{sourceBlob,maskCanvas})}catch(e){console.warn("Could not restore cutout metadata",e)}}}
 async function ensureCutoutRecord(o){
-  if(!o?.cutoutRecordId||!o.cutoutSourceDataUrl||!o.cutoutMaskDataUrl)return null;
-  const existing=cutoutRecordsById.get(o.cutoutRecordId);
+  if(!o)return null;
+  const existing=o.cutoutRecordId?cutoutRecordsById.get(o.cutoutRecordId):null;
   if(existing)return existing;
-  try{
-    const sourceBlob=await dataUrlToBlob(o.cutoutSourceDataUrl);
-    const maskImg=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=o.cutoutMaskDataUrl});
-    const maskCanvas=document.createElement("canvas");
-    maskCanvas.width=maskImg.naturalWidth||maskImg.width;
-    maskCanvas.height=maskImg.naturalHeight||maskImg.height;
-    maskCanvas.getContext("2d").drawImage(maskImg,0,0);
-    const record={sourceBlob,maskCanvas};
-    cutoutRecordsById.set(o.cutoutRecordId,record);
-    return record;
-  }catch(e){
-    console.warn("Could not rebuild cutout record",e);
-    return null;
+  if(o.cutoutSourceDataUrl&&o.cutoutMaskDataUrl&&o.cutoutRecordId){
+    try{
+      const sourceBlob=await dataUrlToBlob(o.cutoutSourceDataUrl);
+      const maskImg=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=o.cutoutMaskDataUrl});
+      const maskCanvas=document.createElement("canvas");
+      maskCanvas.width=maskImg.naturalWidth||maskImg.width;
+      maskCanvas.height=maskImg.naturalHeight||maskImg.height;
+      maskCanvas.getContext("2d").drawImage(maskImg,0,0);
+      const record={sourceBlob,maskCanvas};
+      cutoutRecordsById.set(o.cutoutRecordId,record);
+      return record;
+    }catch(e){console.warn("Could not rebuild cutout record",e)}
   }
+  if(o.type==="image"&&((o.name||"").endsWith("_cutout.png")||o.cutoutSource)){
+    try{
+      const el=o.getElement(),w=el.naturalWidth||el.width,h=el.naturalHeight||el.height;
+      const c=document.createElement("canvas");c.width=w;c.height=h;
+      const ctx=c.getContext("2d",{willReadFrequently:true});ctx.drawImage(el,0,0,w,h);
+      const pixels=ctx.getImageData(0,0,w,h),mask=document.createElement("canvas");mask.width=w;mask.height=h;
+      const mctx=mask.getContext("2d",{willReadFrequently:true}),md=mctx.createImageData(w,h);
+      for(let i=0;i<pixels.data.length;i+=4){md.data[i]=255;md.data[i+1]=255;md.data[i+2]=255;md.data[i+3]=pixels.data[i+3]}
+      mctx.putImageData(md,0,0);
+      const sourceBlob=await new Promise(res=>c.toBlob(res,"image/png",1));
+      const record={sourceBlob,maskCanvas:mask};
+      const id=o.cutoutRecordId||makeId();
+      o.cutoutRecordId=id;cutoutRecordsById.set(id,record);
+      return record;
+    }catch(e){console.warn("Could not rebuild cutout from visible raster",e)}
+  }
+  return null;
 }
 async function openMaskRefine(){
  const o=selected(),rec=await ensureCutoutRecord(o);if(!rec)return toast("Select an AI cutout layer first");
