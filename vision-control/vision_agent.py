@@ -141,7 +141,7 @@ class VisionAgent:
             "edge_density": round(edge_density, 4),
             "visual_regions": regions[:60],
             "signals": {
-                "possible_blank_or_black_screen": black_ratio >= 0.90,
+                "possible_blank_or_black_screen": (black_ratio >= 0.965 and edge_density < 0.002),
                 "very_low_visual_structure": edge_density <= 0.005,
                 "console_errors": len(self.console_errors),
                 "page_errors": len(self.page_errors)
