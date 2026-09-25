@@ -10,7 +10,8 @@ test("editor boots without runtime console errors",async({page})=>{
   await expect(page.locator("text=Asset Forge")).toBeVisible();
   await expect(page.locator("#editorCanvas")).toBeVisible();
   const bridge=await page.evaluate(()=>window.AssetForgeAgent?.status());
-  expect(bridge, errors.join("\n")).toBeTruthy();
+  expect(bridge, errors.join("
+")).toBeTruthy();
   expect(bridge?.objects).toBe(0);
   expect(errors).toEqual([]);
 });
@@ -193,7 +194,12 @@ test("real white-background sprite sheet import background removal trim and exac
   const cropW=Math.floor(trimmed.selectedSize.width/2);
   const cropH=Math.floor(trimmed.selectedSize.height/2);
   await page.evaluate(({w,h})=>window.AssetForgeAgent.cropSelected(0,0,w,h),{w:cropW,h:cropH});
-  const cropped=await page.evaluate(()=>window.AssetForgeAgent.status());\n  await page.click("#exportBtn");\n  await expect(page.locator("#toast")).toContainText("PNG exported");\n  const croppedData=await page.evaluate(()=>window.AssetForgeAgent.getLastDownloadDataUrl());\n  expect(croppedData).toMatch(/^data:image\/png;base64,/);\n  fs.writeFileSync("tests/verified/real-sprite-cropped.png",Buffer.from(croppedData.split(",")[1],"base64"));
+  const cropped=await page.evaluate(()=>window.AssetForgeAgent.status());
+  await page.click("#exportBtn");
+  await expect(page.locator("#toast")).toContainText("PNG exported");
+  const croppedData=await page.evaluate(()=>window.AssetForgeAgent.getLastDownloadDataUrl());
+  expect(croppedData).toMatch(/^data:image\/png;base64,/);
+  fs.writeFileSync("tests/verified/real-sprite-cropped.png",Buffer.from(croppedData.split(",")[1],"base64"));
   await page.fill("#cols","2");await page.fill("#rows","2");
   await page.click("#framesBtn");
   await expect(page.locator("#toast")).toContainText("4 frames extracted and ready");
