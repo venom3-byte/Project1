@@ -45,17 +45,19 @@ test("missing sprite selection is rejected cleanly",async({page})=>{
   await page.click("#sheetBtn");
   await expect(page.locator("#toast")).toContainText("Extract frames first");
 });
-test("mobile drawers open and close without layout errors",async({page})=>{
+test("mobile bottom sheets scroll and open without layout errors",async({page})=>{
   await page.setViewportSize({width:390,height:844});
   await page.goto("/");
-  await page.click("#toolsToggle");
+  await page.click('button[data-sheet="toolPanel"]');
   await expect(page.locator("#toolPanel")).toHaveClass(/open/);
-  await page.click("#toolsToggle");
-  await expect(page.locator("#toolPanel")).not.toHaveClass(/open/);
-  await page.click("#propsToggle");
+  await page.locator("#toolPanel").evaluate(el=>{el.scrollTop=el.scrollHeight});
+  const scroll=await page.locator("#toolPanel").evaluate(el=>({top:el.scrollTop,height:el.scrollHeight-clientHeight}));
+  expect(scroll.top).toBeGreaterThan(0);
+  await page.click('button[data-sheet="propsPanel"]');
   await expect(page.locator("#propsPanel")).toHaveClass(/open/);
-  await page.click("#propsToggle");
-  await expect(page.locator("#propsPanel")).not.toHaveClass(/open/);
+  await page.locator("#propsPanel").evaluate(el=>{el.scrollTop=el.scrollHeight});
+  const pscroll=await page.locator("#propsPanel").evaluate(el=>el.scrollTop);
+  expect(pscroll).toBeGreaterThanOrEqual(0);
 });
 
 test("real public-domain photo can be imported, cropped and exported as a game asset",async({page})=>{
@@ -108,4 +110,43 @@ test("AI background removal operates on a real raster asset",async({page})=>{
   expect(bridge.backgroundRemovalError, bridge.backgroundRemovalError||"background removal produced no error").toBeFalsy();
   expect(bridge.selected).toMatch(/_cutout\.png$/);
   await expect(page.locator("#status")).toHaveText("Ready");
+});
+
+test("duplicate creates a second visible layer and layer actions work",async({page})=>{
+  await page.goto("/");
+  await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
+  await page.click("#duplicateBtn");
+  const bridge=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(bridge.objects).toBe(2);
+  expect(await page.locator("#layerCount").textContent()).toBe("2");
+  await page.click("#frontBtn");
+  await page.click("#downBtn");
+  expect((await page.evaluate(()=>window.AssetForgeAgent.status())).objects).toBe(2);
+});
+
+
+test("real cutout preserves source RGB while producing transparency",async({page})=>{
+  test.setTimeout(180000);
+  const response=await page.request.get("https://raw.githubusercontent.com/Dashstrom/pixelize/main/docs/examples/car.jpg");
+  expect(response.ok()).toBeTruthy();
+  fs.writeFileSync("tests/fixtures/real-car-audit.jpg",await response.body());
+  await page.goto("/");
+  await page.setInputFiles("#fileInput","tests/fixtures/real-car-audit.jpg");
+  await page.click("#bgBtn");
+  await expect(page.locator("#status")).toHaveText("Ready",{timeout:160000});
+  const bridge=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(bridge.backgroundRemovalError||"").toBe("");
+  const audit=await page.evaluate(()=>window.AssetForgeAgent.pixelAudit());
+  expect(audit).not.toBeNull();
+  expect(audit.meanRgbDelta).toBeLessThan(2.5);
+  expect(audit.opaqueFraction).toBeGreaterThan(0.01);
+  expect(audit.transparentFraction).toBeGreaterThan(0.01);
+});
+
+test("multiple raster animation frames pack with padding and gaps",async({page})=>{
+  await page.goto("/");
+  await page.setInputFiles("#framesInput",["tests/fixtures/pixel.png","tests/fixtures/pixel.png"]);
+  await page.fill("#cols","2"); await page.fill("#rows","1"); await page.fill("#frameGap","4"); await page.fill("#framePadding","8");
+  await page.click("#sheetBtn");
+  await expect(page.locator("#toast")).toContainText("2 frames packed into raster sprite sheet");
 });
