@@ -100,11 +100,11 @@ async function getBiRefNetPipeline(){
     const cfg=await detectPipelineConfig();
     setStatus("Loading BiRefNet Lite ("+cfg.device+" / "+cfg.dtype+")…");
     try{
-      const pipe=await pipeline("background-removal","studioludens/birefnet-lite-512",{device:cfg.device,dtype:cfg.dtype});
+      const pipe=await pipeline("image-segmentation","studioludens/birefnet-lite-512",{device:cfg.device,dtype:cfg.dtype});
       birefnetPipeline=pipe;return pipe
     }catch(e){
       if(cfg.device==="webgpu"){
-        const pipe=await pipeline("background-removal","studioludens/birefnet-lite-512",{device:"wasm",dtype:"fp32"});
+        const pipe=await pipeline("image-segmentation","studioludens/birefnet-lite-512",{device:"wasm",dtype:"fp32"});
         birefnetPipeline=pipe;return pipe
       }
       throw e
@@ -114,26 +114,22 @@ async function getBiRefNetPipeline(){
 }
 async function createBiRefNetMask(sourceBlob){
   const pipe=await getBiRefNetPipeline();
-  const rawResult=await pipe(sourceBlob);
-  const result=Array.isArray(rawResult)?rawResult[0]:rawResult;
-  const rgba=result?.channels===4?result:(typeof result?.rgba==="function"?result.rgba():result);
-  if(!rgba?.data||!rgba.width||!rgba.height)throw new Error("Background-removal pipeline returned no usable image");
-  const stride=Math.max(1,Math.floor(rgba.data.length/(rgba.width*rgba.height)));
-  if(stride<1)throw new Error("Background-removal pipeline returned an empty image");
-  const mask=document.createElement("canvas");mask.width=rgba.width;mask.height=rgba.height;
-  const ctx=mask.getContext("2d",{willReadFrequently:true}),src=new Uint8ClampedArray(rgba.data);
-  const out=new ImageData(rgba.width,rgba.height),od=out.data;
-  for(let i=0,p=0;i<rgba.width*rgba.height;i++,p+=4){
-    const si=i*stride;const a=stride>=4?src[si+3]:(stride===1?src[si]:Math.round((0.299*src[si]+0.587*src[si+Math.min(1,stride-1)]+0.114*src[si+Math.min(2,stride-1)])));
-    od[p]=255;od[p+1]=255;od[p+2]=255;od[p+3]=a
-  }
-  ctx.putImageData(out,0,0);return{canvas:mask,width:rgba.width,height:rgba.height}
+  const raw=await pipe(sourceBlob,{threshold:0.0});
+  const annotations=Array.isArray(raw)?raw:[raw];
+  const best=annotations.find(x=>x?.mask?.data&&x.mask.width&&x.mask.height)||annotations[0];
+  const mask=best?.mask;
+  if(!mask?.data||!mask.width||!mask.height)throw new Error("BiRefNet returned no usable segmentation mask");
+  const single=mask.channels===1?mask:(typeof mask.grayscale==="function"?mask.grayscale():mask);
+  const canvas=document.createElement("canvas");canvas.width=single.width;canvas.height=single.height;
+  const ctx=canvas.getContext("2d",{willReadFrequently:true}),src=new Uint8ClampedArray(single.data),stride=Math.max(1,Math.floor(src.length/(single.width*single.height))),out=new ImageData(single.width,single.height),od=out.data;
+  for(let i=0,p=0;i<single.width*single.height;i++,p+=4){let v=src[i*stride];if(v<=1)v=v*255;v=Math.max(0,Math.min(255,v));od[p]=255;od[p+1]=255;od[p+2]=255;od[p+3]=Math.round(v)}
+  ctx.putImageData(out,0,0);return{canvas,width:canvas.width,height:canvas.height}
 }
 async function composeRawMask(sourceBlob,maskImage){
   const source=await createImageBitmap(sourceBlob),w=source.width,h=source.height,out=document.createElement("canvas");out.width=w;out.height=h;
   const maskCanvas=document.createElement("canvas");maskCanvas.width=w;maskCanvas.height=h;const mctx=maskCanvas.getContext("2d",{willReadFrequently:true});mctx.drawImage(maskImage.canvas,0,0,w,h);
   const octx=out.getContext("2d",{willReadFrequently:true});octx.drawImage(source,0,0,w,h);const od=octx.getImageData(0,0,w,h),aData=mctx.getImageData(0,0,w,h).data;
-  for(let i=0;i<od.data.length;i+=4){od.data[i+3]=aData[i+3]}
+  for(let i=0;i<od.data.length;i+=4)od.data[i+3]=aData[i+3];
   octx.putImageData(od,0,0);source.close();
   const blob=await new Promise((resolve,reject)=>out.toBlob(b=>b?resolve(b):reject(new Error("Could not encode cutout")),"image/png",1));return{blob,maskCanvas}
 }
@@ -160,7 +156,7 @@ function download(blob,name){
   const a=document.createElement("a");a.download=name;a.style.display="none";document.body.appendChild(a);
   if(blob.type==="application/json"){const textValue=typeof blob._assetForgeText==="string"?blob._assetForgeText:null;if(textValue!==null){a.href="data:application/json;charset=utf-8,"+encodeURIComponent(textValue)}else{a.href=URL.createObjectURL(blob)}}
   else{a.href=URL.createObjectURL(blob)}
-  const url=a.href;a.click();setTimeout(()=>{if(url.startsWith("blob:"))URL.revokeObjectURL(url);a.remove()},60000)
+  const url=a.href;window.__assetForgeLastDownload={name,href:url,type:blob.type};a.click();setTimeout(()=>{if(url.startsWith("blob:"))URL.revokeObjectURL(url);a.remove()},60000)
 }
 async function exportSelectedManifest(){
   const o=selected();if(!o)return toast("Select an asset first");
@@ -251,7 +247,7 @@ window.AssetForgeAgent={
   cropSelected:async(x,y,w,h)=>{const o=canvas.getActiveObject();if(!o||o.type!=="image")throw new Error("Select image");return imageFromCrop(o,x,y,w,h)},
   trimSelected:trimTransparent,
   exportPng:selectedPng,
-  saveSelectedToGitHub:async()=>{if(!$("pushBtn").disabled)return $("pushBtn").click();throw new Error("GitHub is not connected")},
+  getLastDownload:()=>window.__assetForgeLastDownload||null,saveSelectedToGitHub:async()=>{if(!$("pushBtn").disabled)return $("pushBtn").click();throw new Error("GitHub is not connected")},
   pixelAudit:async()=>{
     const o=selected(),rec=o&&cutoutRecords.get(o);if(!rec)return null;
     const src=await createImageBitmap(rec.sourceBlob),out=o.getElement();
