@@ -107,7 +107,9 @@ if(A){
   A.getLastDownloadDataUrl=lastDownloadDataUrl;
   A.execute=async(cmd={})=>{
     const op=cmd.op||cmd.action;
-    if(op==="status")return A.status();\n    if(op==="fit")return A.fit?.();\n    if(op==="zoom"){return A.zoomBy?.(+cmd.mult||1.2)}
+    if(op==="status")return A.status();
+    if(op==="fit")return A.fit?.();
+    if(op==="zoom"){return A.zoomBy?.(+cmd.mult||1.2)}
     if(op==="wait")return sleep(Math.max(0,+cmd.ms||0));
     if(op==="removeBackground"){await A.removeBackground();return A.status()}
     if(op==="trim"){await A.trimSelected();return A.status()}
