@@ -1,4 +1,3 @@
-import { fabric } from "https://cdn.jsdelivr.net/npm/fabric@7.4.0/dist/index.min.mjs";
 const $=id=>document.getElementById(id);
 const canvas=new fabric.Canvas("editorCanvas",{preserveObjectStacking:true,selection:true});
 let history=[],future=[],restoring=false,cropTarget=null,github=null,lastBlob=null,recentFrames=[];
