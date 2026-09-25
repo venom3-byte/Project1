@@ -169,10 +169,10 @@ test("game asset manifest export works",async({page})=>{
 test("real sprite sheet remote import background trim and exact crop",async({page})=>{
   test.setTimeout(300000);
   const url="https://raw.githubusercontent.com/Aelof3/sprite-sheet-generator/main/docs/images/06-fullsheet.png";
+  const response=await page.request.get(url);expect(response.ok()).toBeTruthy();
+  fs.writeFileSync("tests/fixtures/real-sprite-sheet.png",await response.body());
   await page.goto("/");
-  await page.click("#urlBtn");
-  await page.fill("#imageUrl",url);
-  await page.click("#loadUrlBtn");
+  await page.setInputFiles("#fileInput","tests/fixtures/real-sprite-sheet.png");
   await expect(page.locator("#props")).toBeVisible({timeout:30000});
   let status=await page.evaluate(()=>window.AssetForgeAgent.status());
   expect(status.selectedType).toBe("image");
