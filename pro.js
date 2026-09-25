@@ -29,8 +29,8 @@ function installCropHandles(){
     const h=document.createElement("div");h.className="crop-handle "+cls;h.dataset.handle=cls;box.appendChild(h);
     h.addEventListener("pointerdown",e=>{
       e.preventDefault();e.stopPropagation();h.setPointerCapture(e.pointerId);
-      const r=preview.getBoundingClientRect(),iw=+q("#cropW").dataset.iw||1,ih=+q("#cropH").dataset.ih||1;
-      const sx=preview.clientWidth/iw,sy=preview.clientHeight/ih;
+      const r=preview.querySelector("img")?.getBoundingClientRect()||preview.getBoundingClientRect(),iw=+q("#cropW").dataset.iw||1,ih=+q("#cropH").dataset.ih||1;
+      const sx=Math.max(0.0001,r.width/iw),sy=Math.max(0.0001,r.height/ih);
       const x0=+q("#cropX").value||0,y0=+q("#cropY").value||0,w0=+q("#cropW").value||iw,h0=+q("#cropH").value||ih;
       const start={px:e.clientX,py:e.clientY,x:x0,y:y0,w:w0,h:h0};
       const move=ev=>{
@@ -51,7 +51,7 @@ function installCropHandles(){
     if(e.target.classList.contains("crop-handle"))return;
     e.preventDefault();box.setPointerCapture?.(e.pointerId);
     const iw=+q("#cropW").dataset.iw||1,ih=+q("#cropH").dataset.ih||1;
-    const sx=preview.clientWidth/iw,sy=preview.clientHeight/ih;
+    const sx=Math.max(0.0001,r.width/iw),sy=Math.max(0.0001,r.height/ih);
     const start={px:e.clientX,py:e.clientY,x:+q("#cropX").value||0,y:+q("#cropY").value||0,w:+q("#cropW").value||iw,h:+q("#cropH").value||ih};
     const move=ev=>{
       const nx=Math.max(0,Math.min(iw-start.w,start.x+(ev.clientX-start.px)/Math.max(.0001,sx)));
