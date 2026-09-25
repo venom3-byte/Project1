@@ -207,6 +207,8 @@ test("real white-background sprite sheet import background removal trim and exac
   const cropH=Math.floor(trimmed.selectedSize.height/2);
   await page.evaluate(({w,h})=>window.AssetForgeAgent.cropSelected(0,0,w,h),{w:cropW,h:cropH});
   const cropped=await page.evaluate(()=>window.AssetForgeAgent.status());
+  expect(cropped.selectedSize.width).toBe(cropW);
+  expect(cropped.selectedSize.height).toBe(cropH);
   await page.click("#exportBtn");
   await expect(page.locator("#toast")).toContainText("PNG exported");
   const croppedData=await page.evaluate(()=>window.AssetForgeAgent.getLastDownloadDataUrl());
