@@ -321,3 +321,16 @@ test("real white-background sprite sheet import background removal trim and exac
     workflow:["download","import","AI background removal","transparent trim","exact crop","4-frame extract","sprite pack"]
   },null,2));
 });
+
+test("live vision bridge is present and reports runtime state",async({page,request})=>{
+  await page.setViewportSize({width:390,height:844});await page.goto("/");
+  await expect(page.locator("#liveVisionDockBtn")).toBeVisible();
+  await page.click("#liveVisionDockBtn");await expect(page.locator("#liveVision")).toHaveClass(/open/);
+  const r=await request.get("/api/live/status");expect(r.ok()).toBeTruthy();const s=await r.json();
+  expect(s).toHaveProperty("agentConfigured");expect(s).toHaveProperty("model");
+});
+test("live action bridge can execute a page click",async({page})=>{
+  await page.goto("/");
+  const result=await page.evaluate(()=>window.AssetForgeLiveVision.executeAction({type:"click",x:5,y:5,screenWidth:innerWidth,screenHeight:innerHeight}));
+  expect(result).toBeTruthy();
+});
