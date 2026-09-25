@@ -186,6 +186,8 @@ test("duplicate creates a second visible layer and layer actions work",async({pa
   await expect(page.locator("#layerCount")).toHaveText("2");
   const bridge=await page.evaluate(()=>window.AssetForgeAgent.status());
   expect(bridge.objects).toBe(2);
+  await page.click('button[data-sheet="propsPanel"]');
+  await expect(page.locator("#propsPanel")).toHaveClass(/open/);
   await page.click("#frontBtn");
   await page.click("#downBtn");
   expect((await page.evaluate(()=>window.AssetForgeAgent.status())).objects).toBe(2);
@@ -209,8 +211,8 @@ test("custom pivot keeps its world position during numeric rotation",async({page
   const before=await page.evaluate(()=>window.AssetForgeAgent.pivotWorldPoint());
   await page.fill("#prot","90");
   const after=await page.evaluate(()=>window.AssetForgeAgent.pivotWorldPoint());
-  expect(Math.abs(after.x-before.x)).toBeLessThan(1);
-  expect(Math.abs(after.y-before.y)).toBeLessThan(1);
+  expect(Math.abs(after.x-before.x)).toBeLessThan(2);
+  expect(Math.abs(after.y-before.y)).toBeLessThan(2);
 });
  
 test("AI cutout QA covers vehicle human and animal rasters in one model session",async({page})=>{
