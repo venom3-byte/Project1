@@ -71,7 +71,7 @@ $("refreshRepoBtn").onclick=async()=>{const token=$("repoToken").value.trim();if
 $("pushBtn").onclick=async()=>{const o=canvas.getActiveObject();if(!o||o.type!=="image")return toast("Select an image asset first");const b=await selectedPng(),safe=((o.name||"asset").replace(/[^a-z0-9._-]+/gi,"_")||"asset").replace(/\.png$/i,"")+".png",path=github.folder+"/"+safe;setStatus("Saving to GitHub…");try{let sha;try{const old=await githubFetch(path);sha=old.sha}catch{}const body=JSON.stringify({message:"Asset Forge: save "+safe,content:await b64(b),branch:github.branch,...(sha?{sha}:{})});const res=await fetch("https://api.github.com/repos/"+github.repo+"/contents/"+path,{method:"PUT",headers:{"Accept":"application/vnd.github+json","Authorization":"Bearer "+github.token,"Content-Type":"application/json"},body});const data=await res.json();if(!res.ok)throw new Error(data?.message||"Upload failed");setStatus("Ready");toast("Saved to GitHub: "+path);await loadRepoAssets()}catch(e){console.error(e);setStatus("Ready");toast("GitHub save failed: "+e.message)}};
 
 window.AssetForgeAgent={
-  status:()=>({canvas:{width:canvas.width,height:canvas.height},objects:canvas.getObjects().length,selected:canvas.getActiveObject()?.name||null,github:!!github}),
+  status:()=>{const o=canvas.getActiveObject(),el=o?.type==="image"?o.getElement():null;return {canvas:{width:canvas.width,height:canvas.height},objects:canvas.getObjects().length,selected:o?.name||null,selectedSize:el?{width:el.naturalWidth||o.width,height:el.naturalHeight||o.height}:null,github:!!github};},
   upload:addRasterBlob,
   removeBackground:removeBg,
   cropSelected:async(x,y,w,h)=>{const o=canvas.getActiveObject();if(!o||o.type!=="image")throw new Error("Select image");return imageFromCrop(o,x,y,w,h)},
