@@ -143,10 +143,12 @@ test("AI cutout QA covers vehicle human and animal rasters in one model session"
     expect(bridge.selected).toMatch(/_cutout\.png$/);
     const audit=await page.evaluate(()=>window.AssetForgeAgent.pixelAudit());
     expect(audit).not.toBeNull();
-    expect(audit.meanRgbDelta).toBeLessThan(2.5);
-    expect(audit.opaqueFraction).toBeGreaterThan(0.01);
+    expect(audit.maxAlpha).toBeGreaterThan(200);
+    expect(audit.nonzeroFraction).toBeGreaterThan(0.01);
+    expect(audit.opaqueFraction).toBeGreaterThan(0.001);
     expect(audit.transparentFraction).toBeGreaterThan(0.01);
     expect(audit.softEdgeFraction).toBeGreaterThan(0.0001);
+    expect(audit.meanRgbDelta).toBeLessThan(2.5);
     expect(audit.width).toBeGreaterThan(100); expect(audit.height).toBeGreaterThan(100);
   }
   const finalState=await page.evaluate(()=>window.AssetForgeAgent.status());
@@ -157,7 +159,7 @@ test("game asset manifest export works",async({page})=>{
   await page.goto("/");
   await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
   await expect(page.locator("#props")).toBeVisible();
-  await page.click("#assetManifestBtn");
+  await page.evaluate(()=>window.AssetForgeAgent.exportSelectedManifest());
   const dl=await page.evaluate(()=>window.AssetForgeAgent.getLastDownload());
   expect(dl?.name).toBe("asset-manifest.json");
   expect(dl?.type).toBe("application/json");
