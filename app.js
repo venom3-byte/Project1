@@ -61,34 +61,48 @@ document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>$(b.dataset.c
 async function trimTransparent(){const o=canvas.getActiveObject();if(!o||o.type!=="image")return toast("Select a transparent image first");const src=o.getElement(),c=document.createElement("canvas");c.width=src.naturalWidth||o.width;c.height=src.naturalHeight||o.height;const ctx=c.getContext("2d",{willReadFrequently:true});ctx.drawImage(src,0,0,c.width,c.height);const d=ctx.getImageData(0,0,c.width,c.height).data;let minX=c.width,minY=c.height,maxX=-1,maxY=-1;for(let y=0;y<c.height;y++)for(let x=0;x<c.width;x++){if(d[(y*c.width+x)*4+3]>4){if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y}}if(maxX<0)return toast("No visible pixels found");const out=document.createElement("canvas");out.width=maxX-minX+1;out.height=maxY-minY+1;out.getContext("2d").drawImage(c,minX,minY,out.width,out.height,0,0,out.width,out.height);const blob=await new Promise(r=>out.toBlob(r,"image/png",1));await addReplacement(blob,o,(o.name||"asset").replace(/\.[^.]+$/,"")+"_trim.png");toast("Transparent bounds trimmed")}
 $("trimBtn").onclick=trimTransparent;
 
+let highQualityBgPipeline=null,highQualityBgPipelinePromise=null;
 async function blobFromObject(o){
   const el=o?.type==="image"?o.getElement():null;if(!el)throw new Error("Select a raster image first");
   const c=document.createElement("canvas");c.width=el.naturalWidth||el.width;c.height=el.naturalHeight||el.height;c.getContext("2d").drawImage(el,0,0,c.width,c.height);
   return new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(new Error("Could not encode source image")),"image/png",1))
 }
-async function composeWithMask(sourceBlob,maskBlob){
-  const source=await createImageBitmap(sourceBlob),mask=await createImageBitmap(maskBlob),w=source.width,h=source.height,out=document.createElement("canvas");
-  out.width=w;out.height=h;const octx=out.getContext("2d",{willReadFrequently:true}),mcanvas=document.createElement("canvas");mcanvas.width=w;mcanvas.height=h;
-  const mctx=mcanvas.getContext("2d",{willReadFrequently:true});mctx.drawImage(mask,0,0,w,h);octx.drawImage(source,0,0,w,h);
-  const od=octx.getImageData(0,0,w,h),md=mctx.getImageData(0,0,w,h).data;
-  for(let i=0;i<od.data.length;i+=4){let a=md[i+3];if(a<12)a=0;else if(a>243)a=255;od.data[i+3]=a}
-  octx.putImageData(od,0,0);source.close();mask.close();
+async function getHighQualityBgPipeline(){
+  if(highQualityBgPipeline)return highQualityBgPipeline;
+  if(!highQualityBgPipelinePromise){
+    highQualityBgPipelinePromise=(async()=>{
+      const {pipeline}=await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm");
+      const device=(navigator.gpu&&window.isSecureContext)?"webgpu":"wasm";
+      setStatus("Loading BiRefNet Lite model… first run downloads ~94MB");
+      const pipe=await pipeline("background-removal","studioludens/birefnet-lite-512",{device,dtype:"fp16"});
+      highQualityBgPipeline=pipe;return pipe
+    })().catch(e=>{highQualityBgPipelinePromise=null;throw e});
+  }
+  return highQualityBgPipelinePromise
+}
+async function composeRawMask(sourceBlob,maskImage){
+  const source=await createImageBitmap(sourceBlob),w=source.width,h=source.height,out=document.createElement("canvas");out.width=w;out.height=h;
+  const maskCanvas=document.createElement("canvas");maskCanvas.width=w;maskCanvas.height=h;const mctx=maskCanvas.getContext("2d",{willReadFrequently:true});
+  const md=new ImageData(new Uint8ClampedArray(maskImage.data),maskImage.width,maskImage.height);const temp=document.createElement("canvas");temp.width=maskImage.width;temp.height=maskImage.height;temp.getContext("2d").putImageData(md,0,0);mctx.drawImage(temp,0,0,w,h);
+  const octx=out.getContext("2d",{willReadFrequently:true});octx.drawImage(source,0,0,w,h);const od=octx.getImageData(0,0,w,h),aData=mctx.getImageData(0,0,w,h).data;
+  for(let i=0;i<od.data.length;i+=4){let a=maskImage.channels===4?aData[i+3]:aData[i];if(a<10)a=0;else if(a>246)a=255;od.data[i+3]=a}
+  octx.putImageData(od,0,0);source.close();
   const blob=await new Promise((resolve,reject)=>out.toBlob(b=>b?resolve(b):reject(new Error("Could not encode cutout")),"image/png",1));
-  return {blob,maskCanvas:mcanvas}
+  return{blob,maskCanvas}
 }
 async function removeBg(){
   const o=selected();if(!o||o.type!=="image")return toast("Select an image first");
   $("bgBtn").disabled=true;$("mobileBgBtn").disabled=true;setStatus("Preparing original pixels…");
   try{
-    const {segmentForeground}=await import("https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/+esm");
-    const sourceBlob=await blobFromObject(o);setStatus("AI segmentation…");
-    const maskBlob=await segmentForeground(sourceBlob,{device:"cpu",proxyToWorker:false,model:"isnet_fp16",output:{format:"image/png",quality:1},progress:(k,c,t)=>setStatus("AI "+k+" "+c+"/"+t)});
-    setStatus("Preserving original RGB + applying alpha mask…");
-    const composed=await composeWithMask(sourceBlob,maskBlob);
+    const sourceBlob=await blobFromObject(o),pipe=await getHighQualityBgPipeline();setStatus("BiRefNet high-quality segmentation…");
+    const result=await pipe(sourceBlob);const maskImage=Array.isArray(result)?result[0]:result;
+    if(!maskImage?.data)throw new Error("BiRefNet did not return a mask");
+    const composed=await composeRawMask(sourceBlob,maskImage);
     const n=await addReplacement(composed.blob,o,(o.name||"asset").replace(/\.[^.]+$/,"")+"_cutout.png",{cutoutSource:true});
-    cutoutRecords.set(n,{sourceBlob,maskCanvas:composed.maskCanvas});backgroundRemovalError=null;toast("Professional cutout created — original pixels preserved");setStatus("Ready");
-  }catch(e){backgroundRemovalError=e?.stack||e?.message||String(e);console.error("[AssetForge background removal]",e);toast("Background removal failed — original kept");setStatus("Ready")}
-  finally{$("bgBtn").disabled=false;$("mobileBgBtn").disabled=false}
+    cutoutRecords.set(n,{sourceBlob,maskCanvas:composed.maskCanvas});backgroundRemovalError=null;toast("High-quality cutout created — original RGB preserved");setStatus("Ready")
+  }catch(e){
+    backgroundRemovalError=e?.stack||e?.message||String(e);console.error("[AssetForge BiRefNet]",e);toast("AI cutout failed — original kept");setStatus("Ready")
+  }finally{$("bgBtn").disabled=false;$("mobileBgBtn").disabled=false}
 }
 $("bgBtn").onclick=removeBg;$("mobileBgBtn").onclick=removeBg;
 function db(){return new Promise((res,rej)=>{const r=indexedDB.open("asset-forge-v2",1);r.onupgradeneeded=()=>r.result.createObjectStore("assets",{keyPath:"id"});r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
