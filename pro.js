@@ -107,7 +107,7 @@ if(A){
   A.getLastDownloadDataUrl=lastDownloadDataUrl;
   A.execute=async(cmd={})=>{
     const op=cmd.op||cmd.action;
-    if(op==="status")return A.status();
+    if(op==="status")return A.status();\n    if(op==="fit")return A.fit?.();\n    if(op==="zoom"){return A.zoomBy?.(+cmd.mult||1.2)}
     if(op==="wait")return sleep(Math.max(0,+cmd.ms||0));
     if(op==="removeBackground"){await A.removeBackground();return A.status()}
     if(op==="trim"){await A.trimSelected();return A.status()}
@@ -144,6 +144,31 @@ window.addEventListener("message",async e=>{
   }
 });
 
+
+function installMissingActions(){
+  const A=window.AssetForgeAgent;
+  q("#fitBtn")?.addEventListener("click",()=>A?.fit?.());
+  q("#zoomInBtn")?.addEventListener("click",()=>A?.zoomBy?.(1.2));
+  q("#zoomOutBtn")?.addEventListener("click",()=>A?.zoomBy?.(1/1.2));
+  q("#deleteBtnInspector")?.addEventListener("click",()=>q("#deleteBtn")?.click());
+  q("#mobileExportBtn")?.addEventListener("click",()=>q("#exportBtn")?.click());
+  q("#refreshVaultBtn")?.addEventListener("click",()=>A?.refreshVault?.());
+  q("#clearVaultBtn2")?.addEventListener("click",()=>q("#clearVaultBtn")?.click());
+  q("#urlBtn")?.addEventListener("click",()=>q("#urlModal")?.classList.remove("hidden"));
+  q("#loadUrlBtn")?.addEventListener("click",async()=>{
+    const input=q("#imageUrl"),url=input?.value?.trim();
+    if(!url)return toastPro("Paste an image URL first");
+    const b=q("#loadUrlBtn");b.disabled=true;
+    try{
+      const res=await fetch(url,{mode:"cors"});if(!res.ok)throw new Error("HTTP "+res.status);
+      const blob=await res.blob();if(!blob.type.startsWith("image/"))throw new Error("URL is not an image");
+      await A.upload(blob,url.split("/").pop()?.split("?")[0]||"remote-image.png");
+      q("#urlModal").classList.add("hidden");input.value="";toastPro("Raster imported from URL");
+    }catch(e){toastPro("URL import failed: "+e.message)}
+    finally{b.disabled=false}
+  });
+  A.execute= A.execute || (async(cmd)=>{throw new Error("Bridge not ready")});
+}
 function addAutomationPanel(){
   if(q("#proStatus"))return;
   const parent=q("#propsPanel")||q("#toolPanel");if(!parent)return;
@@ -151,7 +176,7 @@ function addAutomationPanel(){
   card.innerHTML='<span class="live-dot"></span><div><strong>PRO control bridge</strong><div class="pro-badge">automation + mobile precision</div></div>';
   parent.insertBefore(card,parent.firstElementChild?.nextElementSibling||parent.firstChild);
 }
-installSheetPolish();patchCropOpen();patchDuplicate();addAutomationPanel();
+installSheetPolish();patchCropOpen();patchDuplicate();addAutomationPanel();installMissingActions();
 
 const mo=new MutationObserver(()=>{installSheetPolish();installCropHandles()});
 mo.observe(document.body,{subtree:true,childList:true});
