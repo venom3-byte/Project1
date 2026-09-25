@@ -1,0 +1,12 @@
+{
+  "source": "https://raw.githubusercontent.com/osmanvision/OsCrop/main/samples/white_bg.png",
+  "workflow": [
+    "download",
+    "import",
+    "AI background removal",
+    "transparent trim",
+    "exact crop",
+    "4-frame extract",
+    "sprite pack"
+  ]
+}
