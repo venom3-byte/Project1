@@ -115,8 +115,10 @@ test("duplicate creates a second visible layer and layer actions work",async({pa
   await page.goto("/");
   await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
   await expect(page.locator("#props")).toBeVisible();
+  await page.setViewportSize({width:390,height:844});
   await page.click("#fitBtn"); await page.click("#zoomInBtn"); await page.click("#zoomOutBtn");
   await page.click("#urlBtn"); await expect(page.locator("#urlModal")).toBeVisible(); await page.click('[data-close="urlModal"]');
+  await page.evaluate(()=>window.scrollTo(0,0));
   await page.evaluate(()=>window.AssetForgeAgent.execute({op:"duplicate"}));
   await expect(page.locator("#toast")).toContainText("Duplicated as a distinct layer");
   await expect(page.locator("#layerCount")).toHaveText("2");
