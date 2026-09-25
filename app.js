@@ -1,4 +1,6 @@
 const $=id=>document.getElementById(id);
+const selected=()=>canvas.getActiveObject();
+const cutoutRecords=new WeakMap();
 const canvas=new fabric.Canvas("editorCanvas",{preserveObjectStacking:true,selection:true,allowTouchScrolling:false,enableRetinaScaling:true,stopContextMenu:true});
 let history=[],future=[],restoring=false,cropTarget=null,github=null,lastBlob=null,recentFrames=[],frameLibrary=[],backgroundRemovalError=null;
 const state={name:"Untitled Asset",canvasWidth:1024,canvasHeight:1024};
@@ -99,9 +101,24 @@ function download(blob,name){const a=document.createElement("a");a.href=URL.crea
 $("exportBtn").onclick=async()=>{try{const b=await selectedPng(),o=canvas.getActiveObject(),name=((o?.name||"asset").replace(/\.[^.]+$/,"")||"asset")+".png";download(b,name);await vaultPut(b,name);toast("PNG exported")}catch(e){console.error(e);toast("Export failed")}};
 
 async function getSelectedSourceBitmap(){const o=canvas.getActiveObject();if(!o||o.type!=="image")throw new Error("Select a sprite sheet image first");return{o,src:o.getElement()}}
-$("framesBtn").onclick=async()=>{try{const{o,src}=await getSelectedSourceBitmap(),cols=Math.max(1,+$("cols").value||1),rows=Math.max(1,+$("rows").value||1),cw=Math.floor((src.naturalWidth||o.width)/cols),ch=Math.floor((src.naturalHeight||o.height)/rows),base=(o.name||"frames").replace(/\.[^.]+$/,"");recentFrames=[];let count=0;for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const out=document.createElement("canvas");out.width=cw;out.height=ch;out.getContext("2d").drawImage(src,c*cw,r*ch,cw,ch,0,0,cw,ch);const b=await new Promise(res=>out.toBlob(res,"image/png",1));recentFrames.push(b);await vaultPut(b,base+"_"+String(++count).padStart(3,"0")+".png")}toast(count+" frames extracted and ready to pack")}catch(e){console.error(e);toast(e.message||"Frame extraction failed")}};
-$("sheetBtn").onclick=async()=>{try{if(!recentFrames.length)throw new Error("Extract frames first");const cols=Math.max(1,+$("cols").value||1),rows=Math.max(1,+$("rows").value||1),count=Math.min(recentFrames.length,cols*rows),first=await createImageBitmap(recentFrames[0]),fw=first.width,fh=first.height,out=document.createElement("canvas");out.width=fw*cols;out.height=fh*rows;const ctx=out.getContext("2d");for(let i=0;i<count;i++){const bm=i===0?first:await createImageBitmap(recentFrames[i]);ctx.drawImage(bm,(i%cols)*fw,Math.floor(i/cols)*fh);if(i>0)bm.close()}first.close();const b=await new Promise(res=>out.toBlob(res,"image/png",1));download(b,"sprite-sheet.png");await vaultPut(b,"sprite-sheet.png");toast(count+" frame(s) packed into raster sheet")}catch(e){console.error(e);toast(e.message||"Sheet export failed")}};
-
+$("framesInputBtn")?.addEventListener("click",()=>$("framesInput")?.click());
+$("framesInput")?.addEventListener("change",e=>{frameLibrary=[...e.target.files];$("frameCount").textContent=frameLibrary.length+" animation frames loaded";toast(frameLibrary.length+" animation frames loaded")});
+async function extractFrames(){
+ const {o,src}=await getSelectedSourceBitmap(),cols=Math.max(1,+$("cols").value||1),rows=Math.max(1,+$("rows").value||1),cw=Math.max(1,Math.floor((src.naturalWidth||o.width)/cols)),ch=Math.max(1,Math.floor((src.naturalHeight||o.height)/rows)),base=(o.name||"frames").replace(/\.[^.]+$/,"");
+ recentFrames=[];for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const out=document.createElement("canvas");out.width=cw;out.height=ch;out.getContext("2d").drawImage(src,c*cw,r*ch,cw,ch,0,0,cw,ch);const b=await new Promise(res=>out.toBlob(res,"image/png",1));recentFrames.push(b);await vaultPut(b,base+"_"+String(recentFrames.length).padStart(3,"0")+".png")}
+ $("frameCount").textContent=recentFrames.length+" extracted frames ready";toast(recentFrames.length+" frames extracted and ready to pack")
+}
+$("framesBtn").onclick=async()=>{try{await extractFrames()}catch(e){console.error(e);toast(e.message||"Frame extraction failed")}};
+async function packFrames(){
+ const frames=frameLibrary.length?frameLibrary:recentFrames;if(!frames.length)throw new Error("Add animation frames or extract frames first");
+ const cols=Math.max(1,+$("cols").value||1),rows=Math.max(1,+$("rows").value||Math.ceil(frames.length/cols)),count=Math.min(frames.length,cols*rows),gap=Math.max(0,+$("frameGap").value||0),pad=Math.max(0,+$("framePadding").value||0);
+ let cw=+$("frameW").value||0,ch=+$("frameH").value||0;const bitmaps=[];for(let i=0;i<count;i++)bitmaps.push(await createImageBitmap(frames[i]));
+ if(!cw)cw=Math.max(...bitmaps.map(b=>b.width));if(!ch)ch=Math.max(...bitmaps.map(b=>b.height));
+ const out=document.createElement("canvas");out.width=pad*2+cols*cw+(cols-1)*gap;out.height=pad*2+rows*ch+(rows-1)*gap;const ctx=out.getContext("2d");
+ for(let i=0;i<count;i++){const b=bitmaps[i],s=Math.min(cw/b.width,ch/b.height,1),w=b.width*s,h=b.height*s,x=pad+(i%cols)*(cw+gap)+(cw-w)/2,y=pad+Math.floor(i/cols)*(ch+gap)+(ch-h)/2;ctx.drawImage(b,x,y,w,h);b.close()}
+ const blob=await new Promise(res=>out.toBlob(res,"image/png",1));download(blob,"sprite-sheet.png");await vaultPut(blob,"sprite-sheet.png");toast(count+" frames packed into raster sprite sheet")
+}
+$("sheetBtn").onclick=async()=>{try{await packFrames()}catch(e){console.error(e);toast(e.message||"Sprite sheet packing failed")}};
 $("undoBtn").onclick=async()=>{if(history.length<2)return;future.push(history.pop());await restore(history.at(-1))};$("redoBtn").onclick=async()=>{const n=future.pop();if(n){history.push(n);await restore(n)}};
 $("newBtn").onclick=()=>{canvas.clear();history=[];future=[];snapshot();$("dropHint").style.display="block";$("docName").textContent="Untitled Asset";toast("New asset")};
 $("saveBtn").onclick=()=>{const data={version:2,width:+$("cw").value,height:+$("ch").value,canvas:canvas.toJSON(["name","assetId"])};download(new Blob([JSON.stringify(data)],{type:"application/json"}),"asset-forge-project.json");toast("Project saved")};
@@ -109,6 +126,36 @@ $("openBtn").onclick=()=>$("projectInput").click();$("projectInput").onchange=as
 $("applySize").onclick=()=>{resizeEditor();snapshot()};
 function togglePanel(id){$(id).classList.toggle("open")};$("toolsToggle").onclick=()=>togglePanel("toolPanel");$("propsToggle").onclick=()=>togglePanel("propsPanel");
 
+function closeSheets(){document.querySelectorAll(".sidebar.open").forEach(x=>x.classList.remove("open"))}
+function toggleSheet(id){$(id)?.classList.toggle("open")}
+document.querySelectorAll("[data-sheet]").forEach(b=>b.onclick=()=>toggleSheet(b.dataset.sheet));
+document.querySelectorAll("[data-sheet-close]").forEach(b=>b.onclick=()=>$(b.dataset.sheetClose)?.classList.remove("open"));
+$("mobileCropBtn")?.addEventListener("click",()=>{if(typeof openCrop==="function")openCrop()});
+$("mobileBgBtn")?.addEventListener("click",()=>removeBg());
+$("mobileImportBtn")?.addEventListener("click",()=>$("fileInput").click());
+$("mobileExportBtn")?.addEventListener("click",()=>exportPng());
+$("mobileSpriteBtn")?.addEventListener("click",()=>{toggleSheet("toolPanel");setTimeout(()=>$("framesInput")?.click(),120)});
+let maskEditor=null,maskMode="erase";
+async function openMaskRefine(){
+ const o=selected(),rec=o&&cutoutRecords.get(o);if(!rec)return toast("Select an AI cutout layer first");
+ const src=await createImageBitmap(rec.sourceBlob);maskEditor={source:src,mask:rec.maskCanvas,scale:1,drawing:false};
+ const view=$("maskCanvas"),max=760,scale=Math.min(max/src.width,max/src.height,1);maskEditor.scale=scale;view.width=Math.max(1,Math.round(src.width*scale));view.height=Math.max(1,Math.round(src.height*scale));
+ renderMaskEditor();$("maskModal").classList.remove("hidden")
+}
+function renderMaskEditor(){
+ if(!maskEditor)return;const view=$("maskCanvas"),v=view.getContext("2d"),src=maskEditor.source,mask=maskEditor.mask,tmp=document.createElement("canvas");tmp.width=view.width;tmp.height=view.height;const tc=tmp.getContext("2d",{willReadFrequently:true});tc.drawImage(src,0,0,tmp.width,tmp.height);const a=tc.getImageData(0,0,tmp.width,tmp.height),md=mask.getContext("2d",{willReadFrequently:true}).getImageData(0,0,mask.width,mask.height).data,s=maskEditor.scale;
+ for(let y=0;y<tmp.height;y++)for(let x=0;x<tmp.width;x++){const sx=Math.min(mask.width-1,Math.floor(x/s)),sy=Math.min(mask.height-1,Math.floor(y/s));a.data[(y*tmp.width+x)*4+3]=md[(sy*mask.width+sx)*4+3]}
+ v.clearRect(0,0,view.width,view.height);v.putImageData(a,0,0)
+}
+function paintMask(e){
+ if(!maskEditor)return;const r=$("maskCanvas").getBoundingClientRect(),x=(e.clientX-r.left)/maskEditor.scale,y=(e.clientY-r.top)/maskEditor.scale,ctx=maskEditor.mask.getContext("2d"),rad=(+$("maskSize").value||50)/2,soft=(+$("maskSoft").value||0)/40;
+ const edge=Math.max(.01,1-soft),g=ctx.createRadialGradient(x,y,0,x,y,rad);
+ if(maskMode==="erase"){g.addColorStop(0,"rgba(0,0,0,1)");g.addColorStop(edge,"rgba(0,0,0,1)");g.addColorStop(1,"rgba(0,0,0,0)");ctx.globalCompositeOperation="destination-out"}else{g.addColorStop(0,"rgba(255,255,255,1)");g.addColorStop(edge,"rgba(255,255,255,1)");g.addColorStop(1,"rgba(255,255,255,0)");ctx.globalCompositeOperation="source-over"}
+ ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,rad,0,Math.PI*2);ctx.fill();ctx.globalCompositeOperation="source-over";renderMaskEditor()
+}
+$("refineMaskBtn")?.addEventListener("click",openMaskRefine);$("maskEraseBtn")?.addEventListener("click",()=>{maskMode="erase";$("maskEraseBtn").classList.add("active");$("maskRestoreBtn").classList.remove("active")});$("maskRestoreBtn")?.addEventListener("click",()=>{maskMode="restore";$("maskRestoreBtn").classList.add("active");$("maskEraseBtn").classList.remove("active")});
+$("maskCanvas")?.addEventListener("pointerdown",e=>{e.preventDefault();$("maskCanvas").setPointerCapture(e.pointerId);maskEditor.drawing=true;paintMask(e)});$("maskCanvas")?.addEventListener("pointermove",e=>{if(maskEditor?.drawing)paintMask(e)});["pointerup","pointercancel"].forEach(n=>$("maskCanvas")?.addEventListener(n,()=>{if(maskEditor)maskEditor.drawing=false}));
+$("applyMask")?.addEventListener("click",async()=>{const o=selected(),rec=o&&cutoutRecords.get(o);if(!rec||!maskEditor)return;const src=await createImageBitmap(rec.sourceBlob),m=maskEditor.mask,out=document.createElement("canvas");out.width=m.width;out.height=m.height;const ctx=out.getContext("2d",{willReadFrequently:true});ctx.drawImage(src,0,0,out.width,out.height);const od=ctx.getImageData(0,0,out.width,out.height),md=m.getContext("2d",{willReadFrequently:true}).getImageData(0,0,m.width,m.height).data;for(let i=0;i<od.data.length;i+=4)od.data[i+3]=md[i+3];ctx.putImageData(od,0,0);const blob=await new Promise(res=>out.toBlob(res,"image/png",1));const n=await addReplacement(blob,o,(o.name||"cutout").replace(/_cutout\.png$/,"")+"_refined.png",{cutoutSource:true});cutoutRecords.set(n,{sourceBlob:rec.sourceBlob,maskCanvas:m});$("maskModal").classList.add("hidden");src.close();toast("Mask refinement applied")});
 function b64(blob){return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result.split(",")[1]);fr.onerror=rej;fr.readAsDataURL(blob)})}
 async function githubFetch(path,options={}){if(!github)throw new Error("GitHub is not connected");const res=await fetch("https://api.github.com/repos/"+github.repo+"/contents/"+path+"?ref="+encodeURIComponent(github.branch),{...options,headers:{"Accept":"application/vnd.github+json","Authorization":"Bearer "+github.token,...(options.headers||{})}});const txt=await res.text();let data=null;try{data=JSON.parse(txt)}catch{}if(!res.ok)throw new Error(data?.message||"GitHub API "+res.status);return data}
 async function loadRepoAssets(){if(!github)return toast("Connect GitHub first");setStatus("Loading repository assets…");try{const data=await githubFetch(github.folder);const files=Array.isArray(data)?data.filter(x=>x.type==="file"&&/\.(png|jpe?g|webp|avif)$/i.test(x.name)):[];for(const f of files){const res=await fetch(f.download_url);if(res.ok){const blob=await res.blob();await vaultPut(blob,f.name,true)}}await renderVault();setStatus("Ready");toast(files.length+" repository assets loaded")}catch(e){console.error(e);setStatus("Ready");toast("Repository load failed: "+e.message)}}
@@ -128,6 +175,13 @@ window.AssetForgeAgent={
   loadGitHubAssets:loadRepoAssets
 };
 
+function installTouchGestures(){
+ const stage=$("stage"),points=new Map();let g=null;
+ stage.addEventListener("pointerdown",e=>{points.set(e.pointerId,{x:e.clientX,y:e.clientY});if(points.size===2){const p=[...points.values()];g={dist:Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y),zoom:canvas.getZoom(),cx:(p[0].x+p[1].x)/2,cy:(p[0].y+p[1].y)/2,tx:canvas.viewportTransform[4],ty:canvas.viewportTransform[5]};canvas.skipTargetFind=true}}, {passive:false});
+ stage.addEventListener("pointermove",e=>{if(points.has(e.pointerId))points.set(e.pointerId,{x:e.clientX,y:e.clientY});if(points.size!==2||!g)return;const p=[...points.values()],dist=Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y),z=Math.max(.1,Math.min(4,g.zoom*dist/g.dist)),cx=(p[0].x+p[1].x)/2,cy=(p[0].y+p[1].y)/2;canvas.zoomToPoint(new fabric.Point(g.cx,g.cy),z);canvas.viewportTransform[4]=g.tx+(cx-g.cx);canvas.viewportTransform[5]=g.ty+(cy-g.cy);canvas.requestRenderAll();$("zoomLabel").textContent=Math.round(z*100)+"%";e.preventDefault()},{passive:false});
+ const up=e=>{points.delete(e.pointerId);if(points.size<2){g=null;canvas.skipTargetFind=false}};stage.addEventListener("pointerup",up);stage.addEventListener("pointercancel",up);window.addEventListener("resize",fit)
+}
+installTouchGestures();
 canvas.on("object:added",()=>{if(!restoring)snapshot();syncProps();renderLayers()});canvas.on("object:modified",()=>{if(!restoring)snapshot();syncProps();renderLayers()});canvas.on("selection:created",()=>{syncProps();renderLayers()});canvas.on("selection:updated",()=>{syncProps();renderLayers()});canvas.on("selection:cleared",()=>{syncProps();renderLayers()});
 document.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){e.preventDefault();$("undoBtn").click()}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="y"){e.preventDefault();$("redoBtn").click()}if(e.key==="Delete"&&document.querySelector(".modal:not(.hidden)")===null)$("deleteBtn").click()};
 $("brightness").value=$("contrast").value=$("saturation").value=$("blur").value=0;
