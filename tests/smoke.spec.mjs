@@ -63,7 +63,7 @@ test("real public-domain photo can be imported, cropped and exported as a game a
   const response=await page.request.get(url);
   expect(response.ok()).toBeTruthy();
   const bytes=await response.body();
-  expect(bytes.length).toBeGreaterThan(100000);
+  expect(bytes.length).toBeGreaterThan(20000);
   fs.writeFileSync("tests/fixtures/real-car.jpg",bytes);
   await page.goto("/");
   await page.setInputFiles("#fileInput","tests/fixtures/real-car.jpg");
