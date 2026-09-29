@@ -206,7 +206,7 @@ function toast(s){const e=document.createElement("div");e.textContent=s;Object.a
 function openGraph(){
   const d=modal("Forge Logic Graph",'<div class="fm-grid"><div class="fm-card"><h4>Graph authoring</h4><div class="fm-actions"><button data-node="OnStart">On Start</button><button data-node="OnUpdate">On Update</button><button data-node="Spawn">Spawn</button><button data-node="Rotate">Rotate</button><button data-node="IfDistance">If Distance</button><button data-node="Play">Play</button></div><div id="nodes"></div></div><div class="fm-card"><h4>Runtime trace</h4><div id="trace" class="fm-code">Add nodes and run the graph.</div><button id="runGraph">Run Graph</button><button id="saveGraph">Save graph JSON</button></div></div>');
   const draw=()=>{d.querySelector("#nodes").innerHTML=graph.graph.nodes.map(n=>'<div class="fm-node"><b>'+n.label+'</b><br><small>'+n.type+' · '+n.id.slice(0,8)+'</small></div>').join("")};
-  d.querySelectorAll("[data-node]").forEach(b=>b.onclick=()=>{graph.node(b.dataset.node,b.textContent);draw()});
+  d.querySelectorAll("[data-node]").forEach(b=>b.onclick=()=>{const prev=graph.graph.nodes.at(-1);const n=graph.node(b.dataset.node,b.textContent);if(prev)graph.link(prev,n);draw()});
   d.querySelector("#runGraph").onclick=()=>d.querySelector("#trace").textContent=graph.run().join(" → ")||"No entry node";
   d.querySelector("#saveGraph").onclick=()=>{const a=document.createElement("a");a.download="forge-graph.json";a.href=URL.createObjectURL(new Blob([JSON.stringify(graph.graph,null,2)],{type:"application/json"}));a.click()};
   draw();
@@ -260,6 +260,7 @@ async function openBuild(){
   toast("Web build package exported");
 }
 
+window.ForgeProduction.build=openBuild;
 function addBar(){
   const bar=document.createElement("div");bar.className="forge-prod";
   const buttons=[["Asset Lab",openAssets],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],["Vision",()=>window.AssetForgeLiveVision?.open()],["Build Web",openBuild]];
