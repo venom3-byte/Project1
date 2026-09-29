@@ -57,6 +57,15 @@ const ForgeAgent={
       case "ability-use": {const a=window.ForgeData.actor(c.actor||"player"),ab=a.abilities.get(c.id);if(!ab)throw new Error("Ability not found");return ab.activate(a,c.context||{});}
       case "quest-define": return window.ForgeData.quests.define(c.id,c.data||{});
       case "quest-progress": window.ForgeData.quests.progress(c.id,c.objectiveId,c.amount||1);return window.ForgeData.quests.status(c.id);
+      case "net-connect": window.ForgeNet.connect(c.room||"default",{peerId:c.peerId});return window.ForgeNet.status();
+      case "net-status": return window.ForgeNet.status();
+      case "net-bind": window.ForgeNet.bindEntity(c.id||window.Forge.selectedId);return window.ForgeNet.status();
+      case "net-publish": return window.ForgeNet.publishEntity();
+      case "replay-record": window.ForgeReplay.startRecord();return window.ForgeReplay.status();
+      case "replay-stop": return window.ForgeReplay.stopRecord();
+      case "replay-play": window.ForgeReplay.play(c.data||window.ForgeReplay.serialize());return window.ForgeReplay.status();
+      case "replay-stop-play": window.ForgeReplay.stop();return window.ForgeReplay.status();
+      case "replay-status": return window.ForgeReplay.status();
       case "build": if(P?.build) return P.build(); return{supported:false};
       default: throw new Error("Unknown Forge command: "+c.op);
     }
