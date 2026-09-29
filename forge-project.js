@@ -28,6 +28,7 @@ class ForgeProjectStore{
       cinematics:window.ForgeCinematics?.serialize?.()||null,
       ui:window.ForgeUISystem?.serialize?.()||null,
       vfx:window.ForgeVFX?.serialize?.()||null,
+      terrain:window.ForgeTerrain?.serialize?.()||null,
       network:window.ForgeNet?.status?.()||null,
       replay:window.ForgeReplay?.serialize?.()||null
     }
