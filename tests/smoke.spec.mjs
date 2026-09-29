@@ -142,6 +142,23 @@ test("VFX, render profiles and runtime services are callable",async({page})=>{
 });
 
 
+test("Vision Core grounds the rendered scene in screen space",async({page})=>{
+  await page.goto("/");
+  const result=await page.evaluate(async()=>{
+    window.Forge.select([...window.Forge.entities.values()].find(x=>x.name==="Ground").id);
+    const map=window.ForgeVision.map();
+    const selected=window.ForgeVision.selectAt(map.entities.find(x=>x.name==="Ground")?.screen.x||10,map.entities.find(x=>x.name==="Ground")?.screen.y||10);
+    const frame=window.ForgeVision.capture({annotate:true,scale:.5});
+    const report=await window.ForgeVision.report();
+    return {map,selected,frame:{width:frame.width,height:frame.height,hasPng:frame.dataUrl.startsWith("data:image/png")},report};
+  });
+  expect(result.map.entities.length).toBeGreaterThan(0);
+  expect(result.map.entities.some(x=>x.name==="Ground"&&x.bounds)).toBeTruthy();
+  expect(result.frame.hasPng).toBeTruthy();
+  expect(result.frame.width).toBeGreaterThan(100);
+  expect(result.report.map.entities.length).toBeGreaterThan(0);
+});
+
 test("in-engine visual QA can audit and baseline the rendered scene",async({page})=>{
   await page.goto("/");
   const audit=await page.evaluate(async()=>await window.ForgeQAPro.audit());
