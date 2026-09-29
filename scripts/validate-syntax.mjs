@@ -7,7 +7,7 @@ const files=[
   "forge-engine.js","forge-ui.js","forge-production.js","forge-project.js","forge-agent.js",
   "forge-runtime.js","forge-gameplay.js","forge-render.js","forge-ui-system.js","forge-vfx.js",
   "forge-2d.js","forge-ai.js","forge-gameplay-data.js","forge-network.js","forge-replay.js",
-  "forge-session.js","forge-shader.js","forge-terrain.js","forge-qa.js","server.mjs","forge-pipeline.mjs"
+  "forge-session.js","forge-shader.js","forge-terrain.js","forge-qa.js","forge-animation.js","forge-vision.js","forge-pose-search.js","server.mjs","forge-pipeline.mjs"
 ];
 const failed=[];
 for(const file of files){
