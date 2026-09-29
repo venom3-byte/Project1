@@ -33,7 +33,8 @@ class ForgeProjectStore{
       animation:window.ForgeAnimation?.serialize?.()||null,
       network:window.ForgeNet?.status?.()||null,
       replay:window.ForgeReplay?.serialize?.()||null,
-      vision:window.ForgeVision?.status?.()||null\n    }
+      vision:window.ForgeVision?.status?.()||null
+    }
   }
   async normalize(data){
     if(!data||typeof data!=="object")throw new Error("Invalid Forge project");
