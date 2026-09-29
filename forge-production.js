@@ -189,6 +189,7 @@ function openAssets(){
   const d=modal("Forge Asset Lab",'<div class="fm-grid"><div class="fm-card"><h4>Production import</h4><input id="fmFiles" type="file" multiple accept=".glb,.gltf,.png,.jpg,.jpeg,.webp,.avif,.wav,.mp3,.ogg"><div class="fm-actions"><button id="fmAnalyze">Analyze</button><button id="fmPrepare">Prepare selected raster</button><button id="fmAtlas">Pack atlas</button></div><div id="fmHint">Use Analyze to audit geometry, textures, animations, alpha, dimensions and optimization recommendations.</div></div><div class="fm-card"><h4>Registry</h4><div id="fmRegistry"></div></div></div>');
   const render=()=>{const box=d.querySelector("#fmRegistry"),list=assets.all();box.innerHTML=list.length?list.map(a=>'<div class="fm-node"><b>'+a.name+'</b><br>'+a.kind+' · '+(a.width?a.width+"×"+a.height:"")+" · "+(a.triangles?a.triangles+" triangles":"")+'<br><span class="fm-'+(a.status==="ready"?"good":"warn")+'">'+(a.optimization||[]).join(" · ")+'</span></div>').join(""):'<span class="fm-warn">Registry is empty.</span>'};
   d.querySelector("#fmAnalyze").onclick=async()=>{const fs=[...d.querySelector("#fmFiles").files];const r=await assets.process(fs);render();d.querySelector("#fmHint").textContent=r.map(x=>x.name+": "+x.status).join(" | ")||"No files selected"};
+  const ai=document.createElement("button");ai.textContent="AI cutout";ai.onclick=async()=>{const f=d.querySelector("#fmFiles").files[0];if(!f)return;try{const out=await assets.cutout(f);const a=document.createElement("a");a.download=out.name;a.href=URL.createObjectURL(out);a.click();d.querySelector("#fmHint").textContent="AI cutout exported: "+out.name}catch(e){d.querySelector("#fmHint").textContent="AI cutout failed: "+e.message}};d.querySelector(".fm-actions").append(ai);
   d.querySelector("#fmPrepare").onclick=async()=>{const f=d.querySelector("#fmFiles").files[0];if(!f)return;const r=await assets.prepare(f,{trim:true,maxSize:4096});const a=document.createElement("a");a.download=r.output.name;a.href=URL.createObjectURL(r.output);a.click();d.querySelector("#fmHint").textContent="Prepared asset exported: "+r.output.name};
   d.querySelector("#fmAtlas").onclick=async()=>{const fs=[...d.querySelector("#fmFiles").files].filter(x=>/^image\\//.test(x.type));if(!fs.length)return;const r=await assets.atlas(fs,4,4);const a=document.createElement("a");a.download=r.file.name;a.href=URL.createObjectURL(r.file);a.click();d.querySelector("#fmHint").textContent="Atlas "+r.width+"×"+r.height+" with "+r.frames.length+" frames exported."};
   render();
@@ -210,9 +211,57 @@ function openGraph(){
   draw();
 }
 function openProfiler(){modal("Forge Profiler",'<div class="fm-grid"><div class="fm-card"><h4>Runtime budget</h4><div id="profileNow"></div></div><div class="fm-card"><h4>Quality gates</h4><div class="fm-good">Renderer path required</div><div class="fm-good">Scene must render</div><div class="fm-good">Physics must update</div><div class="fm-good">No unhandled page errors in CI</div><div class="fm-good">Mobile viewport covered</div></div></div>');const box=document.querySelector(".forge-modal #profileNow");const tick=()=>{if(!box||!document.body.contains(box))return;box.textContent=JSON.stringify(profiler.sample(),null,2);setTimeout(tick,500)};tick()}
+
+
+AssetPipeline.prototype.cutout = async function(file){
+  if(!/^image\//.test(file.type)) throw new Error("AI cutout accepts raster images");
+  const {pipeline}=await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm");
+  const device = navigator.gpu ? "webgpu" : "wasm";
+  let pipe;
+  try{pipe=await pipeline("background-removal","xrds/isnet-general-onnx-int8",{device,dtype:device==="webgpu"?"fp32":"fp32"});}
+  catch(e){pipe=await pipeline("background-removal","xrds/isnet-general-onnx-int8",{device:"wasm",dtype:"fp32"});}
+  const result0=await pipe(file),result=Array.isArray(result0)?result0[0]:result0;
+  const rgba=typeof result?.rgba==="function"?result.rgba():result;
+  if(!rgba?.width||!rgba?.height) throw new Error("Background-removal model returned no image");
+  const w=rgba.width,h=rgba.height,stride=Math.max(1,Math.floor(rgba.data.length/(w*h)));
+  const src=await createImageBitmap(file),out=document.createElement("canvas");out.width=w;out.height=h;
+  const g=out.getContext("2d",{willReadFrequently:true});g.drawImage(src,0,0,w,h);
+  const pixels=g.getImageData(0,0,w,h);
+  for(let i=0;i<w*h;i++){let a=rgba.data[i*stride+(stride>=4?3:0)];if(a<=1)a*=255;pixels.data[i*4+3]=Math.max(0,Math.min(255,a));}
+  g.putImageData(pixels,0,0);
+  const blob=await new Promise((res,rej)=>out.toBlob(b=>b?res(b):rej(new Error("Could not encode cutout")),"image/png",1));
+  src.close();
+  const name=file.name.replace(/\.[^.]+$/,"")+"_cutout.png";
+  this.registry.set(crypto.randomUUID(),{name,kind:"image",status:"ready",source:file.name,operation:"ISNet background removal"});
+  this.persist();
+  return new File([blob],name,{type:"image/png"});
+};
+
+async function openBuild(){
+  if(!window.JSZipModule){
+    try{window.JSZipModule=await import("https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm");}
+    catch(e){toast("Build system could not load JSZip");return}
+  }
+  const JSZip=window.JSZipModule.default||window.JSZipModule;
+  const zip=new JSZip();
+  const project=Forge.serialize();
+  project.meta=Object.assign(project.meta||{},{
+    buildMode:"web",
+    renderBackend:"PlayCanvas 2.22.6",
+    physicsBackend:"Rapier 0.21.0"
+  });
+  zip.file("project.forge.json",JSON.stringify(project,null,2));
+  const runtime='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Forge Build</title><style>html,body{margin:0;height:100%;overflow:hidden;background:#000}canvas{width:100%;height:100%;display:block}</style></head><body><canvas id="c"></canvas><script type="module">import * as pc from "https://cdn.jsdelivr.net/npm/playcanvas@2.22.6/build/playcanvas.mjs";import RAPIER from "https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.21.0/+esm";const P=PROJECT;const app=new pc.Application(document.querySelector("#c"),{graphicsDeviceOptions:{antialias:true,powerPreference:"high-performance"}});app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);app.setCanvasResolution(pc.RESOLUTION_AUTO);app.start();await RAPIER.init();const world=new RAPIER.World({x:0,y:-9.81,z:0}),root=new pc.Entity("ForgeRuntime");app.root.addChild(root);const records=new Map();function mat(){const m=new pc.StandardMaterial();m.diffuse=new pc.Color(.22,.62,.9);m.metalness=.05;m.gloss=.5;m.update();return m}function addPrimitive(e){const map={box:"box",sphere:"sphere",cylinder:"cylinder",capsule:"capsule",plane:"plane"};if(!map[e.kind])return null;const n=new pc.Entity(e.name);n.addComponent("render",{type:map[e.kind]});n.render.material=mat();root.addChild(n);n.setLocalPosition(...e.transform.p);n.setLocalEulerAngles(...e.transform.r);n.setLocalScale(...e.transform.s);return n}for(const e of P.entities){if(e.kind==="model"&&e.components?.asset?.name){const a=new pc.Asset(e.name,"container",{url:"assets/"+e.components.asset.name});app.assets.add(a);a.once("load",()=>{const n=a.resource.instantiateRenderEntity({castShadows:true,receiveShadows:true});n.name=e.name;root.addChild(n);n.setLocalPosition(...e.transform.p);n.setLocalEulerAngles(...e.transform.r);n.setLocalScale(...e.transform.s);records.set(e.id,n)});app.assets.load(a);continue}if(e.kind==="camera"){const n=new pc.Entity(e.name);n.addComponent("camera",{clearColor:new pc.Color(.02,.05,.09)});n.setLocalPosition(...e.transform.p);n.setLocalEulerAngles(...e.transform.r);root.addChild(n);records.set(e.id,n);continue}if(e.kind==="light"){const n=new pc.Entity(e.name);n.addComponent("light",{type:"directional",intensity:2,castShadows:true});n.setLocalPosition(...e.transform.p);n.setLocalEulerAngles(...e.transform.r);root.addChild(n);continue}const n=addPrimitive(e);if(n)records.set(e.id,n)}const cam=[...records.values()].find(n=>n.camera);if(!cam){const n=new pc.Entity("Camera");n.addComponent("camera",{clearColor:new pc.Color(.02,.05,.09)});n.setLocalPosition(7,5,9);n.lookAt(0,0,0);root.addChild(n)}<\/script></body></html>'.replace("PROJECT",JSON.stringify(project));
+  zip.file("index.html",runtime);
+  for(const [name,a] of Forge.assets||[]) if(a?.file) zip.file("assets/"+name,await a.file.arrayBuffer());
+  const blob=await zip.generateAsync({type:"blob",compression:"DEFLATE"});
+  const a=document.createElement("a");a.download="forge-web-build.zip";a.href=URL.createObjectURL(blob);a.click();setTimeout(()=>URL.revokeObjectURL(a.href),60000);
+  toast("Web build package exported");
+}
+
 function addBar(){
   const bar=document.createElement("div");bar.className="forge-prod";
-  const buttons=[["Asset Lab",openAssets],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler]];
+  const buttons=[["Asset Lab",openAssets],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],["Build Web",openBuild]];
   buttons.forEach(([t,f])=>{const b=document.createElement("button");b.textContent=t;b.onclick=f;bar.append(b)});document.body.append(bar);
 }
 addBar();
