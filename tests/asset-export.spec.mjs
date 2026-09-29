@@ -93,3 +93,23 @@ test("asset manifest records professional pipeline metadata",async({page})=>{
   expect(result.spatial.geometry).toBeTruthy();
   expect(result.spatial.sourceBounds).toBeTruthy();
 });
+
+
+test("edited 3D scene can be cooked to GLB and re-imported",async({page})=>{
+  await page.goto("/");
+  await page.click('[data-add="box"]');
+  const result=await page.evaluate(async()=>{
+    const before=window.ForgeSpatial.inspect(window.Forge.selected());
+    const exported=await window.ForgeExport.exportSceneGLB({download:false,name:"qa-box.glb"});
+    const file=new File([exported.blob],"qa-box.glb",{type:"model/gltf-binary"});
+    const imported=await window.Forge.importFile(file);
+    const after=window.ForgeSpatial.inspect(imported.record);
+    return{exported,sourceTriangles:before.geometry.triangles,sourceVertices:before.geometry.vertices,roundtripTriangles:after.geometry.triangles,roundtripVertices:after.geometry.vertices};
+  });
+  expect(result.exported.ok).toBeTruthy();
+  expect(result.exported.validation.ok).toBeTruthy();
+  expect(result.roundtripTriangles).toBeGreaterThan(0);
+  expect(result.roundtripVertices).toBeGreaterThan(0);
+  expect(result.roundtripTriangles).toBe(result.sourceTriangles);
+  expect(result.roundtripVertices).toBe(result.sourceVertices);
+});
