@@ -49,7 +49,14 @@ const ForgeAgent={
       case "prefab-save": {if(!window.ForgeRuntime)throw new Error("Runtime layer unavailable");const r=F.selected();if(!r)throw new Error("Select entity first");return window.ForgeRuntime.prefabs.save(c.name||r.name,{name:r.name,kind:r.kind,components:r.components,transform:{position:[r.entity.getLocalPosition().x,r.entity.getLocalPosition().y,r.entity.getLocalPosition().z],rotation:[r.entity.getLocalEulerAngles().x,r.entity.getLocalEulerAngles().y,r.entity.getLocalEulerAngles().z],scale:[r.entity.getLocalScale().x,r.entity.getLocalScale().y,r.entity.getLocalScale().z]}});}
       case "template-third-person": return window.ForgeGameplay.createThirdPersonTemplate();
       case "template-racing": return window.ForgeGameplay.createRacingTemplate();
-      case "gameplay-status": return window.ForgeGameplay.status();
+      case "gameplay-status": return {runtime:window.ForgeGameplay.status(),actors:window.ForgeData?[...window.ForgeData.actors].map(([id,a])=>({id,attributes:a.attributes.serialize(),inventory:Object.fromEntries(a.inventory),tags:a.tags.all()})):[]};
+      case "tag-add": {const a=window.ForgeData.actor(c.actor||"player");a.tags.add(...(c.tags||[]));return a.tags.all();}
+      case "attribute": {const a=window.ForgeData.actor(c.actor||"player");if(c.value!=null)a.attributes.set(c.name,c.value);if(c.delta!=null)a.attributes.modify(c.name,c.delta);return a.attributes.get(c.name);}
+      case "inventory-grant": {const a=window.ForgeData.actor(c.actor||"player");a.grantItem(c.item,c.count||1);return Object.fromEntries(a.inventory);}
+      case "ability-define": {const a=window.ForgeData.actor(c.actor||"player");return a.addAbility(c.id,c.config||{}).id;}
+      case "ability-use": {const a=window.ForgeData.actor(c.actor||"player"),ab=a.abilities.get(c.id);if(!ab)throw new Error("Ability not found");return ab.activate(a,c.context||{});}
+      case "quest-define": return window.ForgeData.quests.define(c.id,c.data||{});
+      case "quest-progress": window.ForgeData.quests.progress(c.id,c.objectiveId,c.amount||1);return window.ForgeData.quests.status(c.id);
       case "build": if(P?.build) return P.build(); return{supported:false};
       default: throw new Error("Unknown Forge command: "+c.op);
     }
