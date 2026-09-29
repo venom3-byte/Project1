@@ -13,6 +13,25 @@ class Forge2DSystem{
     const m=Forge.material([1,1,1]);m.diffuseMap=tex;m.emissiveMap=tex;m.emissive=new pc.Color(1,1,1);m.update();
     r.entity.render.material=m;r.components.sprite={width:bmp.width,height:bmp.height,pixelsPerUnit:100,animated:false};this.sprites.set(r.id,{id:r.id,entity:r.entity,textures:[tex]});bmp.close();return r
   }
+  async spriteSheetFromFile(file,{frameWidth,frameHeight,columns,rows,fps=12,name=file?.name||"Sprite Sheet"}={}){
+    if(!file)throw new Error("Sprite sheet file is required");
+    const bmp=await createImageBitmap(file);
+    const fw=Number(frameWidth)||0,fh=Number(frameHeight)||0;
+    if(fw<=0||fh<=0){bmp.close();throw new Error("frameWidth and frameHeight are required")}
+    const cols=Number(columns)||Math.floor(bmp.width/fw),rws=Number(rows)||Math.floor(bmp.height/fh);
+    if(cols<1||rws<1||cols*fw>bmp.width||rws*fh>bmp.height){bmp.close();throw new Error("Sprite sheet grid exceeds image bounds")}
+    const frames=[];
+    for(let y=0;y<rws;y++)for(let x=0;x<cols;x++){
+      const c=document.createElement("canvas");c.width=fw;c.height=fh;c.getContext("2d").drawImage(bmp,x*fw,y*fh,fw,fh,0,0,fw,fh);
+      const tex=new pc.Texture(Forge.app.graphicsDevice,{width:fw,height:fh,format:pc.PIXELFORMAT_R8_G8_B8_A8});tex.setSource(c);frames.push(tex)
+    }
+    bmp.close();
+    const r=Forge.primitive("plane",name);r.entity.setEulerAngles(90,0,0);
+    const m=Forge.material([1,1,1]);m.diffuseMap=frames[0];m.emissiveMap=frames[0];m.emissive=new pc.Color(1,1,1);m.update();r.entity.render.material=m;
+    const state={name,id:r.id,entity:r.entity,frames,fps:Math.max(1,Number(fps)||12),index:0,time:0,playing:true,grid:{frameWidth:fw,frameHeight:fh,columns:cols,rows:rws,source:file.name||name}};
+    this.animations.set(name,state);this.sprites.set(r.id,{id:r.id,entity:r.entity,textures:frames});r.components.sprite={animated:true,frameCount:frames.length,fps:state.fps,frameWidth:fw,frameHeight:fh,columns:cols,rows:rws,source:file.name||name};Forge.select(r.id);return state
+  },
+
   async animateSprite(name,files,fps=12){
     if(!files?.length)throw new Error("No sprite frames supplied");
     const bitmaps=await Promise.all(files.map(f=>createImageBitmap(f))),frames=[];

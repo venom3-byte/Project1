@@ -109,6 +109,22 @@ test("racing template creates vehicle controller with four wheels",async({page})
   expect(state.vehicles[0].wheels).toBe(4);
 });
 
+
+test("real sprite sheet import slices raster frames into a playable animation",async({page})=>{
+  await openForge(page);
+  const result=await page.evaluate(async()=>{
+    const c=document.createElement("canvas");c.width=128;c.height=64;const g=c.getContext("2d");
+    for(let i=0;i<8;i++){g.fillStyle=`hsl(${i*45},80%,55%)`;g.fillRect((i%4)*32,Math.floor(i/4)*32,32,32)}
+    const blob=await new Promise(r=>c.toBlob(r,"image/png"));const file=new File([blob],"runner-sheet.png",{type:"image/png"});
+    const state=await window.Forge2D.spriteSheetFromFile(file,{frameWidth:32,frameHeight:32,fps:16,name:"Runner"});
+    return {frames:state.frames.length,grid:state.grid,status:window.Forge2D.status()};
+  });
+  expect(result.frames).toBe(8);
+  expect(result.grid.columns).toBe(4);
+  expect(result.grid.rows).toBe(2);
+  expect(result.status.animations.some(x=>x.name==="Runner"&&x.frames===8)).toBeTruthy();
+});
+
 test("2D platformer template creates orthographic gameplay scene",async({page})=>{
   await openForge(page);
   const result=await page.evaluate(()=>window.Forge2D.createPlatformerTemplate());
