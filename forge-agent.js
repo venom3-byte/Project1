@@ -68,6 +68,7 @@ const ForgeAgent={
       case "replay-play": window.ForgeReplay.play(c.data||window.ForgeReplay.serialize());return window.ForgeReplay.status();
       case "terrain-generate": return window.ForgeTerrain.generate(c.name||"Terrain",c.options||{}).id;
       case "shader-apply": window.ForgeShaders.applyPreset(c.preset||"dissolve");return window.Forge.diagnostics();
+      case "animation-state": return window.Forge.setAnimationState(c.id||window.Forge.selectedId,c.state||"Idle");
       case "replay-stop-play": window.ForgeReplay.stop();return window.ForgeReplay.status();
       case "replay-status": return window.ForgeReplay.status();
       case "build": if(P?.build) return P.build(); return{supported:false};
