@@ -160,6 +160,25 @@ test("Vision Core grounds the rendered scene in screen space",async({page})=>{
   expect(result.report.dom).toHaveProperty("coverage");
 });
 
+test("Pose Search selects the nearest motion feature and can drive animation state",async({page})=>{
+  await page.goto("/");
+  const result=await page.evaluate(()=>{
+    const id="ci-locomotion";
+    window.ForgePoseSearch.createDatabase(id,[
+      {clip:"Idle",time:0,features:[0,0,1]},
+      {clip:"Run",time:.2,features:[1,0,0]},
+      {clip:"Strafe",time:.1,features:[0,1,0]}
+    ]);
+    const query=window.ForgePoseSearch.query(id,[.98,.05,.01],{k:2});
+    const player=window.Forge.primitive("box","PoseActor");
+    const match=window.ForgePoseSearch.match(id,player.id,[1,0,0],{play:false});
+    return {query,match,status:window.ForgePoseSearch.status()};
+  });
+  expect(result.query.results[0].clip).toBe("Run");
+  expect(result.match.match.clip).toBe("Run");
+  expect(result.status.databases[0].entries).toBe(3);
+});
+
 test("in-engine visual QA can audit and baseline the rendered scene",async({page})=>{
   await page.goto("/");
   const audit=await page.evaluate(async()=>await window.ForgeQAPro.audit());
