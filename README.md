@@ -1,58 +1,61 @@
 # Forge Studio
 
-Forge is a browser-first game and interactive-application development environment.
+Forge is evolving into a browser-first, agent-native game and interactive-application development environment.
 
-## What Forge is becoming
+## Current Forge production stack
 
-Forge is no longer just an asset editor. The target is a complete development environment where a developer or an AI agent can inspect a project, import real assets, compose scenes, author gameplay, simulate physics, run visual QA, fix problems and export a runnable product.
+### Engine
+- PlayCanvas 2.22.6 with WebGPU/WebGL2.
+- Rapier 0.21.0 for rigid-body physics.
+- Entity/component scene model.
+- 3D viewport, hierarchy, inspector, transforms, cameras, lights and primitives.
 
-## Current engine foundation
+### Asset Lab
+- Raster asset auditing and preparation.
+- Transparent-bound trimming.
+- AI background removal with ISNet.
+- Sprite-sheet extraction and atlas packing.
+- GLB structure, mesh, material, texture, animation, skin and joint auditing.
+- PBR Material Lab.
+- Server-side GLB Cook pipeline using glTF-Transform 4.5.1 + Meshopt 1.3.0.
+- Lossless prune/dedup/resample.
+- Automatic LOD package generation.
+- Cook manifest with collision and material recommendations.
 
-- Rendering/runtime: PlayCanvas 2.22.6 with WebGPU + WebGL2 paths.
-- Physics: Rapier 0.21.0 WebAssembly backend.
-- Scene model: entity/component data independent from editor UI.
-- Editor: viewport, hierarchy, inspector, primitives, cameras and lighting.
-- Assets: real GLB and raster import.
-- Simulation: rigid bodies, colliders, animation keyframes and executable entity scripts.
-- QA: runtime diagnostics and browser smoke tests on desktop and mobile.
-- Projects: Forge JSON scene serialization.
-- Local bridge: Node server + WebSocket foundation for live agent/browser control.
+### World and gameplay
+- Deterministic PCG scattering for trees/rocks/buildings.
+- World-cell metadata and streaming control.
+- Logic Graph foundation.
+- Keyframe timeline.
+- Entity scripts.
+- Input action mapping.
+- A* navigation grid.
+- Save slots.
+- Prefab registry.
+- WebAudio spatial playback foundation.
 
-## Current workflow
+### AI and vision
+- Structured Forge Agent Protocol over WebSocket.
+- HTTP command bridge at /api/forge/command.
+- Live Vision integration for screen-level interaction.
+- Engine-state commands are preferred over coordinate clicking.
+- Visual QA and browser automation are part of the development loop.
 
-1. Launch npm run dev.
-2. Open Forge Studio in a browser.
-3. Create or import real assets.
-4. Compose the scene in the viewport.
-5. Add physics and animation.
-6. Attach gameplay scripts.
-7. Run Play/Simulation.
-8. Run Visual QA.
-9. Save the Forge project or export the current build package.
+### Build
+- Forge project JSON.
+- Browser Web build package.
+- Local asset bundling into the Web build.
+- CI smoke tests on desktop and mobile.
 
-## Quality policy
+## Engineering rule
 
-A feature is not considered complete only because a button exists. New engine systems are expected to have a real runtime path, a project data representation, browser test coverage, diagnostics and mobile behavior.
+A Forge feature is not considered complete merely because it has a UI. It should have a deterministic data representation, a real runtime path, diagnostics, an automated test, and an explicit fallback for unsupported platform features.
 
-## Architecture
+## Research baseline
 
-See FORGE_ARCHITECTURE.md.
+The architecture is continuously compared with modern workflows from Unreal Engine 5.8, PlayCanvas, Blender and the glTF ecosystem. Unreal's recent production workflows emphasize asset management, Nanite/Lumen rendering, PCG, World Partition, animation/rigging, Niagara, MetaSounds, MassEntity and Automation. Forge uses these as reference workflows while implementing a web-first and agent-native architecture.
 
-The architecture is intentionally adapter-based so the editor can evolve without locking every subsystem to one implementation. Rendering, physics, asset processing, audio, networking and AI services can be replaced or extended behind stable Forge data contracts.
+See:
+- FORGE_ARCHITECTURE.md
+- FORGE_AGENT_PROTOCOL.md
 
-## Research direction
-
-The development baseline is continuously compared with current work in Unity, Unreal Engine, Blender, PlayCanvas, Babylon.js, WebGPU, glTF/USD and modern physics runtimes. The purpose is not to copy one engine, but to combine strong ideas into an agent-friendly workflow with fast iteration and built-in visual verification.
-
-## Near-term engine layers
-
-- Asset database, import processors, texture/mesh optimization, LOD and collision generation.
-- Prefabs, nested scenes and reusable gameplay modules.
-- Material/shader graph and advanced render pipeline.
-- Animation import, retargeting, IK, blend trees and ragdolls.
-- Navigation, behavior trees, gameplay graphs and input actions.
-- Spatial audio and mixer graph.
-- Multiplayer replication and network diagnostics.
-- AI scene understanding, code generation, tool execution and repair loops.
-- Deterministic builds, profiling, regression testing and performance budgets.
-- Desktop/mobile packaging and native helpers where browser capabilities require them.
