@@ -302,6 +302,11 @@ function openRuntime(){
   renderInput();
 }
 
+function openShader(){
+  const d=modal("Forge Shader Lab",'<div class="fm-grid"><div class="fm-card"><h4>Cross-platform shader presets</h4><div class="fm-actions"><button data-shader="dissolve">Dissolve</button><button data-shader="energy">Energy</button><button data-shader="hologram">Hologram</button><button data-shader="damage">Damage</button></div></div><div class="fm-card"><h4>Runtime</h4><pre id="shaderOut" class="fm-code"></pre></div></div>');
+  d.querySelectorAll("[data-shader]").forEach(b=>b.onclick=()=>{try{ForgeShaders.applyPreset(b.dataset.shader);d.querySelector("#shaderOut").textContent=JSON.stringify({preset:b.dataset.shader,diagnostics:Forge.diagnostics()},null,2);toast("Shader applied: "+b.dataset.shader)}catch(e){d.querySelector("#shaderOut").textContent=e.message}});
+  d.querySelector("#shaderOut").textContent=JSON.stringify(window.ForgeShaders?.serialize?.()||{},null,2);
+}
 function openRender(){
   const d=modal("Forge Render Lab",'<div class="fm-grid"><div class="fm-card"><h4>Quality profile</h4><div class="fm-actions"><button data-profile="mobile">Mobile</button><button data-profile="balanced">Balanced</button><button data-profile="high">High</button><button data-profile="cinematic">Cinematic</button></div><pre id="renderState" class="fm-code"></pre></div><div class="fm-card"><h4>Material Graph</h4><div class="fm-actions"><button id="newMatGraph">New PBR graph</button><button id="applyMatGraph">Apply selected graph</button></div><pre id="graphState" class="fm-code"></pre></div></div>');
   const render=()=>d.querySelector("#renderState").textContent=JSON.stringify(window.ForgeRender?.quality?.()||{},null,2);
@@ -325,7 +330,7 @@ function open2D(){
 }
 function addBar(){
   const bar=document.createElement("div");bar.className="forge-prod";
-  const buttons=[["Asset Lab",openAssets],["Material",openMaterial],["Render",openRender],["VFX",openVFX],["2D",open2D],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],["Vision",()=>window.AssetForgeLiveVision?.open()],["Runtime",openRuntime],["Build Web",openBuild]];
+  const buttons=[["Asset Lab",openAssets],["Material",openMaterial],["Shader",openShader],["Render",openRender],["VFX",openVFX],["2D",open2D],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],["Vision",()=>window.AssetForgeLiveVision?.open()],["Runtime",openRuntime],["Build Web",openBuild]];
   buttons.forEach(([t,f])=>{const b=document.createElement("button");b.textContent=t;b.onclick=f;bar.append(b)});document.body.append(bar);
 }
 addBar();
