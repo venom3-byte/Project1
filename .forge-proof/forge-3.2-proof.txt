@@ -1,0 +1,1 @@
+Temporary CI proof marker for Forge 3.2 asset-export and visual-QA acceptance. No runtime code changes.
