@@ -11,6 +11,7 @@ const ForgeAgent={
     ws.onclose=()=>{this.connected=false;setTimeout(()=>this.connect(),1200)};
     ws.onmessage=async e=>{
       let m;try{m=JSON.parse(e.data)}catch{return}
+      if(m.type==="frame"){window.ForgeVisionLatestFrame=m;return}
       if(m.type!=="forge-command")return;
       try{const result=await this.execute(m.command||{});ws.send(JSON.stringify({type:"forge-result",id:m.id||null,ok:true,result}))}
       catch(err){ws.send(JSON.stringify({type:"forge-result",id:m.id||null,ok:false,error:err.message||String(err)}))}
@@ -46,6 +47,7 @@ const ForgeAgent={
       case "vision-map": return window.ForgeVision?.map(c.options||{})||null;
       case "vision-capture": return window.ForgeVision?.capture(c.options||{annotate:true})||null;
       case "vision-report": return window.ForgeVision?.report(c.options||{})||null;
+      case "vision-latest": return window.ForgeVisionLatestFrame||null;
       case "vision-pick": return window.ForgeVision?.hitTest(Number(c.x)||0,Number(c.y)||0)||null;
       case "vision-select": return window.ForgeVision?.selectAt(Number(c.x)||0,Number(c.y)||0)||null;
       case "vision-focus": return window.ForgeVision?.focusAt(Number(c.x)||0,Number(c.y)||0)||null;
