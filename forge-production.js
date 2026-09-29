@@ -269,12 +269,12 @@ async function openBuild(){
   project.runtime=project.runtime||{};project.runtime.assetRoot="./";
   project.meta=Object.assign(project.meta||{},{buildMode:"web",renderBackend:"PlayCanvas 2.22.6",physicsBackend:"Rapier 0.21.0"});
   zip.file("project.forge.json",JSON.stringify(project,null,2));
-  const runtimeFiles=["forge-engine.js","forge-runtime.js","forge-gameplay.js","forge-project.js","forge-render.js","forge-ui-system.js","forge-vfx.js","forge-2d.js","forge-ai.js","forge-gameplay-data.js","forge-network.js","forge-replay.js","forge-session.js","forge-shader.js","forge-terrain.js","forge-qa.js"];
+  const runtimeFiles=["forge-engine.js","forge-runtime.js","forge-gameplay.js","forge-project.js","forge-render.js","forge-ui-system.js","forge-vfx.js","forge-2d.js","forge-ai.js","forge-gameplay-data.js","forge-network.js","forge-replay.js","forge-session.js","forge-shader.js","forge-terrain.js","forge-qa.js","forge-animation.js"];
   for(const path of runtimeFiles){const resp=await fetch("./"+path);if(!resp.ok)throw new Error("Cannot package runtime module: "+path);zip.file(path,await resp.text())}
   const runtimeHtml = "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1,viewport-fit=cover\"><meta name=\"theme-color\" content=\"#06101d\"><title>Forge Game Build</title><style>html,body{margin:0;height:100%;overflow:hidden;background:#000}canvas{width:100%;height:100%;display:block}#boot{position:fixed;inset:0;display:grid;place-items:center;background:#06101d;color:#bcd0e5;font:14px system-ui;z-index:20}</style></head><body><div id=\"boot\">Forge Runtime loading…</div><canvas id=\"c\"></canvas><script type=\"module\">import{ForgeEngine}from\"./forge-engine.js\";const boot=document.getElementById(\"boot\"),canvas=document.getElementById(\"c\");const engine=new ForgeEngine(canvas,m=>console.log(\"[Forge]\",m));await engine.init();window.Forge=engine;await import(\"./forge-runtime.js\");await import(\"./forge-ui-system.js\");await import(\"./forge-render.js\");await import(\"./forge-vfx.js\");await import(\"./forge-2d.js\");await import(\"./forge-ai.js\");await import(\"./forge-gameplay-data.js\");await import(\"./forge-network.js\");await import(\"./forge-replay.js\");await import(\"./forge-session.js\");await import(\"./forge-shader.js\");await import(\"./forge-terrain.js\");await import(\"./forge-qa.js\");await import(\"./forge-gameplay.js\");await import(\"./forge-project.js\");const project=await fetch(\"./project.forge.json\").then(r=>{if(!r.ok)throw new Error(\"Project file missing\");return r.json()});project.runtime=project.runtime||{};project.runtime.assetRoot=\"./\";await window.ForgeProject.load(project);engine.running=true;boot.remove();window.addEventListener(\"error\",e=>console.error(e.error||e.message));<\\/script></body></html>";
   zip.file("index.html",runtimeHtml);
   zip.file("manifest.webmanifest",JSON.stringify({name:"Forge Game",short_name:"ForgeGame",start_url:"./",display:"fullscreen",background_color:"#000000",theme_color:"#06101d"},null,2));
-  zip.file("sw.js",'self.addEventListener("install",e=>e.waitUntil(caches.open("forge-v1").then(c=>c.addAll(["./","./index.html","./project.forge.json","./forge-engine.js","./forge-runtime.js","./forge-gameplay.js","./forge-project.js","./forge-render.js","./forge-ui-system.js","./forge-vfx.js","./forge-2d.js","./forge-ai.js","./forge-gameplay-data.js","./forge-network.js","./forge-replay.js","./forge-session.js","./forge-shader.js","./forge-terrain.js","./forge-qa.js"]))));self.addEventListener("fetch",e=>e.respondWith(caches.match(e.request).then(x=>x||fetch(e.request))))');
+  zip.file("sw.js",'self.addEventListener("install",e=>e.waitUntil(caches.open("forge-v1").then(c=>c.addAll(["./","./index.html","./project.forge.json","./forge-engine.js","./forge-runtime.js","./forge-gameplay.js","./forge-project.js","./forge-render.js","./forge-ui-system.js","./forge-vfx.js","./forge-2d.js","./forge-ai.js","./forge-gameplay-data.js","./forge-network.js","./forge-replay.js","./forge-session.js","./forge-shader.js","./forge-terrain.js","./forge-qa.js","./forge-animation.js"]))));self.addEventListener("fetch",e=>e.respondWith(caches.match(e.request).then(x=>x||fetch(e.request))))');
   for(const [name,a] of Forge.assets||[]) if(a?.file) zip.file("assets/"+name,await a.file.arrayBuffer());
   const blob=await zip.generateAsync({type:"blob",compression:"DEFLATE"});
   const a=document.createElement("a");a.download="forge-web-build.zip";a.href=URL.createObjectURL(blob);a.click();setTimeout(()=>URL.revokeObjectURL(a.href),60000);
@@ -291,6 +291,14 @@ function openMaterial(){
   render();
 }
 
+function openAnimationGraph(){
+  const r=Forge.selected();const d=modal("Forge Animation Graph + Rig",'<div class="fm-grid"><div class="fm-card"><h4>State Graph</h4><div class="fm-actions"><button id="agNew">Create graph</button><button id="agRun">Evaluate</button></div><pre id="agOut" class="fm-code"></pre></div><div class="fm-card"><h4>Rig Profile</h4><div class="fm-actions"><button id="rigMake">Auto-map humanoid rig</button></div><pre id="rigOut" class="fm-code"></pre></div></div>');
+  let graph=null,rig=null;
+  d.querySelector("#agNew").onclick=()=>{if(!r){toast("Select an animated entity first");return}graph=window.ForgeAnimation.createGraph(r.id);if(graph.states.length>1)for(let i=0;i<graph.states.length-1;i++)window.ForgeAnimation.addTransition(graph.id,graph.states[i].name,graph.states[i+1].name,{speed:i+1});d.querySelector("#agOut").textContent=JSON.stringify(graph,null,2)};
+  d.querySelector("#agRun").onclick=()=>{if(!graph){toast("Create the graph first");return}window.ForgeAnimation.setParameter(graph.id,"speed",1);d.querySelector("#agOut").textContent=JSON.stringify(graph,null,2)};
+  d.querySelector("#rigMake").onclick=()=>{if(!r){toast("Select a model first");return}rig=window.ForgeAnimation.createRigProfile(r.id);d.querySelector("#rigOut").textContent=JSON.stringify({profile:rig,validation:window.ForgeAnimation.validateRig(rig.id)},null,2)};
+  d.querySelector("#agOut").textContent="No graph yet.";d.querySelector("#rigOut").textContent="No rig profile yet.";
+}
 function openAnimation(){
   const r=Forge.selected(),clips=r?.components?.animation?.clips||[];
   const d=modal("Forge Animation Lab",'<div class="fm-grid"><div class="fm-card"><h4>Imported Clips</h4><div id="animClips"></div><div class="fm-actions"><button id="animPlay">Play</button><button id="animPause">Pause</button></div></div><div class="fm-card"><h4>State</h4><pre id="animState" class="fm-code"></pre></div></div>');
@@ -349,7 +357,7 @@ function open2D(){
 }
 function addBar(){
   const bar=document.createElement("div");bar.className="forge-prod";
-  const buttons=[["Asset Lab",openAssets],["Material",openMaterial],["Shader",openShader],["Animation",openAnimation],["Sequencer",openCinematics],["Render",openRender],["VFX",openVFX],["2D",open2D],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],["Vision",()=>window.AssetForgeLiveVision?.open()],["Runtime",openRuntime],["Build Web",openBuild]];
+  const buttons=[["Asset Lab",openAssets],["Material",openMaterial],["Shader",openShader],["Animation",openAnimation],["Anim Graph",openAnimationGraph],["Sequencer",openCinematics],["Render",openRender],["VFX",openVFX],["2D",open2D],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],["Vision",()=>window.AssetForgeLiveVision?.open()],["Runtime",openRuntime],["Build Web",openBuild]];
   buttons.forEach(([t,f])=>{const b=document.createElement("button");b.textContent=t;b.onclick=f;bar.append(b)});document.body.append(bar);
 }
 addBar();
