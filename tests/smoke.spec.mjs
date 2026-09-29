@@ -287,3 +287,21 @@ test("Game session lifecycle is serializable and restartable",async({page})=>{
   expect(state.players[0][1].name).toBe("Player One");
   expect(state.state.values.score).toBe(3);
 });
+
+
+test("integrated AAA showcase creates a playable end-to-end game state",async({page})=>{
+  await page.goto("/");
+  const result=await page.evaluate(()=>window.ForgeGameplay.createShowcaseGame());
+  const state=await page.evaluate(()=>({
+    gameplay:window.ForgeGameplay.status(),
+    session:window.ForgeSession.serialize(),
+    quest:window.ForgeData.quests.status("arena-objective"),
+    project:window.ForgeProject.serialize()
+  }));
+  expect(result.type).toBe("showcase");
+  expect(state.gameplay.characters.length).toBe(1);
+  expect(state.gameplay.agents.length).toBe(5);
+  expect(state.session.state.phase).toBe("playing");
+  expect(state.quest[0].objectives[0].target).toBe(5);
+  expect(state.project.gameplay.type).toBe("showcase");
+});
