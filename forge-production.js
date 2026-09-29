@@ -115,6 +115,24 @@ class AssetPipeline {
     this.persist();this.lastResults=results;return results;
   }
 
+
+  async storeFile(file){
+    const db=await new Promise((resolve,reject)=>{const q=indexedDB.open("forge-content-v1",1);q.onupgradeneeded=()=>q.result.createObjectStore("files",{keyPath:"name"});q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error)});
+    return new Promise((resolve,reject)=>{const tx=db.transaction("files","readwrite");tx.objectStore("files").put({name:file.name,type:file.type,size:file.size,lastModified:file.lastModified||Date.now(),blob:file});tx.oncomplete=()=>resolve(true);tx.onerror=()=>reject(tx.error)})
+  }
+  async listStored(){
+    const db=await new Promise((resolve,reject)=>{const q=indexedDB.open("forge-content-v1",1);q.onupgradeneeded=()=>q.result.createObjectStore("files",{keyPath:"name"});q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error)});
+    return new Promise((resolve,reject)=>{const q=db.transaction("files","readonly").objectStore("files").getAll();q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error)})
+  }
+  async getStored(name){
+    const all=await this.listStored();return all.find(x=>x.name===name)||null
+  }
+  async hydrateEngineAssets(){
+    const items=await this.listStored();
+    for(const item of items){if(!Forge.assets.has(item.name))Forge.assets.set(item.name,{type:item.type||"application/octet-stream",file:item.blob,url:URL.createObjectURL(item.blob)})}
+    return items.length
+  }
+
   persist(){localStorage.setItem("forge.assetRegistry",JSON.stringify([...this.registry.entries()]));}
   all(){return [...this.registry.values()]}
 }
