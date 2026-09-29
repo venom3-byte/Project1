@@ -140,9 +140,12 @@ public class MainActivity extends ComponentActivity {
       if (Build.VERSION.SDK_INT >= 31) {
         VibratorManager vm = (VibratorManager) context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE);
         if (vm != null) vm.getDefaultVibrator().vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE));
-      } else {
+      } else if (Build.VERSION.SDK_INT >= 26) {
         Vibrator v = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
         if (v != null) v.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE));
+      } else {
+        Vibrator v = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
+        if (v != null) v.vibrate(ms);
       }
     }
   }
