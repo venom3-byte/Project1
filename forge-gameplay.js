@@ -153,7 +153,6 @@ const ForgeGameplay = {
     ]);
     ForgeAI.trees.register(id,seq);return id
   }
-  ,
   aiChase(a,dt){
     const player=[...this.characters.values()][0];if(!player||!a.controller)return false;
     const p=player.entity.getPosition(),e=a.entity.getPosition(),dx=p.x-e.x,dz=p.z-e.z,dist=Math.hypot(dx,dz)||1;
