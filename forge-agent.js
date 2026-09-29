@@ -21,6 +21,28 @@ const ForgeAgent={
     const F=window.Forge,P=window.ForgeProduction;
     switch(c.op){
       case "agent-task": return {accepted:true,task:String(c.task||""),note:"Natural-language task accepted by Forge control plane; convert to deterministic engine commands before execution."};
+      case "batch": {
+        const commands=Array.isArray(c.commands)?c.commands.slice(0,32):[];
+        const results=[];
+        for(const cmd of commands){
+          if(cmd?.op==="batch"||cmd?.op==="vision-loop")throw new Error("Nested agent loops are not allowed");
+          results.push({command:cmd,result:await this.execute(cmd)});
+        }
+        return {count:results.length,results,vision:window.ForgeVision?.report?await window.ForgeVision.report():null};
+      }
+      case "vision-loop": {
+        const commands=Array.isArray(c.commands)?c.commands.slice(0,24):[];
+        const results=[];const stopOnFailure=c.stopOnVisualFailure!==false;
+        for(let i=0;i<commands.length;i++){
+          const cmd=commands[i];
+          if(cmd?.op==="batch"||cmd?.op==="vision-loop")throw new Error("Nested agent loops are not allowed");
+          const result=await this.execute(cmd);
+          const vision=window.ForgeVision?.report?await window.ForgeVision.report():null;
+          results.push({index:i,command:cmd,result,vision});
+          if(stopOnFailure&&vision?.visual&&(vision.visual.renderedContentMissing||vision.visual.blackCanvasWithUI||vision.visual.uiOvercrowded))break;
+        }
+        return {count:results.length,requested:commands.length,stopped:results.length<commands.length,results};
+      }
       case "diagnostics": return F.diagnostics();
       case "entities": return [...F.entities.values()].map(r=>({id:r.id,name:r.name,kind:r.kind,components:r.components}));
       case "select": {const r=c.id?F.select(c.id):[...F.entities.values()].find(x=>x.name===c.name);if(!r)throw new Error("Entity not found");return{ id:r.id,name:r.name,kind:r.kind};}
