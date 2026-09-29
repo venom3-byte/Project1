@@ -51,6 +51,7 @@ const ForgeAgent={
       case "prefab-save": {if(!window.ForgeRuntime)throw new Error("Runtime layer unavailable");const r=F.selected();if(!r)throw new Error("Select entity first");return window.ForgeRuntime.prefabs.save(c.name||r.name,{name:r.name,kind:r.kind,components:r.components,transform:{position:[r.entity.getLocalPosition().x,r.entity.getLocalPosition().y,r.entity.getLocalPosition().z],rotation:[r.entity.getLocalEulerAngles().x,r.entity.getLocalEulerAngles().y,r.entity.getLocalEulerAngles().z],scale:[r.entity.getLocalScale().x,r.entity.getLocalScale().y,r.entity.getLocalScale().z]}});}
       case "template-third-person": return window.ForgeGameplay.createThirdPersonTemplate();
       case "template-racing": return window.ForgeGameplay.createRacingTemplate();
+      case "template-showcase": return window.ForgeGameplay.createShowcaseGame();
       case "gameplay-status": return {runtime:window.ForgeGameplay.status(),actors:window.ForgeData?[...window.ForgeData.actors].map(([id,a])=>({id,attributes:a.attributes.serialize(),inventory:Object.fromEntries(a.inventory),tags:a.tags.all()})):[]};
       case "tag-add": {const a=window.ForgeData.actor(c.actor||"player");a.tags.add(...(c.tags||[]));return a.tags.all();}
       case "attribute": {const a=window.ForgeData.actor(c.actor||"player");if(c.value!=null)a.attributes.set(c.name,c.value);if(c.delta!=null)a.attributes.modify(c.name,c.delta);return a.attributes.get(c.name);}
