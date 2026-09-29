@@ -67,7 +67,21 @@ function updateAssetBrowser(){
   for(const r of records){
     const row=document.createElement("button");row.className="asset-row"+(r.id===engine.selectedId?" active":"");
     const t=r.components.asset.type==="model"?"3D":r.components.asset.type==="image"?"2D":"FILE";
-    row.innerHTML="<span class='asset-icon'>"+t+"</span><span class='asset-name'>"+esc(r.name)+"</span><span class='asset-kind'>"+esc(r.kind)+"</span>";
+    const visual=document.createElement("span");visual.className="asset-visual";
+    const entry=engine.assets?.get?.(r.components.asset.name);
+    if(r.components.asset.type==="image"&&entry?.file){
+      if(!entry.previewUrl){try{entry.previewUrl=URL.createObjectURL(entry.file)}catch{}}
+      if(entry.previewUrl){
+        const img=document.createElement("img");img.className="asset-thumb";img.alt="";img.src=entry.previewUrl;visual.append(img);
+      }else{
+        const ic=document.createElement("span");ic.className="asset-icon";ic.textContent=t;visual.append(ic);
+      }
+    }else{
+      const ic=document.createElement("span");ic.className="asset-icon";ic.textContent=t;visual.append(ic);
+    }
+    row.append(visual);
+    const nameNode=document.createElement("span");nameNode.className="asset-name";nameNode.textContent=r.name;row.append(nameNode);
+    const kindNode=document.createElement("span");kindNode.className="asset-kind";kindNode.textContent=r.kind;row.append(kindNode);
     row.onclick=()=>{engine.select(r.id);refresh();inspect();engine.focus()};
     list.append(row)
   }
