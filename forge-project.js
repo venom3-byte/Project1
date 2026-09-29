@@ -1,12 +1,12 @@
 
 class ForgeProjectStore{
-  constructor(){this.format="forge-project";this.version=4;this.migrations=new Map()}
+  constructor(){this.format="forge-project";this.version=4;this.migrations=new Map();this.meta={name:"Forge Project",engine:"Forge Studio 2.0",createdAt:new Date().toISOString()}}
   registerMigration(from,fn){this.migrations.set(from,fn)}
   serialize(){
     const F=window.Forge,P=window.ForgeProduction,R=window.ForgeRuntime,G=window.ForgeGameplay;
     return {
       format:this.format,version:this.version,
-      meta:{name:"Forge Project",engine:"Forge Studio 2.0",createdAt:new Date().toISOString()},
+      meta:{...this.meta,updatedAt:new Date().toISOString()},
       scene:F.serialize(),
       production:{
         assets:P?.assets?.all?.()||[],
@@ -37,6 +37,7 @@ class ForgeProjectStore{
       poseSearch:window.ForgePoseSearch?.serialize?.()||null
     }
   }
+  setMeta(patch={}){this.meta={...this.meta,...structuredClone(patch)};return this.meta}
   async normalize(data){
     if(!data||typeof data!=="object")throw new Error("Invalid Forge project");
     let d=structuredClone(data);
@@ -48,7 +49,7 @@ class ForgeProjectStore{
     return d
   }
   async load(data){
-    const d=await this.normalize(data),F=window.Forge,P=window.ForgeProduction,R=window.ForgeRuntime;await P?.assets?.hydrateEngineAssets?.();
+    const d=await this.normalize(data),F=window.Forge,P=window.ForgeProduction,R=window.ForgeRuntime;this.meta={...this.meta,...(d.meta||{})};await P?.assets?.hydrateEngineAssets?.();
     await F.load(d.scene,d.runtime?.assetRoot?{assetRoot:d.runtime.assetRoot}:{});
     if(P?.graph&&d.production?.graph)P.graph.graph=d.production.graph;
     if(R?.prefabs&&Array.isArray(d.runtime?.prefabs)){R.prefabs.store=new Map(d.runtime.prefabs);R.prefabs.persist()}
