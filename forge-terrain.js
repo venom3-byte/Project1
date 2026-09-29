@@ -14,7 +14,36 @@ class ForgeTerrainSystem{
     for(let z=0;z<n;z++)for(let x=0;x<n;x++){const a=z*(n+1)+x,b=a+1,c=a+(n+1),d=c+1;indices.push(a,c,b,b,c,d)}
     const normals=pc.calculateNormals(positions,indices),mesh=new pc.Mesh(Forge.app.graphicsDevice);mesh.setPositions(positions);mesh.setNormals(normals);mesh.setUvs(0,uvs);mesh.setIndices(indices);mesh.update();
     const r=Forge.add("terrain",name);const mat=Forge.material(materialColor);r.entity.addComponent("render",{meshInstances:[new pc.MeshInstance(mesh,mat)]});r.components.terrain={size,subdivisions,seed,height};
-    if(Forge.world&&Forge.rapier){try{const body=Forge.world.createRigidBody(Forge.rapier.RigidBodyDesc.fixed());const scale=new Forge.rapier.Vector3(size,height,size);const desc=Forge.rapier.ColliderDesc.heightfield(n+1,n+1,new Float32Array(heights),scale);desc.setActiveEvents(Forge.rapier.ActiveEvents.COLLISION_EVENTS);const collider=Forge.world.createCollider(desc,body);Forge.physics.set(r.id,{body,collider,mode:"fixed",shape:"heightfield",colliderHandle:collider.handle});Forge.colliderEntityMap.set(collider.handle,r.id);r.components.physics={mode:"fixed",shape:"heightfield"}}catch(e){Forge.log("Terrain heightfield collider failed: "+(e?.message||String(e)),"error")}}
+    if(Forge.world&&Forge.rapier){
+      let body=null,collider=null,shape="none";
+      try{
+        body=Forge.world.createRigidBody(Forge.rapier.RigidBodyDesc.fixed());
+        try{
+          const scale=new Forge.rapier.Vector3(size,height,size);
+          const desc=Forge.rapier.ColliderDesc.heightfield(n+1,n+1,new Float32Array(heights),scale);
+          desc.setActiveEvents?.(Forge.rapier.ActiveEvents.COLLISION_EVENTS);
+          collider=Forge.world.createCollider(desc,body);shape="heightfield";
+        }catch{
+          const desc=Forge.rapier.ColliderDesc.trimesh(new Float32Array(positions),new Uint32Array(indices));
+          desc.setActiveEvents?.(Forge.rapier.ActiveEvents.COLLISION_EVENTS);
+          collider=Forge.world.createCollider(desc,body);shape="trimesh";
+        }
+      }catch(e){
+        Forge.log("Terrain detailed collider failed: "+(e?.message||String(e)),"warn");
+        try{
+          if(body)Forge.world.removeRigidBody(body);
+          body=Forge.world.createRigidBody(Forge.rapier.RigidBodyDesc.fixed());
+          const desc=Forge.rapier.ColliderDesc.cuboid(Math.max(.5,size*.5),Math.max(.5,height*.5),Math.max(.5,size*.5));
+          desc.setActiveEvents?.(Forge.rapier.ActiveEvents.COLLISION_EVENTS);
+          collider=Forge.world.createCollider(desc,body);shape="box";
+        }catch(e2){Forge.log("Terrain fallback collider failed: "+(e2?.message||String(e2)),"error")}
+      }
+      if(collider){
+        Forge.physics.set(r.id,{body,collider,mode:"fixed",shape,colliderHandle:collider.handle});
+        Forge.colliderEntityMap.set(collider.handle,r.id);
+        r.components.physics={mode:"fixed",shape};
+      }
+    }
     this.terrains.set(r.id,{id:r.id,name:r.name,mesh,heights,config:r.components.terrain});Forge.select(r.id);return r
   }
   remove(id){const t=this.terrains.get(id);if(t){t.mesh.destroy();this.terrains.delete(id)}Forge.removePhysics(id);const r=Forge.entities.get(id);if(r){r.entity.destroy();Forge.entities.delete(id)}}
