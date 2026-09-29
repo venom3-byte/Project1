@@ -261,9 +261,18 @@ async function openBuild(){
 }
 
 window.ForgeProduction.build=openBuild;
+
+function openMaterial(){
+  const d=modal("Forge Material Lab",'<div class="fm-grid"><div class="fm-card"><h4>PBR surface</h4><label>Base color <input id="matColor" type="color" value="#3a9ee6"></label><label>Metalness <input id="matMetal" type="range" min="0" max="1" step=".01" value=".05"></label><label>Roughness <input id="matRough" type="range" min="0" max="1" step=".01" value=".5"></label><label>Opacity <input id="matOpacity" type="range" min="0" max="1" step=".01" value="1"></label><label>Emissive strength <input id="matEmit" type="range" min="0" max="5" step=".01" value="0"></label><div class="fm-actions"><button id="matApply">Apply material</button><button id="matExport">Export preset</button></div></div><div class="fm-card"><h4>Selected material data</h4><pre id="matState" class="fm-code"></pre></div></div>');
+  const hex=h=>[parseInt(h.slice(1,3),16)/255,parseInt(h.slice(3,5),16)/255,parseInt(h.slice(5,7),16)/255];
+  const render=()=>{d.querySelector("#matState").textContent=JSON.stringify(Forge.materialState()||{hint:"Select a renderable entity"},null,2)};
+  d.querySelector("#matApply").onclick=()=>{Forge.applyMaterial({color:hex(d.querySelector("#matColor").value),metalness:+d.querySelector("#matMetal").value,roughness:+d.querySelector("#matRough").value,opacity:+d.querySelector("#matOpacity").value,emissive:[1,1,1],emissiveIntensity:+d.querySelector("#matEmit").value});render();toast("PBR material applied")};
+  d.querySelector("#matExport").onclick=()=>{const data=Forge.materialState()||{};const a=document.createElement("a");a.download="forge-material.json";a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.click()};
+  render();
+}
 function addBar(){
   const bar=document.createElement("div");bar.className="forge-prod";
-  const buttons=[["Asset Lab",openAssets],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],["Vision",()=>window.AssetForgeLiveVision?.open()],["Build Web",openBuild]];
+  const buttons=[["Asset Lab",openAssets],["Material",openMaterial],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],["Vision",()=>window.AssetForgeLiveVision?.open()],["Build Web",openBuild]];
   buttons.forEach(([t,f])=>{const b=document.createElement("button");b.textContent=t;b.onclick=f;bar.append(b)});document.body.append(bar);
 }
 addBar();
