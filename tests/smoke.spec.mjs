@@ -140,3 +140,17 @@ test("VFX, render profiles and runtime services are callable",async({page})=>{
   expect(result.vfx.presets).toContain("explosion");
   expect(result.runtime).toHaveProperty("input");
 });
+
+
+test("in-engine visual QA can audit and baseline the rendered scene",async({page})=>{
+  await page.goto("/");
+  const audit=await page.evaluate(async()=>await window.ForgeQAPro.audit());
+  expect(audit.width).toBeGreaterThan(100);
+  expect(audit.height).toBeGreaterThan(100);
+  expect(audit.engine.entities).toBeGreaterThan(0);
+  const base=await page.evaluate(async()=>await window.ForgeQAPro.saveBaseline("ci"));
+  expect(base.engine.renderables).toBeGreaterThan(0);
+  const diff=await page.evaluate(async()=>await window.ForgeQAPro.diff("ci"));
+  expect(diff.ok).toBeTruthy();
+  expect(diff.meanSampleDelta).toBeLessThan(.05);
+});
