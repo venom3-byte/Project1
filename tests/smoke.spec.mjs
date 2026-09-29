@@ -123,7 +123,9 @@ test("complete project graph preserves gameplay configuration",async({page})=>{
   const json=await page.evaluate(()=>JSON.stringify(window.ForgeProject.serialize()));
   const project=JSON.parse(json);
   expect(project.format).toBe("forge-project");
-  expect(project.version).toBe(4);
+  expect(project.version).toBe(5);
+  expect(project.meta.units).toBe("meters");
+  expect(project.scene.meta.units).toBe("meters");
   expect(project.gameplay.type).toBe("third-person");
   expect(project.runtime).toHaveProperty("audio");
   expect(project.production).toHaveProperty("graph");
