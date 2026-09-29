@@ -224,17 +224,45 @@ class ForgeVisionCore {
     return {frameId:this.frameId,width:out.width,height:out.height,dataUrl:options.dataUrl===false?null:data,map:m};
   }
 
+  domAudit() {
+    const c=this.canvas(), rect=c?.getBoundingClientRect?.();
+    if(!rect?.width||!rect?.height) return {interactive:0,visible:0,overlaps:0,oversized:[],offscreen:0,coverage:0};
+    const area=rect.width*rect.height;
+    const items=[];
+    for(const el of document.querySelectorAll('button,input,select,textarea,[role="button"],a')){
+      const s=getComputedStyle(el), r=el.getBoundingClientRect();
+      if(s.display==="none"||s.visibility==="hidden"||Number(s.opacity)===0||r.width<=0||r.height<=0) continue;
+      const ix=Math.max(0,Math.min(rect.right,r.right)-Math.max(rect.left,r.left));
+      const iy=Math.max(0,Math.min(rect.bottom,r.bottom)-Math.max(rect.top,r.top));
+      const overlap=ix*iy;
+      if(overlap>0) items.push({id:el.id||"",tag:el.tagName.toLowerCase(),text:(el.textContent||"").trim().slice(0,48),area:Number((overlap/area).toFixed(4)),rect:{x:r.left-rect.left,y:r.top-rect.top,width:r.width,height:r.height}});
+    }
+    const coverage=items.reduce((sum,x)=>sum+x.area,0);
+    return {
+      interactive:document.querySelectorAll('button,input,select,textarea,[role="button"],a').length,
+      visible:items.length,
+      overlaps:items.length,
+      oversized:items.filter(x=>x.area>=.18).sort((a,b)=>b.area-a.area).slice(0,12),
+      offscreen:items.filter(x=>x.rect.x+x.rect.width<0||x.rect.y+x.rect.height<0||x.rect.x>rect.width||x.rect.y>rect.height).length,
+      coverage:Number(Math.min(1,coverage).toFixed(4))
+    };
+  }
+
   async report(options={}) {
     const qa=window.ForgeQAPro ? await window.ForgeQAPro.audit() : null;
     const map=this.map({includeNonRenderable:!!options.includeNonRenderable});
+    const dom=this.domAudit();
     const visual = {
       blank:qa?qa.visibleRatio<0.01:false,
       mostlyBlack:qa?qa.blackRatio>0.92:false,
       lowContrast:qa?qa.meanLuminance<8:false,
       offscreenEntities:map.entities.filter(x=>x.bounds&&!x.bounds.onscreen).length,
-      renderableEntities:map.entities.filter(x=>x.visible).length
+      renderableEntities:map.entities.filter(x=>x.visible).length,
+      uiOvercrowded:dom.coverage>.55||dom.oversized.length>2,
+      blackCanvasWithUI:qa?qa.blackRatio>.92&&dom.visible>0:false,
+      renderedContentMissing:qa?qa.visibleRatio<.01&&map.entities.filter(x=>x.visible).length===0:false
     };
-    return {version:this.version,frameId:this.frameId,qa,map,visual};
+    return {version:this.version,frameId:this.frameId,qa,map,dom,visual};
   }
 
   async saveBaseline(name="default") {
