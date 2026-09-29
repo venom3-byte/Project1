@@ -90,6 +90,11 @@ const ForgeAgent={
       case "animation-graph-param": return window.ForgeAnimation.setParameter(c.graphId,c.key,c.value);
       case "rig-profile": return window.ForgeAnimation.createRigProfile(c.id||window.Forge.selectedId,c.name||"Humanoid");
       case "rig-validate": return window.ForgeAnimation.validateRig(c.rigId);
+      case "pose-db-create": return window.ForgePoseSearch.createDatabase(c.id||"Locomotion",c.entries||[],c.options||{});
+      case "pose-db-add": return window.ForgePoseSearch.addEntries(c.id||"Locomotion",c.entries||[]);
+      case "pose-query": return window.ForgePoseSearch.query(c.id||"Locomotion",c.vector||[],c.options||{});
+      case "motion-match": return window.ForgePoseSearch.match(c.id||"Locomotion",c.actorId||window.Forge.selectedId,c.vector||[],c.options||{});
+      case "pose-status": return window.ForgePoseSearch.status();
       case "replay-stop-play": window.ForgeReplay.stop();return window.ForgeReplay.status();
       case "replay-status": return window.ForgeReplay.status();
       case "build": if(P?.build) return P.build(); return{supported:false};
