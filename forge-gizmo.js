@@ -12,7 +12,7 @@ function attach(){
     state.gizmos.translate=new Translate(cam,state.layer);
     state.gizmos.rotate=new Rotate(cam,state.layer);
     state.gizmos.scale=new Scale(cam,state.layer);
-    for(const[g]of Object.entries(state.gizmos)){
+    for(const[name,g]of Object.entries(state.gizmos)){
       g.off?.();
       g.on("transform:end",()=>{window.dispatchEvent(new Event("forge-gizmo-transform"));});
       g.coordSpace=state.space;
