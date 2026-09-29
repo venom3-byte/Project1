@@ -10,6 +10,8 @@ class ForgeVisionCore {
     this.frameId = 0;
     this.lastFrame = null;
     this.baselines = new Map();
+    this.external={endpoint:"/api/vision/analyze",provider:"generic",configured:false,lastResult:null,lastError:null};
+    try{Object.assign(this.external,JSON.parse(localStorage.getItem("forge.vision.external")||"{}"))}catch{}
   }
 
   canvas() {
@@ -309,8 +311,40 @@ class ForgeVisionCore {
     return hit;
   }
 
+  configureExternal(options={}){
+    this.external={...this.external,...options,configured:!!(options.endpoint||this.external.endpoint)};
+    localStorage.setItem("forge.vision.external",JSON.stringify(this.external));
+    return {...this.external,lastResult:undefined};
+  }
+
+  async analyzeExternal(options={}){
+    const endpoint=String(options.endpoint||this.external.endpoint||"/api/vision/analyze");
+    const frame=this.capture({annotate:false,scale:options.scale||1,dataUrl:true});
+    const report=await this.report();
+    try{
+      const response=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+        provider:options.provider||this.external.provider||"generic",
+        frame,
+        report,
+        task:String(options.task||"Analyze the game/editor frame and return actionable visual findings."),
+        requestId:crypto.randomUUID()
+      })});
+      const payload=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(payload.error||("Vision endpoint HTTP "+response.status));
+      this.external={...this.external,endpoint,provider:options.provider||this.external.provider||"generic",configured:true,lastResult:payload,lastError:null};
+      localStorage.setItem("forge.vision.external",JSON.stringify({...this.external,lastResult:payload}));
+      return payload;
+    }catch(error){
+      this.external={...this.external,endpoint,lastError:error?.message||String(error)};
+      localStorage.setItem("forge.vision.external",JSON.stringify({...this.external,lastResult:null}));
+      throw error;
+    }
+  }
+
+  externalResult(){return this.external}
+
   status() {
-    return {version:this.version,frameId:this.frameId,overlay:this.running,overlayMode:this.overlayMode,lastFrame:this.lastFrame?{frameId:this.lastFrame.frameId,width:this.lastFrame.width,height:this.lastFrame.height,createdAt:this.lastFrame.createdAt}:null};
+    return {version:this.version,frameId:this.frameId,overlay:this.running,overlayMode:this.overlayMode,lastFrame:this.lastFrame?{frameId:this.lastFrame.frameId,width:this.lastFrame.width,height:this.lastFrame.height,createdAt:this.lastFrame.createdAt}:null,external:{endpoint:this.external.endpoint,provider:this.external.provider,configured:this.external.configured,lastError:this.external.lastError,lastResult:!!this.external.lastResult}};
   }
 }
 
