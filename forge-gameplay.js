@@ -1,4 +1,9 @@
 
+const Forge=window.Forge;
+const ForgeAI=window.ForgeAI;
+if(!Forge)throw new Error("Forge engine was not initialized");
+if(!ForgeAI)throw new Error("Forge AI layer was not initialized");
+
 const ForgeGameplay = {
   characters:new Map(),
   vehicles:new Map(),
