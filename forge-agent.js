@@ -40,6 +40,12 @@ const ForgeAgent={
       case "asset-registry": return P?P.assets.all():[];
       case "qa": return window.ForgeQA?.status?window.ForgeQA.status():F.diagnostics();
       case "screenshot": {const canvas=document.querySelector("#viewport");return{dataUrl:canvas?.toDataURL("image/png")||null};}
+      case "runtime": return window.ForgeRuntime?.snapshot?.()||{};
+      case "nav-bake": {if(!window.ForgeRuntime)throw new Error("Runtime layer unavailable");window.ForgeRuntime.nav.bakeFromScene(F);return{width:window.ForgeRuntime.nav.width,height:window.ForgeRuntime.nav.height,cell:window.ForgeRuntime.nav.cell};}
+      case "nav-path": {if(!window.ForgeRuntime)throw new Error("Runtime layer unavailable");return window.ForgeRuntime.nav.path(c.start,c.goal);}
+      case "save-slot": {if(!window.ForgeRuntime)throw new Error("Runtime layer unavailable");window.ForgeRuntime.save.save(String(c.slot||"default"),c.data||F.serialize());return true;}
+      case "load-slot": {if(!window.ForgeRuntime)throw new Error("Runtime layer unavailable");return window.ForgeRuntime.save.load(String(c.slot||"default"));}
+      case "prefab-save": {if(!window.ForgeRuntime)throw new Error("Runtime layer unavailable");const r=F.selected();if(!r)throw new Error("Select entity first");return window.ForgeRuntime.prefabs.save(c.name||r.name,{name:r.name,kind:r.kind,components:r.components,transform:{p:r.entity.getLocalPosition().toJSON?null:[r.entity.getLocalPosition().x,r.entity.getLocalPosition().y,r.entity.getLocalPosition().z]}});}
       case "build": if(P?.build) return P.build(); return{supported:false};
       default: throw new Error("Unknown Forge command: "+c.op);
     }
