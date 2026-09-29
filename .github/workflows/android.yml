@@ -33,11 +33,10 @@ jobs:
       - name: Install Forge build dependencies
         run: npm install
 
-      - name: Verify Android SDK platform
-        shell: bash
-        run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platforms;android-37" "build-tools;36.0.0"
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-37 build-tools;36.0.0'
 
       - name: Export Forge runtime into Android assets
         run: node scripts/export-android.mjs android/demo-project.forge.json
