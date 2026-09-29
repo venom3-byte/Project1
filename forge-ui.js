@@ -1,18 +1,19 @@
+const bootEl=document.getElementById("forgeBoot"),bootText=document.getElementById("forgeBootText");
+window.ForgeReady=false;window.ForgeBootState="loading";document.documentElement.dataset.forgeReady="0";
+function bootMessage(s,error=false){if(bootText)bootText.textContent=s;if(error){bootEl?.classList.remove("hidden");if(bootText)bootText.style.color="#ff9aa6"}}
 const $=id=>document.getElementById(id),out=$("log");
 const write=(s,type="info")=>{out.textContent+="["+new Date().toLocaleTimeString()+"] "+s+"\n";out.scrollTop=out.scrollHeight;if(type==="error")console.error(s)};
 const toast=s=>{const e=document.createElement("div");e.textContent=s;Object.assign(e.style,{position:"fixed",bottom:"18px",left:"50%",transform:"translateX(-50%)",background:"#0b1d31",border:"1px solid #31506f",padding:"10px 14px",borderRadius:"10px",zIndex:99,maxWidth:"92vw",boxShadow:"0 8px 30px #0008"});document.body.appendChild(e);setTimeout(()=>e.remove(),1900)};
 import{ForgeEngine}from"./forge-engine.js";
 const engine=new ForgeEngine($("viewport"),write);
-await engine.init();
-window.Forge=engine;
-await import("./forge-spatial.js");
-for(const module of [
+try{bootMessage("Starting renderer and physics…");await engine.init();window.Forge=engine;bootMessage("Loading spatial core and editor systems…");await import("./forge-spatial.js");for(const module of [
   "./forge-production.js","./forge-project.js","./forge-render.js","./forge-ui-system.js","./forge-vfx.js",
   "./forge-2d.js","./forge-ai.js","./forge-gameplay-data.js","./forge-network.js","./forge-replay.js",
   "./forge-session.js","./forge-shader.js","./forge-terrain.js","./forge-qa.js","./forge-animation.js",
   "./forge-runtime.js","./forge-gameplay.js","./live-vision.js","./forge-agent.js","./forge-export.js","./forge-gizmo.js"
 ]) await import(module);
-window.dispatchEvent(new Event("forge-ready"));
+}catch(error){window.ForgeBootState="error";bootMessage("Forge could not complete startup: "+(error?.message||String(error)),true);console.error(error);throw error}
+window.ForgeReady=true;window.ForgeBootState="ready";document.documentElement.dataset.forgeReady="1";bootEl?.classList.add("hidden");window.dispatchEvent(new Event("forge-ready"));
 
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function icon(k){return({box:"▣",sphere:"●",cylinder:"⬢",capsule:"◉",plane:"▱",camera:"◫",light:"☼",model:"◇",empty:"＋"})[k]||"•"}
@@ -52,11 +53,22 @@ function updateSpatial(){
   $("geoCollision").textContent=r.components.physics?(r.components.physics.mode+"/"+r.components.physics.shape):"none";
 }
 function updateAssetPanel(){
-  const r=engine.selected(),label=$("assetSelected"),type=$("assetType");
+  const r=engine.selected(),label=$("assetSelected"),type=$("assetType"),meta=$("assetMeta");
   if(!label||!type)return;
   const a=r?.components?.asset;
   label.textContent=r?.name||"No asset selected";
   type.textContent=a?.type?(a.type==="model"?"3D GLB":a.type==="image"?"2D Image":a.type.toUpperCase()):"Scene object";
+  if(meta){
+    if(!a){
+      meta.textContent="Select an imported asset to inspect source metadata.";
+    }else{
+      const entry=engine.assets?.get?.(a.name);
+      const bytes=Number(entry?.file?.size||0);
+      const mime=entry?.file?.type||"application/octet-stream";
+      const dims=a.width&&a.height?(" · "+a.width+"×"+a.height+"px"):"";
+      meta.textContent="SOURCE · "+a.name+" · "+bytes.toLocaleString()+" bytes · "+mime+dims;
+    }
+  }
 }
 function updateAssetBrowser(){
   const list=$("assetList");if(!list)return;
@@ -67,7 +79,21 @@ function updateAssetBrowser(){
   for(const r of records){
     const row=document.createElement("button");row.className="asset-row"+(r.id===engine.selectedId?" active":"");
     const t=r.components.asset.type==="model"?"3D":r.components.asset.type==="image"?"2D":"FILE";
-    row.innerHTML="<span class='asset-icon'>"+t+"</span><span class='asset-name'>"+esc(r.name)+"</span><span class='asset-kind'>"+esc(r.kind)+"</span>";
+    const visual=document.createElement("span");visual.className="asset-visual";
+    const entry=engine.assets?.get?.(r.components.asset.name);
+    if(r.components.asset.type==="image"&&entry?.file){
+      if(!entry.previewUrl){try{entry.previewUrl=URL.createObjectURL(entry.file)}catch{}}
+      if(entry.previewUrl){
+        const img=document.createElement("img");img.className="asset-thumb";img.alt="";img.src=entry.previewUrl;visual.append(img);
+      }else{
+        const ic=document.createElement("span");ic.className="asset-icon";ic.textContent=t;visual.append(ic);
+      }
+    }else{
+      const ic=document.createElement("span");ic.className="asset-icon";ic.textContent=t;visual.append(ic);
+    }
+    row.append(visual);
+    const nameNode=document.createElement("span");nameNode.className="asset-name";nameNode.textContent=r.name;row.append(nameNode);
+    const kindNode=document.createElement("span");kindNode.className="asset-kind";kindNode.textContent=r.kind;row.append(kindNode);
     row.onclick=()=>{engine.select(r.id);refresh();inspect();engine.focus()};
     list.append(row)
   }
