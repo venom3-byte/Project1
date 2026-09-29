@@ -1,18 +1,19 @@
+const bootEl=document.getElementById("forgeBoot"),bootText=document.getElementById("forgeBootText");
+window.ForgeReady=false;window.ForgeBootState="loading";document.documentElement.dataset.forgeReady="0";
+function bootMessage(s,error=false){if(bootText)bootText.textContent=s;if(error){bootEl?.classList.remove("hidden");if(bootText)bootText.style.color="#ff9aa6"}}
 const $=id=>document.getElementById(id),out=$("log");
 const write=(s,type="info")=>{out.textContent+="["+new Date().toLocaleTimeString()+"] "+s+"\n";out.scrollTop=out.scrollHeight;if(type==="error")console.error(s)};
 const toast=s=>{const e=document.createElement("div");e.textContent=s;Object.assign(e.style,{position:"fixed",bottom:"18px",left:"50%",transform:"translateX(-50%)",background:"#0b1d31",border:"1px solid #31506f",padding:"10px 14px",borderRadius:"10px",zIndex:99,maxWidth:"92vw",boxShadow:"0 8px 30px #0008"});document.body.appendChild(e);setTimeout(()=>e.remove(),1900)};
 import{ForgeEngine}from"./forge-engine.js";
 const engine=new ForgeEngine($("viewport"),write);
-await engine.init();
-window.Forge=engine;
-await import("./forge-spatial.js");
-for(const module of [
+try{bootMessage("Starting renderer and physics…");await engine.init();window.Forge=engine;bootMessage("Loading spatial core and editor systems…");await import("./forge-spatial.js");for(const module of [
   "./forge-production.js","./forge-project.js","./forge-render.js","./forge-ui-system.js","./forge-vfx.js",
   "./forge-2d.js","./forge-ai.js","./forge-gameplay-data.js","./forge-network.js","./forge-replay.js",
   "./forge-session.js","./forge-shader.js","./forge-terrain.js","./forge-qa.js","./forge-animation.js",
   "./forge-runtime.js","./forge-gameplay.js","./live-vision.js","./forge-agent.js","./forge-export.js","./forge-gizmo.js"
 ]) await import(module);
-window.dispatchEvent(new Event("forge-ready"));
+}catch(error){window.ForgeBootState="error";bootMessage("Forge could not complete startup: "+(error?.message||String(error)),true);console.error(error);throw error}
+window.ForgeReady=true;window.ForgeBootState="ready";document.documentElement.dataset.forgeReady="1";bootEl?.classList.add("hidden");window.dispatchEvent(new Event("forge-ready"));
 
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function icon(k){return({box:"▣",sphere:"●",cylinder:"⬢",capsule:"◉",plane:"▱",camera:"◫",light:"☼",model:"◇",empty:"＋"})[k]||"•"}
