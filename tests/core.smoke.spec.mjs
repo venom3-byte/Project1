@@ -107,3 +107,13 @@ test("asset browser filters and selects imported real assets",async({page})=>{
   expect(result.filtered).toHaveLength(1);
   expect(result.selected).toBe("browser-proof.png");
 });
+
+
+test("local computer-vision health reports rendered pixels and layout",async({page})=>{
+  await page.goto("/");
+  const result=await page.evaluate(()=>window.AssetForgeLiveVision.visualHealth());
+  expect(result.viewport?.width).toBeGreaterThan(300);
+  expect(result.viewport?.height).toBeGreaterThan(300);
+  expect(result.overflow).toBeLessThanOrEqual(1);
+  expect(result.ok).toBeTruthy();
+});
