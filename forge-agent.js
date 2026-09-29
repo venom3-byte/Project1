@@ -4,7 +4,30 @@ const ForgeAgent={
   connect(){
     if(!this.serverCapable()||typeof WebSocket==='undefined')return;
     if(this.ws&&(this.ws.readyState===1||this.ws.readyState===0))return;
-    const proto=location.protocol==='https:'?'wss:':'ws:';try{const ws=new WebSocket(proto+'//'+location.host+'/live');this.ws=ws;ws.onopen=()=>{this.connected=true;ws.send(JSON.stringify({type:'hello',role:'forge-agent',protocol:3}))};ws.onclose=()=>{this.connected=false;this.ws=null};ws.onerror=()=>{this.connected=false};ws.onmessage=async e=>{let m;try{m=JSON.parse(e.data)}catch{return}if(m.type!=='forge-command')return;try{const result=await this.execute(m.command||{});ws.send(JSON.stringify({type:'forge-result',id:m.id||null,ok:true,result}))}catch(err){ws.send(JSON.stringify({type:'forge-result',id:m.id||null,ok:false,error:err.message||String(err))}))}}}catch{this.connected=false;this.ws=null}},
+    const proto=location.protocol==='https:'?'wss:':'ws:';
+    try{
+      const ws=new WebSocket(proto+'//'+location.host+'/live'); this.ws=ws;
+      ws.onopen=()=>{
+        this.connected=true;
+        ws.send(JSON.stringify({type:'hello',role:'forge-agent',protocol:3}));
+      };
+      ws.onclose=()=>{this.connected=false;this.ws=null};
+      ws.onerror=()=>{this.connected=false};
+      ws.onmessage=async e=>{
+        let m;
+        try{m=JSON.parse(e.data)}catch{return}
+        if(m.type!=='forge-command')return;
+        try{
+          const result=await this.execute(m.command||{});
+          ws.send(JSON.stringify({type:'forge-result',id:m.id||null,ok:true,result}));
+        }catch(err){
+          ws.send(JSON.stringify({type:'forge-result',id:m.id||null,ok:false,error:err.message||String(err)}));
+        }
+      };
+    }catch{
+      this.connected=false;this.ws=null;
+    }
+  },
   async execute(c){const F=window.Forge,P=window.ForgeProduction;switch(c.op){
     case 'agent-task': return this.serverCapable()?{accepted:true,task:String(c.task||''),mode:'server-control-plane'}:await window.AssetForgeLiveVision?.executeAction?.({type:'vision'});
     case 'diagnostics':return F.diagnostics();
