@@ -62,5 +62,5 @@ class PrefabSystem{
 
 ForgeRuntime.input=new InputSystem();ForgeRuntime.nav=new NavigationSystem();ForgeRuntime.save=new SaveSystem();ForgeRuntime.audio=new AudioSystem();ForgeRuntime.prefabs=new PrefabSystem();
 ForgeRuntime.snapshot=()=>({input:ForgeRuntime.input.snapshot(),slots:ForgeRuntime.save.list(),prefabs:ForgeRuntime.prefabs.list()});
-window.ForgeRuntime=ForgeRuntime;
+window.ForgeRuntime=ForgeRuntime;ForgeRuntime.input.mountMobileControls();
 window.addEventListener("blur",()=>ForgeRuntime.input.down.clear());
