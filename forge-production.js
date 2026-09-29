@@ -270,9 +270,21 @@ function openMaterial(){
   d.querySelector("#matExport").onclick=()=>{const data=Forge.materialState()||{};const a=document.createElement("a");a.download="forge-material.json";a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.click()};
   render();
 }
+
+function openRuntime(){
+  const d=modal("Forge Runtime Lab",'<div class="fm-grid"><div class="fm-card"><h4>Input Map</h4><div id="rtInput"></div><div class="fm-actions"><button id="rtFocus">Focus viewport</button><button id="rtClear">Clear input state</button></div></div><div class="fm-card"><h4>Navigation</h4><div class="fm-actions"><button id="navBake">Bake grid</button><button id="navPath">Test path</button></div><pre id="navOut" class="fm-code"></pre></div><div class="fm-card"><h4>Save Slots</h4><input id="slotName" value="autosave"><div class="fm-actions"><button id="slotSave">Save slot</button><button id="slotLoad">Inspect slot</button></div><pre id="slotOut" class="fm-code"></pre></div><div class="fm-card"><h4>Prefabs</h4><input id="prefabName" placeholder="Prefab name"><div class="fm-actions"><button id="prefabSave">Save selected as prefab</button></div><pre id="prefabOut" class="fm-code"></pre></div></div>');
+  const renderInput=()=>{d.querySelector("#rtInput").innerHTML=Object.entries(window.ForgeRuntime?.input.bindings||{}).map(([k,v])=>'<div>'+k+' → '+v.join(", ")+'</div>').join("")};
+  d.querySelector("#rtFocus").onclick=()=>document.querySelector("#viewport")?.focus();d.querySelector("#rtClear").onclick=()=>window.ForgeRuntime?.input.down.clear();
+  d.querySelector("#navBake").onclick=()=>{window.ForgeRuntime.nav.bakeFromScene(Forge);d.querySelector("#navOut").textContent=JSON.stringify({width:window.ForgeRuntime.nav.width,height:window.ForgeRuntime.nav.height,cell:window.ForgeRuntime.nav.cell},null,2)};
+  d.querySelector("#navPath").onclick=()=>{const p=window.ForgeRuntime.nav.path({x:0,y:0,z:0},{x:8,y:0,z:8});d.querySelector("#navOut").textContent=JSON.stringify(p,null,2)};
+  d.querySelector("#slotSave").onclick=()=>{const s=d.querySelector("#slotName").value||"autosave";window.ForgeRuntime.save.save(s,Forge.serialize());d.querySelector("#slotOut").textContent=JSON.stringify(window.ForgeRuntime.save.load(s),null,2)};
+  d.querySelector("#slotLoad").onclick=()=>{const s=d.querySelector("#slotName").value||"autosave";d.querySelector("#slotOut").textContent=JSON.stringify(window.ForgeRuntime.save.load(s),null,2)};
+  d.querySelector("#prefabSave").onclick=()=>{const r=Forge.selected();if(!r){toast("Select an entity first");return}const name=d.querySelector("#prefabName").value||r.name;window.ForgeRuntime.prefabs.save(name,{name:r.name,kind:r.kind,components:r.components,transform:{position:[r.entity.getLocalPosition().x,r.entity.getLocalPosition().y,r.entity.getLocalPosition().z],rotation:[r.entity.getLocalEulerAngles().x,r.entity.getLocalEulerAngles().y,r.entity.getLocalEulerAngles().z],scale:[r.entity.getLocalScale().x,r.entity.getLocalScale().y,r.entity.getLocalScale().z]}});d.querySelector("#prefabOut").textContent=JSON.stringify(window.ForgeRuntime.prefabs.list(),null,2)};
+  renderInput();
+}
 function addBar(){
   const bar=document.createElement("div");bar.className="forge-prod";
-  const buttons=[["Asset Lab",openAssets],["Material",openMaterial],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],["Vision",()=>window.AssetForgeLiveVision?.open()],["Build Web",openBuild]];
+  const buttons=[["Asset Lab",openAssets],["Material",openMaterial],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],["Vision",()=>window.AssetForgeLiveVision?.open()],["Runtime",openRuntime],["Build Web",openBuild]];
   buttons.forEach(([t,f])=>{const b=document.createElement("button");b.textContent=t;b.onclick=f;bar.append(b)});document.body.append(bar);
 }
 addBar();
