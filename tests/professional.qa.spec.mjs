@@ -194,7 +194,7 @@ test.describe("Forge professional acceptance",()=>{
     expect(glb.length).toBeGreaterThan(100000);
     const originalSha=await sha(new Blob([glb]));
     await waitForForge(page);
-    const result=await page.evaluate(async(bytes)=>{
+    const result=await page.evaluate(async({bytes,originalSha})=>{
       const file=new File([bytes],"Fox.glb",{type:"model/gltf-binary"});
       await window.ForgeProduction.assets.storeFile(file);
       const imported=await window.Forge.importFile(file);
@@ -218,7 +218,7 @@ test.describe("Forge professional acceptance",()=>{
         derived:scene.validation,
         round:{name:round.record.name,spatial:roundSpatial}
       };
-    },glb);
+    },{bytes:glb,originalSha});
     expect(result.name).toBe("Fox");
     expect(result.clips.length).toBeGreaterThanOrEqual(3);
     expect(result.playing).toBeTruthy();
