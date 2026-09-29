@@ -140,7 +140,7 @@ const ForgeGameplay = {
     if(dist<=a.detectionRange&&dist>a.attackRange){a.state="chase";const l=dist||1;const desired={x:dx/l*a.speed*dt,y:-2.5*dt,z:dz/l*a.speed*dt};a.controller.computeColliderMovement(a.collider,desired);const move=a.controller.computedMovement();const t=a.body.translation();a.body.setNextKinematicTranslation({x:t.x+move.x,y:t.y+move.y,z:t.z+move.z});a.entity.setEulerAngles(0,Math.atan2(dx,dz)*180/Math.PI,0);}
     else if(dist<=a.attackRange){a.state="attack";a.damageCooldown=Math.max(0,a.damageCooldown-dt);if(a.damageCooldown===0){player.hp=Math.max(0,player.hp-a.damage);a.damageCooldown=1.0;}}
     else a.state="idle";
-    if(a.hp<=0){Forge.deleteSelected?.()}
+    if(a.hp<=0){Forge.removePhysics(a.id);a.entity.destroy();Forge.entities.delete(a.id);this.agents.delete(a.id)}
   },
 
   updateVehicle(v,dt){
@@ -182,7 +182,7 @@ const ForgeGameplay = {
     Forge.createPlane("Ground",40,40);const light=Forge.createLight("Sun");const player=this.createCharacter("Player",{x:0,y:1.2,z:0});
     const enemy1=this.createEnemy("Enemy_A",{x:7,y:1,z:6}),enemy2=this.createEnemy("Enemy_B",{x:-7,y:1,z:4}),enemy3=this.createEnemy("Enemy_C",{x:4,y:1,z:-8});
     for(let i=0;i<8;i++){const r=Forge.primitive("box","Cover_"+i);r.entity.setLocalPosition((i%4)*4-6,.75,Math.floor(i/4)*6-3);r.entity.setLocalScale(1.5,1.5,1.5);Forge.setPhysics(r.id,"fixed","box");}
-    Forge.frame();Forge.select(player.id);
+    Forge.frame();Forge.select(player.id);window.ForgeUISystem?.hudForThirdPerson(()=>({hp:player.hp,state:player.grounded?"GROUNDED":"AIRBORNE"}));
     return{type:"third-person",player:player.id,enemies:[enemy1.id,enemy2.id,enemy3.id]};
   },
 
