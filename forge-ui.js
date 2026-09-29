@@ -52,11 +52,22 @@ function updateSpatial(){
   $("geoCollision").textContent=r.components.physics?(r.components.physics.mode+"/"+r.components.physics.shape):"none";
 }
 function updateAssetPanel(){
-  const r=engine.selected(),label=$("assetSelected"),type=$("assetType");
+  const r=engine.selected(),label=$("assetSelected"),type=$("assetType"),meta=$("assetMeta");
   if(!label||!type)return;
   const a=r?.components?.asset;
   label.textContent=r?.name||"No asset selected";
   type.textContent=a?.type?(a.type==="model"?"3D GLB":a.type==="image"?"2D Image":a.type.toUpperCase()):"Scene object";
+  if(meta){
+    if(!a){
+      meta.textContent="Select an imported asset to inspect source metadata.";
+    }else{
+      const entry=engine.assets?.get?.(a.name);
+      const bytes=Number(entry?.file?.size||0);
+      const mime=entry?.file?.type||"application/octet-stream";
+      const dims=a.width&&a.height?(" · "+a.width+"×"+a.height+"px"):"";
+      meta.textContent="SOURCE · "+a.name+" · "+bytes.toLocaleString()+" bytes · "+mime+dims;
+    }
+  }
 }
 function updateAssetBrowser(){
   const list=$("assetList");if(!list)return;
