@@ -43,6 +43,19 @@ const ForgeAgent={
       case "qa-baseline": return window.ForgeQAPro?await window.ForgeQAPro.saveBaseline(c.name||"default"):null;
       case "qa-diff": return window.ForgeQAPro?await window.ForgeQAPro.diff(c.name||"default"):null;
       case "screenshot": {const canvas=document.querySelector("#viewport");return{dataUrl:canvas?.toDataURL("image/png")||null};}
+      case "vision-map": return window.ForgeVision?.map(c.options||{})||null;
+      case "vision-capture": return window.ForgeVision?.capture(c.options||{annotate:true})||null;
+      case "vision-report": return window.ForgeVision?.report(c.options||{})||null;
+      case "vision-pick": return window.ForgeVision?.hitTest(Number(c.x)||0,Number(c.y)||0)||null;
+      case "vision-select": return window.ForgeVision?.selectAt(Number(c.x)||0,Number(c.y)||0)||null;
+      case "vision-focus": return window.ForgeVision?.focusAt(Number(c.x)||0,Number(c.y)||0)||null;
+      case "vision-overlay": {
+        if(!window.ForgeVision)throw new Error("Vision core unavailable");
+        if(c.enabled===false)window.ForgeVision.stopOverlay();
+        else {window.ForgeVision.overlayMode=c.mode||"selected";window.ForgeVision.startOverlay(c.intervalMs||120);}
+        return window.ForgeVision.status();
+      }
+
       case "runtime": return window.ForgeRuntime?.snapshot?.()||{};
       case "nav-bake": {if(!window.ForgeRuntime)throw new Error("Runtime layer unavailable");window.ForgeRuntime.nav.bakeFromScene(F);return{width:window.ForgeRuntime.nav.width,height:window.ForgeRuntime.nav.height,cell:window.ForgeRuntime.nav.cell};}
       case "nav-path": {if(!window.ForgeRuntime)throw new Error("Runtime layer unavailable");return window.ForgeRuntime.nav.path(c.start,c.goal);}
