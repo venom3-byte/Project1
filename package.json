@@ -8,7 +8,7 @@
     "test": "playwright test",
     "test:forge": "playwright test tests/smoke.spec.mjs",
     "build:android": "node scripts/export-android.mjs",
-    "test:boot": "playwright test tests/boot.spec.mjs"
+    "test:boot": "playwright test tests/boot.spec.mjs --workers=2"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
