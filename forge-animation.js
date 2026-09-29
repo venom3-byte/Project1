@@ -9,7 +9,7 @@ const ForgeAnimation={
     this.graphs.set(graph.id,graph);return graph
   },
   addTransition(graphId,from,to,condition={}){const g=this.graphs.get(graphId);if(!g)throw new Error("Graph not found");g.transitions.push({from,to,condition});return g}
-  setParameter(graphId,key,value){const g=this.graphs.get(graphId);if(!g)throw new Error("Graph not found");g.parameters[key]=value;this.evaluate(graphId);return g.parameters[key]}
+  setParameter(graphId,key,value){const g=this.graphs.get(graphId);if(!g)throw new Error("Graph not found");g.parameters[key]=value;this.evaluate(graphId);return g.parameters[key]},
   evaluate(graphId){
     const g=this.graphs.get(graphId);if(!g)return null;
     for(const t of g.transitions){if(t.from!==g.active)continue;const c=t.condition||{};let pass=true;for(const [k,v] of Object.entries(c)){const actual=g.parameters[k];if(typeof v==="number"&&typeof actual==="number"&&actual<v)pass=false;else if(typeof v==="boolean"&&actual!==v)pass=false;else if(typeof v==="string"&&actual!==v)pass=false}if(pass){g.active=t.to;break}}
@@ -24,7 +24,7 @@ const ForgeAnimation={
     const profile={id:crypto.randomUUID(),name,entityId,bones,humanoid:map,coverage:Number((Object.keys(map).length/Object.keys(aliases).length).toFixed(3))};this.rigs.set(profile.id,profile);return profile
   },
   validateRig(id){const r=this.rigs.get(id);if(!r)return null;return{coverage:r.coverage,valid:r.coverage>=.7,missing:["pelvis","spine","head","leftHand","rightHand","leftFoot","rightFoot"].filter(k=>!r.humanoid[k])}},
-  serialize(){return{graphs:[...this.graphs.values()],rigs:[...this.rigs.values()]}}
+  serialize(){return{graphs:[...this.graphs.values()],rigs:[...this.rigs.values()]}},
   load(data){this.graphs=new Map((data?.graphs||[]).map(g=>[g.id,g]));this.rigs=new Map((data?.rigs||[]).map(r=>[r.id,r]))}
 };
 window.ForgeAnimation=ForgeAnimation;
