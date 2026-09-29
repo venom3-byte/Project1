@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#06101d"><title>Forge Studio 2.0</title><link rel="stylesheet" href="./forge.css">
+</head><body>
+<header class="topbar">
+  <div class="brand"><div class="mark">F</div><div><b>FORGE</b><small>Studio 2.0</small></div></div>
+  <nav class="modebar"><button class="mode active" data-mode="game">Game</button><button class="mode" data-mode="scene">Scene</button><button class="mode" data-mode="assets">Assets</button><button class="mode" data-mode="logic">Logic</button><button class="mode" data-mode="qa">QA</button></nav>
+  <div class="top-actions"><button id="openProject">Open</button><button id="saveProject">Save</button><button id="play" class="primary">▶ Play</button><button id="build">Build Web</button></div>
+</header>
+<main class="shell">
+<aside class="leftpanel">
+  <div class="block tools"><div class="title">CREATE</div><button data-add="box">▣ Box</button><button data-add="sphere">● Sphere</button><button data-add="cylinder">⬢ Cylinder</button><button data-add="capsule">◉ Capsule</button><button data-add="plane">▱ Plane</button><button data-add="camera">◫ Camera</button><button data-add="light">☼ Light</button><button data-add="empty">＋ Empty</button></div>
+  <div class="block"><div class="title">ASSETS</div><input id="assetInput" type="file" multiple accept=".glb,.gltf,.png,.jpg,.jpeg,.webp,.avif,.mp3,.wav,.ogg,.json"><button id="importAssets" class="wide primary">Import</button><div id="dropzone" class="dropzone">Drop real assets here</div></div>
+  <div class="block"><div class="title">TOOLS</div><button id="focus">Focus</button><button id="duplicate">Duplicate</button><button id="delete" class="danger">Delete</button><button id="frame">Frame All</button><button id="reset">Reset</button></div>
+  <div class="block stats"><div><span>Renderer</span><b id="renderer">…</b></div><div><span>FPS</span><b id="fps">0</b></div><div><span>Physics</span><b id="physics">0</b></div></div>
+</aside>
+<section class="workspace">
+<div class="viewport"><canvas id="viewport"></canvas><div class="hud"><div><span id="sceneCount">0 entities</span><span id="selected">None</span></div><div><button id="qa">◎ Visual QA</button><button id="grid" class="active">Grid</button></div></div><div id="dropOverlay" class="drop-overlay hidden">Release to import</div></div>
+<section class="timeline"><div class="timeline-head"><b>ANIMATION / SIMULATION</b><div><button id="rewind">|◀</button><button id="timelinePlay">▶</button><button id="key">◆ Key</button><label>Time <input id="time" value="0" type="number" step=".01"></label></div></div><div class="track" id="track"><div id="playhead"></div></div></section>
+</section>
+<aside class="rightpanel">
+<div class="inspector"><div class="title">INSPECTOR <span id="kind">—</span></div><div id="empty">Select an entity</div><div id="form" class="hidden">
+<label>Name<input id="name"></label><div class="st">TRANSFORM</div>
+<div class="g3"><label>X<input id="px" type="number" step=".01"></label><label>Y<input id="py" type="number" step=".01"></label><label>Z<input id="pz" type="number" step=".01"></label></div>
+<div class="g3"><label>RX<input id="rx" type="number" step=".5"></label><label>RY<input id="ry" type="number" step=".5"></label><label>RZ<input id="rz" type="number" step=".5"></label></div>
+<div class="g3"><label>SX<input id="sx" type="number" step=".01"></label><label>SY<input id="sy" type="number" step=".01"></label><label>SZ<input id="sz" type="number" step=".01"></label></div>
+<div class="st">PHYSICS</div><label>Body<select id="body"><option value="none">None</option><option value="dynamic">Dynamic</option><option value="fixed">Fixed</option><option value="kinematic">Kinematic</option></select></label>
+<label>Shape<select id="shape"><option value="none">None</option><option value="box">Box</option><option value="ball">Sphere</option><option value="capsule">Capsule</option></select></label>
+<div class="g2"><button id="apply" class="primary">Apply</button><button id="script">Script</button></div></div></div>
+<div class="hierarchy"><div class="title">HIERARCHY</div><div id="tree"></div></div>
+<div class="console"><div class="title">CONSOLE <button id="clear">Clear</button></div><pre id="log"></pre></div>
+</aside>
+</main>
+<dialog id="qaDialog"><div class="dialog-head"><b>Forge Visual QA</b><button data-close="qaDialog">×</button></div><pre id="qaReport"></pre><div class="dialog-actions"><button data-close="qaDialog">Close</button><button id="runQA" class="primary">Run smoke</button></div></dialog>
+<dialog id="scriptDialog"><div class="dialog-head"><b>Entity Script</b><button data-close="scriptDialog">×</button></div><textarea id="code">// api.entity, api.time, api.dt
+api.entity.setEulerAngles(0, api.time * 30, 0);</textarea><div class="dialog-actions"><button data-close="scriptDialog">Cancel</button><button id="saveScript" class="primary">Attach</button></div></dialog>
+<input id="projectInput" hidden type="file" accept=".json,.forge.json">
+<script type="module" src="./forge-ui.js"></script>
+</body></html>
