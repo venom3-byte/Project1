@@ -36,7 +36,7 @@ class ForgeProjectStore{
     return d
   }
   async load(data){
-    const d=await this.normalize(data),F=window.Forge,P=window.ForgeProduction,R=window.ForgeRuntime;
+    const d=await this.normalize(data),F=window.Forge,P=window.ForgeProduction,R=window.ForgeRuntime;await P?.assets?.hydrateEngineAssets?.();
     await F.load(d.scene);
     if(P?.graph&&d.production?.graph)P.graph.graph=d.production.graph;
     if(R?.prefabs&&Array.isArray(d.runtime?.prefabs)){R.prefabs.store=new Map(d.runtime.prefabs);R.prefabs.persist()}
