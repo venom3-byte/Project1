@@ -273,8 +273,10 @@ async function openAndroid(){
   const d=modal("Forge Android Export",'<div class="fm-grid"><div class="fm-card"><h4>Installable Android target</h4><p>Packages the current Forge project and its real imported assets for the native Android shell.</p><div class="fm-actions"><button id="androidExport" class="primary">Export Android input</button><button id="androidStatus">Inspect project</button></div></div><div class="fm-card"><h4>Build pipeline</h4><pre class="fm-code">node scripts/export-android.mjs forge-project.json assets/<br>gradle -p android assembleDebug<br><br>APK: android/app/build/outputs/apk/debug/app-debug.apk</pre></div><div class="fm-card"><pre id="androidOut" class="fm-code"></pre></div></div>');
   const out=d.querySelector("#androidOut");
   const project=window.ForgeProject?.serialize?.()||null;
-  const files=["android/settings.gradle","android/build.gradle","android/gradle.properties","android/app/build.gradle","android/app/proguard-rules.pro","android/app/src/main/AndroidManifest.xml","android/app/src/main/java/com/venom3byte/forgegame/MainActivity.java","android/app/src/main/res/values/styles.xml","android/app/src/main/res/values/strings.xml"];
+  const files=["android/settings.gradle","android/build.gradle","android/gradle.properties","android/forge-android.properties.json","android/app/build.gradle","android/app/proguard-rules.pro","android/app/src/main/AndroidManifest.xml","android/app/src/main/java/com/venom3byte/forgegame/MainActivity.java","android/app/src/main/res/values/styles.xml","android/app/src/main/res/values/strings.xml","android/app/src/main/res/drawable/ic_forge.xml","android/app/src/main/res/drawable/ic_forge_foreground.xml","android/app/src/main/res/drawable/ic_forge_background.xml","android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml","android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml"];
   d.querySelector("#androidStatus").onclick=()=>{out.textContent=JSON.stringify({project:!!project,entities:project?.scene?.entities?.length||0,assets:window.ForgeProduction?.assets?.all?.()?.length||0,targetSdk:37},null,2)};
+  const androidMeta=Object.assign({applicationId:"com.venom3byte.forgegame",appName:project?.meta?.name||"Forge Game",versionCode:1,versionName:"0.1.0",minSdk:24,targetSdk:37,compileSdk:37},project?.meta?.android||{});
+  const metaBlob=JSON.stringify(androidMeta,null,2);
   d.querySelector("#androidExport").onclick=async()=>{
     try{
       const ZIPMOD=window.JSZipModule||(await import("https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm"));window.JSZipModule=ZIPMOD;
@@ -282,7 +284,7 @@ async function openAndroid(){
       if(!project)throw new Error("No Forge project available");
       project.runtime=project.runtime||{};project.runtime.assetRoot="./";
       z.file("project.forge.json",JSON.stringify(project,null,2));
-      for(const p of files){const resp=await fetch("./"+p);if(!resp.ok)throw new Error("Missing Android template file: "+p);z.file(p,await resp.text())}
+      for(const p of files){if(p==="android/forge-android.properties.json"){z.file(p,metaBlob);continue}const resp=await fetch("./"+p);if(!resp.ok)throw new Error("Missing Android template file: "+p);z.file(p,await resp.text())}
       for(const [name,a] of window.Forge.assets||[])if(a?.file)z.file("assets/"+name,await a.file.arrayBuffer());
       z.file("README.txt","Forge Android package input. Run: node scripts/export-android.mjs project.forge.json assets/ then gradle -p android assembleDebug");
       const blob=await z.generateAsync({type:"blob",compression:"DEFLATE"});const a=document.createElement("a");a.download="forge-android-project-input.zip";a.href=URL.createObjectURL(blob);a.click();setTimeout(()=>URL.revokeObjectURL(a.href),60000);
