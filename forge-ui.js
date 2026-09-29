@@ -166,7 +166,9 @@ function updateSpatial(){
   box.classList.remove("hidden");const s=i.world.size,o=i.source.size,g=i.geometry||{};
   $("sourceDim").textContent=[o.x,o.y,o.z].map(v=>v.toFixed(3)).join(" × ")+" m";
   $("worldDim").textContent=[s.x,s.y,s.z].map(v=>v.toFixed(3)).join(" × ")+" m";
-  $("worldCenter").textContent=[i.world.center.x,i.world.center.y,i.world.center.z].map(v=>v.toFixed(3)).join(", ");
+  const center=i.world.center;
+  const cx=Number(center?.x??center?.[0]??0),cy=Number(center?.y??center?.[1]??0),cz=Number(center?.z??center?.[2]??0);
+  $("worldCenter").textContent=[cx,cy,cz].map(v=>v.toFixed(3)).join(", ");
   $("geoVertices").textContent=String(g.vertices||0);
   $("geoTriangles").textContent=String(g.triangles||0);
   $("geoUV").textContent=String(g.uvChannels||0);
