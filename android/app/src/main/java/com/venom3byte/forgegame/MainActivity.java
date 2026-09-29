@@ -1,7 +1,6 @@
 package com.venom3byte.forgegame;
 
 import android.annotation.SuppressLint;
-import android.app.Activity;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
 import android.graphics.Color;
@@ -18,11 +17,13 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
+import androidx.activity.ComponentActivity;
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.webkit.WebViewAssetLoader;
 import androidx.webkit.WebViewClientCompat;
 
-public class MainActivity extends Activity {
+public class MainActivity extends ComponentActivity {
   private WebView webView;
 
   @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
@@ -80,6 +81,15 @@ public class MainActivity extends Activity {
     webView.addJavascriptInterface(new ForgeAndroidBridge(this), "ForgeAndroid");
     setContentView(webView);
 
+    getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+      @Override public void handleOnBackPressed() {
+        if (webView != null) {
+          webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('forgeandroidback'));", null);
+        }
+        new android.os.Handler(getMainLooper()).postDelayed(MainActivity.this::finish, 120);
+      }
+    });
+
     hideSystemUi();
     webView.loadUrl("https://appassets.androidplatform.net/assets/forge/index.html");
   }
@@ -112,14 +122,6 @@ public class MainActivity extends Activity {
     super.onResume();
     if (webView != null) webView.onResume();
     hideSystemUi();
-  }
-
-  @Override
-  public void onBackPressed() {
-    if (webView != null) {
-      webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('forgeandroidback'));", null);
-    }
-    new android.os.Handler(getMainLooper()).postDelayed(this::finish, 120);
   }
 
   public static class ForgeAndroidBridge {
