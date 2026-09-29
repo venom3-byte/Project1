@@ -1,14 +1,15 @@
 
 class ForgeNetworkSystem{
   constructor(){
-    this.ws=null;this.connected=false;this.room="default";this.peerId=crypto.randomUUID();this.peers=new Map();this.handlers=new Map();this.inputTimer=0;this.entityId=null;this.authority=false
+    this.ws=null;this.connected=false;this.room="default";this.peerId=crypto.randomUUID();this.endpoint="";this.peers=new Map();this.handlers=new Map();this.inputTimer=0;this.entityId=null;this.authority=false
   }
   on(type,fn){if(!this.handlers.has(type))this.handlers.set(type,new Set());this.handlers.get(type).add(fn);return()=>this.handlers.get(type)?.delete(fn)}
   emit(type,data){for(const fn of this.handlers.get(type)||[]){try{fn(data)}catch(e){console.error("[ForgeNet]",e)}}}
   connect(room="default",options={}){
     if(this.ws?.readyState===1)return;
-    this.room=room;this.peerId=options.peerId||this.peerId;const proto=location.protocol==="https:"?"wss:":"ws:";
-    const ws=new WebSocket(proto+"//"+location.host+"/net");this.ws=ws;
+    this.room=room;this.peerId=options.peerId||this.peerId;this.endpoint=String(options.url||this.endpoint||window.ForgeProject?.meta?.network?.endpoint||localStorage.getItem("forge.network.endpoint")||"");
+    const base=this.endpoint||(location.protocol==="https:"?"wss:":"ws:")+"//"+location.host+"/net";
+    const url=this.endpoint?this.endpoint.replace(/\/$/,"")+"/net":base;const ws=new WebSocket(url);this.ws=ws;
     ws.onopen=()=>{this.connected=true;ws.send(JSON.stringify({type:"hello",room:this.room,peerId:this.peerId,protocol:1}));this.emit("connected",{room:this.room,peerId:this.peerId});this.startInputReplication()};
     ws.onclose=()=>{this.connected=false;this.stopInputReplication();this.emit("disconnected",{})};
     ws.onerror=e=>this.emit("error",e);
@@ -36,6 +37,7 @@ class ForgeNetworkSystem{
     const p=this.peers.get(peerId);if(!p?.entityId)return false;const r=Forge.entities.get(p.entityId);if(!r)return false;
     r.entity.setLocalPosition(...state.position);r.entity.setLocalEulerAngles(...state.rotation);return true
   }
-  status(){return{connected:this.connected,room:this.room,peerId:this.peerId,peers:[...this.peers.keys()],boundEntity:this.entityId,authority:this.authority}}
+  setEndpoint(url){this.endpoint=String(url||"");if(this.endpoint)localStorage.setItem("forge.network.endpoint",this.endpoint);else localStorage.removeItem("forge.network.endpoint");return this.endpoint}
+  status(){return{connected:this.connected,room:this.room,peerId:this.peerId,peers:[...this.peers.keys()],boundEntity:this.entityId,authority:this.authority,endpoint:this.endpoint||null}}
 }
 window.ForgeNet=new ForgeNetworkSystem();
