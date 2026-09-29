@@ -102,7 +102,7 @@ test.describe("Forge professional acceptance",()=>{
       const r=window.Forge.selected(),rect=window.ForgeSpatial.screenRect(r);
       return{name:r.name,rect,viewport:document.querySelector(".viewport").getBoundingClientRect().toJSON()};
     });
-    const x=Math.max(1,target.rect.x+target.rect.width/2),y=Math.max(1,target.rect.y+target.rect.height/2);
+    const vp=target.viewport;const x=vp.x+target.rect.x+target.rect.width/2,y=vp.y+target.rect.y+target.rect.height/2;
     await page.mouse.click(x,y);
     expect(await page.locator("#selected").textContent()).toBe(target.name);
   });
