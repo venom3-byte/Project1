@@ -1,0 +1,1 @@
+PROOF FIX: transform gizmo history syntax corrected after CI syntax report; rerun all acceptance gates.
