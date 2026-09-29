@@ -11,6 +11,10 @@ if(missing.length)throw new Error("Android package missing: "+missing.join(", ")
 const stat=await fs.stat(path.join(dir,"game.js"));
 if(stat.size<100000)throw new Error("Android game bundle is unexpectedly small: "+stat.size+" bytes");
 const project=JSON.parse(await fs.readFile(path.join(dir,"project.forge.json"),"utf8"));
+const metaPath=path.resolve(root,"android/forge-android.properties.json");
+const androidMeta=JSON.parse(await fs.readFile(metaPath,"utf8"));
+const expected=project.meta?.android||{};
+for(const key of ["applicationId","appName","versionCode","versionName","minSdk","targetSdk","compileSdk"])if(expected[key]!=null&&String(androidMeta[key])!==String(expected[key]))throw new Error("Android metadata mismatch for "+key+": project="+expected[key]+" generated="+androidMeta[key]);
 if(project.format!=="forge-project")throw new Error("Invalid Forge project format in Android package");
 if(!Array.isArray(project.scene?.entities))throw new Error("Android project scene is missing entities");
 const syntax=spawnSync(process.execPath,["--check",path.join(dir,"game.js")],{encoding:"utf8"});
