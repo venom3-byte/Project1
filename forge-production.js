@@ -65,7 +65,7 @@ class AssetPipeline {
       p+=8+len;
     }
     if(!json) return {kind:"glb",status:"invalid",warnings:["GLB JSON chunk is missing."],optimization:[]};
-    const meshes=json.meshes||[],nodes=json.nodes||[],mats=json.materials||[],textures=json.textures||[],anims=json.animations||[];
+    const meshes=json.meshes||[],nodes=json.nodes||[],mats=json.materials||[],textures=json.textures||[],anims=json.animations||[],skins=json.skins||[];
     let triangles=0,vertices=0;
     for(const m of meshes){
       for(const prim of (m.primitives||[])){
@@ -80,7 +80,7 @@ class AssetPipeline {
     if(meshes.length>25) optimization.push("Consider mesh merging/instancing for repeated environment assets.");
     if(textures.length>0) optimization.push("Generate compressed runtime texture variants and mipmaps.");
     if(anims.length>0) optimization.push("Register animation clips and skeleton/retarget metadata.");
-    return {kind:"model",status:"ready",nodes:nodes.length,meshes:meshes.length,materials:mats.length,textures:textures.length,animations:anims.length,vertices,triangles,optimization};
+    return {kind:"model",status:"ready",nodes:nodes.length,meshes:meshes.length,materials:mats.length,textures:textures.length,animations:anims.length,skins:skins.length,joints:skins.reduce((n,s)=>n+(s.joints||[]).length,0),vertices,triangles,optimization};
   }
 
   async prepare(file, options={}) {
