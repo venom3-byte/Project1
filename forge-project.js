@@ -19,7 +19,7 @@ class ForgeProjectStore{
         prefabs:R?[...R.prefabs.store.entries()]:[],
         slots:R?.save?.list?.()||[]
       },
-      gameplay:G?.status?.()||null,
+      gameplay:G?.serialize?.()||null,
       rendering:window.ForgeRender?.serialize?.()||null,
       cinematics:window.ForgeCinematics?.serialize?.()||null,
       ui:window.ForgeUISystem?.serialize?.()||null
@@ -43,7 +43,7 @@ class ForgeProjectStore{
     if(R?.input&&d.runtime?.input){for(const [k,v] of Object.entries(d.runtime.input))R.input.bind(k,v)}
     if(window.ForgeRender?.load&&d.rendering)window.ForgeRender.load(d.rendering);
     if(window.ForgeCinematics?.load&&d.cinematics)window.ForgeCinematics.load(d.cinematics);
-    if(window.ForgeUISystem?.load&&d.ui)window.ForgeUISystem.load(d.ui);
+    if(window.ForgeUISystem?.load&&d.ui)window.ForgeUISystem.load(d.ui);if(window.ForgeGameplay?.hydrate&&d.gameplay)window.ForgeGameplay.hydrate(d.gameplay);
     return d
   }
   download(name="forge-project.forge.json"){
