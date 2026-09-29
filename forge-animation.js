@@ -8,7 +8,7 @@ const ForgeAnimation={
     const graph={id:crypto.randomUUID(),entityId,name,states,transitions:[],active:states[0]?.name||null,parameters:{speed:0,grounded:true}};
     this.graphs.set(graph.id,graph);return graph
   },
-  addTransition(graphId,from,to,condition={}){const g=this.graphs.get(graphId);if(!g)throw new Error("Graph not found");g.transitions.push({from,to,condition});return g}
+  addTransition(graphId,from,to,condition={}){const g=this.graphs.get(graphId);if(!g)throw new Error("Graph not found");g.transitions.push({from,to,condition});return g},
   setParameter(graphId,key,value){const g=this.graphs.get(graphId);if(!g)throw new Error("Graph not found");g.parameters[key]=value;this.evaluate(graphId);return g.parameters[key]},
   evaluate(graphId){
     const g=this.graphs.get(graphId);if(!g)return null;
