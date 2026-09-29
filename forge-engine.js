@@ -15,6 +15,25 @@ export class ForgeEngine{
   add(kind,name){const e=new pc.Entity(name);this.root.addChild(e);return this.rec(name,kind,e)}
   material(color=[.22,.62,.9]){const m=new pc.StandardMaterial();m.diffuse=new pc.Color(...color);m.metalness=.05;m.gloss=.5;m.update();return m}
   primitive(kind,name){const r=this.add(kind,name||kind+"-"+(this.entities.size+1));r.entity.addComponent("render",{type:kind==="sphere"?"sphere":kind==="cylinder"?"cylinder":kind==="capsule"?"capsule":kind==="plane"?"plane":"box"});r.entity.render.material=this.material(kind==="plane"?[.12,.2,.27]:[.22,.62,.9]);if(kind!=="plane")r.entity.setLocalPosition((Math.random()-.5)*4,1+(Math.random()*1.7),(Math.random()-.5)*4);return r}
+  attachAnimations(entity,resource){
+    const tracks=resource?.animations||[];
+    if(!tracks.length)return [];
+    try{
+      if(!entity.anim)entity.addComponent("anim",{activate:true,speed:1});
+      const clips=[];
+      for(let i=0;i<tracks.length;i++){
+        const track=tracks[i],name=track?.name||("Clip_"+i);
+        entity.anim.assignAnimation(name,track,1,true);
+        clips.push(name);
+      }
+      entity.anim.playing=true;
+      return clips;
+    }catch(error){this.log("Animation attach failed: "+error.message,"error");return []}
+  }
+  setAnimationState(id,state){
+    const r=this.entities.get(id);if(!r?.entity?.anim?.baseLayer)return false;
+    try{r.entity.anim.baseLayer.play(state);return true}catch{return false}
+  }
   createPlane(name,w=30,d=30){const r=this.primitive("plane",name);r.entity.setLocalScale(w,1,d);r.entity.setLocalPosition(0,0,0);this.setPhysics(r.id,"fixed","box");return r}
   createCamera(name,pos){const r=this.add("camera",name);r.entity.addComponent("camera",{clearColor:new pc.Color(.02,.05,.09),fov:60});r.entity.setLocalPosition(pos.x,pos.y,pos.z);r.entity.lookAt(0,1,0);r.components.camera={active:true};return r}
   createLight(name){const r=this.add("light",name);r.entity.addComponent("light",{type:"directional",color:new pc.Color(1,.96,.88),intensity:2,castShadows:true,shadowDistance:40});r.entity.setEulerAngles(48,-32,0);r.components.light={type:"directional"};return r}
@@ -67,7 +86,7 @@ export class ForgeEngine{
       if(asset?.name && assetRoot){
         const url=assetRoot+"assets/"+encodeURIComponent(asset.name);
         if(asset.type==="model"){
-          await new Promise((resolve,reject)=>{const a=new pc.Asset(asset.name,"container",{url});this.app.assets.add(a);a.once("error",reject);a.once("load",()=>{try{const child=a.resource.instantiateRenderEntity({castShadows:true,receiveShadows:true});child.name=r.name;const p=r.entity.getLocalPosition(),e=r.entity.getLocalEulerAngles(),s=r.entity.getLocalScale();r.entity.destroy();this.root.addChild(child);child.setLocalPosition(p.x,p.y,p.z);child.setLocalEulerAngles(e.x,e.y,e.z);child.setLocalScale(s.x,s.y,s.z);r.entity=child;child.__forge={id:r.id,kind:"model",name:r.name,components:r.components};this.entities.set(r.id,r);resolve()}catch(error){reject(error)}});this.app.assets.load(a)})
+          await new Promise((resolve,reject)=>{const a=new pc.Asset(asset.name,"container",{url});this.app.assets.add(a);a.once("error",reject);a.once("load",()=>{try{const child=a.resource.instantiateRenderEntity({castShadows:true,receiveShadows:true});child.name=r.name;const p=r.entity.getLocalPosition(),e=r.entity.getLocalEulerAngles(),s=r.entity.getLocalScale();r.entity.destroy();this.root.addChild(child);child.setLocalPosition(p.x,p.y,p.z);child.setLocalEulerAngles(e.x,e.y,e.z);child.setLocalScale(s.x,s.y,s.z);r.entity=child;child.__forge={id:r.id,kind:"model",name:r.name,components:r.components};const clips=this.attachAnimations(child,a.resource);if(clips.length)r.components.animation={clips,playing:true};this.entities.set(r.id,r);resolve()}catch(error){reject(error)}});this.app.assets.load(a)})
         }else if(asset.type==="image"){
           const a=new pc.Asset(asset.name,"texture",{url,flipY:true});this.app.assets.add(a);await new Promise((resolve,reject)=>{a.once("error",reject);a.once("load",resolve);this.app.assets.load(a)});const mat=this.material([1,1,1]);mat.diffuseMap=a.resource;mat.emissiveMap=a.resource;mat.emissive=new pc.Color(1,1,1);mat.update();if(!r.entity.render)r.entity.addComponent("render",{type:"plane"});r.entity.render.material=mat;r.entity.render.castShadows=false
         }
