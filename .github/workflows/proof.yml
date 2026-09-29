@@ -30,7 +30,7 @@ jobs:
           path: forge-syntax-report.json
           if-no-files-found: ignore
       - name: Core + visual + export acceptance
-        run: npm run test:core
+        run: npm run test:core && npm run validate:gltf
       - name: Full regression suite
         run: npm run test:forge
       - name: Upload Playwright diagnostics
@@ -41,4 +41,5 @@ jobs:
           path: |
             playwright-report
             test-results
+            gltf-validation-report.json
           if-no-files-found: ignore
