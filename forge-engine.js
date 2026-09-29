@@ -1,13 +1,15 @@
 import * as pc from "https://cdn.jsdelivr.net/npm/playcanvas@2.22.6/build/playcanvas.mjs";
 import RAPIER from "https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.21.0/+esm";
 
+function androidBackendLabel(device){return device?.isWebGPU?"WebGPU>WebGL2":"WebGL2"}
+
 export class ForgeEngine{
   constructor(canvas,log=()=>{}){this.canvas=canvas;this.log=log;this.app=null;this.root=null;this.entities=new Map();this.selectedId=null;this.rapier=null;this.world=null;this.physics=new Map();this.keyframes=new Map();this.scripts=new Map();this.timelineTime=0;this.running=false;this.timelinePlaying=false;this.fps=0;this.frames=0;this.lastFPS=performance.now();this.frameMs=0;this.physicsAccumulator=0;this.physicsFixedDt=1/60;this.physicsMaxSubsteps=5;this.prePhysicsSystems=new Set();this.postPhysicsSystems=new Set();this.collisionListeners=new Set();this.colliderEntityMap=new Map();this.eventQueue=null}
   async init(){
     const android=!!window.ForgeAndroid||/Android/i.test(navigator.userAgent);
     const graphicsDeviceOptions={antialias:true,alpha:false,powerPreference:"high-performance",preserveDrawingBuffer:true};
-    if(android&&pc.DEVICETYPE_WEBGL2)graphicsDeviceOptions.deviceTypes=[pc.DEVICETYPE_WEBGL2];
-    this.app=new pc.Application(this.canvas,{graphicsDeviceOptions});
+    const deviceTypes=android?[pc.DEVICETYPE_WEBGL2]:[pc.DEVICETYPE_WEBGPU,pc.DEVICETYPE_WEBGL2].filter(Boolean);
+    this.app=new pc.Application(this.canvas,{graphicsDeviceOptions,deviceTypes});
     const editorCanvas=this.canvas?.id==="viewport";
     this.app.setCanvasFillMode(editorCanvas?pc.FILLMODE_NONE:pc.FILLMODE_FILL_WINDOW);
     this.app.setCanvasResolution(pc.RESOLUTION_AUTO);
@@ -109,7 +111,7 @@ export class ForgeEngine{
     }
     this.frame()
   }
-  diagnostics(){return{ok:true,renderer:this.app?.graphicsDevice?.isWebGPU?"WebGPU":"WebGL2",fps:Number(this.fps.toFixed(1)),frameMs:Number(this.frameMs.toFixed(2)),entities:this.entities.size,renderables:[...this.entities.values()].filter(r=>r.entity.render?.meshInstances?.length).length,physics:this.physics.size,scripts:this.scripts.size,tracks:this.keyframes.size,time:Number(this.timelineTime.toFixed(2))}}
+  diagnostics(){return{ok:true,renderer:this.app?.graphicsDevice?.isWebGPU?"WebGPU":"WebGL2",backendPreference:(this.app?.graphicsDevice?.isWebGPU?"WebGPU>WebGL2":androidBackendLabel(this.app?.graphicsDevice)),fps:Number(this.fps.toFixed(1)),frameMs:Number(this.frameMs.toFixed(2)),entities:this.entities.size,renderables:[...this.entities.values()].filter(r=>r.entity.render?.meshInstances?.length).length,physics:this.physics.size,scripts:this.scripts.size,tracks:this.keyframes.size,time:Number(this.timelineTime.toFixed(2))}}
 }
 export{pc,RAPIER};
 // Future importer adapters may register .gltf directory/zip packages here without changing the scene schema.
