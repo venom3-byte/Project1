@@ -222,12 +222,12 @@ const ForgeGameplay = {
 
   hydrate(config){
     if(!config?.type)return;
-    this.clear();
+    this.characters.clear();this.vehicles.clear();this.agents.clear();this.projectiles=[];this.fireCooldown=0;
     if(config.type==="third-person"){
       const p=Forge.entities.get(config.player);
       if(p){const phys=Forge.physics.get(p.id);const c=Forge.rapier?new Forge.rapier.KinematicCharacterController(.02,Forge.world.integrationParameters,Forge.world.broadPhase,Forge.world.narrowPhase,Forge.world.bodies,Forge.world.colliders):null;if(c){c.enableAutostep(.45,.2,true);c.enableSnapToGround(.2)}this.characters.set(p.id,{id:p.id,entity:p.entity,body:phys?.body,collider:phys?.collider,controller:c,speed:5.5,sprintSpeed:8.5,jumpSpeed:6.2,gravity:-18,verticalVelocity:0,grounded:false,cameraDistance:6,cameraHeight:2.8,damage:20,hp:100});}
       for(const id of (config.enemies||[])){const e=Forge.entities.get(id);if(!e)continue;const phys=Forge.physics.get(id);const cc=Forge.rapier?new Forge.rapier.KinematicCharacterController(.02,Forge.world.integrationParameters,Forge.world.broadPhase,Forge.world.narrowPhase,Forge.world.bodies,Forge.world.colliders):null;if(cc)cc.enableSnapToGround(.2);this.agents.set(id,{id,entity:e.entity,body:phys?.body,collider:phys?.collider,controller:cc,state:"idle",speed:2.3,attackRange:1.6,detectionRange:14,damageCooldown:0,hp:60});}
-      this.currentTemplate=structuredClone(config);this.running=true;
+      this.currentTemplate=structuredClone(config);this.running=true;const pnow=this.characters.get(config.player);if(pnow)window.ForgeUISystem?.hudForThirdPerson(()=>({hp:pnow.hp,state:pnow.grounded?"GROUNDED":"AIRBORNE"}));
     }else if(config.type==="racing"){
       const r=Forge.entities.get(config.vehicle);const phys=r&&Forge.physics.get(r.id);if(!r||!phys)throw new Error("Saved vehicle entity is missing");
       const v=new Forge.rapier.DynamicRayCastVehicleController(phys.body,Forge.world.broadPhase,Forge.world.narrowPhase,Forge.world.bodies,Forge.world.colliders);v.setIndexUpAxis(1);v.setIndexForwardAxis(2);for(const w of [{x:-.92,z:1.3},{x:.92,z:1.3},{x:-.92,z:-1.3},{x:.92,z:-1.3}])v.addWheel({x:w.x,y:-.18,z:w.z},{x:0,y:-1,z:0},{x:1,y:0,z:0},.35,.34);for(let i=0;i<4;i++){v.setWheelSuspensionStiffness(i,28);v.setWheelSuspensionCompression(i,4);v.setWheelSuspensionRelaxation(i,6);v.setWheelMaxSuspensionTravel(i,.25);v.setWheelFrictionSlip(i,4);v.setWheelSideFrictionStiffness(i,1.2)}this.vehicles.set(r.id,{id:r.id,entity:r.entity,body:phys.body,vehicle:v,maxEngineForce:1250,maxBrakeForce:90,maxSteer:.45,drive:[0,1],steer:[0,1]});this.currentTemplate=structuredClone(config);this.running=true;
