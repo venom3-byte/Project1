@@ -203,7 +203,7 @@ const ForgeGameplay = {
   },
 
   createThirdPersonTemplate(){
-    this.init();this.clear();
+    this.init();this.clear();Forge.resetScene(false);
     Forge.createPlane("Ground",40,40);const light=Forge.createLight("Sun");const player=this.createCharacter("Player",{x:0,y:1.2,z:0});
     const enemy1=this.createEnemy("Enemy_A",{x:7,y:1,z:6}),enemy2=this.createEnemy("Enemy_B",{x:-7,y:1,z:4}),enemy3=this.createEnemy("Enemy_C",{x:4,y:1,z:-8});
     for(let i=0;i<8;i++){const r=Forge.primitive("box","Cover_"+i);r.entity.setLocalPosition((i%4)*4-6,.75,Math.floor(i/4)*6-3);r.entity.setLocalScale(1.5,1.5,1.5);r.components.navObstacle=true;Forge.setPhysics(r.id,"fixed","box");}
@@ -212,7 +212,7 @@ const ForgeGameplay = {
   },
 
   createRacingTemplate(){
-    this.init();this.clear();
+    this.init();this.clear();Forge.resetScene(false);
     Forge.createPlane("TrackGround",80,80);Forge.createLight("Sun");const car=this.createVehicle("PlayerCar",{x:0,y:1,z:0});
     for(let i=0;i<10;i++){const edge=Forge.primitive("box","TrackEdge_"+i);edge.entity.setLocalPosition(-6,1,-30+i*7);edge.entity.setLocalScale(.5,1,3);Forge.setPhysics(edge.id,"fixed","box");}
     for(let i=0;i<10;i++){const edge=Forge.primitive("box","TrackEdgeR_"+i);edge.entity.setLocalPosition(6,1,-30+i*7);edge.entity.setLocalScale(.5,1,3);Forge.setPhysics(edge.id,"fixed","box");}
