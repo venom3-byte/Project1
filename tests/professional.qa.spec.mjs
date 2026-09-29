@@ -163,6 +163,8 @@ test.describe("Forge professional acceptance",()=>{
     expect(result.sourceSha).toBe(await sha(new Blob([png])));
     expect(result.exportedBytes).toBe(result.sourceBytes);
     expect(result.previewBytes).toBeGreaterThan(50);
+    expect(await page.locator(".asset-row .asset-thumb").evaluate(img=>img.complete&&img.naturalWidth>0)).toBeTruthy();
+    expect(await page.locator("#assetMeta").textContent()).toContain("developer-reference.png");
     await writeFile("test-results/pro-2d-source.png",png);
     await page.screenshot({path:"test-results/pro-2d-import.png",fullPage:true});
   });
