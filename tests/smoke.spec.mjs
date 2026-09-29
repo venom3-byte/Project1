@@ -258,7 +258,7 @@ test("data-driven gameplay supports tags attributes abilities inventory and ques
   expect(result.tags).toContain("Character.Player");
   expect(result.power).toBe(10);
   expect(result.inventory.Potion).toBe(2);
-  expect(result.quest[0].objectives[0].current).toBe(1);
+  expect(result.quest.objectives[0].current).toBe(1);
 });
 
 test("replay records and restores deterministic input frames",async({page})=>{
@@ -391,6 +391,6 @@ test("integrated AAA showcase creates a playable end-to-end game state",async({p
   expect(state.gameplay.characters.length).toBe(1);
   expect(state.gameplay.agents.length).toBe(5);
   expect(state.session.state.phase).toBe("playing");
-  expect(state.quest[0].objectives[0].target).toBe(5);
+  expect(state.quest.objectives[0].target).toBe(5);
   expect(state.project.gameplay.type).toBe("showcase");
 });
