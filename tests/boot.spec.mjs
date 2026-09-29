@@ -1,0 +1,36 @@
+import{test,expect}from"@playwright/test";
+
+async function boot(page,testInfo){
+  const errors=[];
+  page.on("pageerror",e=>errors.push(String(e)));
+  page.on("console",m=>m.type()==="error"&&errors.push(m.text()));
+  const t0=Date.now();
+  await page.goto("/");
+  await page.waitForFunction(()=>window.ForgeBoot?.ok===true,{timeout:30000});
+  const boot=await page.evaluate(()=>window.ForgeBoot);
+  testInfo.annotations.push({type:"boot-ms",description:String(boot.totalMs)});
+  testInfo.annotations.push({type:"core-ready-ms",description:String(boot.coreReadyMs)});
+  expect(boot.ok).toBe(true);
+  expect(boot.coreReadyMs).toBeLessThan(10000);
+  expect(boot.totalMs).toBeLessThan(20000);
+  expect(Date.now()-t0).toBeLessThan(30000);
+  expect(errors).toEqual([]);
+  return boot;
+}
+
+test("Forge cold editor boot completes with staged timing telemetry",async({page},testInfo)=>{
+  const boot=await boot(page,testInfo);
+  const diagnostics=await page.evaluate(()=>window.Forge.diagnostics());
+  expect(diagnostics.entities).toBe(3);
+  expect(diagnostics.renderables).toBeGreaterThan(0);
+  expect(await page.locator("#renderer").textContent()).toMatch(/WebGPU|WebGL2/);
+  console.log(JSON.stringify({bootMs:boot.totalMs,coreReadyMs:boot.coreReadyMs,gameplayReadyMs:boot.gameplayReadyMs,engineReadyMs:boot.engineReadyMs}));
+});
+
+test("Forge mobile editor boot completes without viewport errors",async({page},testInfo)=>{
+  await page.setViewportSize({width:390,height:844});
+  const boot=await boot(page,testInfo);
+  await expect(page.locator("#viewport")).toBeVisible();
+  await expect(page.locator("#sceneCount")).toContainText("3 entities");
+  expect(boot.totalMs).toBeLessThan(20000);
+});
