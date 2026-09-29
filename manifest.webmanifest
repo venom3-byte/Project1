@@ -1,1 +1,18 @@
-{"name":"Forge Studio 3.5","short_name":"Forge","start_url":"./","scope":"./","display":"standalone","background_color":"#06101d","theme_color":"#06101d","description":"Independent spatial game and app forge","icons":[]}
+{
+  "name": "Forge Studio 3.5",
+  "short_name": "Forge",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#06101d",
+  "theme_color": "#06101d",
+  "description": "Independent spatial game and app forge",
+  "icons": [
+    {
+      "src": "./forge-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
