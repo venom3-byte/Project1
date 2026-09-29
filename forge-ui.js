@@ -26,7 +26,7 @@ function refresh(){
     row.onclick=()=>{engine.select(r.id);inspect();refresh()};
     tree.append(row)
   }
-  const s=engine.selected();$("selected").textContent=s?s.name:"None";$("sceneCount").textContent=engine.entities.size+" entities";$("hierarchyCount").textContent=engine.entities.size?String(engine.entities.size):"";updateSpatial();updateAssetPanel()
+  const s=engine.selected();$("selected").textContent=s?s.name:"None";$("sceneCount").textContent=engine.entities.size+" entities";$("hierarchyCount").textContent=engine.entities.size?String(engine.entities.size):"";updateSpatial();updateAssetPanel();updateAssetBrowser()
 }
 function inspect(){
   const r=engine.selected();$("empty").classList.toggle("hidden",!!r);$("form").classList.toggle("hidden",!r);$("kind").textContent=r?r.kind:"—";
@@ -58,6 +58,20 @@ function updateAssetPanel(){
   label.textContent=r?.name||"No asset selected";
   type.textContent=a?.type?(a.type==="model"?"3D GLB":a.type==="image"?"2D Image":a.type.toUpperCase()):"Scene object";
 }
+function updateAssetBrowser(){
+  const list=$("assetList");if(!list)return;
+  const q=String($("assetSearch")?.value||"").trim().toLowerCase();
+  list.innerHTML="";
+  const records=[...engine.entities.values()].filter(r=>r.components?.asset?.name).filter(r=>!q||r.name.toLowerCase().includes(q)||String(r.components.asset.type).toLowerCase().includes(q));
+  if(!records.length){const e=document.createElement("div");e.className="asset-empty";e.textContent="No imported assets";list.append(e);return}
+  for(const r of records){
+    const row=document.createElement("button");row.className="asset-row"+(r.id===engine.selectedId?" active":"");
+    const t=r.components.asset.type==="model"?"3D":r.components.asset.type==="image"?"2D":"FILE";
+    row.innerHTML="<span class='asset-icon'>"+t+"</span><span class='asset-name'>"+esc(r.name)+"</span><span class='asset-kind'>"+esc(r.kind)+"</span>";
+    row.onclick=()=>{engine.select(r.id);refresh();inspect();engine.focus()};
+    list.append(row)
+  }
+}
 function apply(){
   const r=engine.selected();if(!r)return;
   engine.transform({x:+$("px").value,y:+$("py").value,z:+$("pz").value,rx:+$("rx").value,ry:+$("ry").value,rz:+$("rz").value,sx:+$("sx").value,sy:+$("sy").value,sz:+$("sz").value});
@@ -83,6 +97,7 @@ $("exportManifest")?.addEventListener("click",()=>assetAction(()=>window.ForgeEx
 $("validateAsset")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.validateSelected(),"Asset validation"));
 $("assetQA")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.runExportQA(),"Export round-trip QA"));
 $("treeFilter")?.addEventListener("input",refresh);
+$("assetSearch")?.addEventListener("input",updateAssetBrowser);
 $("quickFocus")?.addEventListener("click",()=>engine.focus());
 $("quickFrame")?.addEventListener("click",()=>engine.frame());
 $("quickVision")?.addEventListener("click",()=>$("visionOpen")?.click());
