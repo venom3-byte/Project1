@@ -22,7 +22,7 @@ class InputSystem{
     const end=()=>{active=false;this.virtualMove={x:0,z:0};knob.style.transform=""};
     joy.addEventListener("pointerdown",e=>{active=true;joy.setPointerCapture(e.pointerId);move(e)});joy.addEventListener("pointermove",move);joy.addEventListener("pointerup",end);joy.addEventListener("pointercancel",end);
     for(const b of root.querySelectorAll("[data-mobile]")){const a=b.dataset.mobile;b.addEventListener("pointerdown",e=>{e.preventDefault();this.down.add(a);try{window.ForgeAndroid?.vibrate?.(a==="fire"?18:10)}catch{}});b.addEventListener("pointerup",()=>this.down.delete(a));b.addEventListener("pointercancel",()=>this.down.delete(a));b.addEventListener("pointerleave",()=>this.down.delete(a))}
-    const show=()=>{root.style.display=(navigator.maxTouchPoints>0||matchMedia("(pointer:coarse)").matches)?"block":"none"};show();addEventListener("resize",show);
+    const show=()=>{const touch=navigator.maxTouchPoints>0||matchMedia("(pointer:coarse)").matches;const playMode=document.body?.dataset?.forgeMode==="play";root.style.display=(touch&&playMode)?"block":"none"};show();addEventListener("resize",show);window.addEventListener("forgegamemodechange",show);
   }
 }
 
