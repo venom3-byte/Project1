@@ -5,6 +5,7 @@ const ForgeGameplay = {
   agents:new Map(),
   projectiles:[],
   running:false,
+  currentTemplate:null,
   unsubscribePre:null,
   fireCooldown:0,
   projectileSpeed:24,
@@ -19,7 +20,7 @@ const ForgeGameplay = {
     return this;
   },
 
-  clear(){
+  clear(){this.currentTemplate=null;
     for(const [id] of this.characters){const r=Forge.entities.get(id);if(r){Forge.removePhysics(id);r.entity.destroy();Forge.entities.delete(id)}}
     for(const [id] of this.vehicles){const r=Forge.entities.get(id);if(r){Forge.removePhysics(id);r.entity.destroy();Forge.entities.delete(id)}}
     for(const p of this.projectiles){const r=Forge.entities.get(p.id);if(r){Forge.removePhysics(p.id);r.entity.destroy();Forge.entities.delete(p.id)}}
@@ -206,8 +207,8 @@ const ForgeGameplay = {
     Forge.createPlane("Ground",40,40);const light=Forge.createLight("Sun");const player=this.createCharacter("Player",{x:0,y:1.2,z:0});
     const enemy1=this.createEnemy("Enemy_A",{x:7,y:1,z:6}),enemy2=this.createEnemy("Enemy_B",{x:-7,y:1,z:4}),enemy3=this.createEnemy("Enemy_C",{x:4,y:1,z:-8});
     for(let i=0;i<8;i++){const r=Forge.primitive("box","Cover_"+i);r.entity.setLocalPosition((i%4)*4-6,.75,Math.floor(i/4)*6-3);r.entity.setLocalScale(1.5,1.5,1.5);r.components.navObstacle=true;Forge.setPhysics(r.id,"fixed","box");}
-    Forge.frame();Forge.select(player.id);window.ForgeUISystem?.hudForThirdPerson(()=>({hp:player.hp,state:player.grounded?"GROUNDED":"AIRBORNE"}));
-    return{type:"third-person",player:player.id,enemies:[enemy1.id,enemy2.id,enemy3.id]};
+    Forge.frame();Forge.select(player.id);this.currentTemplate={type:"third-person",player:player.id,enemies:[enemy1.id,enemy2.id,enemy3.id]};window.ForgeUISystem?.hudForThirdPerson(()=>({hp:player.hp,state:player.grounded?"GROUNDED":"AIRBORNE"}));
+    return this.currentTemplate;
   },
 
   createRacingTemplate(){
@@ -215,10 +216,24 @@ const ForgeGameplay = {
     Forge.createPlane("TrackGround",80,80);Forge.createLight("Sun");const car=this.createVehicle("PlayerCar",{x:0,y:1,z:0});
     for(let i=0;i<10;i++){const edge=Forge.primitive("box","TrackEdge_"+i);edge.entity.setLocalPosition(-6,1,-30+i*7);edge.entity.setLocalScale(.5,1,3);Forge.setPhysics(edge.id,"fixed","box");}
     for(let i=0;i<10;i++){const edge=Forge.primitive("box","TrackEdgeR_"+i);edge.entity.setLocalPosition(6,1,-30+i*7);edge.entity.setLocalScale(.5,1,3);Forge.setPhysics(edge.id,"fixed","box");}
-    Forge.frame();Forge.select(car.id);
-    return{type:"racing",vehicle:car.id};
+    Forge.frame();Forge.select(car.id);this.currentTemplate={type:"racing",vehicle:car.id};return this.currentTemplate;
   },
 
+
+  hydrate(config){
+    if(!config?.type)return;
+    this.clear();
+    if(config.type==="third-person"){
+      const p=Forge.entities.get(config.player);
+      if(p){const phys=Forge.physics.get(p.id);const c=Forge.rapier?new Forge.rapier.KinematicCharacterController(.02,Forge.world.integrationParameters,Forge.world.broadPhase,Forge.world.narrowPhase,Forge.world.bodies,Forge.world.colliders):null;if(c){c.enableAutostep(.45,.2,true);c.enableSnapToGround(.2)}this.characters.set(p.id,{id:p.id,entity:p.entity,body:phys?.body,collider:phys?.collider,controller:c,speed:5.5,sprintSpeed:8.5,jumpSpeed:6.2,gravity:-18,verticalVelocity:0,grounded:false,cameraDistance:6,cameraHeight:2.8,damage:20,hp:100});}
+      for(const id of (config.enemies||[])){const e=Forge.entities.get(id);if(!e)continue;const phys=Forge.physics.get(id);const cc=Forge.rapier?new Forge.rapier.KinematicCharacterController(.02,Forge.world.integrationParameters,Forge.world.broadPhase,Forge.world.narrowPhase,Forge.world.bodies,Forge.world.colliders):null;if(cc)cc.enableSnapToGround(.2);this.agents.set(id,{id,entity:e.entity,body:phys?.body,collider:phys?.collider,controller:cc,state:"idle",speed:2.3,attackRange:1.6,detectionRange:14,damageCooldown:0,hp:60});}
+      this.currentTemplate=structuredClone(config);this.running=true;
+    }else if(config.type==="racing"){
+      const r=Forge.entities.get(config.vehicle);const phys=r&&Forge.physics.get(r.id);if(!r||!phys)throw new Error("Saved vehicle entity is missing");
+      const v=new Forge.rapier.DynamicRayCastVehicleController(phys.body,Forge.world.broadPhase,Forge.world.narrowPhase,Forge.world.bodies,Forge.world.colliders);v.setIndexUpAxis(1);v.setIndexForwardAxis(2);for(const w of [{x:-.92,z:1.3},{x:.92,z:1.3},{x:-.92,z:-1.3},{x:.92,z:-1.3}])v.addWheel({x:w.x,y:-.18,z:w.z},{x:0,y:-1,z:0},{x:1,y:0,z:0},.35,.34);for(let i=0;i<4;i++){v.setWheelSuspensionStiffness(i,28);v.setWheelSuspensionCompression(i,4);v.setWheelSuspensionRelaxation(i,6);v.setWheelMaxSuspensionTravel(i,.25);v.setWheelFrictionSlip(i,4);v.setWheelSideFrictionStiffness(i,1.2)}this.vehicles.set(r.id,{id:r.id,entity:r.entity,body:phys.body,vehicle:v,maxEngineForce:1250,maxBrakeForce:90,maxSteer:.45,drive:[0,1],steer:[0,1]});this.currentTemplate=structuredClone(config);this.running=true;
+    }
+  },
+  serialize(){return this.currentTemplate?structuredClone(this.currentTemplate):null},
   status(){
     return{
       characters:[...this.characters.values()].map(c=>({id:c.id,hp:c.hp,grounded:c.grounded})),
