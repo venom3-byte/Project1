@@ -81,7 +81,7 @@ test("3D GLB source survives exact export with spatial geometry stats",async({pa
   expect(result.spatial.geometry.vertices).toBeGreaterThan(0);
   expect(result.spatial.geometry.triangles).toBeGreaterThan(0);
   expect(result.spatial.world.size.x).toBeGreaterThan(0);
-  await writeFile("test-results/qa-triangle.export.glb",Buffer.from(result.exp.bytesArray));
+  await writeFile("test-results/qa-triangle.export.glb",Buffer.from(result.bytesArray));
 });
 
 test("asset manifest records professional pipeline metadata",async({page})=>{
