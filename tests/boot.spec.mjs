@@ -5,7 +5,7 @@ async function waitForBoot(page,testInfo){
   page.on("pageerror",e=>errors.push(String(e)));
   page.on("console",m=>m.type()==="error"&&errors.push(m.text()));
   const t0=Date.now();
-  await page.goto("/");
+  await page.goto("/",{waitUntil:"domcontentloaded"});
   await page.waitForFunction(()=>window.ForgeBoot?.ok===true,{timeout:30000});
   const boot=await page.evaluate(()=>window.ForgeBoot);
   testInfo.annotations.push({type:"boot-ms",description:String(boot.totalMs)});
