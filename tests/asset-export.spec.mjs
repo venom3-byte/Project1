@@ -51,13 +51,13 @@ test("2D image source survives exact export and validation",async({page})=>{
     const exp=await window.ForgeExport.exportSource({download:false});
     const same=await window.ForgeExport.equalBytes(file,exp.blob);
     const out=new Uint8Array(await exp.blob.arrayBuffer());
-    return{check,exp:{...exp,bytesArray:[...out]},same,selected:window.Forge.selected()?.name};
+    return{check,exportOk:exp.ok,exportName:exp.name,exportBytes:exp.bytes,exportSha:exp.sha256,bytesArray:[...out],same,selected:window.Forge.selected()?.name};
   });
   expect(result.check.ok).toBeTruthy();
   expect(result.check.quality.hasBounds).toBeTruthy();
   expect(result.same).toBeTruthy();
   expect(result.selected).toBe("qa-texture.png");
-  await writeFile("test-results/qa-texture.export.png",Buffer.from(result.exp.bytesArray));
+  await writeFile("test-results/qa-texture.export.png",Buffer.from(result.bytesArray));
 });
 
 test("3D GLB source survives exact export with spatial geometry stats",async({page})=>{
@@ -72,7 +72,7 @@ test("3D GLB source survives exact export with spatial geometry stats",async({pa
     const same=await window.ForgeExport.equalBytes(file,exp.blob);
     const spatial=window.ForgeSpatial.inspect(imported.record);
     const out=new Uint8Array(await exp.blob.arrayBuffer());
-    return{check,exp:{...exp,bytesArray:[...out]},same,spatial};
+    return{check,exportOk:exp.ok,exportName:exp.name,exportBytes:exp.bytes,exportSha:exp.sha256,bytesArray:[...out],same,spatial};
   },bytes);
   expect(result.check.ok).toBeTruthy();
   expect(result.same).toBeTruthy();
@@ -111,7 +111,7 @@ test("edited 3D scene can be cooked to GLB and re-imported",async({page})=>{
     const imported=await window.Forge.importFile(file);
     const after=window.ForgeSpatial.inspect(imported.record);
     const out=new Uint8Array(await exported.blob.arrayBuffer());
-    return{exported:{...exported,bytesArray:[...out]},sourceTriangles:before.geometry.triangles,sourceVertices:before.geometry.vertices,roundtripTriangles:after.geometry.triangles,roundtripVertices:after.geometry.vertices};
+    return{exported:{ok:exported.ok,name:exported.name,bytes:exported.bytes,validation:exported.validation,bytesArray:[...out]},sourceTriangles:before.geometry.triangles,sourceVertices:before.geometry.vertices,roundtripTriangles:after.geometry.triangles,roundtripVertices:after.geometry.vertices};
   });
   expect(result.exported.ok).toBeTruthy();
   expect(result.exported.validation.ok).toBeTruthy();
