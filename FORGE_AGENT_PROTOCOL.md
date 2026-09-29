@@ -62,6 +62,10 @@ The protocol is reserved for deep systems such as skeletal retargeting, material
 - vision-pick / vision-select / vision-focus: deterministic screen-coordinate grounding from rendered pixels to real Forge entities.
 - vision-overlay: toggles live projected entity labels/boxes for visual debugging.
 - vision-latest: exposes the latest external live-vision frame received by Forge Agent.
+- vision-config: configure the provider-neutral external vision analyzer endpoint.
+- vision-analyze: send the current real rendered PNG plus Forge scene-map/QA context to the configured analyzer.
+- vision-result: return the last external vision response/error.
+- The server proxy uses FORGE_VISION_ENDPOINT and optional FORGE_VISION_TOKEN so browser/game code never receives the secret token.
 
 These commands use PlayCanvas worldToScreen and screenToWorld mappings so the agent can reason in the same screen coordinates used by the renderer and UI.
 - batch: execute up to 32 deterministic commands and return a fresh visual report.
