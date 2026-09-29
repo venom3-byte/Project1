@@ -121,16 +121,65 @@ export class ForgeEngine{
   attachAnimations(entity,resource){const tracks=resource?.animations||[];if(!tracks.length)return[];try{if(!entity.anim)entity.addComponent('anim',{activate:true,speed:1});const clips=[];for(let i=0;i<tracks.length;i++){const name=tracks[i]?.name||('Clip_'+i);entity.anim.assignAnimation(name,tracks[i],undefined,1,true);clips.push(name)}entity.anim.playing=true;return clips}catch(e){this.log('Animation attach failed: '+e.message,'error');return[]}}
   setAnimationState(id,state){const r=this.entities.get(id);if(!r?.entity?.anim?.baseLayer)return false;try{r.entity.anim.baseLayer.play(state);return true}catch{return false}}
   serialize(){return{format:'forge-scene',version:3,meta:{engine:'Forge Studio 3.0',time:new Date().toISOString(),units:'meters'},entities:[...this.entities.values()].map(r=>{const p=r.entity.getLocalPosition(),q=r.entity.getLocalEulerAngles(),s=r.entity.getLocalScale();return{id:r.id,name:r.name,kind:r.kind,transform:{p:[p.x,p.y,p.z],r:[q.x,q.y,q.z],s:[s.x,s.y,s.z]},components:r.components,keyframes:this.keyframes.get(r.id)||[],script:this.scripts.get(r.id)||null}})}}
-  async load(data,{assetRoot=''}={}){
-    for(const r of[...this.entities.values()]){this.removePhysics(r.id);r.entity.destroy()}this.entities.clear();this.selectedId=null;this.keyframes.clear();this.scripts.clear();
-    for(const d of data.entities||[]){if(d.kind==='terrain'&&d.components?.terrain&&window.ForgeTerrain){window.ForgeTerrain.generate(d.name,d.components.terrain);continue}
-      const r=this.add(d.kind,d.name),t=d.transform||{};r.entity.setLocalPosition(...(t.p||[0,0,0]));r.entity.setLocalEulerAngles(...(t.r||[0,0,0]));r.entity.setLocalScale(...(t.s||[1,1,1]));
-      if(['box','sphere','cylinder','capsule','plane'].includes(d.kind)){r.entity.addComponent('render',{type:d.kind==='sphere'?'sphere':d.kind==='cylinder'?'cylinder':d.kind==='capsule'?'capsule':d.kind==='plane'?'plane':'box'});r.entity.render.material=this.material()}
-      if(d.kind==='camera')r.entity.addComponent('camera',{clearColor:new pc.Color(.02,.05,.09)});if(d.kind==='light')r.entity.addComponent('light',{type:'directional',intensity:2,castShadows:true});
-      r.components=d.components||{};if(d.components?.material){const previous=this.selectedId;this.selectedId=r.id;this.applyMaterial(d.components.material);this.selectedId=previous}if(d.components?.physics)this.setPhysics(r.id,d.components.physics.mode,d.components.physics.shape);if(d.keyframes?.length)this.keyframes.set(r.id,d.keyframes);if(d.script)this.scripts.set(r.id,d.script);
-      const asset=d.components?.asset;if(asset?.name&&assetRoot&&asset.type==='model'){const a=new pc.Asset(asset.name,'container',{url:assetRoot+'assets/'+encodeURIComponent(asset.name)});this.app.assets.add(a);await new Promise((resolve,reject)=>{a.once('error',reject);a.once('load',()=>{try{const child=a.resource.instantiateRenderEntity({castShadows:true,receiveShadows:true});child.name=r.name;const p=r.entity.getLocalPosition(),e=r.entity.getLocalEulerAngles(),s=r.entity.getLocalScale();r.entity.destroy();this.root.addChild(child);child.setLocalPosition(p.x,p.y,p.z);child.setLocalEulerAngles(e.x,e.y,e.z);child.setLocalScale(s.x,s.y,s.z);r.entity=child;child.__forge={id:r.id,kind:'model',name:r.name,components:r.components};this.attachAnimations(child,a.resource);this.entities.set(r.id,r);resolve()}catch(err){reject(err)}});this.app.assets.load(a)}}}
-    this.frame()
+  async load(data,{assetRoot='' }={}) {
+    for(const r of [...this.entities.values()]){
+      this.removePhysics(r.id); r.entity.destroy();
+    }
+    this.entities.clear(); this.selectedId=null; this.keyframes.clear(); this.scripts.clear();
+
+    for(const d of data.entities||[]){
+      if(d.kind==='terrain'&&d.components?.terrain&&window.ForgeTerrain){
+        window.ForgeTerrain.generate(d.name,d.components.terrain); continue;
+      }
+      const r=this.add(d.kind,d.name), t=d.transform||{};
+      r.entity.setLocalPosition(...(t.p||[0,0,0]));
+      r.entity.setLocalEulerAngles(...(t.r||[0,0,0]));
+      r.entity.setLocalScale(...(t.s||[1,1,1]));
+      if(['box','sphere','cylinder','capsule','plane'].includes(d.kind)){
+        r.entity.addComponent('render',{type:d.kind==='sphere'?'sphere':d.kind==='cylinder'?'cylinder':d.kind==='capsule'?'capsule':d.kind==='plane'?'plane':'box'});
+        r.entity.render.material=this.material();
+      }
+      if(d.kind==='camera')r.entity.addComponent('camera',{clearColor:new pc.Color(.02,.05,.09)});
+      if(d.kind==='light')r.entity.addComponent('light',{type:'directional',intensity:2,castShadows:true});
+      r.components=d.components||{};
+      if(d.components?.material){
+        const previous=this.selectedId;
+        this.selectedId=r.id; this.applyMaterial(d.components.material); this.selectedId=previous;
+      }
+      if(d.components?.physics)this.setPhysics(r.id,d.components.physics.mode,d.components.physics.shape);
+      if(d.keyframes?.length)this.keyframes.set(r.id,d.keyframes);
+      if(d.script)this.scripts.set(r.id,d.script);
+
+      const asset=d.components?.asset;
+      if(asset?.name&&assetRoot&&asset.type==='model'){
+        const a=new pc.Asset(asset.name,'container',{url:assetRoot+'assets/'+encodeURIComponent(asset.name)});
+        this.app.assets.add(a);
+        await new Promise((resolve,reject)=>{
+          a.once('error',reject);
+          a.once('load',()=>{
+            try{
+              const child=a.resource.instantiateRenderEntity({castShadows:true,receiveShadows:true});
+              child.name=r.name;
+              const p=r.entity.getLocalPosition(), euler=r.entity.getLocalEulerAngles(), s=r.entity.getLocalScale();
+              r.entity.destroy();
+              this.root.addChild(child);
+              child.setLocalPosition(p.x,p.y,p.z);
+              child.setLocalEulerAngles(euler.x,euler.y,euler.z);
+              child.setLocalScale(s.x,s.y,s.z);
+              r.entity=child;
+              child.__forge={id:r.id,kind:'model',name:r.name,components:r.components};
+              this.attachAnimations(child,a.resource);
+              this.entities.set(r.id,r);
+              resolve();
+            }catch(err){reject(err)}
+          });
+          this.app.assets.load(a);
+        });
+      }
+    }
+    this.frame();
   }
+
   diagnostics(){return{ok:true,renderer:this.app?.graphicsDevice?.isWebGPU?'WebGPU':'WebGL2',fps:Number(this.fps.toFixed(1)),frameMs:Number(this.frameMs.toFixed(2)),entities:this.entities.size,renderables:[...this.entities.values()].filter(r=>r.entity.render?.meshInstances?.length).length,physics:this.physics.size,scripts:this.scripts.size,tracks:this.keyframes.size,time:Number(this.timelineTime.toFixed(2)),unitSystem:this.unitSystem,view:this.viewMode,spatial:this.spatial?true:false}}
 }
 export{pc,RAPIER};
