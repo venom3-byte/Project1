@@ -233,3 +233,24 @@ test("recursive prefab capture and spawn preserve child entities",async({page})=
   expect(result.spawned).toBeTruthy();
   expect(result.childCount).toBe(1);
 });
+
+
+test("real animated GLB import exposes playable animation clips",async({page})=>{
+  test.setTimeout(120000);
+  const url="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Fox/glTF-Binary/Fox.glb";
+  const response=await page.request.get(url);
+  expect(response.ok()).toBeTruthy();
+  const bytes=await response.body();
+  expect(bytes.length).toBeGreaterThan(100000);
+  await page.goto("/");
+  await page.setInputFiles("#assetInput",{name:"Fox.glb",mimeType:"model/gltf-binary",buffer:bytes});
+  await expect(page.locator("#sceneCount")).toContainText("4 entities");
+  const info=await page.evaluate(()=>({
+    selected:window.Forge.selected()?.name,
+    clips:window.Forge.selected()?.components?.animation?.clips||[],
+    playing:!!window.Forge.selected()?.entity?.anim?.playing
+  }));
+  expect(info.selected).toContain("Fox");
+  expect(info.clips.length).toBeGreaterThan(0);
+  expect(info.playing).toBeTruthy();
+});
