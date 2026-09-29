@@ -8,7 +8,8 @@
     "test": "playwright test",
     "test:forge": "playwright test tests/smoke.spec.mjs",
     "check": "node --check forge-engine.js && node --check forge-spatial.js && node --check forge-ui.js && node --check forge-agent.js && node --check live-vision.js && node --check forge-project.js && node --check forge-export.js && node --check server.mjs && node --check sw.js",
-    "test:core": "playwright test tests/core.smoke.spec.mjs tests/asset-export.spec.mjs tests/visual.smoke.spec.mjs"
+    "test:core": "playwright test tests/core.smoke.spec.mjs tests/asset-export.spec.mjs tests/visual.smoke.spec.mjs tests/professional.qa.spec.mjs",
+    "test:professional": "playwright test tests/professional.qa.spec.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0"
@@ -19,5 +20,5 @@
     "@gltf-transform/functions": "4.5.1",
     "meshoptimizer": "1.3.0"
   },
-  "version": "3.5.0"
+  "version": "3.6.0"
 }
