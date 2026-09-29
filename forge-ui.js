@@ -10,7 +10,7 @@ for(const module of [
   "./forge-production.js","./forge-project.js","./forge-render.js","./forge-ui-system.js","./forge-vfx.js",
   "./forge-2d.js","./forge-ai.js","./forge-gameplay-data.js","./forge-network.js","./forge-replay.js",
   "./forge-session.js","./forge-shader.js","./forge-terrain.js","./forge-qa.js","./forge-animation.js",
-  "./forge-runtime.js","./forge-gameplay.js","./live-vision.js","./forge-agent.js","./forge-export.js"
+  "./forge-runtime.js","./forge-gameplay.js","./live-vision.js","./forge-agent.js","./forge-export.js","./forge-gizmo.js"
 ]) await import(module);
 window.dispatchEvent(new Event("forge-ready"));
 
@@ -86,6 +86,24 @@ $("treeFilter")?.addEventListener("input",refresh);
 $("quickFocus")?.addEventListener("click",()=>engine.focus());
 $("quickFrame")?.addEventListener("click",()=>engine.frame());
 $("quickVision")?.addEventListener("click",()=>$("visionOpen")?.click());
+document.querySelectorAll("[data-gizmo]")?.forEach(b=>b.addEventListener("click",()=>{
+  const mode=b.dataset.gizmo;if(window.ForgeGizmo?.setMode(mode)){
+    document.querySelectorAll("[data-gizmo]").forEach(x=>x.classList.toggle("active",x===b));
+    write("Gizmo: "+mode)
+  }
+}));
+$("spaceToggle")?.addEventListener("click",()=>{
+  const next=window.ForgeGizmo?.state?.space==="local"?"world":"local";
+  window.ForgeGizmo?.setSpace(next);
+  $("spaceToggle").textContent=next==="local"?"Local":"World";
+});
+window.addEventListener("forge-gizmo-transform",()=>{refresh();inspect()});
+window.addEventListener("keydown",e=>{
+  if(e.target?.matches?.("input,textarea,select"))return;
+  if(e.key==="1")document.querySelector('[data-gizmo="translate"]')?.click();
+  else if(e.key==="2")document.querySelector('[data-gizmo="rotate"]')?.click();
+  else if(e.key==="3")document.querySelector('[data-gizmo="scale"]')?.click();
+});
 $("mFocus")?.addEventListener("click",()=>engine.focus());
 $("mFrame")?.addEventListener("click",()=>engine.frame());
 $("mExport")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.exportSource(),"Source export"));
