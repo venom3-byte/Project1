@@ -1,0 +1,1 @@
+Temporary CI proof marker for Forge 3.3 GLB cooking, 2D/3D source export, and visual QA. No runtime changes.
