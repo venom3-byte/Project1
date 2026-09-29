@@ -44,11 +44,15 @@ class SaveSystem{
 }
 
 class AudioSystem{
-  constructor(){this.ctx=null;this.buffers=new Map();this.master=null}
-  init(){if(this.ctx)return;this.ctx=new AudioContext();this.master=this.ctx.createGain();this.master.gain.value=.9;this.master.connect(this.ctx.destination)}
+  constructor(){this.ctx=null;this.buffers=new Map();this.buses=new Map();this.active=new Set();this.volumes={master:1,music:1,sfx:1,ui:1,ambience:1}}
+  init(){if(this.ctx)return;this.ctx=new AudioContext();this.buses.set("master",this.ctx.createGain());this.buses.set("music",this.ctx.createGain());this.buses.set("sfx",this.ctx.createGain());this.buses.set("ui",this.ctx.createGain());this.buses.set("ambience",this.ctx.createGain());this.buses.get("music").connect(this.buses.get("master"));this.buses.get("sfx").connect(this.buses.get("master"));this.buses.get("ui").connect(this.buses.get("master"));this.buses.get("ambience").connect(this.buses.get("master"));this.buses.get("master").connect(this.ctx.destination);this.applyVolumes()}
+  applyVolumes(){for(const [name,g] of this.buses){g.gain.value=this.volumes[name]??1}}
+  setVolume(bus,value){this.volumes[bus]=Math.max(0,Math.min(1,Number(value)||0));if(this.ctx)this.applyVolumes()}
   async load(name,file){this.init();const b=await this.ctx.decodeAudioData(await file.arrayBuffer());this.buffers.set(name,b);return name}
-  play(name,{volume=1,loop=false,position=null}={}){this.init();const b=this.buffers.get(name);if(!b)throw new Error("Audio not loaded: "+name);const src=this.ctx.createBufferSource(),gain=this.ctx.createGain();src.buffer=b;src.loop=loop;gain.gain.value=volume;src.connect(gain);if(position&&this.ctx.createPanner){const p=this.ctx.createPanner();p.panningModel="HRTF";p.distanceModel="inverse";p.positionX.value=position.x;p.positionY.value=position.y;p.positionZ.value=position.z;gain.connect(p);p.connect(this.master)}else gain.connect(this.master);src.start();return src}
-  stopAll(){}
+  play(name,{volume=1,loop=false,position=null,bus="sfx"}={}){this.init();const b=this.buffers.get(name);if(!b)throw new Error("Audio not loaded: "+name);if(this.ctx.state==="suspended")this.ctx.resume().catch(()=>{});const src=this.ctx.createBufferSource(),gain=this.ctx.createGain();src.buffer=b;src.loop=loop;gain.gain.value=volume;src.connect(gain);let target=this.buses.get(bus)||this.buses.get("sfx");if(position){const p=this.ctx.createPanner();p.panningModel="HRTF";p.distanceModel="inverse";p.refDistance=2;p.maxDistance=100;p.rolloffFactor=1;p.positionX.value=position.x;p.positionY.value=position.y;p.positionZ.value=position.z;gain.connect(p);p.connect(target)}else gain.connect(target);src.onended=()=>this.active.delete(src);this.active.add(src);src.start();return src}
+  stopAll(){for(const s of this.active){try{s.stop()}catch{} }this.active.clear()}
+  serialize(){return{volumes:this.volumes}}
+  loadState(d){if(d?.volumes)this.volumes=Object.assign(this.volumes,d.volumes);if(this.ctx)this.applyVolumes()}
 }
 
 class PrefabSystem{
@@ -61,6 +65,6 @@ class PrefabSystem{
 }
 
 ForgeRuntime.input=new InputSystem();ForgeRuntime.nav=new NavigationSystem();ForgeRuntime.save=new SaveSystem();ForgeRuntime.audio=new AudioSystem();ForgeRuntime.prefabs=new PrefabSystem();
-ForgeRuntime.snapshot=()=>({input:ForgeRuntime.input.snapshot(),slots:ForgeRuntime.save.list(),prefabs:ForgeRuntime.prefabs.list()});
+ForgeRuntime.snapshot=()=>({input:ForgeRuntime.input.snapshot(),slots:ForgeRuntime.save.list(),prefabs:ForgeRuntime.prefabs.list(),audio:ForgeRuntime.audio.serialize()});
 window.ForgeRuntime=ForgeRuntime;ForgeRuntime.input.mountMobileControls();
 window.addEventListener("blur",()=>ForgeRuntime.input.down.clear());
