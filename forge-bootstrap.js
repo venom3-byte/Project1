@@ -11,7 +11,7 @@ const importTimed=async(url,phase)=>{
   return ms;
 };
 
-const modules=[
+const coreModules=[
   "./forge-project.js",
   "./forge-render.js",
   "./forge-ui-system.js",
@@ -28,19 +28,28 @@ const modules=[
   "./forge-animation.js",
   "./forge-vision.js",
   "./forge-pose-search.js",
-  "./forge-runtime.js",
-  "./forge-gameplay.js",
-  "./forge-agent.js",
-  "./forge-production.js"
+  "./forge-runtime.js"
 ];
 
 try{
   await importTimed("./forge-ui.js","editor-core");
   window.ForgeBoot.engineReadyMs=Number((performance.now()-bootStarted).toFixed(2));
-  window.ForgeBoot.phase="modules";
-  for(const url of modules) await importTimed(url,"module");
+  window.ForgeBoot.phase="core";
+  await Promise.all(coreModules.map(url=>importTimed(url,"core")));
+
+  window.ForgeBoot.coreReadyMs=Number((performance.now()-bootStarted).toFixed(2));
+  window.ForgeBoot.phase="gameplay";
+  await importTimed("./forge-gameplay.js","gameplay");
+  window.ForgeBoot.gameplayReadyMs=Number((performance.now()-bootStarted).toFixed(2));
+
+  window.ForgeBoot.phase="tools";
+  await Promise.all([
+    importTimed("./forge-agent.js","tools"),
+    importTimed("./forge-production.js","tools")
+  ]);
+
   const totalMs=Number((performance.now()-bootStarted).toFixed(2));
-  window.ForgeBoot={...window.ForgeBoot,ok:true,phase:"ready",modules:modules.length,totalMs,readyAt:Date.now()};
+  window.ForgeBoot={...window.ForgeBoot,ok:true,phase:"ready",modules:coreModules.length+3,totalMs,readyAt:Date.now()};
   document.documentElement.dataset.forgeBootMs=String(totalMs);
   document.dispatchEvent(new CustomEvent("forgebootready",{detail:window.ForgeBoot}));
 }catch(error){
