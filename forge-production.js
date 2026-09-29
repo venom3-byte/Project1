@@ -301,9 +301,31 @@ function openRuntime(){
   d.querySelector("#prefabSave").onclick=()=>{const r=Forge.selected();if(!r){toast("Select an entity first");return}const name=d.querySelector("#prefabName").value||r.name;window.ForgeRuntime.prefabs.save(name,{name:r.name,kind:r.kind,components:r.components,transform:{position:[r.entity.getLocalPosition().x,r.entity.getLocalPosition().y,r.entity.getLocalPosition().z],rotation:[r.entity.getLocalEulerAngles().x,r.entity.getLocalEulerAngles().y,r.entity.getLocalEulerAngles().z],scale:[r.entity.getLocalScale().x,r.entity.getLocalScale().y,r.entity.getLocalScale().z]}});d.querySelector("#prefabOut").textContent=JSON.stringify(window.ForgeRuntime.prefabs.list(),null,2)};
   renderInput();
 }
+
+function openRender(){
+  const d=modal("Forge Render Lab",'<div class="fm-grid"><div class="fm-card"><h4>Quality profile</h4><div class="fm-actions"><button data-profile="mobile">Mobile</button><button data-profile="balanced">Balanced</button><button data-profile="high">High</button><button data-profile="cinematic">Cinematic</button></div><pre id="renderState" class="fm-code"></pre></div><div class="fm-card"><h4>Material Graph</h4><div class="fm-actions"><button id="newMatGraph">New PBR graph</button><button id="applyMatGraph">Apply selected graph</button></div><pre id="graphState" class="fm-code"></pre></div></div>');
+  const render=()=>d.querySelector("#renderState").textContent=JSON.stringify(window.ForgeRender?.quality?.()||{},null,2);
+  d.querySelectorAll("[data-profile]").forEach(b=>b.onclick=()=>{window.ForgeRender?.apply?.(b.dataset.profile);render();toast("Render profile: "+b.dataset.profile)});
+  d.querySelector("#newMatGraph").onclick=()=>{const g=window.ForgeRender?.createMaterialGraph?.("PBR "+Date.now());d.querySelector("#graphState").textContent=JSON.stringify(g,null,2)};
+  d.querySelector("#applyMatGraph").onclick=()=>{const g=[...(window.ForgeRender?.materialGraphs?.values?.()||[])].at(-1);if(!g){toast("Create a graph first");return}window.ForgeRender.applyGraph(g.id);d.querySelector("#graphState").textContent=JSON.stringify(g,null,2);toast("Material graph applied")};
+  render();
+}
+function openVFX(){
+  const d=modal("Forge VFX Lab",'<div class="fm-grid"><div class="fm-card"><h4>Runtime emitters</h4><div class="fm-actions"><button data-vfx="burst">Burst</button><button data-vfx="explosion">Explosion</button><button data-vfx="dust">Dust</button><button data-vfx="rain">Rain</button></div><pre id="vfxState" class="fm-code"></pre></div><div class="fm-card"><h4>Selected entity</h4><div class="fm-actions"><button id="vfxAtSelected">Emit at selected</button></div><div class="fm-code">VFX is runtime data and can be triggered from gameplay or the agent.</div></div></div>');
+  const pos=()=>{const r=Forge.selected();if(!r)return{x:0,y:1,z:0};const p=r.entity.getPosition();return{x:p.x,y:p.y,z:p.z}};
+  d.querySelectorAll("[data-vfx]").forEach(b=>b.onclick=()=>{window.ForgeVFX?.spawn?.(b.dataset.vfx,pos());d.querySelector("#vfxState").textContent=JSON.stringify(window.ForgeVFX?.status?.(),null,2)});
+  d.querySelector("#vfxAtSelected").onclick=()=>{window.ForgeVFX?.explosion?.(pos());d.querySelector("#vfxState").textContent=JSON.stringify(window.ForgeVFX?.status?.(),null,2)};
+  d.querySelector("#vfxState").textContent=JSON.stringify(window.ForgeVFX?.status?.(),null,2);
+}
+function open2D(){
+  const d=modal("Forge 2D Lab",'<div class="fm-grid"><div class="fm-card"><h4>2D templates</h4><div class="fm-actions"><button id="platformer2D">Platformer</button></div><pre id="twoDState" class="fm-code"></pre></div><div class="fm-card"><h4>Sprite pipeline</h4><input id="spriteFiles2D" type="file" multiple accept="image/png,image/jpeg,image/webp"><div class="fm-actions"><button id="spriteImport2D">Import sprite</button></div></div></div>');
+  d.querySelector("#platformer2D").onclick=()=>{const r=window.Forge2D?.createPlatformerTemplate?.();d.querySelector("#twoDState").textContent=JSON.stringify(r,null,2);toast("2D platformer template created")};
+  d.querySelector("#spriteImport2D").onclick=async()=>{const fs=[...d.querySelector("#spriteFiles2D").files];if(!fs.length)return;const r=await window.Forge2D.spriteFromFile(fs[0],"Sprite");Forge.select(r.id);refreshHierarchy();toast("Sprite imported")};
+  d.querySelector("#twoDState").textContent=JSON.stringify(window.Forge2D?.status?.(),null,2);
+}
 function addBar(){
   const bar=document.createElement("div");bar.className="forge-prod";
-  const buttons=[["Asset Lab",openAssets],["Material",openMaterial],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],["Vision",()=>window.AssetForgeLiveVision?.open()],["Runtime",openRuntime],["Build Web",openBuild]];
+  const buttons=[["Asset Lab",openAssets],["Material",openMaterial],["Render",openRender],["VFX",openVFX],["2D",open2D],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],["Vision",()=>window.AssetForgeLiveVision?.open()],["Runtime",openRuntime],["Build Web",openBuild]];
   buttons.forEach(([t,f])=>{const b=document.createElement("button");b.textContent=t;b.onclick=f;bar.append(b)});document.body.append(bar);
 }
 addBar();
