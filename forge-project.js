@@ -33,7 +33,8 @@ class ForgeProjectStore{
       animation:window.ForgeAnimation?.serialize?.()||null,
       network:window.ForgeNet?.status?.()||null,
       replay:window.ForgeReplay?.serialize?.()||null,
-      vision:window.ForgeVision?.status?.()||null
+      vision:window.ForgeVision?.status?.()||null,
+      poseSearch:window.ForgePoseSearch?.serialize?.()||null
     }
   }
   async normalize(data){
@@ -54,7 +55,7 @@ class ForgeProjectStore{
     if(R?.input&&d.runtime?.input){for(const [k,v] of Object.entries(d.runtime.input))R.input.bind(k,v)}if(R?.audio?.loadState&&d.runtime?.audio)R.audio.loadState(d.runtime.audio)
     if(window.ForgeRender?.load&&d.rendering)window.ForgeRender.load(d.rendering);
     if(window.ForgeCinematics?.load&&d.cinematics)window.ForgeCinematics.load(d.cinematics);
-    if(window.ForgeUISystem?.load&&d.ui)window.ForgeUISystem.load(d.ui);if(window.ForgeVFX?.load&&d.vfx)window.ForgeVFX.load(d.vfx);if(window.ForgeAnimation?.load&&d.animation)window.ForgeAnimation.load(d.animation);if(d.replay&&window.ForgeReplay)window.ForgeReplay.load(d.replay);if(window.ForgeGameplay?.hydrate&&d.gameplay)window.ForgeGameplay.hydrate(d.gameplay);if(window.ForgeSession?.load&&d.session)window.ForgeSession.load(d.session);if(d.twoD?.platformer&&window.Forge2D)window.Forge2D.platformer=d.twoD.platformer;if(d.gameplayData&&window.ForgeData){window.ForgeData.registry.load(d.gameplayData.registry||[]);window.ForgeData.quests.load(d.gameplayData.quests||[]);for(const [id,data] of (d.gameplayData.actors||[])){const a=window.ForgeData.actor(id);a.load(data)}}
+    if(window.ForgeUISystem?.load&&d.ui)window.ForgeUISystem.load(d.ui);if(window.ForgeVFX?.load&&d.vfx)window.ForgeVFX.load(d.vfx);if(window.ForgeAnimation?.load&&d.animation)window.ForgeAnimation.load(d.animation);if(window.ForgePoseSearch?.load&&d.poseSearch)window.ForgePoseSearch.load(d.poseSearch);if(d.replay&&window.ForgeReplay)window.ForgeReplay.load(d.replay);if(window.ForgeGameplay?.hydrate&&d.gameplay)window.ForgeGameplay.hydrate(d.gameplay);if(window.ForgeSession?.load&&d.session)window.ForgeSession.load(d.session);if(d.twoD?.platformer&&window.Forge2D)window.Forge2D.platformer=d.twoD.platformer;if(d.gameplayData&&window.ForgeData){window.ForgeData.registry.load(d.gameplayData.registry||[]);window.ForgeData.quests.load(d.gameplayData.quests||[]);for(const [id,data] of (d.gameplayData.actors||[])){const a=window.ForgeData.actor(id);a.load(data)}}
     return d
   }
   download(name="forge-project.forge.json"){
