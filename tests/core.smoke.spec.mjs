@@ -5,6 +5,7 @@ test("core boot is deterministic and error-free",async({page})=>{
   page.on("pageerror",e=>errors.push(String(e)));
   page.on("console",m=>m.type()==="error"&&errors.push(m.text()));
   await page.goto("/");
+  await page.waitForFunction(()=>window.ForgeReady===true,{timeout:20000});
   await expect(page.locator("#sceneCount")).toContainText("3 entities");
   await expect(page.locator("#renderer")).toHaveText(/WebGPU|WebGL2/);
   const d=await page.evaluate(()=>window.Forge.diagnostics());
@@ -16,6 +17,7 @@ test("core boot is deterministic and error-free",async({page})=>{
 
 test("spatial core reports exact primitive dimensions and screen projection",async({page})=>{
   await page.goto("/");
+  await page.waitForFunction(()=>window.ForgeReady===true,{timeout:20000});
   await page.click('[data-add="box"]');
   await expect(page.locator("#form")).toBeVisible();
   const result=await page.evaluate(()=>{
@@ -30,6 +32,7 @@ test("spatial core reports exact primitive dimensions and screen projection",asy
 
 test("core scene manipulation and QA stay functional",async({page})=>{
   await page.goto("/");
+  await page.waitForFunction(()=>window.ForgeReady===true,{timeout:20000});
   await page.click('[data-add="box"]');
   await expect(page.locator("#form")).toBeVisible();
   await page.fill("#px","3");await page.dispatchEvent("#px","change");
@@ -42,6 +45,7 @@ test("core scene manipulation and QA stay functional",async({page})=>{
 
 test("core gameplay modules are ready after boot",async({page})=>{
   await page.goto("/");
+  await page.waitForFunction(()=>window.ForgeReady===true,{timeout:20000});
   const ready=await page.evaluate(()=>({
     gameplay:!!window.ForgeGameplay,
     data:!!window.ForgeData,
@@ -56,6 +60,7 @@ test("core gameplay modules are ready after boot",async({page})=>{
 
 test("core 2D template and terrain no longer crash spatial inspection",async({page})=>{
   await page.goto("/");
+  await page.waitForFunction(()=>window.ForgeReady===true,{timeout:20000});
   const result=await page.evaluate(()=>{
     const p=window.Forge2D.createPlatformerTemplate();
     const t=window.ForgeTerrain.generate("Core Terrain",{size:16,subdivisions:12,seed:9,height:3});
@@ -67,6 +72,7 @@ test("core 2D template and terrain no longer crash spatial inspection",async({pa
 
 test("core project format is v5 and standalone metadata survives",async({page})=>{
   await page.goto("/");
+  await page.waitForFunction(()=>window.ForgeReady===true,{timeout:20000});
   const project=await page.evaluate(()=>window.ForgeProject.serialize());
   expect(project.format).toBe("forge-project");
   expect(project.version).toBe(5);
@@ -76,6 +82,7 @@ test("core project format is v5 and standalone metadata survives",async({page})=
 
 test("native transform gizmo layer is available and mode switches are deterministic",async({page})=>{
   await page.goto("/");
+  await page.waitForFunction(()=>window.ForgeReady===true,{timeout:20000});
   await page.waitForFunction(()=>window.ForgeGizmo?.state?.ready===true,{timeout:5000});
   const result=await page.evaluate(()=>{
     window.ForgeGizmo.setMode("rotate");
@@ -91,6 +98,7 @@ test("native transform gizmo layer is available and mode switches are determinis
 
 test("asset browser filters and selects imported real assets",async({page})=>{
   await page.goto("/");
+  await page.waitForFunction(()=>window.ForgeReady===true,{timeout:20000});
   const result=await page.evaluate(async()=>{
     const canvas=document.createElement("canvas");canvas.width=2;canvas.height=2;
     const blob=await new Promise(r=>{canvas.toBlob(r,"image/png")});
@@ -111,6 +119,7 @@ test("asset browser filters and selects imported real assets",async({page})=>{
 
 test("local computer-vision health reports rendered pixels and layout",async({page})=>{
   await page.goto("/");
+  await page.waitForFunction(()=>window.ForgeReady===true,{timeout:20000});
   const result=await page.evaluate(()=>window.AssetForgeLiveVision.visualHealth());
   expect(result.viewport?.width).toBeGreaterThan(300);
   expect(result.viewport?.height).toBeGreaterThan(300);
@@ -121,6 +130,7 @@ test("local computer-vision health reports rendered pixels and layout",async({pa
 
 test("transform undo and redo restore exact local state",async({page})=>{
   await page.goto("/");
+  await page.waitForFunction(()=>window.ForgeReady===true,{timeout:20000});
   const result=await page.evaluate(()=>{
     const r=window.Forge.selected()||window.Forge.primitive("box","History QA");
     window.Forge.select(r.id);
