@@ -209,24 +209,26 @@ window.addEventListener("forge-selection",()=>{refresh();inspect()});
 window.addEventListener("forge-assets-changed",()=>{refresh();inspect()});
 window.ForgeVision={scan:()=>window.ForgeSpatial?.sceneVision?.()||{},inspect:id=>{const r=engine.entities.get(id);return r?window.ForgeSpatial?.inspect?.(r):null},selectAt:(x,y)=>engine.pick({clientX:x,clientY:y})};
 function stats(){const d=engine.diagnostics();$("renderer").textContent=d.renderer;$("fps").textContent=d.fps;$("physics").textContent=d.physics;requestAnimationFrame(stats)}
-const initialDiagnostics={
-  renderer:/webgpu/i.test(engine.app?.graphicsDevice?.constructor?.name||"")?"WebGPU":"WebGL2",
-  physics:engine.physics?.size||0
-};
-$("renderer").textContent=initialDiagnostics.renderer;
-$("fps").textContent=String(engine.fps||0);
-$("physics").textContent=String(initialDiagnostics.physics);
-$("sceneCount").textContent=engine.entities.size+" entities";
-$("selected").textContent=engine.selected()?.name||"None";
-$("standaloneMode").textContent=location.protocol==="file:"?"Local file":(/github\\.io$/i.test(location.hostname)?"Standalone PWA":"Server + WebSocket");
 window.ForgeReady=true;
 window.ForgeBootState="ready";
 document.documentElement.dataset.forgeReady="1";
 bootEl?.classList.add("hidden");
 write("Forge Studio ready flag set");
 setTimeout(()=>{
-  try{refresh();inspect();}catch(e){write("Deferred UI refresh failed: "+e.message,"error")}
-  requestAnimationFrame(()=>{try{stats()}catch(e){write("Deferred stats failed: "+e.message,"error")}});
-  setTimeout(()=>{try{window.dispatchEvent(new Event("forge-ready"))}catch(e){write("Deferred forge-ready dispatch failed: "+e.message,"error")}},0);
+  try{
+    const initialDiagnostics={
+      renderer:/webgpu/i.test(engine.app?.graphicsDevice?.constructor?.name||"")?"WebGPU":"WebGL2",
+      physics:engine.physics?.size||0
+    };
+    $("renderer").textContent=initialDiagnostics.renderer;
+    $("fps").textContent=String(engine.fps||0);
+    $("physics").textContent=String(initialDiagnostics.physics);
+    $("sceneCount").textContent=engine.entities.size+" entities";
+    $("selected").textContent=engine.selected()?.name||"None";
+    $("standaloneMode").textContent=location.protocol==="file:"?"Local file":(/github\\.io$/i.test(location.hostname)?"Standalone PWA":"Server + WebSocket");
+    refresh();inspect();
+    requestAnimationFrame(()=>{try{stats()}catch(e){write("Deferred stats failed: "+e.message,"error")}});
+    setTimeout(()=>{try{window.dispatchEvent(new Event("forge-ready"))}catch(e){write("Deferred forge-ready dispatch failed: "+e.message,"error")}},0);
+  }catch(e){window.ForgeBootState="ui-error";write("Deferred boot UI failed: "+(e?.message||String(e)),"error");console.error(e)}
 },0);
 write("Forge Studio 3.9 ready");
