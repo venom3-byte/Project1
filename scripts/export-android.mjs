@@ -19,6 +19,16 @@ const project=JSON.parse(await fs.readFile(projectPath,"utf8"));
 project.runtime=project.runtime||{};
 project.runtime.assetRoot="./";
 project.meta=Object.assign(project.meta||{},{androidExport:true,androidTargetSdk:37});
+const android=Object.assign({
+  applicationId:"com.venom3byte.forgegame",
+  appName:project.meta?.name||"Forge Game",
+  versionCode:1,
+  versionName:"0.1.0",
+  minSdk:24,
+  targetSdk:37,
+  compileSdk:37
+},project.meta?.android||{});
+
 
 await fs.rm(out,{recursive:true,force:true});
 await fs.mkdir(out,{recursive:true});
@@ -84,6 +94,7 @@ try{
   const html='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="theme-color" content="#000"><title>Forge Game</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;touch-action:none}#boot{position:fixed;inset:0;display:grid;place-items:center;background:#050912;color:#d5e9ff;font:600 14px system-ui;z-index:10}</style></head><body><div id="boot">Forge Game loading…</div><script type="module">import "./game.js";document.getElementById("boot")?.remove();</script></body></html>';
   await fs.writeFile(path.join(out,"index.html"),html,"utf8");
   await fs.writeFile(path.join(out,"project.forge.json"),JSON.stringify(project,null,2),"utf8");
+await fs.writeFile(path.resolve(projectRoot,"android/forge-android.properties.json"),JSON.stringify(android,null,2)+"\n","utf8");
   if(sourceAssets) await copyDir(sourceAssets,path.join(out,"assets"));
   console.log(JSON.stringify({ok:true,out,project:projectPath,assets:sourceAssets||null},null,2));
 }finally{
