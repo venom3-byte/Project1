@@ -1,0 +1,1 @@
+Temporary CI proof marker: latest main — transform gizmos + visual QA + exact 2D/3D export evidence.
