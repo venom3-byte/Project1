@@ -67,12 +67,46 @@ const forgeVisionProxy=new Proxy(lightweightVision,{
 window.AssetForgeLiveVision=forgeVisionProxy;const write=(s,type="info")=>{out.textContent+="["+new Date().toLocaleTimeString()+"] "+s+"\n";out.scrollTop=out.scrollHeight;if(type==="error")console.error(s)};
 const toast=s=>{const e=document.createElement("div");e.textContent=s;Object.assign(e.style,{position:"fixed",bottom:"18px",left:"50%",transform:"translateX(-50%)",background:"#0b1d31",border:"1px solid #31506f",padding:"10px 14px",borderRadius:"10px",zIndex:99,maxWidth:"92vw",boxShadow:"0 8px 30px #0008"});document.body.appendChild(e);setTimeout(()=>e.remove(),1900)};
 import{ForgeEngine}from"./forge-engine.js";
+const forgeRuntimeDefaults=()=>{
+  const bindings=new Map([
+    ["moveForward",["KeyW","ArrowUp"]],["moveBack",["KeyS","ArrowDown"]],
+    ["moveLeft",["KeyA","ArrowLeft"]],["moveRight",["KeyD","ArrowRight"]],
+    ["jump",["Space"]],["fire",["Mouse0","KeyJ"]],["sprint",["ShiftLeft","ShiftRight"]]
+  ]);
+  const down=new Set(),gamepadDown=new Set();
+  const input={
+    bindings,down,gamepadDown,virtualMove:{x:0,z:0},gamepadMove:{x:0,z:0},
+    bind(action,keys){bindings.set(action,[...(keys||[])]);return this},
+    isDown(action){return down.has(action)||gamepadDown.has(action)},
+    moveVector(){const x=this.virtualMove.x+((down.has("moveRight")?1:0)-(down.has("moveLeft")?1:0));const z=this.virtualMove.z+((down.has("moveForward")?1:0)-(down.has("moveBack")?1:0));const l=Math.hypot(x,z);return l>1?{x:x/l,z:z/l}:{x,z}},
+    snapshot(){return Object.fromEntries([...bindings].map(([k])=>[k,this.isDown(k)]))},
+    mountMobileControls(){return this}
+  };
+  addEventListener("keydown",e=>{for(const[k,keys]of bindings)if(keys.includes(e.code)||keys.includes(e.key))down.add(k)});
+  addEventListener("keyup",e=>{for(const[k,keys]of bindings)if(keys.includes(e.code)||keys.includes(e.key))down.delete(k)});
+  addEventListener("blur",()=>{down.clear();gamepadDown.clear()});
+  const nav={cell:.75,width:80,height:80,blocked:new Uint8Array(80*80),clear(){this.blocked.fill(0)},bakeFromScene(F){this.clear();for(const r of F.entities.values()){if(!r.components.navObstacle)continue;const p=r.entity.getPosition(),s=r.entity.getLocalScale();const min={x:Math.floor((p.x-s.x)/this.cell+this.width/2),z:Math.floor((p.z-s.z)/this.cell+this.height/2)},max={x:Math.floor((p.x+s.x)/this.cell+this.width/2),z:Math.floor((p.z+s.z)/this.cell+this.height/2)};for(let z=Math.max(0,min.z);z<=Math.min(this.height-1,max.z);z++)for(let x=Math.max(0,min.x);x<=Math.min(this.width-1,max.x);x++)this.blocked[z*this.width+x]=1}},path(){return[]}};
+  const save={save(slot,data){localStorage.setItem("forge.slot."+slot,JSON.stringify({savedAt:new Date().toISOString(),data}));return true},load(slot){const v=localStorage.getItem("forge.slot."+slot);return v?JSON.parse(v):null},list(){return Object.keys(localStorage).filter(k=>k.startsWith("forge.slot.")).map(k=>k.slice(11))},remove(slot){localStorage.removeItem("forge.slot."+slot)}};
+  const audio={volumes:{master:1,music:1,sfx:1,ui:1,ambience:1},serialize(){return{volumes:this.volumes}},loadState(d){if(d?.volumes)this.volumes=Object.assign(this.volumes,d.volumes)},setVolume(bus,value){this.volumes[bus]=Math.max(0,Math.min(1,Number(value)||0))}};
+  const prefabs={store:new Map(JSON.parse(localStorage.getItem("forge.prefabs")||"[]")),list(){return[...this.store.keys()]},persist(){localStorage.setItem("forge.prefabs",JSON.stringify([...this.store.entries()]))},capture(){return null},save(){return null},get(){return null},spawn(){return null}};
+  return{input,nav,save,audio,prefabs,snapshot(){return{input:input.snapshot(),slots:save.list(),prefabs:prefabs.list(),audio:audio.serialize(),lazyRuntime:true}}};
+};
+if(!window.ForgeRuntime)window.ForgeRuntime=forgeRuntimeDefaults();
+let forgeRuntimePromise=null;
+const loadForgeRuntime=async()=>{
+  if(forgeRuntimePromise)return forgeRuntimePromise;
+  forgeRuntimePromise=import("./forge-runtime.js").then(()=>{
+    const R=window.ForgeRuntime;
+    if(R){const old=R.snapshot;R.snapshot=()=>Object.assign(old?old():{},window.ForgeGameplay?{gameplay:window.ForgeGameplay.status()}:{});R.__lazyLoaded=true}
+    return R;
+  });
+  return forgeRuntimePromise;
+};
 const engine=new ForgeEngine($("viewport"),write);
 try{bootMessage("Starting renderer and physics…");await engine.init();window.Forge=engine;bootMessage("Loading spatial core and editor systems…");await import("./forge-spatial.js");for(const module of [
   "./forge-production.js","./forge-project.js","./forge-render.js","./forge-ui-system.js","./forge-vfx.js",
   "./forge-2d.js","./forge-ai.js","./forge-gameplay-data.js","./forge-network.js","./forge-replay.js",
   "./forge-session.js","./forge-shader.js","./forge-terrain.js","./forge-qa.js","./forge-animation.js",
-  "./forge-runtime.js"
 ]){
   bootMessage("Loading "+module+"…");
   const started=performance.now();
@@ -272,6 +306,7 @@ window.addEventListener("forge-assets-changed",()=>{refresh();inspect()});
 window.ForgeVision={scan:()=>window.ForgeSpatial?.sceneVision?.()||{},inspect:id=>{const r=engine.entities.get(id);return r?window.ForgeSpatial?.inspect?.(r):null},selectAt:(x,y)=>engine.pick({clientX:x,clientY:y})};
 function stats(){const d=engine.diagnostics();$("renderer").textContent=d.renderer;$("fps").textContent=d.fps;$("physics").textContent=d.physics;requestAnimationFrame(stats)}
 window.ForgeReady=true;
+loadForgeRuntime().catch(error=>{window.ForgeRuntime.__runtimeLoadError=error?.message||String(error);write("Deferred runtime load failed: "+window.ForgeRuntime.__runtimeLoadError,"error")});
 window.ForgeBootState="ready";
 document.documentElement.dataset.forgeReady="1";
 bootEl?.classList.add("hidden");
