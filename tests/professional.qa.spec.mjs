@@ -107,6 +107,22 @@ test.describe("Forge professional acceptance",()=>{
     expect(await page.locator("#selected").textContent()).toBe(target.name);
   });
 
+  test("spatial vision control can move a selected object to the visual center",async({page})=>{
+    await waitForForge(page);
+    await page.click('[data-add="box"]');
+    const result=await page.evaluate(()=>{
+      const r=window.Forge.selected();
+      const vp=document.querySelector(".viewport").getBoundingClientRect();
+      window.ForgeSpatial.moveToScreen(r.id,vp.left+vp.width/2,vp.top+vp.height/2,.5,0);
+      const rect=window.ForgeSpatial.screenRect(r);
+      return{rect,centerX:vp.width/2,centerY:vp.height/2,viewport:vp.toJSON()};
+    });
+    const actualX=result.rect.x+result.rect.width/2;
+    const actualY=result.rect.y+result.rect.height/2;
+    expect(Math.abs(actualX-result.centerX)).toBeLessThan(24);
+    expect(Math.abs(actualY-result.centerY)).toBeLessThan(24);
+  });
+
   test("gizmo mode, space switching, snapping, undo, and redo remain deterministic",async({page})=>{
     await waitForForge(page);
     await page.click('[data-add="box"]');
