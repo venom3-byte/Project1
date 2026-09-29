@@ -249,7 +249,7 @@ const ForgeGameplay = {
   hydrate(config){
     if(!config?.type)return;
     this.characters.clear();this.vehicles.clear();this.agents.clear();this.projectiles=[];this.fireCooldown=0;
-    if(config.type==="third-person"){
+    if(config.type==="third-person" || config.type==="showcase"){
       const p=Forge.entities.get(config.player);
       if(p){const phys=Forge.physics.get(p.id);const c=Forge.rapier?new Forge.rapier.KinematicCharacterController(.02,Forge.world.integrationParameters,Forge.world.broadPhase,Forge.world.narrowPhase,Forge.world.bodies,Forge.world.colliders):null;if(c){c.enableAutostep(.45,.2,true);c.enableSnapToGround(.2)}this.characters.set(p.id,{id:p.id,entity:p.entity,body:phys?.body,collider:phys?.collider,controller:c,speed:5.5,sprintSpeed:8.5,jumpSpeed:6.2,gravity:-18,verticalVelocity:0,grounded:false,cameraDistance:6,cameraHeight:2.8,damage:20,hp:100});}
       for(const id of (config.enemies||[])){const e=Forge.entities.get(id);if(!e)continue;const phys=Forge.physics.get(id);const cc=Forge.rapier?new Forge.rapier.KinematicCharacterController(.02,Forge.world.integrationParameters,Forge.world.broadPhase,Forge.world.narrowPhase,Forge.world.bodies,Forge.world.colliders):null;if(cc)cc.enableSnapToGround(.2);this.agents.set(id,{id,entity:e.entity,body:phys?.body,collider:phys?.collider,controller:cc,state:"idle",speed:2.3,attackRange:1.6,detectionRange:14,damageCooldown:0,hp:60});}
