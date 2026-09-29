@@ -260,6 +260,21 @@ const ForgeGameplay = {
     }
   },
   serialize(){return this.currentTemplate?structuredClone(this.currentTemplate):null},
+
+  ,
+  createShowcaseGame(){
+    this.init();this.clear();Forge.resetScene(false);
+    Forge.createPlane("ArenaGround",48,48);Forge.createLight("ArenaSun");
+    const player=this.createCharacter("Hero",{x:0,y:1.2,z:0});
+    const enemies=[];for(const pos of [{x:8,y:1,z:8},{x:-8,y:1,z:7},{x:7,y:1,z:-8},{x:-7,y:1,z:-7},{x:12,y:1,z:0}])enemies.push(this.createEnemy("Enemy_"+(enemies.length+1),pos));
+    for(let i=0;i<12;i++){const r=Forge.primitive("box","ArenaCover_"+i);const a=(i%6)*6-15,b=Math.floor(i/6)*8-5;r.entity.setLocalPosition(a,.8,b);r.entity.setLocalScale(1.3,1.6,1.3);r.components.navObstacle=true;Forge.setPhysics(r.id,"fixed","box")}
+    if(window.ForgeData){const a=window.ForgeData.actor(player.id);a.tags.add("Character.Player","Team.Blue");a.attributes.set("Health",100);a.grantItem("Medkit",3);a.addAbility("Sprint",{cooldown:.5,cost:{Stamina:5}});window.ForgeData.quests.define("arena-objective",{title:"Clear the Arena",objectives:[{id:"defeat",target:5}],rewards:{xp:100}})}
+    if(window.ForgeSession){window.ForgeSession.players.clear();window.ForgeSession.addPlayer("local","Hero");window.ForgeSession.mode.configure({winCondition:"defeat-all",reward:100});window.ForgeSession.start()}
+    this.currentTemplate={type:"showcase",player:player.id,enemies:enemies.map(e=>e.id),questId:"arena-objective"};
+    Forge.select(player.id);Forge.frame();window.ForgeUISystem?.hudForThirdPerson(()=>({hp:window.ForgeData?.actor(player.id)?.attributes.get("Health")??player.hp,state:"ARENA"}));
+    return this.currentTemplate
+  }
+
   status(){
     return{
       characters:[...this.characters.values()].map(c=>({id:c.id,hp:c.hp,grounded:c.grounded})),
