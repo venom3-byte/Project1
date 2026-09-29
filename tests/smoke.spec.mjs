@@ -160,6 +160,22 @@ test("Vision Core grounds the rendered scene in screen space",async({page})=>{
   expect(result.report.dom).toHaveProperty("coverage");
 });
 
+test("Vision Agent loop executes commands with visual feedback",async({page})=>{
+  await page.goto("/");
+  const result=await page.evaluate(async()=>{
+    return await window.ForgeAgent.execute({
+      op:"vision-loop",
+      commands:[
+        {op:"create",kind:"box",name:"LoopBox",x:0,y:1,z:0},
+        {op:"transform",x:2,y:1,z:0},
+        {op:"vision-map"}
+      ],
+      stopOnVisualFailure:true
+    });
+  });
+  return result;
+});
+
 test("Pose Search selects the nearest motion feature and can drive animation state",async({page})=>{
   await page.goto("/");
   const result=await page.evaluate(()=>{
