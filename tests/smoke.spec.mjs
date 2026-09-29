@@ -1,39 +1,41 @@
 import{test,expect}from"@playwright/test";
+const openForge=async page=>{await openForge(page);await page.waitForFunction(()=>window.ForgeBoot?.ok===true,{timeout:30000});};
+
 test("Forge boots with renderer and scene kernel",async({page})=>{
   const errors=[];page.on("pageerror",e=>errors.push(String(e)));page.on("console",m=>m.type()==="error"&&errors.push(m.text()));
-  await page.goto("/");await expect(page.locator("#sceneCount")).toContainText("3 entities");await expect(page.locator("#renderer")).toHaveText(/WebGPU|WebGL2/);
+  await openForge(page);await expect(page.locator("#sceneCount")).toContainText("3 entities");await expect(page.locator("#renderer")).toHaveText(/WebGPU|WebGL2/);
   const s=await page.evaluate(()=>window.Forge.diagnostics());expect(s.entities).toBe(3);expect(s.renderables).toBeGreaterThan(0);expect(errors).toEqual([]);
 });
 test("scene creation, selection, inspector and transform work",async({page})=>{
-  await page.goto("/");await page.click('[data-add="box"]');await expect(page.locator("#sceneCount")).toContainText("4 entities");await expect(page.locator("#form")).toBeVisible();
+  await openForge(page);await page.click('[data-add="box"]');await expect(page.locator("#sceneCount")).toContainText("4 entities");await expect(page.locator("#form")).toBeVisible();
   const before=await page.locator("#px").inputValue();await page.fill("#px","3");await page.dispatchEvent("#px","change");expect(await page.locator("#px").inputValue()).toBe("3");expect(before).not.toBe("3");
   const d=await page.evaluate(()=>window.Forge.diagnostics());expect(d.renderables).toBeGreaterThanOrEqual(2);
 });
 test("physics body updates runtime state",async({page})=>{
-  await page.goto("/");await page.click('[data-add="box"]');await page.selectOption("#body","dynamic");await page.selectOption("#shape","box");await page.click("#apply");await page.waitForTimeout(400);
+  await openForge(page);await page.click('[data-add="box"]');await page.selectOption("#body","dynamic");await page.selectOption("#shape","box");await page.click("#apply");await page.waitForTimeout(400);
   const d=await page.evaluate(()=>window.Forge.diagnostics());expect(d.physics).toBeGreaterThan(1);
 });
 test("keyframe timeline is persistent in project JSON",async({page})=>{
-  await page.goto("/");await page.click('[data-add="box"]');await page.click("#key");await page.fill("#time","1");await page.dispatchEvent("#time","input");await page.click("#key");
+  await openForge(page);await page.click('[data-add="box"]');await page.click("#key");await page.fill("#time","1");await page.dispatchEvent("#time","input");await page.click("#key");
   const p=await page.evaluate(()=>window.Forge.serialize());const chosen=p.entities.find(x=>x.id===window.Forge.selectedId);expect(chosen.keyframes.length).toBe(2);
 });
 test("real raster asset import creates a renderable asset",async({page})=>{
-  await page.goto("/");
+  await openForge(page);
   const data=await page.evaluate(()=>{const c=document.createElement("canvas");c.width=64;c.height=64;const g=c.getContext("2d");g.fillStyle="#00c8ff";g.fillRect(8,8,48,48);return c.toDataURL("image/png").split(",")[1]});
   await page.setInputFiles("#assetInput",{name:"car-texture.png",mimeType:"image/png",buffer:Buffer.from(data,"base64")});
   await expect(page.locator("#sceneCount")).toContainText("4 entities");
   const s=await page.evaluate(()=>window.Forge.diagnostics());expect(s.renderables).toBeGreaterThan(1);
 });
 test("project save/open round trip keeps scene entities",async({page})=>{
-  await page.goto("/");await page.click('[data-add="sphere"]');const json=await page.evaluate(()=>JSON.stringify(window.Forge.serialize()));
+  await openForge(page);await page.click('[data-add="sphere"]');const json=await page.evaluate(()=>JSON.stringify(window.Forge.serialize()));
   await page.setInputFiles("#projectInput",{name:"roundtrip.forge.json",mimeType:"application/json",buffer:Buffer.from(json)});
   const d=await page.evaluate(()=>window.Forge.diagnostics());expect(d.entities).toBe(4);
 });
 test("visual QA reports healthy runtime",async({page})=>{
-  await page.goto("/");await page.click("#qa");await expect(page.locator("#qaDialog")).toBeVisible();await page.click("#runQA");const text=await page.locator("#qaReport").textContent();expect(text).toContain('"ok": true');
+  await openForge(page);await page.click("#qa");await expect(page.locator("#qaDialog")).toBeVisible();await page.click("#runQA");const text=await page.locator("#qaReport").textContent();expect(text).toContain('"ok": true');
 });
 test("mobile studio keeps viewport and inspector usable",async({page})=>{
-  await page.setViewportSize({width:390,height:844});await page.goto("/");await expect(page.locator("#viewport")).toBeVisible();await page.click('[data-add="box"]');await expect(page.locator("#form")).toBeVisible();await page.click("#saveProject");
+  await page.setViewportSize({width:390,height:844});await openForge(page);await expect(page.locator("#viewport")).toBeVisible();await page.click('[data-add="box"]');await expect(page.locator("#form")).toBeVisible();await page.click("#saveProject");
 });
 
 
@@ -87,7 +89,7 @@ test("Forge HTTP command endpoint accepts structured engine commands",async({req
 
 
 test("third-person gameplay template creates real controller and AI runtime state",async({page})=>{
-  await page.goto("/");
+  await openForge(page);
   const result=await page.evaluate(()=>window.ForgeGameplay.createThirdPersonTemplate());
   expect(result.type).toBe("third-person");
   const state=await page.evaluate(()=>window.ForgeGameplay.status());
@@ -99,7 +101,7 @@ test("third-person gameplay template creates real controller and AI runtime stat
 });
 
 test("racing template creates vehicle controller with four wheels",async({page})=>{
-  await page.goto("/");
+  await openForge(page);
   const result=await page.evaluate(()=>window.ForgeGameplay.createRacingTemplate());
   expect(result.type).toBe("racing");
   const state=await page.evaluate(()=>window.ForgeGameplay.status());
@@ -108,7 +110,7 @@ test("racing template creates vehicle controller with four wheels",async({page})
 });
 
 test("2D platformer template creates orthographic gameplay scene",async({page})=>{
-  await page.goto("/");
+  await openForge(page);
   const result=await page.evaluate(()=>window.Forge2D.createPlatformerTemplate());
   expect(result.player).toBeTruthy();
   const state=await page.evaluate(()=>window.Forge2D.status());
@@ -118,7 +120,7 @@ test("2D platformer template creates orthographic gameplay scene",async({page})=
 });
 
 test("project publishing metadata survives serialization",async({page})=>{
-  await page.goto("/");
+  await openForge(page);
   const result=await page.evaluate(()=>{
     window.ForgeProject.setMeta({name:"Android Test Game",android:{applicationId:"com.example.forgeqa",appName:"Android Test Game",versionCode:7,versionName:"1.2.3"}});
     const saved=window.ForgeProject.serialize();
@@ -131,7 +133,7 @@ test("project publishing metadata survives serialization",async({page})=>{
 });
 
 test("complete project graph preserves gameplay configuration",async({page})=>{
-  await page.goto("/");
+  await openForge(page);
   await page.evaluate(()=>window.ForgeGameplay.createThirdPersonTemplate());
   const json=await page.evaluate(()=>JSON.stringify(window.ForgeProject.serialize()));
   const project=JSON.parse(json);
@@ -143,7 +145,7 @@ test("complete project graph preserves gameplay configuration",async({page})=>{
 });
 
 test("VFX, render profiles and runtime services are callable",async({page})=>{
-  await page.goto("/");
+  await openForge(page);
   const result=await page.evaluate(()=>{
     window.ForgeRender.apply("cinematic");
     const v=window.ForgeVFX.spawn("burst",{x:0,y:1,z:0});
@@ -156,7 +158,7 @@ test("VFX, render profiles and runtime services are callable",async({page})=>{
 
 
 test("Vision Core grounds the rendered scene in screen space",async({page})=>{
-  await page.goto("/");
+  await openForge(page);
   const result=await page.evaluate(async()=>{
     window.Forge.select([...window.Forge.entities.values()].find(x=>x.name==="Ground").id);
     const map=window.ForgeVision.map();
@@ -174,7 +176,7 @@ test("Vision Core grounds the rendered scene in screen space",async({page})=>{
 });
 
 test("Vision Agent loop executes commands with visual feedback",async({page})=>{
-  await page.goto("/");
+  await openForge(page);
   const result=await page.evaluate(async()=>{
     return await window.ForgeAgent.execute({
       op:"vision-loop",
@@ -190,7 +192,7 @@ test("Vision Agent loop executes commands with visual feedback",async({page})=>{
 });
 
 test("Pose Search selects the nearest motion feature and can drive animation state",async({page})=>{
-  await page.goto("/");
+  await openForge(page);
   const result=await page.evaluate(()=>{
     const id="ci-locomotion";
     window.ForgePoseSearch.createDatabase(id,[
@@ -209,7 +211,7 @@ test("Pose Search selects the nearest motion feature and can drive animation sta
 });
 
 test("in-engine visual QA can audit and baseline the rendered scene",async({page})=>{
-  await page.goto("/");
+  await openForge(page);
   const audit=await page.evaluate(async()=>await window.ForgeQAPro.audit());
   expect(audit.width).toBeGreaterThan(100);
   expect(audit.height).toBeGreaterThan(100);
@@ -223,7 +225,7 @@ test("in-engine visual QA can audit and baseline the rendered scene",async({page
 
 
 test("terrain generation produces a renderable world surface and physics collider",async({page})=>{
-  await page.goto("/");
+  await openForge(page);
   const result=await page.evaluate(()=>window.ForgeTerrain.generate("CI Terrain",{size:24,subdivisions:24,seed:22,height:4}));
   expect(result.components.terrain.subdivisions).toBe(24);
   const state=await page.evaluate(()=>window.ForgeTerrain.status());
@@ -233,7 +235,7 @@ test("terrain generation produces a renderable world surface and physics collide
 });
 
 test("shader lab applies a custom material preset to a selected renderable",async({page})=>{
-  await page.goto("/");
+  await openForge(page);
   await page.click('[data-add="box"]');
   const ok=await page.evaluate(()=>window.ForgeShaders.applyPreset("energy"));
   expect(ok).toBeTruthy();
@@ -242,7 +244,7 @@ test("shader lab applies a custom material preset to a selected renderable",asyn
 });
 
 test("data-driven gameplay supports tags attributes abilities inventory and quests",async({page})=>{
-  await page.goto("/");
+  await openForge(page);
   const result=await page.evaluate(()=>{
     const a=window.ForgeData.actor("ci-player");
     a.tags.add("Character.Player","Team.Blue");
@@ -260,7 +262,7 @@ test("data-driven gameplay supports tags attributes abilities inventory and ques
 });
 
 test("replay records and restores deterministic input frames",async({page})=>{
-  await page.goto("/");
+  await openForge(page);
   const state=await page.evaluate(async()=>{
     window.ForgeReplay.startRecord();
     window.ForgeRuntime.input.down.add("moveForward");
@@ -275,7 +277,7 @@ test("replay records and restores deterministic input frames",async({page})=>{
 });
 
 test("network system accepts a persistent remote endpoint",async({page})=>{
-  await page.goto("/");
+  await openForge(page);
   const endpoint=await page.evaluate(()=>{
     window.ForgeNet.setEndpoint("wss://example.invalid/forge");
     return window.ForgeNet.status().endpoint;
@@ -285,7 +287,7 @@ test("network system accepts a persistent remote endpoint",async({page})=>{
 });
 
 test("multiplayer WebSocket room relay accepts a client connection",async({page})=>{
-  await page.goto("/");
+  await openForge(page);
   const result=await page.evaluate(()=>new Promise(resolve=>{
     const ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/net");
     const timer=setTimeout(()=>{try{ws.close()}catch{};resolve("timeout")},5000);
@@ -296,7 +298,7 @@ test("multiplayer WebSocket room relay accepts a client connection",async({page}
 });
 
 test("recursive prefab capture and spawn preserve child entities",async({page})=>{
-  await page.goto("/");
+  await openForge(page);
   const result=await page.evaluate(()=>{
     const parent=window.Forge.primitive("box","PrefabRoot");
     const child=window.Forge.primitive("sphere","PrefabChild");
@@ -318,7 +320,7 @@ test("real animated GLB import exposes playable animation clips",async({page})=>
   expect(response.ok()).toBeTruthy();
   const bytes=await response.body();
   expect(bytes.length).toBeGreaterThan(100000);
-  await page.goto("/");
+  await openForge(page);
   await page.setInputFiles("#assetInput",{name:"Fox.glb",mimeType:"model/gltf-binary",buffer:bytes});
   await expect(page.locator("#sceneCount")).toContainText("4 entities");
   const info=await page.evaluate(()=>({
@@ -333,7 +335,7 @@ test("real animated GLB import exposes playable animation clips",async({page})=>
 
 
 test("Rapier collision events reach the Forge collision bus",async({page})=>{
-  await page.goto("/");
+  await openForge(page);
   const hit=await page.evaluate(async()=>{
     let started=false;
     window.Forge.onCollision(e=>{if(e.started)started=true});
@@ -348,7 +350,7 @@ test("Rapier collision events reach the Forge collision bus",async({page})=>{
 });
 
 test("Game session lifecycle is serializable and restartable",async({page})=>{
-  await page.goto("/");
+  await openForge(page);
   const state=await page.evaluate(()=>{
     window.ForgeSession.addPlayer("p1","Player One");
     window.ForgeSession.mode.configure({winScore:10});
@@ -366,7 +368,7 @@ test("Game session lifecycle is serializable and restartable",async({page})=>{
 
 
 test("integrated AAA showcase creates a playable end-to-end game state",async({page})=>{
-  await page.goto("/");
+  await openForge(page);
   const result=await page.evaluate(()=>window.ForgeGameplay.createShowcaseGame());
   const state=await page.evaluate(()=>({
     gameplay:window.ForgeGameplay.status(),
