@@ -6,6 +6,8 @@ const ForgeGameplay = {
   projectiles:[],
   running:false,
   unsubscribePre:null,
+  fireCooldown:0,
+  projectileSpeed:24,
   unsubscribePost:null,
 
   init(){
@@ -163,6 +165,28 @@ const ForgeGameplay = {
     const cp=cam.getLocalPosition();const k=.12;cam.setLocalPosition(cp.x+(desired.x-cp.x)*k,cp.y+(desired.y-cp.y)*k,cp.z+(desired.z-cp.z)*k);cam.lookAt(target);
   },
 
+
+  fire(player){
+    if(this.fireCooldown>0)return null;
+    const cam=Forge.camera();if(!cam)return null;
+    const p=cam.getPosition(),d=cam.forward,origin={x:p.x+d.x*1.2,y:p.y+d.y*1.2,z:p.z+d.z*1.2};
+    const q=this.spawnProjectile(origin,{x:d.x*this.projectileSpeed,y:d.y*this.projectileSpeed,z:d.z*this.projectileSpeed},25);
+    this.fireCooldown=.22;return q;
+  }
+
+  processCombat(dt){
+    this.fireCooldown=Math.max(0,this.fireCooldown-dt);
+    const input=window.ForgeRuntime?.input,player=[...this.characters.values()][0];
+    if(player&&input?.isDown("fire"))this.fire(player);
+    for(const p of this.projectiles){
+      const pos=p.entity.getPosition();
+      for(const a of this.agents.values()){
+        if(!a.entity.enabled)continue;
+        if(pos.distance(a.entity.getPosition())<1.0){a.hp=Math.max(0,a.hp-p.damage);p.life=0;break}
+      }
+    }
+  }
+
   prePhysics(dt){
     if(!this.running)return;
     for(const c of this.characters.values())this.updateCharacter(c,dt);
@@ -172,7 +196,7 @@ const ForgeGameplay = {
 
   postPhysics(dt){
     if(!this.running)return;
-    this.updateCamera();
+    this.processCombat(dt);this.updateCamera();
     for(const p of this.projectiles){p.life-=dt;if(p.life<=0){const r=Forge.entities.get(p.id);if(r){Forge.removePhysics(p.id);r.entity.destroy();Forge.entities.delete(p.id)}}}
     this.projectiles=this.projectiles.filter(x=>x.life>0);
   },
@@ -181,7 +205,7 @@ const ForgeGameplay = {
     this.init();this.clear();
     Forge.createPlane("Ground",40,40);const light=Forge.createLight("Sun");const player=this.createCharacter("Player",{x:0,y:1.2,z:0});
     const enemy1=this.createEnemy("Enemy_A",{x:7,y:1,z:6}),enemy2=this.createEnemy("Enemy_B",{x:-7,y:1,z:4}),enemy3=this.createEnemy("Enemy_C",{x:4,y:1,z:-8});
-    for(let i=0;i<8;i++){const r=Forge.primitive("box","Cover_"+i);r.entity.setLocalPosition((i%4)*4-6,.75,Math.floor(i/4)*6-3);r.entity.setLocalScale(1.5,1.5,1.5);Forge.setPhysics(r.id,"fixed","box");}
+    for(let i=0;i<8;i++){const r=Forge.primitive("box","Cover_"+i);r.entity.setLocalPosition((i%4)*4-6,.75,Math.floor(i/4)*6-3);r.entity.setLocalScale(1.5,1.5,1.5);r.components.navObstacle=true;Forge.setPhysics(r.id,"fixed","box");}
     Forge.frame();Forge.select(player.id);window.ForgeUISystem?.hudForThirdPerson(()=>({hp:player.hp,state:player.grounded?"GROUNDED":"AIRBORNE"}));
     return{type:"third-person",player:player.id,enemies:[enemy1.id,enemy2.id,enemy3.id]};
   },
