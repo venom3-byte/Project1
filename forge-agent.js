@@ -19,6 +19,7 @@ const ForgeAgent={
   async execute(c){
     const F=window.Forge,P=window.ForgeProduction;
     switch(c.op){
+      case "agent-task": return {accepted:true,task:String(c.task||""),note:"Natural-language task accepted by Forge control plane; convert to deterministic engine commands before execution."};
       case "diagnostics": return F.diagnostics();
       case "entities": return [...F.entities.values()].map(r=>({id:r.id,name:r.name,kind:r.kind,components:r.components}));
       case "select": {const r=c.id?F.select(c.id):[...F.entities.values()].find(x=>x.name===c.name);if(!r)throw new Error("Entity not found");return{ id:r.id,name:r.name,kind:r.kind};}
