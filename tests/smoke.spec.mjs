@@ -17,7 +17,7 @@ test("physics body updates runtime state",async({page})=>{
 });
 test("keyframe timeline is persistent in project JSON",async({page})=>{
   await openForge(page);await page.click('[data-add="box"]');await page.click("#key");await page.fill("#time","1");await page.dispatchEvent("#time","input");await page.click("#key");
-  const p=await page.evaluate(()=>window.Forge.serialize());const chosen=p.entities.find(x=>x.id===window.Forge.selectedId);expect(chosen.keyframes.length).toBe(2);
+  const snapshot=await page.evaluate(()=>({project:window.Forge.serialize(),selectedId:window.Forge.selectedId}));const chosen=snapshot.project.entities.find(x=>x.id===snapshot.selectedId);expect(chosen.keyframes.length).toBe(2);
 });
 test("real raster asset import creates a renderable asset",async({page})=>{
   await openForge(page);
