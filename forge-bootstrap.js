@@ -1,6 +1,6 @@
 const bootStarted=performance.now();
 const bootTimings=[];
-window.ForgeBoot={ok:false,phase:"starting",startedAt:Date.now(),startedPerf:bootStarted,modules:0,timings:bootTimings};
+window.ForgeBoot={ok:false,phase:"starting",startedAt:Date.now(),startedPerf:bootStarted,timings:bootTimings};
 
 const importTimed=async(url,phase)=>{
   const t0=performance.now();
@@ -11,7 +11,7 @@ const importTimed=async(url,phase)=>{
   return ms;
 };
 
-const modules=[
+const coreModules=[
   "./forge-project.js",
   "./forge-render.js",
   "./forge-ui-system.js",
@@ -28,28 +28,27 @@ const modules=[
   "./forge-animation.js",
   "./forge-vision.js",
   "./forge-pose-search.js",
-  "./forge-runtime.js",
-  "./forge-gameplay.js",
-  "./forge-agent.js",
-  "./forge-production.js"
+  "./forge-runtime.js"
 ];
 
 try{
   await importTimed("./forge-ui.js","editor-core");
   window.ForgeBoot.engineReadyMs=Number((performance.now()-bootStarted).toFixed(2));
-  window.ForgeBoot.phase="modules";
-  for(const url of modules) await importTimed(url,"module");
+
+  window.ForgeBoot.phase="core";
+  for(const url of coreModules) await importTimed(url,"core");
+  window.ForgeBoot.coreReadyMs=Number((performance.now()-bootStarted).toFixed(2));
+
+  window.ForgeBoot.phase="gameplay";
+  await importTimed("./forge-gameplay.js","gameplay");
+  window.ForgeBoot.gameplayReadyMs=Number((performance.now()-bootStarted).toFixed(2));
+
+  window.ForgeBoot.phase="tools";
+  await importTimed("./forge-agent.js","tools");
+  await importTimed("./forge-production.js","tools");
+
   const totalMs=Number((performance.now()-bootStarted).toFixed(2));
-  window.ForgeBoot={
-    ...window.ForgeBoot,
-    ok:true,
-    phase:"ready",
-    modules:modules.length+1,
-    coreReadyMs:Number((performance.now()-bootStarted).toFixed(2)),
-    gameplayReadyMs:Number((performance.now()-bootStarted).toFixed(2)),
-    totalMs,
-    readyAt:Date.now()
-  };
+  window.ForgeBoot={...window.ForgeBoot,ok:true,phase:"ready",modules:coreModules.length+4,totalMs,readyAt:Date.now()};
   document.documentElement.dataset.forgeBootMs=String(totalMs);
   document.dispatchEvent(new CustomEvent("forgebootready",{detail:window.ForgeBoot}));
 }catch(error){
