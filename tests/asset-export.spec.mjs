@@ -1,4 +1,5 @@
 import{test,expect}from"@playwright/test";
+import{writeFile}from"node:fs/promises";
 
 function makeTriangleGlb(){
   const positions=new Float32Array([0,0,0,1,0,0,0,1,0]);
@@ -49,12 +50,14 @@ test("2D image source survives exact export and validation",async({page})=>{
     const check=await window.ForgeExport.validateSelected();
     const exp=await window.ForgeExport.exportSource({download:false});
     const same=await window.ForgeExport.equalBytes(file,exp.blob);
-    return{check,exp,same,selected:window.Forge.selected()?.name};
+    const out=new Uint8Array(await exp.blob.arrayBuffer());
+    return{check,exp:{...exp,bytesArray:[...out]},same,selected:window.Forge.selected()?.name};
   });
   expect(result.check.ok).toBeTruthy();
   expect(result.check.quality.hasBounds).toBeTruthy();
   expect(result.same).toBeTruthy();
   expect(result.selected).toBe("qa-texture.png");
+  await writeFile("test-results/qa-texture.export.png",Buffer.from(result.exp.bytesArray));
 });
 
 test("3D GLB source survives exact export with spatial geometry stats",async({page})=>{
@@ -68,13 +71,15 @@ test("3D GLB source survives exact export with spatial geometry stats",async({pa
     const exp=await window.ForgeExport.exportSource({download:false});
     const same=await window.ForgeExport.equalBytes(file,exp.blob);
     const spatial=window.ForgeSpatial.inspect(imported.record);
-    return{check,exp,same,spatial};
+    const out=new Uint8Array(await exp.blob.arrayBuffer());
+    return{check,exp:{...exp,bytesArray:[...out]},same,spatial};
   },bytes);
   expect(result.check.ok).toBeTruthy();
   expect(result.same).toBeTruthy();
   expect(result.spatial.geometry.vertices).toBeGreaterThan(0);
   expect(result.spatial.geometry.triangles).toBeGreaterThan(0);
   expect(result.spatial.world.size.x).toBeGreaterThan(0);
+  await writeFile("test-results/qa-triangle.export.glb",Buffer.from(result.exp.bytesArray));
 });
 
 test("asset manifest records professional pipeline metadata",async({page})=>{
@@ -85,13 +90,14 @@ test("asset manifest records professional pipeline metadata",async({page})=>{
     const file=new File([blob],"manifest.png",{type:"image/png"});
     await window.Forge.importFile(file);
     const m=await window.ForgeExport.exportManifest({download:false});
-    return m.payload;
+    return {...m.payload,manifestText:await m.blob.text()};
   });
   expect(result.schema).toBe("forge-asset-manifest-v1");
   expect(result.quality.linearUnits).toBe("meters");
   expect(result.quality.coordinateSystem).toContain("+Y up");
   expect(result.spatial.geometry).toBeTruthy();
   expect(result.spatial.sourceBounds).toBeTruthy();
+  await writeFile("test-results/qa-manifest.json",result.manifestText);
 });
 
 
@@ -104,7 +110,8 @@ test("edited 3D scene can be cooked to GLB and re-imported",async({page})=>{
     const file=new File([exported.blob],"qa-box.glb",{type:"model/gltf-binary"});
     const imported=await window.Forge.importFile(file);
     const after=window.ForgeSpatial.inspect(imported.record);
-    return{exported,sourceTriangles:before.geometry.triangles,sourceVertices:before.geometry.vertices,roundtripTriangles:after.geometry.triangles,roundtripVertices:after.geometry.vertices};
+    const out=new Uint8Array(await exported.blob.arrayBuffer());
+    return{exported:{...exported,bytesArray:[...out]},sourceTriangles:before.geometry.triangles,sourceVertices:before.geometry.vertices,roundtripTriangles:after.geometry.triangles,roundtripVertices:after.geometry.vertices};
   });
   expect(result.exported.ok).toBeTruthy();
   expect(result.exported.validation.ok).toBeTruthy();
@@ -112,4 +119,5 @@ test("edited 3D scene can be cooked to GLB and re-imported",async({page})=>{
   expect(result.roundtripVertices).toBeGreaterThan(0);
   expect(result.roundtripTriangles).toBe(result.sourceTriangles);
   expect(result.roundtripVertices).toBe(result.sourceVertices);
+  await writeFile("test-results/qa-box.cooked.glb",Buffer.from(result.exported.bytesArray));
 });
