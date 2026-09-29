@@ -23,6 +23,8 @@ test("desktop visual QA has a rendered scene and disciplined editor layout",asyn
   await page.setViewportSize({width:1440,height:900});
   await page.goto("/");
   await page.waitForFunction(()=>window.ForgeReady===true,{timeout:20000});
+  await page.waitForFunction(()=>{const d=window.Forge?.diagnostics?.();return d?.entities===3&&d?.renderables>0},{timeout:10000});
+  await page.waitForTimeout(120);
   await page.screenshot({path:"test-results/forge-desktop-proof.png",fullPage:true});
   const h=await pixelHealth(page);
   const layout=await page.evaluate(()=>({
@@ -45,10 +47,12 @@ test("mobile visual QA exposes touch controls without scattered full-screen butt
   await page.setViewportSize({width:390,height:844});
   await page.goto("/");
   await page.waitForFunction(()=>window.ForgeReady===true,{timeout:20000});
+  await page.waitForFunction(()=>{const d=window.Forge?.diagnostics?.();return d?.entities===3&&d?.renderables>0},{timeout:10000});
+  await page.waitForTimeout(120);
   await page.screenshot({path:"test-results/forge-mobile-proof.png",fullPage:true});
   await expect(page.locator(".mobile-quickbar")).toBeVisible();
   await expect(page.locator(".mobile-quickbar button")).toHaveCount(5);
-  await expect(page.locator(".viewport canvas")).toBeVisible();
+  await expect(page.locator("#viewport")).toBeVisible();
   const layout=await page.evaluate(()=>({
     width:document.querySelector(".viewport").getBoundingClientRect().width,
     height:document.querySelector(".viewport").getBoundingClientRect().height,
