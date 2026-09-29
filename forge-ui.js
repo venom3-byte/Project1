@@ -43,8 +43,19 @@ const loadForgeVision=async()=>{
   forgeVisionPromise=import("./live-vision.js").then(()=>window.AssetForgeLiveVision);
   return forgeVisionPromise;
 };
-const forgeVisionProxy=new Proxy({},{
-  get(_target,prop){
+const lightweightVision={
+  visualHealth(){
+    const canvas=document.getElementById("viewport"),root=document.documentElement;
+    const rect=canvas?.getBoundingClientRect?.()||{width:0,height:0};
+    const viewport={width:rect.width||0,height:rect.height||0};
+    const overflow=Math.max(0,(root.scrollWidth||0)-(root.clientWidth||0));
+    return{ok:viewport.width>300&&viewport.height>300&&overflow<=1,viewport,overflow,mode:"lightweight"};
+  },
+  status(){return{running:false,connected:false,standalone:location.protocol==="file:"||/github\\.io$/i.test(location.hostname),lazy:true};}
+};
+const forgeVisionProxy=new Proxy(lightweightVision,{
+  get(target,prop){
+    if(prop in target)return target[prop];
     return async(...args)=>{
       const api=await loadForgeVision();
       const fn=api?.[prop];
@@ -53,8 +64,7 @@ const forgeVisionProxy=new Proxy({},{
     };
   }
 });
-window.AssetForgeLiveVision=forgeVisionProxy;
-const write=(s,type="info")=>{out.textContent+="["+new Date().toLocaleTimeString()+"] "+s+"\n";out.scrollTop=out.scrollHeight;if(type==="error")console.error(s)};
+window.AssetForgeLiveVision=forgeVisionProxy;const write=(s,type="info")=>{out.textContent+="["+new Date().toLocaleTimeString()+"] "+s+"\n";out.scrollTop=out.scrollHeight;if(type==="error")console.error(s)};
 const toast=s=>{const e=document.createElement("div");e.textContent=s;Object.assign(e.style,{position:"fixed",bottom:"18px",left:"50%",transform:"translateX(-50%)",background:"#0b1d31",border:"1px solid #31506f",padding:"10px 14px",borderRadius:"10px",zIndex:99,maxWidth:"92vw",boxShadow:"0 8px 30px #0008"});document.body.appendChild(e);setTimeout(()=>e.remove(),1900)};
 import{ForgeEngine}from"./forge-engine.js";
 const engine=new ForgeEngine($("viewport"),write);
