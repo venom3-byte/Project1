@@ -1,6 +1,8 @@
 name: Forge Android Device Proof
 
 on:
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -68,11 +70,20 @@ jobs:
             adb shell am force-stop com.venom3byte.forgegame
             adb shell monkey -p com.venom3byte.forgegame 1
             sleep 8
-            adb shell pidof com.venom3byte.forgegame
+            adb shell pidof com.venom3byte.forgegame > forge-android-pid.txt
+            test -s forge-android-pid.txt
+            adb shell dumpsys window | grep -E "mCurrentFocus|mFocusedApp" | grep -F "com.venom3byte.forgegame"
             adb exec-out screencap -p > forge-android-screen.png
+            test -s forge-android-screen.png
+            stat -c "%n %s bytes" forge-android-screen.png
+            adb logcat -d -t 2000 > forge-android-logcat.txt
+            ! grep -E "FATAL EXCEPTION|AndroidRuntime.*: FATAL" forge-android-logcat.txt || (cat forge-android-logcat.txt && exit 1)
 
       - name: Upload device screenshot
         uses: actions/upload-artifact@v4
         with:
           name: forge-android-device-proof
-          path: forge-android-screen.png
+          path: |
+            forge-android-screen.png
+            forge-android-pid.txt
+            forge-android-logcat.txt
