@@ -62,9 +62,10 @@ $("boundsToggle")?.addEventListener("change",e=>{if(window.ForgeSpatial)window.F
 $("visionRefresh")?.addEventListener("click",()=>{$("visionReport").textContent=JSON.stringify(window.ForgeSpatial?.sceneVision?.()||{},null,2)});
 $("visionCenter")?.addEventListener("click",()=>{engine.frame();$("visionReport").textContent=JSON.stringify(window.ForgeSpatial?.sceneVision?.()||{},null,2)});
 $("visionMove")?.addEventListener("click",()=>{const r=engine.selected(),rect=$("viewport").getBoundingClientRect();if(!r||!window.ForgeSpatial)return;window.ForgeSpatial.moveToScreen(r.id,rect.left+rect.width/2,rect.top+rect.height/2,.5,0);refresh();inspect()});
-$("visionOpen")?.addEventListener("click",()=>{if(!window.ForgeSpatial)return;$("#visionReport").textContent=JSON.stringify(window.ForgeSpatial.sceneVision(),null,2);$("#visionDialog").showModal()});
+$("visionOpen")?.addEventListener("click",()=>{if(!window.ForgeSpatial)return;$("visionReport").textContent=JSON.stringify(window.ForgeSpatial.sceneVision(),null,2);$("#visionDialog").showModal()});
 $("visionSelect")?.addEventListener("click",()=>toast("Tap an object in the viewport to select it"));
-$("standaloneMode").textContent=location.protocol==="file:"?"Local file":(/github\\.io$/i.test(location.hostname)?"Standalone PWA":"Server + WebSocket");
+$("standaloneMode").textContent=location.protocol==="file:"?"Local file":(/github\.io$/i.test(location.hostname)?"Standalone PWA":"Server + WebSocket");
 engine.canvas.addEventListener("pointerdown",()=>{setTimeout(()=>{refresh();inspect()},0)});
 window.addEventListener("forge-selection",()=>{refresh();inspect()});
+window.ForgeVision={scan:()=>window.ForgeSpatial?.sceneVision?.()||{},inspect:id=>{const r=engine.entities.get(id);return r?window.ForgeSpatial?.inspect?.(r):null},selectAt:(x,y)=>engine.pick({clientX:x,clientY:y})};
 function stats(){const d=engine.diagnostics();$("renderer").textContent=d.renderer;$("fps").textContent=d.fps;$("physics").textContent=d.physics;requestAnimationFrame(stats)}stats();refresh();inspect();write("Forge Studio 3.0 ready");
