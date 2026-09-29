@@ -152,7 +152,7 @@ const ForgeGameplay = {
       new ForgeAI.BTAction(bb=>{bb.state="idle";return true})
     ]);
     ForgeAI.trees.register(id,seq);return id
-  }
+  },
   aiChase(a,dt){
     const player=[...this.characters.values()][0];if(!player||!a.controller)return false;
     const p=player.entity.getPosition(),e=a.entity.getPosition(),dx=p.x-e.x,dz=p.z-e.z,dist=Math.hypot(dx,dz)||1;
@@ -162,7 +162,7 @@ const ForgeGameplay = {
     a.body.setNextKinematicTranslation({x:t.x+move.x,y:t.y+move.y,z:t.z+move.z});
     a.entity.setEulerAngles(0,Math.atan2(dx,dz)*180/Math.PI,0);
     return "running"
-  }
+  },
   updateEnemy(a,dt){
     const player=[...this.characters.values()][0];if(!player||!a.body||!a.collider||!a.controller)return;
     const p=player.entity.getPosition(),e=a.entity.getPosition(),dx=p.x-e.x,dz=p.z-e.z,dist=Math.hypot(dx,dz);if(!a.btId&&window.ForgeAI)a.btId=this.setupEnemyBehavior(a);if(a.btId&&window.ForgeAI){ForgeAI.trees.set(a.btId,"distance",dist);ForgeAI.trees.tick(a.btId,dt);a.state=ForgeAI.trees.trees.get(a.btId)?.blackboard.state||a.state;a.damageCooldown=Math.max(0,a.damageCooldown-dt);return;}
