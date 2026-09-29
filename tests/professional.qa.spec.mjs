@@ -171,6 +171,7 @@ test.describe("Forge professional acceptance",()=>{
     test.setTimeout(120000);
     const glb=await download(page,FOX);
     expect(glb.length).toBeGreaterThan(100000);
+    const originalSha=await sha(new Blob([glb]));
     await waitForForge(page);
     const result=await page.evaluate(async(bytes)=>{
       const file=new File([bytes],"Fox.glb",{type:"model/gltf-binary"});
@@ -191,6 +192,7 @@ test.describe("Forge professional acceptance",()=>{
         sourceBytes:file.size,
         exportedBytes:source.blob.size,
         sourceSha:await window.ForgeExport.sha256(source.blob),
+        originalSha,
         spatial,
         derived:scene.validation,
         round:{name:round.record.name,spatial:roundSpatial}
@@ -201,6 +203,8 @@ test.describe("Forge professional acceptance",()=>{
     expect(result.playing).toBeTruthy();
     expect(result.check.ok).toBeTruthy();
     expect(result.exportedBytes).toBe(result.sourceBytes);
+    expect(result.sourceSha).toBe(result.originalSha);
+    expect(result.clips).toEqual(expect.arrayContaining(["Survey","Walk","Run"]));
     expect(result.spatial.geometry.animations).toBeGreaterThanOrEqual(3);
     expect(result.spatial.geometry.vertices).toBeGreaterThan(0);
     expect(result.spatial.geometry.triangles).toBeGreaterThan(0);
@@ -214,20 +218,23 @@ test.describe("Forge professional acceptance",()=>{
   test("real textured ToyCar GLB preserves geometry/material data through derived export",async({page})=>{
     test.setTimeout(120000);
     const glb=await download(page,TOYCAR);
-    expect(glb.length).toBeGreaterThan(1000000);
+    expect(glb.length).toBeGreaterThan(5000000);
+    const originalSha=await sha(new Blob([glb]));
     await waitForForge(page);
     const result=await page.evaluate(async(bytes)=>{
       const file=new File([bytes],"ToyCar.glb",{type:"model/gltf-binary"});
       const imported=await window.Forge.importFile(file);
       const before=window.ForgeSpatial.inspect(imported.record);
       const qa=await window.ForgeExport.runExportQA();
+      const source=await window.ForgeExport.exportSource({download:false});
       const derived=await window.ForgeExport.exportSceneGLB({download:false,name:"ToyCar-derived.glb"});
       const derivedFile=new File([derived.blob],"ToyCar-derived.glb",{type:"model/gltf-binary"});
       const round=await window.Forge.importFile(derivedFile);
       const after=window.ForgeSpatial.inspect(round.record);
-      return{before,qa,derived:derived.validation,after};
+      return{before,qa,sourceSha:await window.ForgeExport.sha256(source.blob),derived:derived.validation,after};
     },glb);
     expect(result.qa.ok).toBeTruthy();
+    expect(result.sourceSha).toBe(originalSha);
     expect(result.before.geometry.vertices).toBeGreaterThan(0);
     expect(result.before.geometry.triangles).toBeGreaterThan(0);
     expect(result.before.geometry.materials).toBeGreaterThan(0);
