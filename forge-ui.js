@@ -1,8 +1,7 @@
-import{ForgeEngine}from"./forge-engine.js";
 const $=id=>document.getElementById(id),out=$("log");
 const write=(s,type="info")=>{out.textContent+="["+new Date().toLocaleTimeString()+"] "+s+"\n";out.scrollTop=out.scrollHeight;if(type==="error")console.error(s)};
 const toast=s=>{const e=document.createElement("div");e.textContent=s;Object.assign(e.style,{position:"fixed",bottom:"18px",left:"50%",transform:"translateX(-50%)",background:"#0b1d31",border:"1px solid #31506f",padding:"10px 14px",borderRadius:"10px",zIndex:99,maxWidth:"92vw"});document.body.appendChild(e);setTimeout(()=>e.remove(),1700)};
-const engine=new ForgeEngine($("viewport"),write);await engine.init();window.Forge=engine;window.dispatchEvent(new Event("forge-ready"));
+const engine=window.Forge;if(!engine)throw new Error("Forge bootstrap did not initialize the engine");
 
 function refresh(){
   const tree=$("tree");tree.innerHTML="";
