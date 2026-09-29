@@ -8,11 +8,23 @@ export class ForgeEngine{
     const graphicsDeviceOptions={antialias:true,alpha:false,powerPreference:"high-performance",preserveDrawingBuffer:true};
     if(android&&pc.DEVICETYPE_WEBGL2)graphicsDeviceOptions.deviceTypes=[pc.DEVICETYPE_WEBGL2];
     this.app=new pc.Application(this.canvas,{graphicsDeviceOptions});
-    this.app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);this.app.setCanvasResolution(pc.RESOLUTION_AUTO);this.app.scene.gammaCorrection=pc.GAMMA_SRGB;this.app.scene.toneMapping=pc.TONEMAP_ACES;this.app.start();
+    const editorCanvas=this.canvas?.id==="viewport";
+    this.app.setCanvasFillMode(editorCanvas?pc.FILLMODE_NONE:pc.FILLMODE_FILL_WINDOW);
+    this.app.setCanvasResolution(pc.RESOLUTION_AUTO);
+    this.app.scene.gammaCorrection=pc.GAMMA_SRGB;this.app.scene.toneMapping=pc.TONEMAP_ACES;this.app.start();
+    const resize=()=>{
+      if(editorCanvas){
+        const host=this.canvas.parentElement,r=host?.getBoundingClientRect?.();
+        if(r?.width&&r?.height){this.canvas.style.width=Math.round(r.width)+"px";this.canvas.style.height=Math.round(r.height)+"px";}
+      }
+      this.app.resizeCanvas();
+    };
+    if(editorCanvas&&window.ResizeObserver){this.resizeObserver=new ResizeObserver(resize);if(this.canvas.parentElement)this.resizeObserver.observe(this.canvas.parentElement);}
+    resize();
     this.root=new pc.Entity("ForgeScene");this.app.root.addChild(this.root);
     await RAPIER.init();this.rapier=RAPIER;this.world=new RAPIER.World({x:0,y:-9.81,z:0});this.eventQueue=new RAPIER.EventQueue(true);
     this.createCamera("Main Camera",{x:7,y:5,z:9});this.createLight("Sun");this.createPlane("Ground",30,30);
-    this.app.on("update",dt=>this.update(dt));this.canvas.addEventListener("pointerdown",e=>this.pick(e));window.addEventListener("resize",()=>this.app.resizeCanvas());this.app.resizeCanvas();this.log("Forge Engine 2.0 online");return this;
+    this.app.on("update",dt=>this.update(dt));this.canvas.addEventListener("pointerdown",e=>this.pick(e));window.addEventListener("resize",()=>resize());this.log("Forge Engine 2.0 online");return this;
   }
   rec(name,kind,e){const id=crypto.randomUUID();e.__forge={id,kind,name,components:{}};const r={id,kind,name,entity:e,components:e.__forge.components};this.entities.set(id,r);return r}
   add(kind,name){const e=new pc.Entity(name);this.root.addChild(e);return this.rec(name,kind,e)}
