@@ -84,3 +84,59 @@ test("Forge HTTP command endpoint accepts structured engine commands",async({req
   expect(result.ok).toBeTruthy();
   expect(result.queued).toBeTruthy();
 });
+
+
+test("third-person gameplay template creates real controller and AI runtime state",async({page})=>{
+  await page.goto("/");
+  const result=await page.evaluate(()=>window.ForgeGameplay.createThirdPersonTemplate());
+  expect(result.type).toBe("third-person");
+  const state=await page.evaluate(()=>window.ForgeGameplay.status());
+  expect(state.characters.length).toBe(1);
+  expect(state.agents.length).toBe(3);
+  const d=await page.evaluate(()=>window.Forge.diagnostics());
+  expect(d.physics).toBeGreaterThan(1);
+  expect(d.renderables).toBeGreaterThan(5);
+});
+
+test("racing template creates vehicle controller with four wheels",async({page})=>{
+  await page.goto("/");
+  const result=await page.evaluate(()=>window.ForgeGameplay.createRacingTemplate());
+  expect(result.type).toBe("racing");
+  const state=await page.evaluate(()=>window.ForgeGameplay.status());
+  expect(state.vehicles.length).toBe(1);
+  expect(state.vehicles[0].wheels).toBe(4);
+});
+
+test("2D platformer template creates orthographic gameplay scene",async({page})=>{
+  await page.goto("/");
+  const result=await page.evaluate(()=>window.Forge2D.createPlatformerTemplate());
+  expect(result.player).toBeTruthy();
+  const state=await page.evaluate(()=>window.Forge2D.status());
+  expect(state.platformer.player).toBeTruthy();
+  const camera=await page.evaluate(()=>window.Forge.entities.get(state.platformer.camera)?.kind);
+  expect(camera).toBe("camera");
+});
+
+test("complete project graph preserves gameplay configuration",async({page})=>{
+  await page.goto("/");
+  await page.evaluate(()=>window.ForgeGameplay.createThirdPersonTemplate());
+  const json=await page.evaluate(()=>JSON.stringify(window.ForgeProject.serialize()));
+  const project=JSON.parse(json);
+  expect(project.format).toBe("forge-project");
+  expect(project.version).toBe(4);
+  expect(project.gameplay.type).toBe("third-person");
+  expect(project.runtime).toHaveProperty("audio");
+  expect(project.production).toHaveProperty("graph");
+});
+
+test("VFX, render profiles and runtime services are callable",async({page})=>{
+  await page.goto("/");
+  const result=await page.evaluate(()=>{
+    window.ForgeRender.apply("cinematic");
+    const v=window.ForgeVFX.spawn("burst",{x:0,y:1,z:0});
+    return {quality:window.ForgeRender.quality(),vfx:window.ForgeVFX.status(),runtime:window.ForgeRuntime.snapshot(),tag:v?.name||null};
+  });
+  expect(result.quality.profile).toBe("cinematic");
+  expect(result.vfx.presets).toContain("explosion");
+  expect(result.runtime).toHaveProperty("input");
+});
