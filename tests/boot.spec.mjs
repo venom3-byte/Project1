@@ -6,8 +6,9 @@ async function waitForBoot(page,testInfo){
   page.on("console",m=>m.type()==="error"&&errors.push(m.text()));
   const t0=Date.now();
   await page.goto("/",{waitUntil:"domcontentloaded"});
-  await page.waitForFunction(()=>window.ForgeBoot?.ok===true,{timeout:30000});
+  await page.waitForFunction(()=>window.ForgeBoot?.ok===true||window.ForgeBoot?.phase==="error",{timeout:30000});
   const boot=await page.evaluate(()=>window.ForgeBoot);
+  if(!boot?.ok)throw new Error("Forge boot failed: "+JSON.stringify({phase:boot?.phase,error:boot?.error,totalMs:boot?.totalMs,timings:boot?.timings}));
   testInfo.annotations.push({type:"boot-ms",description:String(boot.totalMs)});
   testInfo.annotations.push({type:"core-ready-ms",description:String(boot.coreReadyMs)});
   expect(boot.ok).toBe(true);
