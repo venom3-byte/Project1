@@ -25,7 +25,6 @@ const ForgeAnimation={
   },
   validateRig(id){const r=this.rigs.get(id);if(!r)return null;return{coverage:r.coverage,valid:r.coverage>=.7,missing:["pelvis","spine","head","leftHand","rightHand","leftFoot","rightFoot"].filter(k=>!r.humanoid[k])}},
   serialize(){return{graphs:[...this.graphs.values()],rigs:[...this.rigs.values()]}}
-  ,
   load(data){this.graphs=new Map((data?.graphs||[]).map(g=>[g.id,g]));this.rigs=new Map((data?.rigs||[]).map(r=>[r.id,r]))}
 };
 window.ForgeAnimation=ForgeAnimation;
