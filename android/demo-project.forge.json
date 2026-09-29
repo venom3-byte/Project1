@@ -1,0 +1,254 @@
+{
+  "format": "forge-project",
+  "version": 4,
+  "meta": {
+    "name": "Forge Android Starter",
+    "engine": "Forge Studio 2.0",
+    "androidExport": true
+  },
+  "scene": {
+    "format": "forge-scene",
+    "version": 2,
+    "meta": {
+      "engine": "Forge Studio 2.0"
+    },
+    "entities": [
+      {
+        "id": "camera-main",
+        "name": "Main Camera",
+        "kind": "camera",
+        "transform": {
+          "p": [
+            0,
+            4.2,
+            8
+          ],
+          "r": [
+            -15,
+            0,
+            0
+          ],
+          "s": [
+            1,
+            1,
+            1
+          ]
+        },
+        "components": {
+          "camera": {
+            "active": true
+          }
+        }
+      },
+      {
+        "id": "sun-main",
+        "name": "Sun",
+        "kind": "light",
+        "transform": {
+          "p": [
+            0,
+            6,
+            0
+          ],
+          "r": [
+            48,
+            -32,
+            0
+          ],
+          "s": [
+            1,
+            1,
+            1
+          ]
+        },
+        "components": {
+          "light": {
+            "type": "directional"
+          }
+        }
+      },
+      {
+        "id": "ground-main",
+        "name": "Ground",
+        "kind": "plane",
+        "transform": {
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": [
+            0,
+            0,
+            0
+          ],
+          "s": [
+            24,
+            1,
+            24
+          ]
+        },
+        "components": {
+          "physics": {
+            "mode": "fixed",
+            "shape": "box"
+          }
+        }
+      },
+      {
+        "id": "player-main",
+        "name": "Hero",
+        "kind": "capsule",
+        "transform": {
+          "p": [
+            0,
+            1.2,
+            0
+          ],
+          "r": [
+            0,
+            0,
+            0
+          ],
+          "s": [
+            0.55,
+            1,
+            0.55
+          ]
+        },
+        "components": {
+          "physics": {
+            "mode": "kinematic",
+            "shape": "capsule"
+          },
+          "gameplay": {
+            "role": "player"
+          }
+        }
+      },
+      {
+        "id": "enemy-main",
+        "name": "Enemy",
+        "kind": "box",
+        "transform": {
+          "p": [
+            5,
+            1.1,
+            2
+          ],
+          "r": [
+            0,
+            0,
+            0
+          ],
+          "s": [
+            0.8,
+            1.1,
+            0.8
+          ]
+        },
+        "components": {
+          "physics": {
+            "mode": "kinematic",
+            "shape": "box"
+          },
+          "gameplay": {
+            "role": "enemy"
+          }
+        }
+      },
+      {
+        "id": "cover-a",
+        "name": "Cover A",
+        "kind": "box",
+        "transform": {
+          "p": [
+            -2,
+            0.8,
+            -1
+          ],
+          "r": [
+            0,
+            0,
+            0
+          ],
+          "s": [
+            1.2,
+            1.6,
+            1.2
+          ]
+        },
+        "components": {
+          "physics": {
+            "mode": "fixed",
+            "shape": "box"
+          },
+          "navObstacle": true
+        }
+      },
+      {
+        "id": "cover-b",
+        "name": "Cover B",
+        "kind": "box",
+        "transform": {
+          "p": [
+            3,
+            0.8,
+            -4
+          ],
+          "r": [
+            0,
+            0,
+            0
+          ],
+          "s": [
+            1.2,
+            1.6,
+            1.2
+          ]
+        },
+        "components": {
+          "physics": {
+            "mode": "fixed",
+            "shape": "box"
+          },
+          "navObstacle": true
+        }
+      }
+    ]
+  },
+  "production": {
+    "assets": [],
+    "graph": null,
+    "world": null,
+    "profiler": null
+  },
+  "runtime": {
+    "input": null,
+    "prefabs": [],
+    "slots": [],
+    "audio": null,
+    "assetRoot": "./"
+  },
+  "gameplay": {
+    "type": "third-person",
+    "player": "player-main",
+    "enemies": [
+      "enemy-main"
+    ]
+  },
+  "session": null,
+  "gameplayData": null,
+  "twoD": null,
+  "rendering": null,
+  "cinematics": null,
+  "ui": null,
+  "vfx": null,
+  "terrain": null,
+  "shader": null,
+  "animation": null,
+  "network": null,
+  "replay": null,
+  "vision": null,
+  "poseSearch": null
+}
