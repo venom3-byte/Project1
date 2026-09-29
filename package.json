@@ -1,16 +1,13 @@
 {
-  "name": "asset-forge-studio",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "test": "playwright test",
-    "start": "node server.mjs",
-    "dev": "node server.mjs"
+  "name":"asset-forge-studio",
+  "private":true,
+  "type":"module",
+  "scripts":{
+    "start":"node server.mjs",
+    "dev":"node server.mjs",
+    "test":"playwright test",
+    "test:forge":"playwright test tests/smoke.spec.mjs"
   },
-  "devDependencies": {
-    "@playwright/test": "^1.55.0"
-  },
-  "dependencies": {
-    "ws": "^8.18.3"
-  }
+  "devDependencies":{"@playwright/test":"^1.55.0"},
+  "dependencies":{"ws":"^8.18.3"}
 }
