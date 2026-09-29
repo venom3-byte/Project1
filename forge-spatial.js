@@ -38,10 +38,22 @@ class SpatialCore{
           for(const c of cornersFromAabb(mesh.aabb))expand(out,nodeMatrix.transformPoint(c));
         }
         if(mesh){
-          const pos=mesh.getPositions?.();if(pos)vertices+=Math.floor(pos.length/3);
-          const indices=mesh.getIndices?.();if(indices)triangles+=Math.floor(indices.length/3);else if(pos)triangles+=Math.floor(pos.length/9);
-          const f=mesh.vertexBuffer?.getFormat?.();
-          if(f?.elements){for(const e of f.elements){const sem=String(e.semantic||'');if(sem.startsWith('TEXCOORD'))uvChannels=Math.max(uvChannels,(Number(sem.replace(/\D+/g,''))||0)+1)}}
+          try{
+            const vb=mesh.vertexBuffer;
+            vertices+=Number(vb?.numVertices||vb?.getNumVertices?.()||0);
+            for(const prim of(mesh.primitive||[])){
+              if(prim?.type===pc.PRIMITIVE_TRIANGLES)triangles+=Math.floor(Number(prim.count||0)/3);
+            }
+          }catch{}
+          try{
+            const f=mesh.vertexBuffer?.getFormat?.();
+            if(f?.elements){
+              for(const e of f.elements){
+                const sem=String(e.semantic||'');
+                if(sem.startsWith('TEXCOORD'))uvChannels=Math.max(uvChannels,(Number(sem.replace(/\D+/g,''))||0)+1);
+              }
+            }
+          }catch{}
         }
         materials+=mi.material?1:0;count++;
       }
