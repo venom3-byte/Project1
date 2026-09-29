@@ -2,16 +2,22 @@ plugins {
   id "com.android.application"
 }
 
+def forgeAndroidFile = rootProject.file("forge-android.properties.json")
+def forgeAndroid = forgeAndroidFile.exists()
+  ? new groovy.json.JsonSlurper().parse(forgeAndroidFile)
+  : [:]
+
 android {
   namespace "com.venom3byte.forgegame"
-  compileSdk 37
+  compileSdk (forgeAndroid.compileSdk ?: 37)
 
   defaultConfig {
-    applicationId "com.venom3byte.forgegame"
-    minSdk 24
-    targetSdk 37
-    versionCode 1
-    versionName "0.1.0"
+    applicationId (forgeAndroid.applicationId ?: "com.venom3byte.forgegame")
+    minSdk (forgeAndroid.minSdk ?: 24)
+    targetSdk (forgeAndroid.targetSdk ?: 37)
+    versionCode (forgeAndroid.versionCode ?: 1)
+    versionName (forgeAndroid.versionName ?: "0.1.0")
+    resValue "string", "app_name", forgeAndroid.appName ?: "Forge Game"
   }
 
   compileOptions {
