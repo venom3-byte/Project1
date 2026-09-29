@@ -117,6 +117,19 @@ test("2D platformer template creates orthographic gameplay scene",async({page})=
   expect(camera).toBe("camera");
 });
 
+test("project publishing metadata survives serialization",async({page})=>{
+  await page.goto("/");
+  const result=await page.evaluate(()=>{
+    window.ForgeProject.setMeta({name:"Android Test Game",android:{applicationId:"com.example.forgeqa",appName:"Android Test Game",versionCode:7,versionName:"1.2.3"}});
+    const saved=window.ForgeProject.serialize();
+    return saved.meta;
+  });
+  expect(result.name).toBe("Android Test Game");
+  expect(result.android.applicationId).toBe("com.example.forgeqa");
+  expect(result.android.versionCode).toBe(7);
+  expect(result.android.versionName).toBe("1.2.3");
+});
+
 test("complete project graph preserves gameplay configuration",async({page})=>{
   await page.goto("/");
   await page.evaluate(()=>window.ForgeGameplay.createThirdPersonTemplate());
