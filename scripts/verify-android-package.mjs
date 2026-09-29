@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
-const root=path.resolve(new URL("..",import.meta.url).pathname);
+const root=fileURLToPath(new URL("..",import.meta.url));
 const dir=path.resolve(root,"android/app/src/main/assets/forge");
 const required=["index.html","game.js","project.forge.json"];
 const missing=[];
