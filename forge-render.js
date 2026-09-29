@@ -15,7 +15,6 @@ class ForgeRenderSystem{
       if(r.entity.camera){r.entity.camera.toneMapping=p.toneMapping;r.entity.camera.gammaCorrection=pc.GAMMA_SRGB}
       if(r.entity.light){r.entity.light.castShadows=p.shadows;r.entity.light.shadowDistance=p.shadowDistance}
     }
-    const canvas=window.Forge.canvas;if(canvas){canvas.style.width=(100*p.renderScale)+"%";canvas.style.height=(100*p.renderScale)+"%";canvas.style.margin=p.renderScale<1?"auto":""}
     return p
   }
   quality(){return{profile:this.profile,config:this.profiles[this.profile]}}
