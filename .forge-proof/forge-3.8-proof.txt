@@ -1,0 +1,1 @@
+FINAL-PROOF-MARKER 3.8: UI + gizmos + undo/redo + asset browser + local visual health + exact 2D/3D export evidence + PWA.
