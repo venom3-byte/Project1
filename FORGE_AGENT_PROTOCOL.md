@@ -64,3 +64,6 @@ The protocol is reserved for deep systems such as skeletal retargeting, material
 - vision-latest: exposes the latest external live-vision frame received by Forge Agent.
 
 These commands use PlayCanvas worldToScreen and screenToWorld mappings so the agent can reason in the same screen coordinates used by the renderer and UI.
+- batch: execute up to 32 deterministic commands and return a fresh visual report.
+- vision-loop: execute up to 24 commands with a visual report after every step and stop automatically on blank/black/overcrowded visual states.
+- pose-db-create / pose-db-add / pose-query / motion-match / pose-status: Motion Matching-style pose database and nearest-pose selection.
