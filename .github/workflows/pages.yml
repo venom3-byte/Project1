@@ -33,8 +33,8 @@ jobs:
           if-no-files-found: ignore
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Forge smoke suite
-        run: npm run test:forge
+      - name: Forge core acceptance
+        run: npm run test:core
       - name: Upload Playwright diagnostics
         if: always()
         uses: actions/upload-artifact@v4
