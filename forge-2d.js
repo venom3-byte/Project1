@@ -29,6 +29,7 @@ class Forge2DSystem{
     for(const s of this.animations.values()){if(!s.playing||s.frames.length<2)continue;s.time+=dt;const frameTime=1/s.fps;if(s.time<frameTime)continue;const steps=Math.floor(s.time/frameTime);s.time-=steps*frameTime;s.index=(s.index+steps)%s.frames.length;const tex=s.frames[s.index],m=s.entity.render?.material;if(m){m.diffuseMap=tex;m.emissiveMap=tex;m.update()}}
   }
   createPlatformerTemplate(){
+    document.body.dataset.forgeMode="play";window.dispatchEvent(new Event("forgegamemodechange"));
     for(const r of [...Forge.entities.values()]){Forge.removePhysics(r.id);r.entity.destroy();Forge.entities.delete(r.id)}
     const cam=this.createCamera("2D Camera",{width:18,height:10});
     const ground=Forge.primitive("box","Ground2D");ground.entity.setLocalPosition(0,-.5,0);ground.entity.setLocalScale(14,.5,1);Forge.setPhysics(ground.id,"fixed","box");
