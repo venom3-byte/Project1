@@ -8,6 +8,7 @@ def forgeAndroid = forgeAndroidFile.exists()
   : [:]
 
 android {
+  buildFeatures { buildConfig true }
   namespace "com.venom3byte.forgegame"
   compileSdk (forgeAndroid.compileSdk ?: 37)
 
