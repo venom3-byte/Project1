@@ -171,9 +171,9 @@
     if(state.busy){log('Agent is already running','error');return}
     state.busy=true;$('#liveVisionAgent').disabled=true;
     try{
-      const r=await fetch('./api/agent/task',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task})});
-      const data=await r.json();if(!r.ok)throw new Error(data.message||'Agent request failed');
-      log(data.output||'Agent completed','ok');if(data.turns)log('completed in '+data.turns+' turns','ok');
+      const r=await fetch('./api/forge/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command:{op:'agent-task',task}})});
+      const data=await r.json();if(!r.ok)throw new Error(data.error||'Agent bridge request failed');
+      log(data.queued?'Task sent to Forge control plane':'Agent bridge accepted task','ok');
     }catch(e){log(e?.message||String(e),'error')}finally{state.busy=false;$('#liveVisionAgent').disabled=false}
   }
   const api={open:openPanel,start,stop,runAgent,status:()=>({running:state.running,connected:state.ws?.readyState===WebSocket.OPEN,lastFrameAt:state.lastFrameAt,frames:state.frameSeq}),executeAction};
