@@ -53,7 +53,7 @@ jobs:
           cache-provider: basic
 
       - name: Lint Android app
-        run: gradle -p android lint
+        run: gradle -p android lint --continue
 
       - name: Assemble installable debug APK
         run: gradle -p android assembleDebug
