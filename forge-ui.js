@@ -37,6 +37,23 @@ const forgeAgentProxy=new Proxy({},{
   }
 });
 window.ForgeAgent=forgeAgentProxy;
+let forgeVisionPromise=null;
+const loadForgeVision=async()=>{
+  if(forgeVisionPromise)return forgeVisionPromise;
+  forgeVisionPromise=import("./live-vision.js").then(()=>window.AssetForgeLiveVision);
+  return forgeVisionPromise;
+};
+const forgeVisionProxy=new Proxy({},{
+  get(_target,prop){
+    return async(...args)=>{
+      const api=await loadForgeVision();
+      const fn=api?.[prop];
+      if(typeof fn!=="function")throw new Error("Forge vision API method unavailable: "+String(prop));
+      return fn(...args);
+    };
+  }
+});
+window.AssetForgeLiveVision=forgeVisionProxy;
 const write=(s,type="info")=>{out.textContent+="["+new Date().toLocaleTimeString()+"] "+s+"\n";out.scrollTop=out.scrollHeight;if(type==="error")console.error(s)};
 const toast=s=>{const e=document.createElement("div");e.textContent=s;Object.assign(e.style,{position:"fixed",bottom:"18px",left:"50%",transform:"translateX(-50%)",background:"#0b1d31",border:"1px solid #31506f",padding:"10px 14px",borderRadius:"10px",zIndex:99,maxWidth:"92vw",boxShadow:"0 8px 30px #0008"});document.body.appendChild(e);setTimeout(()=>e.remove(),1900)};
 import{ForgeEngine}from"./forge-engine.js";
@@ -45,7 +62,7 @@ try{bootMessage("Starting renderer and physics…");await engine.init();window.F
   "./forge-production.js","./forge-project.js","./forge-render.js","./forge-ui-system.js","./forge-vfx.js",
   "./forge-2d.js","./forge-ai.js","./forge-gameplay-data.js","./forge-network.js","./forge-replay.js",
   "./forge-session.js","./forge-shader.js","./forge-terrain.js","./forge-qa.js","./forge-animation.js",
-  "./forge-runtime.js","./forge-gameplay.js","./live-vision.js"
+  "./forge-runtime.js"
 ]){
   bootMessage("Loading "+module+"…");
   const started=performance.now();
