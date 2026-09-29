@@ -154,3 +154,82 @@ test("in-engine visual QA can audit and baseline the rendered scene",async({page
   expect(diff.ok).toBeTruthy();
   expect(diff.meanSampleDelta).toBeLessThan(.05);
 });
+
+
+test("terrain generation produces a renderable world surface and physics collider",async({page})=>{
+  await page.goto("/");
+  const result=await page.evaluate(()=>window.ForgeTerrain.generate("CI Terrain",{size:24,subdivisions:24,seed:22,height:4}));
+  expect(result.components.terrain.subdivisions).toBe(24);
+  const state=await page.evaluate(()=>window.ForgeTerrain.status());
+  expect(state.terrains.length).toBe(1);
+  const d=await page.evaluate(()=>window.Forge.diagnostics());
+  expect(d.physics).toBeGreaterThan(1);
+});
+
+test("shader lab applies a custom material preset to a selected renderable",async({page})=>{
+  await page.goto("/");
+  await page.click('[data-add="box"]');
+  const ok=await page.evaluate(()=>window.ForgeShaders.applyPreset("energy"));
+  expect(ok).toBeTruthy();
+  const selected=await page.evaluate(()=>window.Forge.selected().components.shader?.preset);
+  expect(selected).toBe("energy");
+});
+
+test("data-driven gameplay supports tags attributes abilities inventory and quests",async({page})=>{
+  await page.goto("/");
+  const result=await page.evaluate(()=>{
+    const a=window.ForgeData.actor("ci-player");
+    a.tags.add("Character.Player","Team.Blue");
+    a.attributes.define("Power",10,0,100);
+    a.addAbility("Heal",{cooldown:1,effects:[{id:"heal",duration:0,modifiers:{Health:{op:"add",value:10}}}]});
+    a.grantItem("Potion",2);
+    window.ForgeData.quests.define("q",{title:"Test",objectives:[{id:"kill",target:2}]});
+    window.ForgeData.quests.progress("q","kill",1);
+    return {tags:a.tags.all(),power:a.attributes.get("Power"),inventory:Object.fromEntries(a.inventory),quest:window.ForgeData.quests.status("q")};
+  });
+  expect(result.tags).toContain("Character.Player");
+  expect(result.power).toBe(10);
+  expect(result.inventory.Potion).toBe(2);
+  expect(result.quest[0].objectives[0].current).toBe(1);
+});
+
+test("replay records and restores deterministic input frames",async({page})=>{
+  await page.goto("/");
+  const state=await page.evaluate(async()=>{
+    window.ForgeReplay.startRecord();
+    window.ForgeRuntime.input.down.add("moveForward");
+    for(let i=0;i<12;i++)window.ForgeReplay.recordStep(1/60);
+    window.ForgeRuntime.input.down.delete("moveForward");
+    const data=window.ForgeReplay.stopRecord();
+    window.ForgeReplay.play(data);
+    return window.ForgeReplay.status();
+  });
+  expect(state.frames).toBe(12);
+  expect(state.playing).toBeTruthy();
+});
+
+test("multiplayer WebSocket room relay accepts a client connection",async({page})=>{
+  await page.goto("/");
+  const result=await page.evaluate(()=>new Promise(resolve=>{
+    const ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/net");
+    const timer=setTimeout(()=>{try{ws.close()}catch{};resolve("timeout")},5000);
+    ws.onopen=()=>{clearTimeout(timer);ws.send(JSON.stringify({type:"hello",room:"ci",peerId:"ci-peer"}));setTimeout(()=>{ws.close();resolve("open")},100)};
+    ws.onerror=()=>{clearTimeout(timer);resolve("error")};
+  }));
+  expect(result).toBe("open");
+});
+
+test("recursive prefab capture and spawn preserve child entities",async({page})=>{
+  await page.goto("/");
+  const result=await page.evaluate(()=>{
+    const parent=window.Forge.primitive("box","PrefabRoot");
+    const child=window.Forge.primitive("sphere","PrefabChild");
+    child.entity.reparent(parent.entity);
+    const p=window.ForgeRuntime.prefabs.save("CI Prefab",parent.id);
+    const spawned=window.ForgeRuntime.prefabs.spawn("CI Prefab",{x:4,y:1,z:2});
+    return {has:p?.record?.children?.length===1,spawned:!!spawned,childCount:spawned?.entity?.children?.length||0};
+  });
+  expect(result.has).toBeTruthy();
+  expect(result.spawned).toBeTruthy();
+  expect(result.childCount).toBe(1);
+});
