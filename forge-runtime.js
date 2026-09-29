@@ -1,14 +1,15 @@
 const ForgeRuntime={};
 
 class InputSystem{
-  constructor(){this.bindings=new Map();this.down=new Set();this.listeners=new Map();this.virtualMove={x:0,z:0};this.bindDefaults();
+  constructor(){this.bindings=new Map();this.down=new Set();this.listeners=new Map();this.virtualMove={x:0,z:0};this.gamepadMove={x:0,z:0};this.bindDefaults();
     addEventListener("keydown",e=>{for(const [a,keys] of this.bindings){if(keys.includes(e.code)||keys.includes(e.key))this.down.add(a)}});
     addEventListener("keyup",e=>{for(const [a,keys] of this.bindings){if(keys.includes(e.code)||keys.includes(e.key))this.down.delete(a)}});addEventListener("blur",()=>this.down.clear());
   }
   bind(action,keys){this.bindings.set(action,[...(keys||[])]);return this}
   bindDefaults(){this.bind("moveForward",["KeyW","ArrowUp"]);this.bind("moveBack",["KeyS","ArrowDown"]);this.bind("moveLeft",["KeyA","ArrowLeft"]);this.bind("moveRight",["KeyD","ArrowRight"]);this.bind("jump",["Space"]);this.bind("fire",["Mouse0","KeyJ"]);this.bind("sprint",["ShiftLeft","ShiftRight"]);}
-  isDown(action){return this.down.has(action)}
-  moveVector(){const x=this.virtualMove.x+((this.isDown("moveRight")?1:0)-(this.isDown("moveLeft")?1:0));const z=this.virtualMove.z+((this.isDown("moveForward")?1:0)-(this.isDown("moveBack")?1:0));const l=Math.hypot(x,z);return l>1?{x:x/l,z:z/l}:{x,z}}
+  pollGamepad(){const pads=navigator.getGamepads?.()||[];const p=[...pads].find(x=>x);if(!p){this.gamepadMove={x:0,z:0};return}const ax=Number(p.axes?.[0]||0),ay=Number(p.axes?.[1]||0);this.gamepadMove={x:Math.abs(ax)>.12?ax:0,z:Math.abs(ay)>.12?-ay:0};if(p.buttons?.[0]?.pressed)this.down.add("jump");else this.down.delete("jump");if(p.buttons?.[7]?.pressed)this.down.add("fire");else this.down.delete("fire");if(p.buttons?.[10]?.pressed)this.down.add("sprint");else this.down.delete("sprint")}
+  isDown(action){this.pollGamepad();return this.down.has(action)}
+  moveVector(){this.pollGamepad();const x=this.virtualMove.x+this.gamepadMove.x+((this.down.has("moveRight")?1:0)-(this.down.has("moveLeft")?1:0));const z=this.virtualMove.z+this.gamepadMove.z+((this.down.has("moveForward")?1:0)-(this.down.has("moveBack")?1:0));const l=Math.hypot(x,z);return l>1?{x:x/l,z:z/l}:{x,z}}
   snapshot(){return Object.fromEntries([...this.bindings].map(([k])=>[k,this.isDown(k)]))}
 
   mountMobileControls(){
