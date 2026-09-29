@@ -1,5 +1,7 @@
 import{defineConfig,devices}from"@playwright/test";
 export default defineConfig({
+  fullyParallel:true,
+  workers:4,
   reporter:[["list"],["html",{outputFolder:"playwright-report",open:"never"}]],
   testDir:"./tests",
   timeout:60000,
