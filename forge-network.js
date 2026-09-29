@@ -15,7 +15,7 @@ class ForgeNetworkSystem{
     ws.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}
       if(m.type==="peer-join"){this.peers.set(m.peerId,{id:m.peerId});this.emit("peer-join",m)}
       else if(m.type==="peer-leave"){this.peers.delete(m.peerId);this.emit("peer-leave",m)}
-      else if(m.type==="state"){this.peers.set(m.peerId,{id:m.peerId,state:m.state,updatedAt:performance.now()});this.emit("state",m)}
+      else if(m.type==="state"){const prev=this.peers.get(m.peerId)||{id:m.peerId};const next={...prev,id:m.peerId,entityId:m.entityId||prev.entityId,state:m.state,updatedAt:performance.now()};this.peers.set(m.peerId,next);if(next.entityId&&m.state)this.applyPeerState(m.peerId,m.state);this.emit("state",m)}
       else if(m.type==="input"){this.emit("input",m)}
       else this.emit(m.type,m)
     };
