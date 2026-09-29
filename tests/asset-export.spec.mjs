@@ -40,6 +40,7 @@ function makeTriangleGlb(){
 
 test("2D image source survives exact export and validation",async({page})=>{
   await page.goto("/");
+  await page.waitForFunction(()=>window.ForgeReady===true,{timeout:20000});
   const result=await page.evaluate(async()=>{
     const c=document.createElement("canvas");c.width=4;c.height=4;
     const x=c.getContext("2d");x.fillStyle="#ff3366";x.fillRect(0,0,4,4);
@@ -62,6 +63,7 @@ test("2D image source survives exact export and validation",async({page})=>{
 
 test("3D GLB source survives exact export with spatial geometry stats",async({page})=>{
   await page.goto("/");
+  await page.waitForFunction(()=>window.ForgeReady===true,{timeout:20000});
   const bytes=makeTriangleGlb();
   const result=await page.evaluate(async(bytes)=>{
     const file=new File([new Uint8Array(bytes)],"qa-triangle.glb",{type:"model/gltf-binary"});
@@ -84,6 +86,7 @@ test("3D GLB source survives exact export with spatial geometry stats",async({pa
 
 test("asset manifest records professional pipeline metadata",async({page})=>{
   await page.goto("/");
+  await page.waitForFunction(()=>window.ForgeReady===true,{timeout:20000});
   const result=await page.evaluate(async()=>{
     const c=document.createElement("canvas");c.width=8;c.height=2;
     const blob=await new Promise(r=>{c.getContext("2d").fillRect(0,0,8,2);c.toBlob(r,"image/png")});
@@ -103,6 +106,7 @@ test("asset manifest records professional pipeline metadata",async({page})=>{
 
 test("edited 3D scene can be cooked to GLB and re-imported",async({page})=>{
   await page.goto("/");
+  await page.waitForFunction(()=>window.ForgeReady===true,{timeout:20000});
   await page.click('[data-add="box"]');
   const result=await page.evaluate(async()=>{
     const before=window.ForgeSpatial.inspect(window.Forge.selected());
