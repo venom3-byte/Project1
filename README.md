@@ -1,46 +1,58 @@
-# Asset Forge Studio
+# Forge Studio
 
-Professional raster-first game-asset editor and preparation pipeline.
+Forge is a browser-first game and interactive-application development environment.
 
-## Core workflow
+## What Forge is becoming
 
-- Raster PNG/JPEG/WebP/AVIF import, drag/drop, and remote URL import.
-- Real crop and transparent-pixel trimming.
-- Non-destructive image adjustments: brightness, contrast, saturation, blur.
-- Real layer stack with visibility, selection, duplicate, delete, and Z-order controls.
-- Layer naming plus game-asset pivot metadata.
-- High-quality browser background removal with the MIT ISNet General INT8 ONNX model through Transformers.js.
-- Background removal preserves the original RGB pixels and applies the AI result as an alpha matte.
-- Manual mask refinement with erase/restore brush, brush size, and softness.
-- Local persistent Asset Vault using IndexedDB.
-- GitHub Asset Vault sync using the GitHub Contents API and a fine-grained token held in memory only.
-- Sprite-sheet extraction into individual frames.
-- Multi-frame sprite packing with rows, columns, cell size, gap, padding, and FPS.
-- Automatic sprite manifest JSON export with frame geometry and timing.
-- Individual game-asset manifest JSON export containing dimensions and pivot metadata.
-- Project JSON save/open.
-- Professional mobile workflow: bottom action dock, scrollable bottom sheets, one-finger selection, two-finger pan/zoom, and pinch zoom.
-- Desktop workflow with side inspectors, canvas zoom, fit, keyboard shortcuts, and responsive panels.
-- No SVG artwork or programmatic SVG asset generation.
+Forge is no longer just an asset editor. The target is a complete development environment where a developer or an AI agent can inspect a project, import real assets, compose scenes, author gameplay, simulate physics, run visual QA, fix problems and export a runnable product.
 
-## AI cutout engine
+## Current engine foundation
 
-The production path uses `xrds/isnet-general-onnx-int8`. The model card identifies it as MIT-licensed, Transformers.js-compatible, WebGPU-capable, and a 42 MB weight-only INT8 QDQ model. The model card documents that only convolution weights are quantized while activations remain fp32, with output quality intended to match the fp32 base model. citeturn517553search1turn517553search11
+- Rendering/runtime: PlayCanvas 2.22.6 with WebGPU + WebGL2 paths.
+- Physics: Rapier 0.21.0 WebAssembly backend.
+- Scene model: entity/component data independent from editor UI.
+- Editor: viewport, hierarchy, inspector, primitives, cameras and lighting.
+- Assets: real GLB and raster import.
+- Simulation: rigid bodies, colliders, animation keyframes and executable entity scripts.
+- QA: runtime diagnostics and browser smoke tests on desktop and mobile.
+- Projects: Forge JSON scene serialization.
+- Local bridge: Node server + WebSocket foundation for live agent/browser control.
 
-The editor selects WebGPU when available and falls back to WASM, while preserving the original raster RGB and replacing only the alpha channel with the segmentation mask. The manual mask editor can refine the result afterwards.
+## Current workflow
 
-The mobile interaction model was cross-checked against browser editor workflows and current tutorial material: compact persistent actions, layer-oriented editing, and a separate mobile tool surface are used instead of squeezing a desktop sidebar onto a phone. Photopea's mobile tutorial demonstrates adjustment editing on a mobile browser, while Canva's video editor tutorial shows a layer/overlay-oriented editing workflow; the asset pipeline also follows the usual sprite-sheet/texture-atlas workflow used in game development. citeturn183734youtube29turn981227search22turn183734youtube28
+1. Launch npm run dev.
+2. Open Forge Studio in a browser.
+3. Create or import real assets.
+4. Compose the scene in the viewport.
+5. Add physics and animation.
+6. Attach gameplay scripts.
+7. Run Play/Simulation.
+8. Run Visual QA.
+9. Save the Forge project or export the current build package.
 
-## Mobile interaction model
+## Quality policy
 
-The mobile UI uses a bottom action dock and scrollable bottom sheets rather than a scaled desktop sidebar. The editor reserves one-finger touch for normal selection/manipulation and uses two fingers for pan/zoom. This follows standard mobile interaction expectations for tap, drag, swipe, and pinch/zoom, while keeping important actions available through buttons rather than custom gestures alone. citeturn690505search0turn579687search4
+A feature is not considered complete only because a button exists. New engine systems are expected to have a real runtime path, a project data representation, browser test coverage, diagnostics and mobile behavior.
 
-## QA
+## Architecture
 
-The repository contains Playwright browser tests covering boot/runtime errors, real raster import, crop, trim, filters, undo/redo, export, mobile scrolling, duplicate/layer stack behavior, real car photo processing, AI cutout execution, original-RGB preservation audit, real sprite extraction/packing, manifest generation, and the final raster QA preview.
+See FORGE_ARCHITECTURE.md.
 
-The AI tests use a real raster car image downloaded during the test run. The repository CI runs the browser suite before deployment.
+The architecture is intentionally adapter-based so the editor can evolve without locking every subsystem to one implementation. Rendering, physics, asset processing, audio, networking and AI services can be replaced or extended behind stable Forge data contracts.
 
-## Commercial note
+## Research direction
 
-The current segmentation model is MIT-licensed. Keep third-party license notices with distributed software and re-check dependency/model licenses before each release.
+The development baseline is continuously compared with current work in Unity, Unreal Engine, Blender, PlayCanvas, Babylon.js, WebGPU, glTF/USD and modern physics runtimes. The purpose is not to copy one engine, but to combine strong ideas into an agent-friendly workflow with fast iteration and built-in visual verification.
+
+## Near-term engine layers
+
+- Asset database, import processors, texture/mesh optimization, LOD and collision generation.
+- Prefabs, nested scenes and reusable gameplay modules.
+- Material/shader graph and advanced render pipeline.
+- Animation import, retargeting, IK, blend trees and ragdolls.
+- Navigation, behavior trees, gameplay graphs and input actions.
+- Spatial audio and mixer graph.
+- Multiplayer replication and network diagnostics.
+- AI scene understanding, code generation, tool execution and repair loops.
+- Deterministic builds, profiling, regression testing and performance budgets.
+- Desktop/mobile packaging and native helpers where browser capabilities require them.
