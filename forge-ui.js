@@ -106,7 +106,7 @@ const engine=new ForgeEngine($("viewport"),write);
 try{bootMessage("Starting renderer and physics…");await engine.init();window.Forge=engine;bootMessage("Loading spatial core and editor systems…");await import("./forge-spatial.js");for(const module of [
   "./forge-production.js","./forge-project.js","./forge-render.js","./forge-ui-system.js","./forge-vfx.js",
   "./forge-2d.js","./forge-ai.js","./forge-gameplay-data.js","./forge-network.js","./forge-replay.js",
-  "./forge-session.js","./forge-shader.js","./forge-terrain.js","./forge-qa.js","./forge-animation.js",
+  "./forge-session.js","./forge-shader.js","./forge-terrain.js","./forge-qa.js","./forge-animation.js","./forge-gameplay.js",
 ]){
   bootMessage("Loading "+module+"…");
   const started=performance.now();
@@ -228,7 +228,17 @@ function apply(){
   const b=$("body").value,sh=$("shape").value;if(b==="none")engine.removePhysics(r.id);else engine.setPhysics(r.id,b,sh==="none"?"box":sh);
   refresh();inspect()
 }
-document.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>{let r=b.dataset.add==="camera"?engine.createCamera("Camera "+(engine.entities.size+1),{x:6,y:4,z:8}):b.dataset.add==="light"?engine.createLight("Light "+(engine.entities.size+1)):engine.primitive(b.dataset.add,b.dataset.add+"-"+(engine.entities.size+1));engine.select(r.id);refresh();inspect()});
+const selectAndRefresh=(r)=>{
+  if(!r)return;
+  engine.select(r.id);
+  try{refresh()}catch(e){write("Selection refresh failed: "+e.message,"error")}
+  try{inspect()}catch(e){write("Selection inspect failed: "+e.message,"error")}
+  requestAnimationFrame(()=>{try{refresh();inspect()}catch(e){write("Deferred selection UI failed: "+e.message,"error")}});
+};
+document.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>{
+  const r=b.dataset.add==="camera"?engine.createCamera("Camera "+(engine.entities.size+1),{x:6,y:4,z:8}):b.dataset.add==="light"?engine.createLight("Light "+(engine.entities.size+1)):engine.primitive(b.dataset.add,b.dataset.add+"-"+(engine.entities.size+1));
+  selectAndRefresh(r);
+});
 $("apply").onclick=apply;["px","py","pz","rx","ry","rz","sx","sy","sz","name"].forEach(id=>$(id).onchange=apply);
 $("duplicate").onclick=()=>{if(engine.duplicate()){refresh();inspect()}};$("undo")?.addEventListener("click",()=>{if(engine.undo()){refresh();inspect()}});$("redo")?.addEventListener("click",()=>{if(engine.redo()){refresh();inspect()}});
 $("delete").onclick=()=>{engine.delete();refresh();inspect()};$("focus").onclick=()=>engine.focus();$("frame").onclick=()=>engine.frame();$("reset")?.addEventListener("click",()=>location.reload());
@@ -301,8 +311,9 @@ engine.canvas.addEventListener("pointerdown",()=>{
   requestAnimationFrame(()=>ensureForgeGizmo().then(g=>g?.init?.()));
   setTimeout(()=>{refresh();inspect()},0)
 });
-window.addEventListener("forge-selection",()=>{refresh();inspect()});
-window.addEventListener("forge-assets-changed",()=>{refresh();inspect()});
+window.addEventListener("forge-selection",()=>{try{refresh()}catch(e){write("Selection event refresh failed: "+e.message,"error")}try{inspect()}catch(e){write("Selection event inspect failed: "+e.message,"error")}});
+window.addEventListener("forge-assets-changed",()=>{try{refresh()}catch(e){write("Asset event refresh failed: "+e.message,"error")}try{inspect()}catch(e){write("Asset event inspect failed: "+e.message,"error")}});
+window.ForgeRefreshUI=()=>{refresh();inspect();};
 window.ForgeVision={scan:()=>window.ForgeSpatial?.sceneVision?.()||{},inspect:id=>{const r=engine.entities.get(id);return r?window.ForgeSpatial?.inspect?.(r):null},selectAt:(x,y)=>engine.pick({clientX:x,clientY:y})};
 function stats(){const d=engine.diagnostics();$("renderer").textContent=d.renderer;$("fps").textContent=d.fps;$("physics").textContent=d.physics;requestAnimationFrame(stats)}
 window.ForgeReady=true;
