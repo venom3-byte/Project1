@@ -83,7 +83,7 @@ async function exportSource(opts={}){
   if(!exact)throw new Error("Source bytes changed unexpectedly; export aborted.");
   const name=extName(info.record.components.asset.name,info.type==="model"?"glb":"png");
   if(opts.download!==false)await save(info.file,name,info.file.type);
-  return{ok:true,exact,kind:info.type,name,bytes:info.file.size,sha256:info.sha256,validation:info.validation};
+  return{ok:true,exact,kind:info.type,name,bytes:info.file.size,sha256:info.sha256,validation:info.validation,blob:info.file};
 }
 async function exportPreview(opts={}){
   const canvas=engine?.canvas;if(!canvas)throw new Error("Viewport canvas is unavailable.");
@@ -139,7 +139,7 @@ async function validateSelected(){
 async function runExportQA(){
   const info=await sourceInfo();
   const exported=await exportSource({download:false});
-  const exact=await equalBytes(info.file,exported.validation?.ok?info.file:null);
+  const exact=await equalBytes(info.file,exported.blob);
   return{ok:info.validation.ok&&exact,asset:info.record.name,type:info.type,bytes:info.file.size,sha256:info.sha256,exactSourceBytes:exact,validation:info.validation,geometry:info.spatial?.geometry||null};
 }
 window.ForgeExport={selected,sourceInfo,exportSource,exportPreview,exportManifest,validateSelected,runExportQA,sha256,equalBytes};
