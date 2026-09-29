@@ -20,6 +20,8 @@ jobs:
       - run: npm install
       - run: npx playwright install --with-deps chromium
       - run: node scripts/validate-syntax.mjs
+      - name: Run Forge boot regression suite
+        run: npm run test:boot
       - run: npm run test:forge
       - name: Upload Forge QA report
         if: ${{ !cancelled() }}
