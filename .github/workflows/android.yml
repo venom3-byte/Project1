@@ -1,5 +1,6 @@
 name: Forge Android Build
 # Release pipeline: APK + AAB
+# Latest runtime gate: 2026-09-29
 
 on:
   push:
