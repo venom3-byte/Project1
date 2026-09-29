@@ -10,6 +10,22 @@ PlayCanvas is the current runtime foundation because its engine provides WebGL2/
 
 ## Current Forge kernel
 
+### Production layers now included
+- Fixed-step physics with Rapier EventQueue and collision event bus.
+- Terrain mesh generation with heightfield collision.
+- Gameplay framework: GameMode, GameState, PlayerState.
+- Gameplay data: hierarchical Tags, Attributes, Effects, Abilities, Inventory, Quests, Data Registry.
+- Behavior Trees with blackboards and deterministic traces.
+- Character, AI, vehicle and projectile combat templates.
+- 2D orthographic/sprite/flipbook and platformer workflow.
+- PBR Material Lab plus custom Shader Lab.
+- Procedural VFX service and spatial audio buses.
+- Multiplayer room relay and input/state channel.
+- Deterministic Replay record/playback.
+- In-engine visual QA baseline/diff.
+- Recursive prefabs and unified project graph.
+
+
 - PlayCanvas 2.22.6 runtime with WebGPU/WebGL2.
 - Rapier 0.21 physics backend.
 - Entity/component scene model.
@@ -142,6 +158,20 @@ Preferred agent loop:
 7. save/build.
 
 This architecture is specifically intended to let an AI operate Forge with the same precision as a human technical artist/programmer, while retaining deterministic project data and test gates.
+
+## Final production target
+
+Forge is explicitly optimized for an agent-operated workflow:
+- stable engine-state commands instead of UI-only macros;
+- deterministic project data;
+- real asset cooking;
+- gameplay/runtime templates;
+- visual proof after changes;
+- replayable regression scenarios;
+- desktop/mobile QA;
+- Web build packaging from the same project graph.
+
+The remaining research roadmap is intentionally focused on deep production systems rather than superficial UI breadth: skeletal animation/retargeting, advanced shader graph and post-processing, terrain/foliage streaming/HLOD, GPU VFX, cinematic sequencing, native packaging, and deeper networking/prediction.
 
 ## Quality gates
 
