@@ -25,7 +25,7 @@ function makeTriangleGlb(){
   });
   const pad=n=>(n+3)&~3;
   const jb=Buffer.from(json);
-  const jp=Buffer.alloc(pad(jb.length));jb.copy(jp);
+  const jp=Buffer.alloc(pad(jb.length),0x20);jb.copy(jp);
   const bp=Buffer.alloc(pad(bin.length));bin.copy(bp);
   const total=12+8+jp.length+8+bp.length;
   const out=Buffer.alloc(total);
