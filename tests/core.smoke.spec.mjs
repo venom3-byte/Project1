@@ -73,3 +73,17 @@ test("core project format is v5 and standalone metadata survives",async({page})=
   expect(project.meta.units).toBe("meters");
   expect(project.meta.coordinateSystem).toContain("+Y up");
 });
+
+test("native transform gizmo layer is available and mode switches are deterministic",async({page})=>{
+  await page.goto("/");
+  await page.waitForFunction(()=>window.ForgeGizmo?.state?.ready===true,{timeout:5000});
+  const result=await page.evaluate(()=>{
+    window.ForgeGizmo.setMode("rotate");
+    const rotate=window.ForgeGizmo.state.mode;
+    window.ForgeGizmo.setSpace("local");
+    return{rotate,space:window.ForgeGizmo.state.space,buttons:[...document.querySelectorAll("[data-gizmo]")].map(x=>x.textContent)};
+  });
+  expect(result.rotate).toBe("rotate");
+  expect(result.space).toBe("local");
+  expect(result.buttons).toEqual(["Move","Rotate","Scale"]);
+});
