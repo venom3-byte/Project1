@@ -289,9 +289,10 @@ $("mFrame")?.addEventListener("click",()=>engine.frame());
 $("mExport")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.exportSource(),"Source export"));
 
 function smoke(){
-  const d=engine.diagnostics(),s=window.ForgeSpatial?window.ForgeSpatial.sceneVision():null,v=window.AssetForgeLiveVision?.visualHealth?.()||null;
-  const checks=[["renderer",d.renderer==="WebGPU"||d.renderer==="WebGL2"],["scene",d.entities>0],["camera",[...engine.entities.values()].some(x=>x.kind==="camera")],["ground",[...engine.entities.values()].some(x=>x.name==="Ground")],["physics",d.physics>0],["spatialCore",!!d.spatial],["renderLoop",d.fps>=0],["sceneVision",!!s]];
-  return{ok:checks.every(x=>x[1])&&(v?.ok!==false),checks,diagnostics:d,vision:s,visualHealth:v}
+  const d=engine.diagnostics(),v=window.AssetForgeLiveVision?.visualHealth?.()||null;
+  const vision={camera:!!engine.camera(),objects:[...engine.entities.values()].filter(x=>x.entity.render?.meshInstances?.length).map(x=>({id:x.id,name:x.name,kind:x.kind}))};
+  const checks=[["renderer",d.renderer==="WebGPU"||d.renderer==="WebGL2"],["scene",d.entities>0],["camera",[...engine.entities.values()].some(x=>x.kind==="camera")],["ground",[...engine.entities.values()].some(x=>x.name==="Ground")],["physics",d.physics>0],["spatialCore",!!d.spatial],["renderLoop",d.fps>=0],["sceneVision",!!vision]];
+  return{ok:checks.every(x=>x[1])&&(v?.ok!==false),checks,diagnostics:d,vision,visualHealth:v}
 }
 $("qa").onclick=()=>{$("qaReport").textContent=JSON.stringify(smoke(),null,2);$("qaDialog").showModal()};$("runQA").onclick=()=>{$("qaReport").textContent=JSON.stringify(smoke(),null,2)};
 $("script").onclick=()=>{const r=engine.selected();if(!r)return toast("Select an entity");$("scriptDialog").showModal();$("code").value=engine.scripts.get(r.id)||$("code").value};$("saveScript").onclick=()=>{const r=engine.selected();if(r){engine.attachScript(r.id,$("code").value);$("scriptDialog").close();toast("Script attached")}};
