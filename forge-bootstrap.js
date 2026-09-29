@@ -30,7 +30,6 @@ try{
   window.ForgeBoot={ok:false,error:error?.message||String(error),at:Date.now()};
   console.error("[ForgeBoot]",error);
   const log=document.querySelector("#log");
-  if(log)log.textContent+="[BOOT ERROR] "+(error?.stack||error)+"
-";
+  if(log)log.textContent+="[BOOT ERROR] "+(error?.stack||error)+"\n";
   throw error;
 }
