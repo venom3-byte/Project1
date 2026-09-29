@@ -43,6 +43,7 @@ test("desktop visual QA has a rendered scene and disciplined editor layout",asyn
 test("mobile visual QA exposes touch controls without scattered full-screen buttons",async({page})=>{
   await page.setViewportSize({width:390,height:844});
   await page.goto("/");
+  await page.screenshot({path:"test-results/forge-mobile-proof.png",fullPage:true});
   await expect(page.locator(".mobile-quickbar")).toBeVisible();
   await expect(page.locator(".mobile-quickbar button")).toHaveCount(5);
   await expect(page.locator(".viewport canvas")).toBeVisible();
