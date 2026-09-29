@@ -8,7 +8,37 @@
   function open(){mount();style();$('#liveVision').classList.add('open');connectWs()}
   function log(t,c=''){const b=$('#liveVisionLog');if(!b)return;const r=document.createElement('div');r.className='live-log-row '+c;r.textContent=new Date().toLocaleTimeString()+'  '+t;b.prepend(r);while(b.children.length>20)b.lastElementChild.remove()}
   function stateText(t,on=state.running){const s=$('#liveVisionState'),d=$('#liveVisionDot');if(s)s.textContent=t;if(d)d.classList.toggle('live-on',!!on)}
-  function connectWs(){if(!serverCapable()||typeof WebSocket==='undefined'){stateText('Standalone spatial mode',true);return}if(state.ws&&(state.ws.readyState===0||state.ws.readyState===1))return;try{const proto=location.protocol==='https:'?'wss:':'ws:',ws=new WebSocket(proto+'//'+location.host+'/live');state.ws=ws;ws.onopen=()=>{ws.send(JSON.stringify({type:'hello',role:'vision-client',protocol:3,viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio||1}}));stateText('Server bridge connected',state.running);log('WebSocket bridge connected','ok')};ws.onerror=()=>log('Server bridge unavailable — using local spatial mode','warn');ws.onclose=()=>{state.ws=null;if(state.running)stateText('Local eyes active',true)};ws.onmessage=async e=>{let m;try{m=JSON.parse(e.data)}catch{return}if(m.type!=='action')return;try{const result=await executeAction(m.action||{});ws.send(JSON.stringify({type:'action-result',id:m.id||null,ok:true,result}))}catch(err){ws.send(JSON.stringify({type:'action-result',id:m.id||null,ok:false,error:err.message||String(err))}))}}}catch(e){state.ws=null;stateText('Standalone spatial mode',true)}}
+  function connectWs(){
+    if(!serverCapable()||typeof WebSocket==='undefined'){
+      stateText('Standalone spatial mode',true); return;
+    }
+    if(state.ws&&(state.ws.readyState===0||state.ws.readyState===1))return;
+    try{
+      const proto=location.protocol==='https:'?'wss:':'ws:';
+      const ws=new WebSocket(proto+'//'+location.host+'/live');
+      state.ws=ws;
+      ws.onopen=()=>{
+        ws.send(JSON.stringify({type:'hello',role:'vision-client',protocol:3,viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio||1}}));
+        stateText('Server bridge connected',state.running);
+        log('WebSocket bridge connected','ok');
+      };
+      ws.onerror=()=>log('Server bridge unavailable — using local spatial mode','warn');
+      ws.onclose=()=>{state.ws=null;if(state.running)stateText('Local eyes active',true)};
+      ws.onmessage=async e=>{
+        let m;
+        try{m=JSON.parse(e.data)}catch{return}
+        if(m.type!=='action')return;
+        try{
+          const result=await executeAction(m.action||{});
+          ws.send(JSON.stringify({type:'action-result',id:m.id||null,ok:true,result}));
+        }catch(err){
+          ws.send(JSON.stringify({type:'action-result',id:m.id||null,ok:false,error:err.message||String(err)}));
+        }
+      };
+    }catch(e){
+      state.ws=null;stateText('Standalone spatial mode',true);
+    }
+  }
   function normalize(x,y,w,h){return{x:Math.max(0,Math.min(innerWidth-1,(Number(x)||0)*innerWidth/Math.max(1,w||innerWidth))),y:Math.max(0,Math.min(innerHeight-1,(Number(y)||0)*innerHeight/Math.max(1,h||innerHeight)))}}
   function pointer(type,x,y){const el=document.elementFromPoint(x,y)||document.body;const init={bubbles:true,cancelable:true,view:window,clientX:x,clientY:y,button:0,buttons:type==='pointerup'?0:1,pointerId:7,pointerType:'mouse',isPrimary:true};el.dispatchEvent(new PointerEvent(type,init));return{tag:el.tagName||'',id:el.id||''}}
   async function executeAction(a){const F=window.Forge,type=a.type;if(type==='vision'||type==='scene_scan')return F.spatial?.sceneVision?.()||{};if(type==='select_entity'){const r=a.id?F.select(a.id):[...F.entities.values()].find(x=>x.name.toLowerCase()===String(a.name||'').toLowerCase());if(!r)throw new Error('Entity not found');return F.spatial?.inspect?.(r)||{id:r.id,name:r.name,kind:r.kind}}if(type==='focus'){F.focus();return true}if(type==='frame'){F.frame();return true}if(type==='move_screen'){const r=F.selected();if(!r)throw new Error('No selected entity');return F.spatial?.moveToScreen?.(r.id,a.x,a.y,a.depth??.5,a.planeY??0)||false}if(type==='transform'){if(a.id)F.select(a.id);F.transform(a);return F.spatial?.inspect?.(F.selected())||null}if(type==='click'){const p=normalize(a.x,a.y,a.screenWidth,a.screenHeight);return pointer('pointerup',p.x,p.y)}if(type==='wait'){await sleep(Number(a.ms)||250);return true}throw new Error('Unsupported local action '+type)}
