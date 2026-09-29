@@ -187,4 +187,5 @@ export class ForgeEngine{
 
   diagnostics(){return{ok:true,renderer:this.app?.graphicsDevice?.isWebGPU?'WebGPU':'WebGL2',fps:Number(this.fps.toFixed(1)),frameMs:Number(this.frameMs.toFixed(2)),entities:this.entities.size,renderables:[...this.entities.values()].filter(r=>r.entity.render?.meshInstances?.length).length,physics:this.physics.size,scripts:this.scripts.size,tracks:this.keyframes.size,time:Number(this.timelineTime.toFixed(2)),unitSystem:this.unitSystem,view:this.viewMode,spatial:this.spatial?true:false}}
 }
+if(typeof window!=="undefined")window.ForgePlayCanvas=pc;
 export{pc,RAPIER};
