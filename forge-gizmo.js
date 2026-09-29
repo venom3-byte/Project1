@@ -36,9 +36,15 @@ function sync(){
 }
 function setMode(mode){
   if(!["translate","rotate","scale"].includes(mode))return false;
-  state.mode=mode;attach();sync();return true
+  state.mode=mode;
+  if(state.nativeReady)sync();
+  return true
 }
-function setSpace(space){state.space=space==="local"?"local":"world";attach();sync();return state.space}
+function setSpace(space){
+  state.space=space==="local"?"local":"world";
+  if(state.nativeReady)sync();
+  return state.space
+}
 window.ForgeGizmo={state,init:attach,setMode,setSpace,sync};
 window.addEventListener("forge-selection",()=>{if(state.nativeReady)sync()});
 window.addEventListener("forge-gizmo-config",()=>{if(state.nativeReady)sync()});
