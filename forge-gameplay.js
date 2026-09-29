@@ -137,9 +137,36 @@ const ForgeGameplay = {
     }
   },
 
+
+  setupEnemyBehavior(a){
+    if(!window.ForgeAI)return;
+    const id=a.id, seq=new ForgeAI.BTSelector([
+      new ForgeAI.BTSequence([
+        new ForgeAI.BTCondition(bb=>bb.distance<=a.attackRange),
+        new ForgeAI.BTAction(bb=>{bb.state="attack";if(a.damageCooldown<=0){const p=[...this.characters.values()][0];if(p){p.hp=Math.max(0,p.hp-a.damage);a.damageCooldown=1} }})
+      ]),
+      new ForgeAI.BTSequence([
+        new ForgeAI.BTCondition(bb=>bb.distance<=a.detectionRange),
+        new ForgeAI.BTAction((bb,dt)=>{bb.state="chase";return this.aiChase(a,dt)})
+      ]),
+      new ForgeAI.BTAction(bb=>{bb.state="idle";return true})
+    ]);
+    ForgeAI.trees.register(id,seq);return id
+  }
+  ,
+  aiChase(a,dt){
+    const player=[...this.characters.values()][0];if(!player||!a.controller)return false;
+    const p=player.entity.getPosition(),e=a.entity.getPosition(),dx=p.x-e.x,dz=p.z-e.z,dist=Math.hypot(dx,dz)||1;
+    if(dist<=a.attackRange)return true;
+    const desired={x:dx/dist*a.speed*dt,y:-2.5*dt,z:dz/dist*a.speed*dt};
+    a.controller.computeColliderMovement(a.collider,desired);const move=a.controller.computedMovement(),t=a.body.translation();
+    a.body.setNextKinematicTranslation({x:t.x+move.x,y:t.y+move.y,z:t.z+move.z});
+    a.entity.setEulerAngles(0,Math.atan2(dx,dz)*180/Math.PI,0);
+    return "running"
+  }
   updateEnemy(a,dt){
     const player=[...this.characters.values()][0];if(!player||!a.body||!a.collider||!a.controller)return;
-    const p=player.entity.getPosition(),e=a.entity.getPosition(),dx=p.x-e.x,dz=p.z-e.z,dist=Math.hypot(dx,dz);
+    const p=player.entity.getPosition(),e=a.entity.getPosition(),dx=p.x-e.x,dz=p.z-e.z,dist=Math.hypot(dx,dz);if(!a.btId&&window.ForgeAI)a.btId=this.setupEnemyBehavior(a);if(a.btId&&window.ForgeAI){ForgeAI.trees.set(a.btId,"distance",dist);ForgeAI.trees.tick(a.btId,dt);a.state=ForgeAI.trees.trees.get(a.btId)?.blackboard.state||a.state;a.damageCooldown=Math.max(0,a.damageCooldown-dt);return;}
     if(dist<=a.detectionRange&&dist>a.attackRange){a.state="chase";const l=dist||1;const desired={x:dx/l*a.speed*dt,y:-2.5*dt,z:dz/l*a.speed*dt};a.controller.computeColliderMovement(a.collider,desired);const move=a.controller.computedMovement();const t=a.body.translation();a.body.setNextKinematicTranslation({x:t.x+move.x,y:t.y+move.y,z:t.z+move.z});a.entity.setEulerAngles(0,Math.atan2(dx,dz)*180/Math.PI,0);}
     else if(dist<=a.attackRange){a.state="attack";a.damageCooldown=Math.max(0,a.damageCooldown-dt);if(a.damageCooldown===0){player.hp=Math.max(0,player.hp-a.damage);a.damageCooldown=1.0;}}
     else a.state="idle";
