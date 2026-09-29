@@ -156,7 +156,8 @@ test("Vision Core grounds the rendered scene in screen space",async({page})=>{
   expect(result.map.entities.some(x=>x.name==="Ground"&&x.bounds)).toBeTruthy();
   expect(result.frame.hasPng).toBeTruthy();
   expect(result.frame.width).toBeGreaterThan(100);
-  expect(result.report.map.entities.length).toBeGreaterThan(0);\n  expect(result.report.dom).toHaveProperty("coverage");
+  expect(result.report.map.entities.length).toBeGreaterThan(0);
+  expect(result.report.dom).toHaveProperty("coverage");
 });
 
 test("in-engine visual QA can audit and baseline the rendered scene",async({page})=>{
