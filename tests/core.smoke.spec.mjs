@@ -117,3 +117,24 @@ test("local computer-vision health reports rendered pixels and layout",async({pa
   expect(result.overflow).toBeLessThanOrEqual(1);
   expect(result.ok).toBeTruthy();
 });
+
+
+test("transform undo and redo restore exact local state",async({page})=>{
+  await page.goto("/");
+  const result=await page.evaluate(()=>{
+    const r=window.Forge.selected()||window.Forge.primitive("box","History QA");
+    window.Forge.select(r.id);
+    const before=window.Forge._transformState(r);
+    window.Forge.transform({x:4,y:2,z:-3});
+    const changed=window.Forge._transformState(r);
+    const undoOk=window.Forge.undo();
+    const undone=window.Forge._transformState(r);
+    const redoOk=window.Forge.redo();
+    const redone=window.Forge._transformState(r);
+    return{before,changed,undone,redone,undoOk,redoOk};
+  });
+  expect(result.undoOk).toBeTruthy();
+  expect(result.redoOk).toBeTruthy();
+  expect(result.undone).toEqual(result.before);
+  expect(result.redone).toEqual(result.changed);
+});
