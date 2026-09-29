@@ -21,7 +21,7 @@ export class ForgeEngine{
     this.canvas=canvas;this.log=log;this.app=null;this.root=null;this.entities=new Map();this.selectedId=null;this.assets=new Map();
     this.rapier=null;this.world=null;this.physics=new Map();this.keyframes=new Map();this.scripts=new Map();this.timelineTime=0;this.running=false;this.timelinePlaying=false;this.fps=0;this.frames=0;this.lastFPS=performance.now();this.frameMs=0;
     this.physicsAccumulator=0;this.physicsFixedDt=1/60;this.physicsMaxSubsteps=5;this.prePhysicsSystems=new Set();this.postPhysicsSystems=new Set();this.collisionListeners=new Set();this.colliderEntityMap=new Map();this.eventQueue=null;
-    this.triangleCache=new WeakMap();this.pickBudget=120000;this.unitSystem='meters';this.viewMode='perspective';this.gizmoSpace='world';this.snapEnabled=false;this.snapSize=.25
+    this.triangleCache=new WeakMap();this.pickBudget=120000;this.unitSystem='meters';this.viewMode='perspective';this.gizmoSpace='world';this.snapEnabled=false;this.snapSize=.25;this.history=[];this.redoStack=[];this.historyLimit=100;
   }
   async init(){
     this.app=new pc.Application(this.canvas,{graphicsDeviceOptions:{antialias:true,alpha:false,powerPreference:'high-performance',preserveDrawingBuffer:true}});
@@ -97,10 +97,15 @@ export class ForgeEngine{
     }
     if(best)this.select(best.id);return best
   }
-  transform(v){
-    const r=this.selected();if(!r)return null;const p=r.entity.getLocalPosition(),rot=r.entity.getLocalEulerAngles(),s=r.entity.getLocalScale(),snap=n=>this.snapEnabled?Math.round(Number(n)/this.snapSize)*this.snapSize:Number(n);
-    r.entity.setLocalPosition(Number.isFinite(v.x)?snap(v.x):p.x,Number.isFinite(v.y)?snap(v.y):p.y,Number.isFinite(v.z)?snap(v.z):p.z);r.entity.setLocalEulerAngles(Number.isFinite(v.rx)?v.rx:rot.x,Number.isFinite(v.ry)?v.ry:rot.y,Number.isFinite(v.rz)?v.rz:rot.z);r.entity.setLocalScale(Number.isFinite(v.sx)?Math.max(.0001,v.sx):s.x,Number.isFinite(v.sy)?Math.max(.0001,v.sy):s.y,Number.isFinite(v.sz)?Math.max(.0001,v.sz):s.z);return r
+  _transformState(r){if(!r)return null;const p=r.entity.getLocalPosition(),q=r.entity.getLocalEulerAngles(),s=r.entity.getLocalScale();return{p:[p.x,p.y,p.z],r:[q.x,q.y,q.z],s:[s.x,s.y,s.z]}}
+  _applyTransformState(r,state){if(!r||!state)return false;r.entity.setLocalPosition(...state.p);r.entity.setLocalEulerAngles(...state.r);r.entity.setLocalScale(...state.s);return true}
+  recordTransformHistory(id,before,after){if(!id||!before||!after)return false;if(JSON.stringify(before)===JSON.stringify(after))return false;this.history.push({type:'transform',id,before,after});if(this.history.length>this.historyLimit)this.history.shift();this.redoStack.length=0;return true}
+  transform(v,options={}){
+    const r=this.selected();if(!r)return null;const before=this._transformState(r),p=r.entity.getLocalPosition(),rot=r.entity.getLocalEulerAngles(),s=r.entity.getLocalScale(),snap=n=>this.snapEnabled?Math.round(Number(n)/this.snapSize)*this.snapSize:Number(n);
+    r.entity.setLocalPosition(Number.isFinite(v.x)?snap(v.x):p.x,Number.isFinite(v.y)?snap(v.y):p.y,Number.isFinite(v.z)?snap(v.z):p.z);r.entity.setLocalEulerAngles(Number.isFinite(v.rx)?v.rx:rot.x,Number.isFinite(v.ry)?v.ry:rot.y,Number.isFinite(v.rz)?v.rz:rot.z);r.entity.setLocalScale(Number.isFinite(v.sx)?Math.max(.0001,v.sx):s.x,Number.isFinite(v.sy)?Math.max(.0001,v.sy):s.y,Number.isFinite(v.sz)?Math.max(.0001,v.sz):s.z);if(options.history!==false)this.recordTransformHistory(r.id,before,this._transformState(r));return r
   }
+  undo(){const h=this.history.pop();if(!h)return false;const r=this.entities.get(h.id);if(!r){this.redoStack.push(h);return false}this._applyTransformState(r,h.before);this.redoStack.push(h);this.select(r.id);return true}
+  redo(){const h=this.redoStack.pop();if(!h)return false;const r=this.entities.get(h.id);if(!r){this.history.push(h);return false}this._applyTransformState(r,h.after);this.history.push(h);this.select(r.id);return true}
   setWorldPosition(id,p){const r=this.entities.get(id);if(!r)return false;r.entity.setPosition(Number(p.x)||0,Number(p.y)||0,Number(p.z)||0);return true}
   duplicate(){const r=this.selected();if(!r)return null;const e=r.entity.clone();e.name=r.name+' Copy';this.root.addChild(e);const n=this.rec(e.name,r.kind,e);n.components=JSON.parse(JSON.stringify(r.components));const p=e.getLocalPosition();e.setLocalPosition(p.x+1,p.y,p.z);if(n.components.physics)this.setPhysics(n.id,n.components.physics.mode,n.components.physics.shape);this.select(n.id);return n}
   delete(){const r=this.selected();if(!r)return;this.removePhysics(r.id);r.entity.destroy();this.entities.delete(r.id);this.selectedId=null;window.dispatchEvent(new CustomEvent('forge-selection'))}
