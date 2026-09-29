@@ -23,7 +23,7 @@ export class ForgeEngine{
       const clips=[];
       for(let i=0;i<tracks.length;i++){
         const track=tracks[i],name=track?.name||("Clip_"+i);
-        entity.anim.assignAnimation(name,track,1,true);
+        entity.anim.assignAnimation(name,track,undefined,1,true);
         clips.push(name);
       }
       entity.anim.playing=true;
