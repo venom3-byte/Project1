@@ -4,6 +4,9 @@ Forge is evolving into a browser-first, agent-native game and interactive-applic
 
 ## Current Forge production stack
 
+Forge now covers the full production loop from source asset to playable runtime and verification. It is designed around stable engine state and agent control, not editor-only UI automation.
+
+
 ### Engine
 - PlayCanvas 2.22.6 with WebGPU/WebGL2.
 - Rapier 0.21.0 for rigid-body physics.
@@ -58,4 +61,20 @@ The architecture is continuously compared with modern workflows from Unreal Engi
 See:
 - FORGE_ARCHITECTURE.md
 - FORGE_AGENT_PROTOCOL.md
+
+
+
+### Expanded runtime systems
+- Fixed-step physics + collision events.
+- Terrain generation + Rapier heightfield collision.
+- GameMode/GameState/PlayerState.
+- Gameplay Tags, Attributes, Effects, Abilities, Inventory, Quests and Data Registry.
+- Behavior Trees and blackboards.
+- Third-person, vehicle/racing and 2D platformer templates.
+- PBR Material Lab and custom Shader Lab.
+- VFX and spatial audio buses.
+- Multiplayer room relay.
+- Deterministic replay.
+- Visual regression baselines.
+- Recursive prefabs and complete project graph.
 
