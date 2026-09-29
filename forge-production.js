@@ -269,6 +269,34 @@ function openPoseSearch(){
   out().textContent=JSON.stringify(window.ForgePoseSearch.status(),null,2);
 }
 
+async function openAndroid(){
+  const d=modal("Forge Android Export",'<div class="fm-grid"><div class="fm-card"><h4>Installable Android target</h4><p>Packages the current Forge project and its real imported assets for the native Android shell.</p><div class="fm-actions"><button id="androidExport" class="primary">Export Android input</button><button id="androidStatus">Inspect project</button></div></div><div class="fm-card"><h4>Build pipeline</h4><pre class="fm-code">node scripts/export-android.mjs forge-project.json assets/
+gradle -p android assembleDebug
+
+APK:
+android/app/build/outputs/apk/debug/app-debug.apk</pre></div><div class="fm-card"><pre id="androidOut" class="fm-code"></pre></div></div>');
+  const out=d.querySelector("#androidOut");
+  const project=window.ForgeProject?.serialize?.()||null;
+  const files=["android/settings.gradle","android/build.gradle","android/gradle.properties","android/app/build.gradle","android/app/proguard-rules.pro","android/app/src/main/AndroidManifest.xml","android/app/src/main/java/com/venom3byte/forgegame/MainActivity.java","android/app/src/main/res/values/styles.xml","android/app/src/main/res/values/strings.xml"];
+  d.querySelector("#androidStatus").onclick=()=>{out.textContent=JSON.stringify({project:!!project,entities:project?.scene?.entities?.length||0,assets:window.ForgeProduction?.assets?.all?.()?.length||0,targetSdk:37},null,2)};
+  d.querySelector("#androidExport").onclick=async()=>{
+    try{
+      const ZIPMOD=window.JSZipModule||(await import("https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm"));window.JSZipModule=ZIPMOD;
+      const JSZip=ZIPMOD.default||ZIPMOD,z=new JSZip();
+      if(!project)throw new Error("No Forge project available");
+      project.runtime=project.runtime||{};project.runtime.assetRoot="./";
+      z.file("project.forge.json",JSON.stringify(project,null,2));
+      for(const p of files){const resp=await fetch("./"+p);if(!resp.ok)throw new Error("Missing Android template file: "+p);z.file(p,await resp.text())}
+      for(const [name,a] of window.Forge.assets||[])if(a?.file)z.file("assets/"+name,await a.file.arrayBuffer());
+      z.file("README.txt","Forge Android package input. Run: node scripts/export-android.mjs project.forge.json assets/ then gradle -p android assembleDebug");
+      const blob=await z.generateAsync({type:"blob",compression:"DEFLATE"});const a=document.createElement("a");a.download="forge-android-project-input.zip";a.href=URL.createObjectURL(blob);a.click();setTimeout(()=>URL.revokeObjectURL(a.href),60000);
+      out.textContent=JSON.stringify({ok:true,projectEntities:project.scene?.entities?.length||0,assets:(window.Forge.assets||[]).length,file:"forge-android-project-input.zip"},null,2);
+      toast("Android project input exported");
+    }catch(e){out.textContent="Android export failed: "+e.message}
+  };
+  out.textContent=JSON.stringify({project:!!project,targetSdk:37,ready:true},null,2);
+}
+
 async function openBuild(){
   if(!window.JSZipModule){
     try{window.JSZipModule=await import("https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm");}
@@ -368,7 +396,7 @@ function open2D(){
 }
 function addBar(){
   const bar=document.createElement("div");bar.className="forge-prod";
-  const buttons=[["Asset Lab",openAssets],["Material",openMaterial],["Shader",openShader],["Animation",openAnimation],["Anim Graph",openAnimationGraph],["Pose Search",openPoseSearch],["Sequencer",openCinematics],["Render",openRender],["VFX",openVFX],["2D",open2D],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],["Vision",()=>window.AssetForgeLiveVision?.open()],["Runtime",openRuntime],["Build Web",openBuild]];
+  const buttons=[["Asset Lab",openAssets],["Material",openMaterial],["Shader",openShader],["Animation",openAnimation],["Anim Graph",openAnimationGraph],["Pose Search",openPoseSearch],["Sequencer",openCinematics],["Render",openRender],["VFX",openVFX],["2D",open2D],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],["Vision",()=>window.AssetForgeLiveVision?.open()],["Runtime",openRuntime],["Android",openAndroid],["Build Web",openBuild]];
   buttons.forEach(([t,f])=>{const b=document.createElement("button");b.textContent=t;b.onclick=f;bar.append(b)});document.body.append(bar);
 }
 addBar();
