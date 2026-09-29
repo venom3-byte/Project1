@@ -17,13 +17,15 @@ class ForgeProjectStore{
       runtime:{
         input:P?Object.fromEntries([...R.input.bindings].map(([k,v])=>[k,v])):null,
         prefabs:R?[...R.prefabs.store.entries()]:[],
-        slots:R?.save?.list?.()||[]
+        slots:R?.save?.list?.()||[],
+        audio:R?.audio?.serialize?.()||null
       },
       gameplay:G?.serialize?.()||null,
       twoD:window.Forge2D?.status?.()||null,
       rendering:window.ForgeRender?.serialize?.()||null,
       cinematics:window.ForgeCinematics?.serialize?.()||null,
-      ui:window.ForgeUISystem?.serialize?.()||null
+      ui:window.ForgeUISystem?.serialize?.()||null,
+      vfx:window.ForgeVFX?.serialize?.()||null
     }
   }
   async normalize(data){
@@ -41,10 +43,10 @@ class ForgeProjectStore{
     await F.load(d.scene,d.runtime?.assetRoot?{assetRoot:d.runtime.assetRoot}:{});
     if(P?.graph&&d.production?.graph)P.graph.graph=d.production.graph;
     if(R?.prefabs&&Array.isArray(d.runtime?.prefabs)){R.prefabs.store=new Map(d.runtime.prefabs);R.prefabs.persist()}
-    if(R?.input&&d.runtime?.input){for(const [k,v] of Object.entries(d.runtime.input))R.input.bind(k,v)}
+    if(R?.input&&d.runtime?.input){for(const [k,v] of Object.entries(d.runtime.input))R.input.bind(k,v)}if(R?.audio?.loadState&&d.runtime?.audio)R.audio.loadState(d.runtime.audio)
     if(window.ForgeRender?.load&&d.rendering)window.ForgeRender.load(d.rendering);
     if(window.ForgeCinematics?.load&&d.cinematics)window.ForgeCinematics.load(d.cinematics);
-    if(window.ForgeUISystem?.load&&d.ui)window.ForgeUISystem.load(d.ui);if(window.ForgeGameplay?.hydrate&&d.gameplay)window.ForgeGameplay.hydrate(d.gameplay);if(d.twoD?.platformer&&window.Forge2D)window.Forge2D.platformer=d.twoD.platformer;
+    if(window.ForgeUISystem?.load&&d.ui)window.ForgeUISystem.load(d.ui);if(window.ForgeVFX?.load&&d.vfx)window.ForgeVFX.load(d.vfx);if(window.ForgeGameplay?.hydrate&&d.gameplay)window.ForgeGameplay.hydrate(d.gameplay);if(d.twoD?.platformer&&window.Forge2D)window.Forge2D.platformer=d.twoD.platformer;
     return d
   }
   download(name="forge-project.forge.json"){
