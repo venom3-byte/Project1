@@ -27,11 +27,11 @@ function updateSpatial(){
   const r=engine.selected(),box=$("spatialInfo");if(!box)return;if(!r||!window.ForgeSpatial){box.classList.add("hidden");return}
   const i=window.ForgeSpatial.inspect(r);if(!i){box.classList.add("hidden");return}
   box.classList.remove("hidden");const s=i.world.size,o=i.source.size,g=i.geometry;
-  $("srcSize").textContent=[o.x,o.y,o.z].map(v=>v.toFixed(3)).join(" × ")+" m";
-  $("worldSize").textContent=[s.x,s.y,s.z].map(v=>v.toFixed(3)).join(" × ")+" m";
+  $("sourceDim").textContent=[o.x,o.y,o.z].map(v=>v.toFixed(3)).join(" × ")+" m";
+  $("worldDim").textContent=[s.x,s.y,s.z].map(v=>v.toFixed(3)).join(" × ")+" m";
   $("worldCenter").textContent=[i.world.center.x,i.world.center.y,i.world.center.z].map(v=>v.toFixed(3)).join(", ");
-  $("geomStats").textContent=[g.vertices||0,g.triangles||0,g.uvChannels||0,g.materials||0,g.animations||0,g.lods||1].join(" · ");
-  $("collisionInfo").textContent=r.components.physics?(r.components.physics.mode+"/"+r.components.physics.shape):"none";
+  $("geoVertices").textContent=[g.vertices||0,g.triangles||0,g.uvChannels||0,g.materials||0,g.animations||0,g.lods||1].join(" · ");
+  $("geoCollision").textContent=r.components.physics?(r.components.physics.mode+"/"+r.components.physics.shape):"none";
 }
 function apply(){
   const r=engine.selected();if(!r)return;
@@ -56,12 +56,15 @@ $("script").onclick=()=>{const r=engine.selected();if(!r)return toast("Select an
 document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>$(b.dataset.close).close());$("clear").onclick=()=>out.textContent="";
 document.querySelectorAll(".mode").forEach(b=>b.onclick=()=>{document.querySelectorAll(".mode").forEach(x=>x.classList.remove("active"));b.classList.add("active");write("Workspace: "+b.dataset.mode)});
 document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>{engine.setView(b.dataset.view);refresh();inspect()});
-$("snapEnabled")?.addEventListener("change",e=>{engine.snapEnabled=e.target.checked;window.ForgeSpatial?.setSnap(engine.snapSize)});
+$("snapToggle")?.addEventListener("change",e=>{engine.snapEnabled=e.target.checked;window.ForgeSpatial?.setSnap(engine.snapSize)});
 $("snapSize")?.addEventListener("change",e=>{engine.snapSize=Math.max(.001,+e.target.value||.25);window.ForgeSpatial?.setSnap(engine.snapSize)});
-$("showBounds")?.addEventListener("change",e=>{if(window.ForgeSpatial)window.ForgeSpatial.showBounds=e.target.checked});
-$("scanScene")?.addEventListener("click",()=>{$("visionReport").textContent=JSON.stringify(window.ForgeSpatial?.sceneVision?.()||{},null,2)});
-$("visionFocus")?.addEventListener("click",()=>{engine.frame();$("visionReport").textContent=JSON.stringify(window.ForgeSpatial?.sceneVision?.()||{},null,2)});
+$("boundsToggle")?.addEventListener("change",e=>{if(window.ForgeSpatial)window.ForgeSpatial.showBounds=e.target.checked});
+$("visionRefresh")?.addEventListener("click",()=>{$("visionReport").textContent=JSON.stringify(window.ForgeSpatial?.sceneVision?.()||{},null,2)});
+$("visionCenter")?.addEventListener("click",()=>{engine.frame();$("visionReport").textContent=JSON.stringify(window.ForgeSpatial?.sceneVision?.()||{},null,2)});
 $("visionMove")?.addEventListener("click",()=>{const r=engine.selected(),rect=$("viewport").getBoundingClientRect();if(!r||!window.ForgeSpatial)return;window.ForgeSpatial.moveToScreen(r.id,rect.left+rect.width/2,rect.top+rect.height/2,.5,0);refresh();inspect()});
+$("visionOpen")?.addEventListener("click",()=>{if(!window.ForgeSpatial)return;$("#visionReport").textContent=JSON.stringify(window.ForgeSpatial.sceneVision(),null,2);$("#visionDialog").showModal()});
+$("visionSelect")?.addEventListener("click",()=>toast("Tap an object in the viewport to select it"));
+$("standaloneMode").textContent=location.protocol==="file:"?"Local file":(/github\\.io$/i.test(location.hostname)?"Standalone PWA":"Server + WebSocket");
 engine.canvas.addEventListener("pointerdown",()=>{setTimeout(()=>{refresh();inspect()},0)});
 window.addEventListener("forge-selection",()=>{refresh();inspect()});
 function stats(){const d=engine.diagnostics();$("renderer").textContent=d.renderer;$("fps").textContent=d.fps;$("physics").textContent=d.physics;requestAnimationFrame(stats)}stats();refresh();inspect();write("Forge Studio 3.0 ready");
