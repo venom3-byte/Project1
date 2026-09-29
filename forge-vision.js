@@ -21,8 +21,9 @@ class ForgeVisionCore {
   }
 
   viewportRect() {
-    const c = this.canvas();
-    return c?.getBoundingClientRect?.() || {left:0, top:0, width:c?.clientWidth||0, height:c?.clientHeight||0};
+    const c=this.canvas(),r=c?.getBoundingClientRect?.();
+    if(!r)return {left:0,top:0,right:0,bottom:0,width:c?.clientWidth||0,height:c?.clientHeight||0};
+    return {left:Number(r.left.toFixed(2)),top:Number(r.top.toFixed(2)),right:Number(r.right.toFixed(2)),bottom:Number(r.bottom.toFixed(2)),width:Number(r.width.toFixed(2)),height:Number(r.height.toFixed(2))};
   }
 
   meshInstances(entity) {
