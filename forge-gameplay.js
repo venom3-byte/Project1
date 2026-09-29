@@ -170,7 +170,7 @@ const ForgeGameplay = {
     if(this.fireCooldown>0)return null;
     const cam=Forge.camera();if(!cam)return null;
     const p=cam.getPosition(),d=cam.forward,origin={x:p.x+d.x*1.2,y:p.y+d.y*1.2,z:p.z+d.z*1.2};
-    const q=this.spawnProjectile(origin,{x:d.x*this.projectileSpeed,y:d.y*this.projectileSpeed,z:d.z*this.projectileSpeed},25);
+    window.ForgeVFX?.muzzle(origin);const q=this.spawnProjectile(origin,{x:d.x*this.projectileSpeed,y:d.y*this.projectileSpeed,z:d.z*this.projectileSpeed},25);
     this.fireCooldown=.22;return q;
   }
 
@@ -182,7 +182,7 @@ const ForgeGameplay = {
       const pos=p.entity.getPosition();
       for(const a of this.agents.values()){
         if(!a.entity.enabled)continue;
-        if(pos.distance(a.entity.getPosition())<1.0){a.hp=Math.max(0,a.hp-p.damage);p.life=0;break}
+        if(pos.distance(a.entity.getPosition())<1.0){a.hp=Math.max(0,a.hp-p.damage);window.ForgeVFX?.explosion(a.entity.getPosition());p.life=0;break}
       }
     }
   }
