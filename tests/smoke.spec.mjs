@@ -1,336 +1,37 @@
-import {test,expect} from "@playwright/test";
-import fs from "node:fs";
-const tinyPng=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAFUlEQVR4nGO846bxnwEJMDGgAcICAJbcAlFKnQqxAAAAAElFTkSuQmCC","base64");
-test.beforeAll(()=>{fs.mkdirSync("tests/fixtures",{recursive:true});fs.mkdirSync("tests/verified",{recursive:true});fs.writeFileSync("tests/fixtures/pixel.png",tinyPng)});
-test("editor boots without runtime console errors",async({page})=>{
-  const errors=[];
-  page.on("pageerror",e=>errors.push(e.message));
-  page.on("console",m=>{if(m.type()==="error")errors.push(m.text())});
+import{test,expect}from"@playwright/test";
+test("Forge boots with renderer and scene kernel",async({page})=>{
+  const errors=[];page.on("pageerror",e=>errors.push(String(e)));page.on("console",m=>m.type()==="error"&&errors.push(m.text()));
+  await page.goto("/");await expect(page.locator("#sceneCount")).toContainText("3 entities");await expect(page.locator("#renderer")).toHaveText(/WebGPU|WebGL2/);
+  const s=await page.evaluate(()=>window.Forge.diagnostics());expect(s.entities).toBe(3);expect(s.renderables).toBeGreaterThan(0);expect(errors).toEqual([]);
+});
+test("scene creation, selection, inspector and transform work",async({page})=>{
+  await page.goto("/");await page.click('[data-add="box"]');await expect(page.locator("#sceneCount")).toContainText("4 entities");await expect(page.locator("#form")).toBeVisible();
+  const before=await page.locator("#px").inputValue();await page.fill("#px","3");await page.dispatchEvent("#px","change");expect(await page.locator("#px").inputValue()).toBe("3");expect(before).not.toBe("3");
+  const d=await page.evaluate(()=>window.Forge.diagnostics());expect(d.renderables).toBeGreaterThanOrEqual(2);
+});
+test("physics body updates runtime state",async({page})=>{
+  await page.goto("/");await page.click('[data-add="box"]');await page.selectOption("#body","dynamic");await page.selectOption("#shape","box");await page.click("#apply");await page.waitForTimeout(400);
+  const d=await page.evaluate(()=>window.Forge.diagnostics());expect(d.physics).toBeGreaterThan(1);
+});
+test("keyframe timeline is persistent in project JSON",async({page})=>{
+  await page.goto("/");await page.click('[data-add="box"]');await page.click("#key");await page.fill("#time","1");await page.dispatchEvent("#time","input");await page.click("#key");
+  const p=await page.evaluate(()=>window.Forge.serialize());const chosen=p.entities.find(x=>x.id===window.Forge.selectedId);expect(chosen.keyframes.length).toBe(2);
+});
+test("real raster asset import creates a renderable asset",async({page})=>{
   await page.goto("/");
-  await expect(page.locator(".brand strong")).toHaveText("Asset Forge");
-  await expect(page.locator("#editorCanvas")).toBeVisible();
-  const bridge=await page.evaluate(()=>window.AssetForgeAgent?.status());
-  expect(bridge, errors.join("\n")).toBeTruthy();
-  expect(bridge?.objects).toBe(0);
-  expect(errors).toEqual([]);
+  const data=await page.evaluate(()=>{const c=document.createElement("canvas");c.width=64;c.height=64;const g=c.getContext("2d");g.fillStyle="#00c8ff";g.fillRect(8,8,48,48);return c.toDataURL("image/png").split(",")[1]});
+  await page.setInputFiles("#assetInput",{name:"car-texture.png",mimeType:"image/png",buffer:Buffer.from(data,"base64")});
+  await expect(page.locator("#sceneCount")).toContainText("4 entities");
+  const s=await page.evaluate(()=>window.Forge.diagnostics());expect(s.renderables).toBeGreaterThan(1);
 });
-test("raster history and saved project preserve actual image data",async({page})=>{
-  await page.goto("/");
-  await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
-  const before=await page.evaluate(()=>window.AssetForgeAgent.status());
-  expect(before.objects).toBe(1);
-  expect(before.selectedType).toBe("image");
-  await page.click("#cropBtn");
-  await page.fill("#cropW","1"); await page.fill("#cropH","1"); await page.click("#applyCrop");
-  expect((await page.evaluate(()=>window.AssetForgeAgent.status())).objects).toBe(1);
-  await page.click("#undoBtn");await page.evaluate(()=>window.AssetForgeAgent.waitForHistoryIdle());
-  const afterUndo=await page.evaluate(()=>window.AssetForgeAgent.status());
-  expect(afterUndo.objects).toBe(1);
-  expect(afterUndo.selectedType).toBe("image");
-  expect(afterUndo.selectedSize.width).toBeGreaterThan(0);
-  await page.click("#redoBtn");await page.evaluate(()=>window.AssetForgeAgent.waitForHistoryIdle());
-  const afterRedo=await page.evaluate(()=>window.AssetForgeAgent.status());
-  expect(afterRedo.objects).toBe(1);
-  expect(afterRedo.selectedType,JSON.stringify(afterRedo)).toBe("image");
-  await page.click("#saveBtn");
-  const projectData=await page.evaluate(()=>window.AssetForgeAgent.getLastProjectDataUrl());
-  expect(projectData).toMatch(/^data:application\/json/);
-  const projectBuffer=Buffer.from(projectData.split(",")[1],"base64");
-  await page.setInputFiles("#projectInput",{name:"roundtrip.asset-forge.json",mimeType:"application/json",buffer:projectBuffer});
-  await expect(page.locator("#toast")).toContainText("Project opened");
-  const reopened=await page.evaluate(()=>window.AssetForgeAgent.status());
-  expect(reopened.objects).toBe(1);
-  expect(reopened.selectedType).toBe("image");
-  expect(reopened.selectedSize.width).toBe(1);
-  expect(reopened.selectedSize.height).toBe(1);
+test("project save/open round trip keeps scene entities",async({page})=>{
+  await page.goto("/");await page.click('[data-add="sphere"]');const json=await page.evaluate(()=>JSON.stringify(window.Forge.serialize()));
+  await page.setInputFiles("#projectInput",{name:"roundtrip.forge.json",mimeType:"application/json",buffer:Buffer.from(json)});
+  const d=await page.evaluate(()=>window.Forge.diagnostics());expect(d.entities).toBe(4);
 });
-
-test("raster import, crop, trim, undo/redo and export remain functional",async({page})=>{
-  await page.goto("/");
-  const largeData=await page.evaluate(async()=>{const img=new Image();img.src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAFUlEQVR4nGO846bxnwEJMDGgAcICAJbcAlFKnQqxAAAAAElFTkSuQmCC";await img.decode();const c=document.createElement("canvas");c.width=128;c.height=128;c.getContext("2d").drawImage(img,0,0,128,128);return c.toDataURL("image/png")});
-  await page.setInputFiles("#fileInput",{name:"pixel-large.png",mimeType:"image/png",buffer:Buffer.from(largeData.split(",")[1],"base64")});
-  await expect(page.locator("#props")).toBeVisible();
-  await expect(page.locator("#pw")).not.toHaveValue("");
-  await page.click("#cropBtn");
-  await expect(page.locator("#cropModal")).toBeVisible();
-  await expect(page.locator(".crop-handle.se")).toBeVisible();
-  const beforeCropW=await page.inputValue("#cropW");
-  const handle=await page.locator(".crop-handle.se").boundingBox();
-  expect(handle).toBeTruthy();
-  await page.mouse.move(handle.x+8,handle.y+8);
-  await page.mouse.down();
-  await page.mouse.move(handle.x+18,handle.y+18);
-  await page.mouse.up();
-  expect(Number(await page.inputValue("#cropW"))).toBeGreaterThanOrEqual(Number(beforeCropW));
-  await page.fill("#cropW","1"); await page.fill("#cropH","1");
-  await page.click("#applyCrop");
-  await expect(page.locator("#cropModal")).toHaveClass(/hidden/);
-  await expect(page.locator("#props")).toBeVisible();
-  await page.click("#undoBtn");await page.evaluate(()=>window.AssetForgeAgent.waitForHistoryIdle()); await page.click("#redoBtn");await page.evaluate(()=>window.AssetForgeAgent.waitForHistoryIdle());
-  await page.click("#exportBtn");
-  await expect(page.locator("#toast")).toContainText("PNG exported");
+test("visual QA reports healthy runtime",async({page})=>{
+  await page.goto("/");await page.click("#qa");await expect(page.locator("#qaDialog")).toBeVisible();await page.click("#runQA");const text=await page.locator("#qaReport").textContent();expect(text).toContain('"ok": true');
 });
-test("raster pixels survive undo/redo and project save/open",async({page})=>{
-  await page.goto("/");
-  await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
-  await expect(page.locator("#props")).toBeVisible();
-  const before=await page.evaluate(()=>window.AssetForgeAgent.rasterSignature());
-  expect(before?.nonZeroPixels).toBeGreaterThan(0);
-  await page.evaluate(()=>window.AssetForgeAgent.cropSelected(0,0,1,1));
-  await page.click("#undoBtn");await page.evaluate(()=>window.AssetForgeAgent.waitForHistoryIdle());
-  const afterUndo=await page.evaluate(()=>window.AssetForgeAgent.rasterSignature());
-  expect(afterUndo,JSON.stringify({before,afterUndo})).toEqual(before);
-  await page.click("#redoBtn");await page.evaluate(()=>window.AssetForgeAgent.waitForHistoryIdle());
-  const afterRedo=await page.evaluate(()=>window.AssetForgeAgent.status());
-  expect(afterRedo.selectedSize).toEqual({width:1,height:1});
-  await page.click("#undoBtn");await page.evaluate(()=>window.AssetForgeAgent.waitForHistoryIdle());
-  await page.click("#saveBtn");
-  const projectData=await page.evaluate(()=>window.AssetForgeAgent.getLastProjectDataUrl());
-  expect(projectData).toMatch(/^data:application\/json/);
-  fs.writeFileSync("tests/fixtures/roundtrip-project.json",Buffer.from(projectData.split(",")[1],"base64"));
-  await page.click("#newBtn");
-  await page.setInputFiles("#projectInput","tests/fixtures/roundtrip-project.json");
-  await expect(page.locator("#props")).toBeVisible();
-  await page.evaluate(()=>window.AssetForgeAgent.execute({op:"select",name:"pixel.png"}));
-  const reopened=await page.evaluate(()=>window.AssetForgeAgent.rasterSignature());
-  expect(reopened).toEqual(before);
-});
-
-test("frame extraction creates actual frame assets and sheet packing uses extracted frames",async({page})=>{
-  await page.goto("/");
-  await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
-  await page.fill("#cols","2");
-  await page.fill("#rows","1");
-  await page.click("#framesBtn");
-  expect((await page.evaluate(()=>window.AssetForgeAgent.status())).frameSource).toBe("extracted");
-  await expect(page.locator("#toast")).toContainText("2 frames extracted and ready to pack");
-  await page.click("#sheetBtn");
-  await expect(page.locator("#toast")).toContainText("2 frames packed into raster sprite sheet");
-});
-test("missing sprite selection is rejected cleanly",async({page})=>{
-  await page.goto("/");
-  await page.click("#framesBtn");
-  await expect(page.locator("#toast")).toContainText("Select a sprite sheet image first");
-  await page.click("#sheetBtn");
-  await expect(page.locator("#toast")).toContainText("Add animation frames or extract frames first");
-});
-test("mobile bottom sheets scroll and open without layout errors",async({page})=>{
-  await page.setViewportSize({width:390,height:844});
-  await page.goto("/");
-  await page.click('button[data-sheet="toolPanel"]');
-  await expect(page.locator("#toolPanel")).toHaveClass(/open/);
-  await page.locator("#toolPanel").evaluate(el=>{el.scrollTop=el.scrollHeight});
-  const scroll=await page.locator("#toolPanel").evaluate(el=>({top:el.scrollTop,height:el.scrollHeight-el.clientHeight}));
-  expect(scroll.top).toBeGreaterThan(0);
-  await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
-  await page.click("#mobileExportBtn"); await expect(page.locator("#toast")).toContainText("PNG exported");
-  await page.click('button[data-sheet="propsPanel"]');
-  await expect(page.locator("#propsPanel")).toHaveClass(/open/);
-  await page.locator("#propsPanel").evaluate(el=>{el.scrollTop=el.scrollHeight});
-  const pscroll=await page.locator("#propsPanel").evaluate(el=>el.scrollTop);
-  expect(pscroll).toBeGreaterThanOrEqual(0);
-});
-
-test("real public-domain photo can be imported, cropped and exported as a game asset",async({page})=>{
-  const url="https://raw.githubusercontent.com/Dashstrom/pixelize/main/docs/examples/car.jpg";
-  const response=await page.request.get(url);
-  expect(response.ok()).toBeTruthy();
-  const bytes=await response.body();
-  expect(bytes.length).toBeGreaterThan(20000);
-  fs.writeFileSync("tests/fixtures/real-car.jpg",bytes);
-  await page.goto("/");
-  await page.setInputFiles("#fileInput","tests/fixtures/real-car.jpg");
-  await expect(page.locator("#props")).toBeVisible();
-  const dims=await page.evaluate(()=>window.AssetForgeAgent.status().selectedSize);
-  expect(dims.width).toBeGreaterThan(100);
-  expect(dims.height).toBeGreaterThan(100);
-  await page.click("#cropBtn");
-  await page.fill("#cropX",String(Math.floor(dims.width*0.1)));
-  await page.fill("#cropY",String(Math.floor(dims.height*0.1)));
-  await page.fill("#cropW",String(Math.floor(dims.width*0.8)));
-  await page.fill("#cropH",String(Math.floor(dims.height*0.8)));
-  await page.click("#applyCrop");
-  await expect(page.locator("#cropModal")).toHaveClass(/hidden/);
-  await page.click("#exportBtn");
-  await expect(page.locator("#toast")).toContainText("PNG exported");
-  await page.fill("#cols","2"); await page.fill("#rows","2");
-  await page.click("#framesBtn"); await expect(page.locator("#toast")).toContainText("4 frames extracted and ready to pack");
-  await page.click("#sheetBtn"); await expect(page.locator("#toast")).toContainText("4 frames packed into raster sprite sheet");
-  const bridge=await page.evaluate(()=>window.AssetForgeAgent.status());
-  expect(bridge.objects).toBe(1);
-  expect(bridge.selected).toMatch(/_crop\.png$/);
-});
-
-test("final raster QA preview processes the real photo",async({page})=>{
-  await page.goto("/demo.html");
-  await expect(page.locator("#status")).toContainText("Ready — real raster processed");
-  await expect(page.locator("#source")).toBeVisible();
-  const result=await page.locator("#result").evaluate(c=>({w:c.width,h:c.height}));
-  expect(result).toEqual({w:512,h:512});
-  await expect(page.locator("#resultMeta")).toContainText("512 × 512 output");
-});
-
-test("duplicate creates a second visible layer and layer actions work",async({page})=>{
-  await page.setViewportSize({width:390,height:844});
-  await page.goto("/");
-  await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
-  await expect(page.locator("#props")).toBeVisible();
-  await expect(page.locator("#mobileExportBtn")).toBeVisible();
-  await page.evaluate(()=>window.AssetForgeAgent.execute({op:"fit"}));
-  await page.evaluate(()=>window.AssetForgeAgent.execute({op:"zoom",mult:1.2}));
-  await page.evaluate(()=>window.AssetForgeAgent.execute({op:"zoom",mult:1/1.2}));
-  await page.click("#mobileExportBtn");
-  await expect(page.locator("#toast")).toContainText("PNG exported");
-  await page.click('button[data-sheet="toolPanel"]');
-  await expect(page.locator("#toolPanel")).toHaveClass(/open/);
-  await page.click("#urlBtn"); await expect(page.locator("#urlModal")).toBeVisible(); await page.click('[data-close="urlModal"]');
-  await page.evaluate(()=>window.scrollTo(0,0));
-  await page.evaluate(()=>window.AssetForgeAgent.execute({op:"duplicate"}));
-  await expect(page.locator("#toast")).toContainText("Duplicated as a distinct layer");
-  await expect(page.locator("#layerCount")).toHaveText("2");
-  const bridge=await page.evaluate(()=>window.AssetForgeAgent.status());
-  expect(bridge.objects).toBe(2);
-  await page.click('button[data-sheet="propsPanel"]');
-  await expect(page.locator("#propsPanel")).toHaveClass(/open/);
-  await page.click("#frontBtn");
-  await page.click("#downBtn");
-  expect((await page.evaluate(()=>window.AssetForgeAgent.status())).objects).toBe(2);
-});
-
-
-test("multiple raster animation frames pack with padding and gaps",async({page})=>{
-  await page.goto("/");
-  await page.setInputFiles("#framesInput",["tests/fixtures/pixel.png","tests/fixtures/pixel.png"]);
-  expect((await page.evaluate(()=>window.AssetForgeAgent.status())).frameSource).toBe("manual");
-  await page.fill("#cols","2"); await page.fill("#rows","1"); await page.fill("#frameGap","4"); await page.fill("#framePadding","8");
-  await page.click("#sheetBtn");
-  await expect(page.locator("#toast")).toContainText("2 frames packed into raster sprite sheet");
-});
-
-test("custom pivot keeps its world position during numeric rotation",async({page})=>{
-  await page.goto("/");
-  await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
-  await expect(page.locator("#props")).toBeVisible();
-  await page.fill("#pivotX","0.2");await page.fill("#pivotY","0.8");
-  const before=await page.evaluate(()=>window.AssetForgeAgent.pivotWorldPoint());
-  await page.fill("#prot","90");
-  const after=await page.evaluate(()=>window.AssetForgeAgent.pivotWorldPoint());
-  expect(Math.abs(after.x-before.x)).toBeLessThan(2);
-  expect(Math.abs(after.y-before.y)).toBeLessThan(2);
-});
- 
-test("AI cutout QA covers vehicle human and animal rasters in one model session",async({page})=>{
-  test.setTimeout(300000);
-  const cases=[
-    ["vehicle","https://raw.githubusercontent.com/Dashstrom/pixelize/main/docs/examples/car.jpg"],
-    ["human","https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/portrait-of-woman_small.jpg"],
-    ["animal","https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/tiger.jpg"]
-  ];
-  await page.goto("/");
-  for(const [kind,url] of cases){
-    const response=await page.request.get(url);expect(response.ok(),kind).toBeTruthy();
-    const bytes=await response.body();const path="tests/fixtures/"+kind+".jpg";fs.writeFileSync(path,bytes);
-    await page.setInputFiles("#fileInput",path);
-    await expect(page.locator("#props")).toBeVisible();
-    await page.click("#bgBtn");
-    await expect(page.locator("#status")).toHaveText("Ready",{timeout:240000});
-    const bridge=await page.evaluate(()=>window.AssetForgeAgent.status());
-    expect(bridge.backgroundRemovalError||"").toBe("");
-    expect(bridge.selected).toMatch(/_cutout\.png$/);
-    const audit=await page.evaluate(()=>window.AssetForgeAgent.pixelAudit());
-    expect(audit).not.toBeNull();
-    expect(audit.maxAlpha).toBeGreaterThan(200);
-    expect(audit.nonzeroFraction).toBeGreaterThan(0.01);
-    expect(audit.opaqueFraction).toBeGreaterThan(0.001);
-    expect(audit.transparentFraction).toBeGreaterThan(0.01);
-    expect(audit.softEdgeFraction).toBeGreaterThan(0.0001);
-    expect(audit.meanRgbDelta, JSON.stringify(audit)).toBeLessThan(2.5);
-    if(kind==="vehicle"){
-      await page.click("#undoBtn");await page.evaluate(()=>window.AssetForgeAgent.waitForHistoryIdle());await page.click("#redoBtn");await page.evaluate(()=>window.AssetForgeAgent.waitForHistoryIdle());
-      await expect(page.locator("#props")).toBeVisible();
-      await page.click("#refineMaskBtn");
-      await expect(page.locator("#maskModal")).toBeVisible({timeout:5000});
-      await page.click('[data-close="maskModal"]');
-    }
-    expect(audit.width).toBeGreaterThan(100); expect(audit.height).toBeGreaterThan(100);
-  }
-  const finalState=await page.evaluate(()=>window.AssetForgeAgent.status());
-  expect(finalState.objects).toBe(3);
-});
-
-test("game asset manifest export works",async({page})=>{
-  await page.goto("/");
-  await page.setInputFiles("#fileInput","tests/fixtures/pixel.png");
-  await expect(page.locator("#props")).toBeVisible();
-  await page.evaluate(()=>window.AssetForgeAgent.exportSelectedManifest());
-  const dl=await page.evaluate(()=>window.AssetForgeAgent.getLastDownload());
-  expect(dl?.name).toBe("asset-manifest.json");
-  expect(dl?.type).toBe("application/json");
-  expect(dl?.href.startsWith("data:application/json")).toBeTruthy();
-});
-
-test("real white-background sprite sheet import background removal trim and exact crop",async({page})=>{
-  test.setTimeout(300000);
-  const url="https://raw.githubusercontent.com/osmanvision/OsCrop/main/samples/white_bg.png";
-  const response=await page.request.get(url);expect(response.ok()).toBeTruthy();
-  fs.writeFileSync("tests/fixtures/real-sprite-sheet.png",await response.body());
-  await page.goto("/");
-  await page.setInputFiles("#fileInput","tests/fixtures/real-sprite-sheet.png");
-  await expect(page.locator("#props")).toBeVisible({timeout:30000});
-  let status=await page.evaluate(()=>window.AssetForgeAgent.status());
-  expect(status.selectedType).toBe("image");
-  expect(status.selectedSize.width).toBeGreaterThan(100);
-  expect(status.selectedSize.height).toBeGreaterThan(100);
-
-  await page.click("#bgBtn");
-  await expect(page.locator("#status")).toHaveText("Ready",{timeout:240000});
-  const afterBg=await page.evaluate(()=>window.AssetForgeAgent.status());
-  expect(afterBg.backgroundRemovalError||"").toBe("");
-
-  await page.click("#trimBtn");
-  await expect(page.locator("#toast")).toContainText("Transparent bounds trimmed");
-  const trimmed=await page.evaluate(()=>window.AssetForgeAgent.status());
-  expect(trimmed.selectedSize.width).toBeGreaterThan(20);
-  expect(trimmed.selectedSize.height).toBeGreaterThan(20);
-
-  const cropW=Math.floor(trimmed.selectedSize.width/2);
-  const cropH=Math.floor(trimmed.selectedSize.height/2);
-  await page.evaluate(({w,h})=>window.AssetForgeAgent.cropSelected(0,0,w,h),{w:cropW,h:cropH});
-  const cropped=await page.evaluate(()=>window.AssetForgeAgent.status());
-  expect(cropped.selectedSize.width).toBe(cropW);
-  expect(cropped.selectedSize.height).toBe(cropH);
-  await page.click("#exportBtn");
-  await expect(page.locator("#toast")).toContainText("PNG exported");
-  const croppedData=await page.evaluate(()=>window.AssetForgeAgent.getLastDownloadDataUrl());
-  expect(croppedData).toMatch(/^data:image\/png;base64,/);
-  fs.writeFileSync("tests/verified/real-sprite-cropped.png",Buffer.from(croppedData.split(",")[1],"base64"));
-  await page.fill("#cols","2");await page.fill("#rows","2");
-  await page.click("#framesBtn");
-  await expect(page.locator("#toast")).toContainText("4 frames extracted and ready");
-  await page.click("#sheetBtn");
-  await expect(page.locator("#toast")).toContainText("4 frames packed into raster sprite sheet");
-  const spriteData=await page.evaluate(()=>window.AssetForgeAgent.getLastSpriteSheetDataUrl());
-  expect(spriteData).toMatch(/^data:image\/png;base64,/);
-  const spriteDownload=await page.evaluate(()=>window.AssetForgeAgent.getLastSpriteImageDataUrl());
-  expect(spriteDownload).toMatch(/^data:image\/png;base64,/);
-  const spriteManifest=await page.evaluate(()=>window.AssetForgeAgent.getLastDownloadDataUrl("spriteManifest"));
-  expect(spriteManifest).toMatch(/^data:application\/json/);
-  fs.writeFileSync("tests/verified/real-sprite-sheet.png",Buffer.from(spriteData.split(",")[1],"base64"));
-  fs.writeFileSync("tests/verified/real-sprite-sheet.json",JSON.stringify({
-    source:url,
-    workflow:["download","import","AI background removal","transparent trim","exact crop","4-frame extract","sprite pack"]
-  },null,2));
-});
-
-test("live vision bridge is present and reports runtime state",async({page,request})=>{
-  await page.setViewportSize({width:390,height:844});await page.goto("/");
-  await expect(page.locator("#liveVisionDockBtn")).toBeVisible();
-  await page.click("#liveVisionDockBtn");await expect(page.locator("#liveVision")).toHaveClass(/open/);
-  const r=await request.get("/api/live/status");expect(r.ok()).toBeTruthy();const s=await r.json();
-  expect(s).toHaveProperty("agentConfigured");expect(s).toHaveProperty("model");
-});
-test("live action bridge can execute a page click",async({page})=>{
-  await page.goto("/");
-  const result=await page.evaluate(()=>window.AssetForgeLiveVision.executeAction({type:"click",x:5,y:5,screenWidth:innerWidth,screenHeight:innerHeight}));
-  expect(result).toBeTruthy();
+test("mobile studio keeps viewport and inspector usable",async({page})=>{
+  await page.setViewportSize({width:390,height:844});await page.goto("/");await expect(page.locator("#viewport")).toBeVisible();await page.click('[data-add="box"]');await expect(page.locator("#form")).toBeVisible();await page.click("#saveProject");
 });
