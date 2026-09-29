@@ -261,7 +261,6 @@ const ForgeGameplay = {
   },
   serialize(){return this.currentTemplate?structuredClone(this.currentTemplate):null},
 
-  ,
   createShowcaseGame(){
     this.init();this.clear();Forge.resetScene(false);
     Forge.createPlane("ArenaGround",48,48);Forge.createLight("ArenaSun");
@@ -273,7 +272,7 @@ const ForgeGameplay = {
     this.currentTemplate={type:"showcase",player:player.id,enemies:enemies.map(e=>e.id),questId:"arena-objective"};
     Forge.select(player.id);Forge.frame();window.ForgeUISystem?.hudForThirdPerson(()=>({hp:window.ForgeData?.actor(player.id)?.attributes.get("Health")??player.hp,state:"ARENA"}));
     return this.currentTemplate
-  }
+  },
 
   status(){
     return{
