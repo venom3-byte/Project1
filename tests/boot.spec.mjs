@@ -1,6 +1,6 @@
 import{test,expect}from"@playwright/test";
 
-async function boot(page,testInfo){
+async function waitForBoot(page,testInfo){
   const errors=[];
   page.on("pageerror",e=>errors.push(String(e)));
   page.on("console",m=>m.type()==="error"&&errors.push(m.text()));
@@ -19,7 +19,7 @@ async function boot(page,testInfo){
 }
 
 test("Forge cold editor boot completes with staged timing telemetry",async({page},testInfo)=>{
-  const boot=await boot(page,testInfo);
+  const boot=await waitForBoot(page,testInfo);
   const diagnostics=await page.evaluate(()=>window.Forge.diagnostics());
   expect(diagnostics.entities).toBe(3);
   expect(diagnostics.renderables).toBeGreaterThan(0);
@@ -29,7 +29,7 @@ test("Forge cold editor boot completes with staged timing telemetry",async({page
 
 test("Forge mobile editor boot completes without viewport errors",async({page},testInfo)=>{
   await page.setViewportSize({width:390,height:844});
-  const boot=await boot(page,testInfo);
+  const boot=await waitForBoot(page,testInfo);
   await expect(page.locator("#viewport")).toBeVisible();
   await expect(page.locator("#sceneCount")).toContainText("3 entities");
   expect(boot.totalMs).toBeLessThan(20000);
