@@ -1,0 +1,5 @@
+const CACHE='forge-static-v3';
+const CORE=['./','./index.html','./forge.css','./forge-ui.js','./forge-engine.js','./forge-spatial.js','./forge-production.js','./forge-project.js','./forge-render.js','./manifest.webmanifest'];
+self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE).catch(()=>{})).then(()=>self.skipWaiting())));
+self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
+self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;const u=new URL(e.request.url);if(u.origin!==location.origin)return;e.respondWith(caches.match(e.request).then(cached=>cached||fetch(e.request).then(r=>{const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));return r}).catch(()=>cached||caches.match('./index.html'))))});
