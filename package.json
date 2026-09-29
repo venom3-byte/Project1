@@ -6,9 +6,10 @@
     "start": "node server.mjs",
     "dev": "node server.mjs",
     "test": "playwright test",
-    "test:forge": "playwright test tests/smoke.spec.mjs",
+    "test:forge": "playwright test tests/smoke.spec.mjs --project=desktop --workers=1",
     "build:android": "node scripts/export-android.mjs",
-    "test:boot": "playwright test tests/boot.spec.mjs --workers=2"
+    "test:boot": "playwright test tests/boot.spec.mjs --workers=2",
+    "test:mobile": "playwright test tests/smoke.spec.mjs --project=mobile --grep=\"mobile studio keeps viewport and inspector usable\" --workers=1"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
