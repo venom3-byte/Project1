@@ -4,7 +4,7 @@ import RAPIER from "https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.21.
 export class ForgeEngine{
   constructor(canvas,log=()=>{}){this.canvas=canvas;this.log=log;this.app=null;this.root=null;this.entities=new Map();this.selectedId=null;this.rapier=null;this.world=null;this.physics=new Map();this.keyframes=new Map();this.scripts=new Map();this.timelineTime=0;this.running=false;this.timelinePlaying=false;this.fps=0;this.frames=0;this.lastFPS=performance.now();this.frameMs=0;this.physicsAccumulator=0;this.physicsFixedDt=1/60;this.physicsMaxSubsteps=5;this.prePhysicsSystems=new Set();this.postPhysicsSystems=new Set();this.collisionListeners=new Set();this.colliderEntityMap=new Map();this.eventQueue=null}
   async init(){
-    this.app=new pc.Application(this.canvas,{graphicsDeviceOptions:{antialias:true,alpha:false,powerPreference:"high-performance",preserveDrawingBuffer:true}});
+    const android=!!window.ForgeAndroid||/Android/i.test(navigator.userAgent);\n    const graphicsDeviceOptions={antialias:true,alpha:false,powerPreference:"high-performance",preserveDrawingBuffer:true};\n    if(android&&pc.DEVICETYPE_WEBGL2)graphicsDeviceOptions.deviceTypes=[pc.DEVICETYPE_WEBGL2];\n    this.app=new pc.Application(this.canvas,{graphicsDeviceOptions});
     this.app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);this.app.setCanvasResolution(pc.RESOLUTION_AUTO);this.app.scene.gammaCorrection=pc.GAMMA_SRGB;this.app.scene.toneMapping=pc.TONEMAP_ACES;this.app.start();
     this.root=new pc.Entity("ForgeScene");this.app.root.addChild(this.root);
     await RAPIER.init();this.rapier=RAPIER;this.world=new RAPIER.World({x:0,y:-9.81,z:0});this.eventQueue=new RAPIER.EventQueue(true);
