@@ -35,3 +35,52 @@ test("visual QA reports healthy runtime",async({page})=>{
 test("mobile studio keeps viewport and inspector usable",async({page})=>{
   await page.setViewportSize({width:390,height:844});await page.goto("/");await expect(page.locator("#viewport")).toBeVisible();await page.click('[data-add="box"]');await expect(page.locator("#form")).toBeVisible();await page.click("#saveProject");
 });
+
+
+test("GLB cook pipeline produces deterministic LOD package",async({request})=>{
+  const json=JSON.stringify({
+    asset:{version:"2.0"},
+    scene:0,
+    scenes:[{nodes:[0]}],
+    nodes:[{mesh:0}],
+    meshes:[{name:"Triangle",primitives:[{attributes:{POSITION:0},indices:1}]}],
+    buffers:[{byteLength:44}],
+    bufferViews:[
+      {buffer:0,byteOffset:0,byteLength:36,target:34962},
+      {buffer:0,byteOffset:36,byteLength:6,target:34963}
+    ],
+    accessors:[
+      {bufferView:0,componentType:5126,count:3,type:"VEC3",min:[0,0,0],max:[1,1,0]},
+      {bufferView:1,componentType:5123,count:3,type:"SCALAR"}
+    ]
+  });
+  const jb=Buffer.from(json);
+  const jpad=Buffer.concat([jb,Buffer.alloc((4-jb.length%4)%4,0x20)]);
+  const pos=Buffer.alloc(36);
+  const fv=new Float32Array(pos.buffer,pos.byteOffset,9);
+  fv.set([0,0,0,1,0,0,0,1,0]);
+  const ib=Buffer.alloc(8);const iv=new Uint16Array(ib.buffer,ib.byteOffset,3);iv.set([0,1,2]);
+  const header=Buffer.alloc(12);
+  header.writeUInt32LE(0x46546c67,0);header.writeUInt32LE(2,4);
+  const total=12+8+jpad.length+8+ib.length;header.writeUInt32LE(total,8);
+  const jh=Buffer.alloc(8);jh.writeUInt32LE(jpad.length,0);jh.writeUInt32LE(0x4e4f534a,4);
+  const bh=Buffer.alloc(8);bh.writeUInt32LE(ib.length,0);bh.writeUInt32LE(0x004e4942,4);
+  const glb=Buffer.concat([header,jh,jpad,bh,Buffer.concat([pos,ib])]);
+  const response=await request.post("/api/pipeline",{data:{operation:"cook-glb",base64:glb.toString("base64"),options:{lods:[1,.5,.2]}}});
+  expect(response.ok()).toBeTruthy();
+  const result=await response.json();
+  expect(result.ok).toBeTruthy();
+  expect(result.files.length).toBe(3);
+  expect(result.files[0].name).toBe("lod0.glb");
+  expect(result.files[1].name).toBe("lod50.glb");
+  expect(result.files[2].name).toBe("lod80.glb");
+  expect(result.manifest.collision.strategy).toBe("auto-box");
+});
+
+test("Forge HTTP command endpoint accepts structured engine commands",async({request})=>{
+  const response=await request.post("/api/forge/command",{data:{command:{op:"diagnostics"}}});
+  expect(response.ok()).toBeTruthy();
+  const result=await response.json();
+  expect(result.ok).toBeTruthy();
+  expect(result.queued).toBeTruthy();
+});
