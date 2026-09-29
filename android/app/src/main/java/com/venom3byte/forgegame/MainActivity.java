@@ -117,11 +117,9 @@ public class MainActivity extends Activity {
   @Override
   public void onBackPressed() {
     if (webView != null) {
-      webView.evaluateJavascript(
-        "window.dispatchEvent(new CustomEvent('forgeandroidback'));",
-        null
-      );
+      webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('forgeandroidback'));", null);
     }
+    new android.os.Handler(getMainLooper()).postDelayed(this::finish, 120);
   }
 
   public static class ForgeAndroidBridge {
