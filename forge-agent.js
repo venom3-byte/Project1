@@ -38,7 +38,9 @@ const ForgeAgent={
       case "project": return F.serialize();
       case "save": {const data=JSON.stringify(F.serialize(),null,2);return{fileName:"forge-project.forge.json",data};}
       case "asset-registry": return P?P.assets.all():[];
-      case "qa": return window.ForgeQA?.status?window.ForgeQA.status():F.diagnostics();
+      case "qa": return window.ForgeQAPro?await window.ForgeQAPro.audit():F.diagnostics();
+      case "qa-baseline": return window.ForgeQAPro?await window.ForgeQAPro.saveBaseline(c.name||"default"):null;
+      case "qa-diff": return window.ForgeQAPro?await window.ForgeQAPro.diff(c.name||"default"):null;
       case "screenshot": {const canvas=document.querySelector("#viewport");return{dataUrl:canvas?.toDataURL("image/png")||null};}
       case "runtime": return window.ForgeRuntime?.snapshot?.()||{};
       case "nav-bake": {if(!window.ForgeRuntime)throw new Error("Runtime layer unavailable");window.ForgeRuntime.nav.bakeFromScene(F);return{width:window.ForgeRuntime.nav.width,height:window.ForgeRuntime.nav.height,cell:window.ForgeRuntime.nav.cell};}
