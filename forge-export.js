@@ -1,3 +1,4 @@
+import{pc}from"./forge-engine.js";
 const engine=window.Forge;
 
 function selected(){
@@ -93,6 +94,21 @@ async function exportPreview(opts={}){
   if(opts.download!==false)await save(blob,name,mime);
   return{ok:true,derived:true,name,bytes:blob.size,mime,blob};
 }
+async function exportSceneGLB(opts={}){
+  const r=selected();
+  if(!r?.entity?.render?.meshInstances?.length)throw new Error("Select a renderable 3D object before exporting GLB.");
+  const Exporter=pc?.GltfExporter;
+  if(typeof Exporter!=="function")throw new Error("PlayCanvas GLB exporter is unavailable in this engine build.");
+  const exporter=new Exporter();
+  const ab=await exporter.build(r.entity,{maxTextureSize:4096,stripUnusedAttributes:false});
+  const blob=new Blob([ab],{type:"model/gltf-binary"});
+  const name=opts.name||((r.name||"forge-asset").replace(/\.[^.]+$/,"")+".glb");
+  const validation=await validateBlob(blob,"model");
+  if(!validation.ok)throw new Error("Generated GLB failed validation: "+validation.errors.join(", "));
+  if(opts.download!==false)await save(blob,name,blob.type);
+  const spatial=window.ForgeSpatial?.inspect?.(r)||null;
+  return{ok:true,derived:true,kind:"model",name,bytes:blob.size,validation,spatial,blob};
+}
 async function exportManifest(opts={}){
   const r=selected(),file=storedFile(r),type=assetType(r);
   if(!r)throw new Error("Select an asset first.");
@@ -142,4 +158,4 @@ async function runExportQA(){
   const exact=await equalBytes(info.file,exported.blob);
   return{ok:info.validation.ok&&exact,asset:info.record.name,type:info.type,bytes:info.file.size,sha256:info.sha256,exactSourceBytes:exact,validation:info.validation,geometry:info.spatial?.geometry||null};
 }
-window.ForgeExport={selected,sourceInfo,exportSource,exportPreview,exportManifest,validateSelected,runExportQA,sha256,equalBytes};
+window.ForgeExport={selected,sourceInfo,exportSource,exportSceneGLB,exportPreview,exportManifest,validateSelected,runExportQA,sha256,equalBytes};
