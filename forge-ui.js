@@ -81,7 +81,8 @@ function apply(){
 }
 document.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>{let r=b.dataset.add==="camera"?engine.createCamera("Camera "+(engine.entities.size+1),{x:6,y:4,z:8}):b.dataset.add==="light"?engine.createLight("Light "+(engine.entities.size+1)):engine.primitive(b.dataset.add,b.dataset.add+"-"+(engine.entities.size+1));engine.select(r.id);refresh();inspect()});
 $("apply").onclick=apply;["px","py","pz","rx","ry","rz","sx","sy","sz","name"].forEach(id=>$(id).onchange=apply);
-$("duplicate").onclick=()=>{if(engine.duplicate()){refresh();inspect()}};$("delete").onclick=()=>{engine.delete();refresh();inspect()};$("focus").onclick=()=>engine.focus();$("frame").onclick=()=>engine.frame();$("reset").onclick=()=>location.reload();
+$("duplicate").onclick=()=>{if(engine.duplicate()){refresh();inspect()}};$("undo")?.addEventListener("click",()=>{if(engine.undo()){refresh();inspect()}});$("redo")?.addEventListener("click",()=>{if(engine.redo()){refresh();inspect()}});
+$("delete").onclick=()=>{engine.delete();refresh();inspect()};$("focus").onclick=()=>engine.focus();$("frame").onclick=()=>engine.frame();$("reset").onclick=()=>location.reload();
 $("play").onclick=()=>{$("play").textContent=engine.running?"❚❚ Play":"▶ Play";engine.running=!engine.running;engine.timelinePlaying=engine.running};$("timelinePlay").onclick=()=>$("play").click();
 $("rewind").onclick=()=>{engine.timelineTime=0;$("time").value=0;engine.evalAnimation(0);inspect()};$("time").oninput=e=>{engine.timelineTime=+e.target.value||0;engine.evalAnimation(engine.timelineTime);$("playhead").style.left=(engine.timelineTime*60)+"px";inspect()};$("key").onclick=()=>{engine.key();toast("Keyframe added")};
 $("importAssets").onclick=()=>$("assetInput").click();$("assetInput").onchange=e=>loadFiles([...e.target.files]);
@@ -115,6 +116,9 @@ $("spaceToggle")?.addEventListener("click",()=>{
 window.addEventListener("forge-gizmo-transform",()=>{refresh();inspect()});
 window.addEventListener("keydown",e=>{
   if(e.target?.matches?.("input,textarea,select"))return;
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){e.preventDefault();if(engine.undo()){refresh();inspect()}return}
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="y"){e.preventDefault();if(engine.redo()){refresh();inspect()}return}
+
   if(e.key==="1")document.querySelector('[data-gizmo="translate"]')?.click();
   else if(e.key==="2")document.querySelector('[data-gizmo="rotate"]')?.click();
   else if(e.key==="3")document.querySelector('[data-gizmo="scale"]')?.click();
