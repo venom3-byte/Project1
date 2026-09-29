@@ -70,6 +70,9 @@ const ForgeAgent={
       case "vision-map": return window.ForgeVision?.map(c.options||{})||null;
       case "vision-capture": return window.ForgeVision?.capture(c.options||{annotate:true})||null;
       case "vision-report": return window.ForgeVision?.report(c.options||{})||null;
+      case "vision-config": return window.ForgeVision?.configureExternal(c.options||{})||null;
+      case "vision-analyze": return window.ForgeVision?.analyzeExternal(c.options||{})||null;
+      case "vision-result": return window.ForgeVision?.externalResult?.()||null;
       case "vision-latest": return window.ForgeVisionLatestFrame||null;
       case "vision-pick": return window.ForgeVision?.hitTest(Number(c.x)||0,Number(c.y)||0)||null;
       case "vision-select": return window.ForgeVision?.selectAt(Number(c.x)||0,Number(c.y)||0)||null;
