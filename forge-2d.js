@@ -30,7 +30,7 @@ class Forge2DSystem{
     const m=Forge.material([1,1,1]);m.diffuseMap=frames[0];m.emissiveMap=frames[0];m.emissive=new pc.Color(1,1,1);m.update();r.entity.render.material=m;
     const state={name,id:r.id,entity:r.entity,frames,fps:Math.max(1,Number(fps)||12),index:0,time:0,playing:true,grid:{frameWidth:fw,frameHeight:fh,columns:cols,rows:rws,source:file.name||name}};
     this.animations.set(name,state);this.sprites.set(r.id,{id:r.id,entity:r.entity,textures:frames});r.components.sprite={animated:true,frameCount:frames.length,fps:state.fps,frameWidth:fw,frameHeight:fh,columns:cols,rows:rws,source:file.name||name};Forge.select(r.id);return state
-  },
+  }
 
   async animateSprite(name,files,fps=12){
     if(!files?.length)throw new Error("No sprite frames supplied");
