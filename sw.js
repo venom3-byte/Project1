@@ -1,4 +1,4 @@
-const CACHE='forge-static-v4';
+const CACHE='forge-static-v5';
 const CORE=['./','./index.html','./forge.css','./forge-ui.js','./forge-engine.js','./forge-spatial.js','./forge-production.js','./forge-project.js','./forge-render.js','./forge-ui-system.js','./forge-vfx.js','./forge-2d.js','./forge-ai.js','./forge-gameplay-data.js','./forge-network.js','./forge-replay.js','./forge-session.js','./forge-shader.js','./forge-terrain.js','./forge-qa.js','./forge-animation.js','./forge-runtime.js','./forge-gameplay.js','./live-vision.js','./forge-agent.js','./forge-export.js','./forge-gizmo.js','./manifest.webmanifest','./forge-icon.svg'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE).catch(()=>{})).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
