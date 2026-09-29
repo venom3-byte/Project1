@@ -2,63 +2,55 @@
 
 Forge exposes a structured control plane over WebSocket /live and HTTP POST /api/forge/command.
 
-## Message
+## Design rule
 
-{
-  "type": "forge-command",
-  "id": "request-id",
-  "command": {
-    "op": "create",
-    "kind": "box",
-    "name": "Crate",
-    "x": 2,
-    "y": 1,
-    "z": 0
-  }
-}
+Agents should control engine state through stable identifiers and structured operations first. Live Vision is for rendered-interface understanding and screen-level actions only.
 
-Responses use a matching forge-result message with ok and result fields.
-
-## Stable command surface
+## Core commands
 
 - diagnostics
 - entities
-- select by id/name
-- create primitive/camera/light
-- transform
-- physics
-- duplicate/delete
-- focus/frame
-- play/stop/key
-- pcg generation
-- world streaming
+- select
+- create / transform / physics
+- duplicate / delete / focus / frame
+- play / stop / key
+- pcg / stream / terrain-generate
 - graph-run
-- project/save
+- project / save / save-slot / load-slot
+- prefab-save / prefab-spawn
 - asset-registry
-- qa
-- screenshot
+- qa / qa-baseline / qa-diff / screenshot
+- template-third-person / template-racing / template-showcase
+- gameplay-status
+- tag-add / attribute / inventory-grant
+- ability-define / ability-use
+- quest-define / quest-progress
+- animation-state
+- shader-apply
+- net-connect / net-status / net-bind / net-publish
+- replay-record / replay-stop / replay-play / replay-stop-play / replay-status
+- runtime
 - build
 
-The protocol addresses engine state, not screen coordinates. Screen-coordinate actions remain available through Live Vision for tasks that genuinely depend on the rendered interface.
+## Agent loop
 
-## Production principle
+1. Inspect the current project and runtime diagnostics.
+2. Make a structured plan.
+3. Execute deterministic operations in small batches.
+4. Re-inspect scene/entity state.
+5. Run physics/gameplay/asset QA.
+6. Run in-engine visual QA and capture a baseline/diff when appropriate.
+7. Save the complete Forge project graph.
+8. Build only after the relevant gates pass.
 
-The agent should normally inspect, form a structured change plan, execute small deterministic operations, inspect again, run QA, capture visual proof, and save/build only after the gates pass.
+## Vision bridge
 
-This makes the agent an engine operator rather than a mouse macro.
+The Live Vision bridge may send natural-language tasks to the structured control plane. The control plane should convert such requests into deterministic engine operations rather than relying on coordinate macros.
 
-## Future commands
+## Safety and determinism
 
-- prefab operations
-- material graphs
-- animation and retargeting
-- navigation and behavior trees
-- audio graph
-- VFX graph
-- multiplayer simulation
-- profiling captures
-- platform builds
-- asset cooking
-- regression repair
+Agent commands should be idempotent where practical, preserve entity IDs, avoid deleting unrelated project state, and report errors explicitly. Build outputs are generated from the same project graph used by the editor.
 
-Backward compatibility is preferred when extending the protocol.
+## Future expansion
+
+The protocol is reserved for deep systems such as skeletal retargeting, material graph authoring, VFX graphs, navigation meshes, HLOD/streaming, audio graphs, authoritative multiplayer/prediction, native packaging, profiling captures and automated regression repair.
