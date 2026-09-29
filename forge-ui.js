@@ -13,7 +13,6 @@ try{bootMessage("Starting renderer and physics…");await engine.init();window.F
   "./forge-runtime.js","./forge-gameplay.js","./live-vision.js","./forge-agent.js","./forge-export.js","./forge-gizmo.js"
 ]) await import(module);
 }catch(error){window.ForgeBootState="error";bootMessage("Forge could not complete startup: "+(error?.message||String(error)),true);console.error(error);throw error}
-window.ForgeReady=true;window.ForgeBootState="ready";document.documentElement.dataset.forgeReady="1";bootEl?.classList.add("hidden");window.dispatchEvent(new Event("forge-ready"));
 
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function icon(k){return({box:"▣",sphere:"●",cylinder:"⬢",capsule:"◉",plane:"▱",camera:"◫",light:"☼",model:"◇",empty:"＋"})[k]||"•"}
@@ -177,4 +176,4 @@ window.addEventListener("forge-selection",()=>{refresh();inspect()});
 window.addEventListener("forge-assets-changed",()=>{refresh();inspect()});
 window.ForgeVision={scan:()=>window.ForgeSpatial?.sceneVision?.()||{},inspect:id=>{const r=engine.entities.get(id);return r?window.ForgeSpatial?.inspect?.(r):null},selectAt:(x,y)=>engine.pick({clientX:x,clientY:y})};
 function stats(){const d=engine.diagnostics();$("renderer").textContent=d.renderer;$("fps").textContent=d.fps;$("physics").textContent=d.physics;requestAnimationFrame(stats)}
-stats();refresh();inspect();write("Forge Studio 3.5 ready");
+stats();refresh();inspect();window.ForgeReady=true;window.ForgeBootState="ready";document.documentElement.dataset.forgeReady="1";bootEl?.classList.add("hidden");window.dispatchEvent(new Event("forge-ready"));write("Forge Studio 3.9 ready");
