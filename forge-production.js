@@ -258,6 +258,17 @@ AssetPipeline.prototype.cutout = async function(file){
   return new File([blob],name,{type:"image/png"});
 };
 
+function openPoseSearch(){
+  const d=modal("Forge Pose Search Lab",'<div class="fm-grid"><div class="fm-card"><h4>Motion database</h4><label>ID <input id="poseDbId" value="Locomotion"></label><div class="fm-actions"><button id="poseSeed">Create sample locomotion DB</button><button id="poseStatus">Status</button></div></div><div class="fm-card"><h4>Query / Match</h4><label>Feature vector <input id="poseVector" value="1,0,0"></label><div class="fm-actions"><button id="poseQuery" class="primary">Query nearest poses</button><button id="poseMatch">Match selected</button></div></div><div class="fm-card"><pre id="poseOut" class="fm-code"></pre></div></div>');
+  const out=()=>d.querySelector("#poseOut");
+  d.querySelector("#poseSeed").onclick=()=>{const id=d.querySelector("#poseDbId").value||"Locomotion";const r=window.ForgePoseSearch.createDatabase(id,[{clip:"Idle",time:0,features:[0,0,1]},{clip:"Walk",time:.25,features:[.35,0,.25]},{clip:"Run",time:.2,features:[1,0,0]},{clip:"Strafe",time:.1,features:[0,1,0]}]);out().textContent=JSON.stringify(r,null,2);};
+  d.querySelector("#poseStatus").onclick=()=>{out().textContent=JSON.stringify(window.ForgePoseSearch.status(),null,2)};
+  const vec=()=>d.querySelector("#poseVector").value.split(",").map(Number).filter(Number.isFinite);
+  d.querySelector("#poseQuery").onclick=()=>{const id=d.querySelector("#poseDbId").value||"Locomotion";out().textContent=JSON.stringify(window.ForgePoseSearch.query(id,vec(),{k:5}),null,2)};
+  d.querySelector("#poseMatch").onclick=()=>{const id=d.querySelector("#poseDbId").value||"Locomotion";const r=window.ForgePoseSearch.match(id,Forge.selectedId,vec(),{play:true});out().textContent=JSON.stringify(r,null,2)};
+  out().textContent=JSON.stringify(window.ForgePoseSearch.status(),null,2);
+}
+
 async function openBuild(){
   if(!window.JSZipModule){
     try{window.JSZipModule=await import("https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm");}
@@ -357,7 +368,7 @@ function open2D(){
 }
 function addBar(){
   const bar=document.createElement("div");bar.className="forge-prod";
-  const buttons=[["Asset Lab",openAssets],["Material",openMaterial],["Shader",openShader],["Animation",openAnimation],["Anim Graph",openAnimationGraph],["Sequencer",openCinematics],["Render",openRender],["VFX",openVFX],["2D",open2D],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],["Vision",()=>window.AssetForgeLiveVision?.open()],["Runtime",openRuntime],["Build Web",openBuild]];
+  const buttons=[["Asset Lab",openAssets],["Material",openMaterial],["Shader",openShader],["Animation",openAnimation],["Anim Graph",openAnimationGraph],["Pose Search",openPoseSearch],["Sequencer",openCinematics],["Render",openRender],["VFX",openVFX],["2D",open2D],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],["Vision",()=>window.AssetForgeLiveVision?.open()],["Runtime",openRuntime],["Build Web",openBuild]];
   buttons.forEach(([t,f])=>{const b=document.createElement("button");b.textContent=t;b.onclick=f;bar.append(b)});document.body.append(bar);
 }
 addBar();
