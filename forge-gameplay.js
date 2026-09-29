@@ -111,8 +111,8 @@ const ForgeGameplay = {
     if(!c.body||!c.collider||!c.controller) return;
     const inp=window.ForgeRuntime?.input;
     const cam=Forge.camera();
-    let ix=(inp?.isDown("moveRight")?1:0)-(inp?.isDown("moveLeft")?1:0);
-    let iz=(inp?.isDown("moveForward")?1:0)-(inp?.isDown("moveBack")?1:0);
+    const mv=inp?.moveVector?.()||{x:0,z:0};
+    let ix=mv.x,iz=mv.z;
     let fwd={x:0,z:-1},right={x:1,z:0};
     if(cam){
       const cf=cam.forward,cr=cam.right;
