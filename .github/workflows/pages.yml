@@ -23,7 +23,14 @@ jobs:
       - name: Install dependencies
         run: npm install
       - name: Syntax validation
-        run: npm run check
+        run: node scripts/validate-syntax.mjs
+      - name: Upload syntax report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-pages-syntax-report
+          path: forge-syntax-report.json
+          if-no-files-found: ignore
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Forge smoke suite
