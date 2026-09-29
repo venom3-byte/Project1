@@ -1,5 +1,5 @@
 import{test,expect}from"@playwright/test";
-const openForge=async page=>{await page.goto("/");await page.waitForFunction(()=>window.ForgeBoot?.ok===true,{timeout:30000});return await page.evaluate(()=>window.ForgeBoot)};
+const openForge=async page=>{await page.goto("/",{waitUntil:"domcontentloaded"});await page.waitForFunction(()=>window.ForgeBoot?.ok===true,{timeout:30000});return await page.evaluate(()=>window.ForgeBoot)};
 
 test("Forge boots with renderer and scene kernel",async({page},testInfo)=>{
   const errors=[];page.on("pageerror",e=>errors.push(String(e)));page.on("console",m=>m.type()==="error"&&errors.push(m.text()));
