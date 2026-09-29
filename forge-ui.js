@@ -136,9 +136,11 @@ $("quickFocus")?.addEventListener("click",()=>engine.focus());
 $("quickFrame")?.addEventListener("click",()=>engine.frame());
 $("quickVision")?.addEventListener("click",()=>$("visionOpen")?.click());
 document.querySelectorAll("[data-gizmo]")?.forEach(b=>b.addEventListener("click",()=>{
-  const mode=b.dataset.gizmo;if(window.ForgeGizmo?.setMode(mode)){
+  const mode=b.dataset.gizmo;
+  if(window.ForgeGizmo?.setMode(mode)){
     document.querySelectorAll("[data-gizmo]").forEach(x=>x.classList.toggle("active",x===b));
-    write("Gizmo: "+mode)
+    write("Gizmo: "+mode);
+    requestAnimationFrame(()=>window.ForgeGizmo?.init?.());
   }
 }));
 $("spaceToggle")?.addEventListener("click",()=>{
@@ -179,7 +181,10 @@ $("visionMove")?.addEventListener("click",()=>{const r=engine.selected(),rect=$(
 $("visionOpen")?.addEventListener("click",()=>{if(!window.ForgeSpatial)return;$("visionReport").textContent=JSON.stringify(window.ForgeSpatial.sceneVision(),null,2);$("visionDialog").showModal()});
 $("visionSelect")?.addEventListener("click",()=>toast("Tap an object in the viewport to select it"));
 $("standaloneMode").textContent=location.protocol==="file:"?"Local file":(/github\.io$/i.test(location.hostname)?"Standalone PWA":"Server + WebSocket");
-engine.canvas.addEventListener("pointerdown",()=>{setTimeout(()=>{refresh();inspect()},0)});
+engine.canvas.addEventListener("pointerdown",()=>{
+  requestAnimationFrame(()=>window.ForgeGizmo?.init?.());
+  setTimeout(()=>{refresh();inspect()},0)
+});
 window.addEventListener("forge-selection",()=>{refresh();inspect()});
 window.addEventListener("forge-assets-changed",()=>{refresh();inspect()});
 window.ForgeVision={scan:()=>window.ForgeSpatial?.sceneVision?.()||{},inspect:id=>{const r=engine.entities.get(id);return r?window.ForgeSpatial?.inspect?.(r):null},selectAt:(x,y)=>engine.pick({clientX:x,clientY:y})};
