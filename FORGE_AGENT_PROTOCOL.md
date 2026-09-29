@@ -54,3 +54,13 @@ Agent commands should be idempotent where practical, preserve entity IDs, avoid 
 ## Future expansion
 
 The protocol is reserved for deep systems such as skeletal retargeting, material graph authoring, VFX graphs, navigation meshes, HLOD/streaming, audio graphs, authoritative multiplayer/prediction, native packaging, profiling captures and automated regression repair.
+## Vision-First Commands
+
+- vision-map: returns the current rendered entities projected into screen space with IDs, bounds, depth, world position and component metadata.
+- vision-capture: captures the current viewport as PNG and can annotate projected entity boxes.
+- vision-report: combines visual QA metrics with the screen-space scene map and flags blank/mostly-black/low-contrast states.
+- vision-pick / vision-select / vision-focus: deterministic screen-coordinate grounding from rendered pixels to real Forge entities.
+- vision-overlay: toggles live projected entity labels/boxes for visual debugging.
+- vision-latest: exposes the latest external live-vision frame received by Forge Agent.
+
+These commands use PlayCanvas worldToScreen and screenToWorld mappings so the agent can reason in the same screen coordinates used by the renderer and UI.
