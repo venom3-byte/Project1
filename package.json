@@ -7,7 +7,8 @@
     "dev": "node server.mjs",
     "test": "playwright test",
     "test:forge": "playwright test tests/smoke.spec.mjs",
-    "check": "node --check forge-engine.js && node --check forge-spatial.js && node --check forge-ui.js && node --check forge-agent.js && node --check live-vision.js && node --check forge-project.js && node --check server.mjs && node --check sw.js"
+    "check": "node --check forge-engine.js && node --check forge-spatial.js && node --check forge-ui.js && node --check forge-agent.js && node --check live-vision.js && node --check forge-project.js && node --check server.mjs && node --check sw.js",
+    "test:core": "playwright test tests/core.smoke.spec.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0"
