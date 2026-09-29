@@ -1,4 +1,5 @@
 name: Forge Android Build
+# Release pipeline: APK + AAB
 
 on:
   push:
