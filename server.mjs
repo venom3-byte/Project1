@@ -1,6 +1,21 @@
 import http from"node:http";import crypto from"node:crypto";import fs from"node:fs";import path from"node:path";import{fileURLToPath}from"node:url";import{WebSocketServer}from"ws";import{cookGLB}from"./forge-pipeline.mjs";
 const root=path.dirname(fileURLToPath(import.meta.url)),port=Number(process.env.PORT||4173),mime={".html":"text/html",".js":"text/javascript",".css":"text/css",".json":"application/json",".png":"image/png",".jpg":"image/jpeg",".webp":"image/webp",".wasm":"application/wasm"};
 const srv=http.createServer((req,res)=>{const u=new URL(req.url,"http://localhost");if(u.pathname==="/api/pipeline" && req.method==="POST"){let body="";req.on("data",c=>body+=c);req.on("end",async()=>{try{const q=JSON.parse(body);if(q.operation!=="cook-glb")return json(res,{ok:false,error:"Unsupported pipeline operation"},400);const bytes=Buffer.from(q.base64||"","base64");if(!bytes.length)return json(res,{ok:false,error:"Empty asset"},400);if(bytes.length>80*1024*1024)return json(res,{ok:false,error:"Asset exceeds 80MB pipeline limit"},413);const cooked=await cookGLB(bytes,q.options||{});return json(res,{ok:true,...cooked});}catch(e){return json(res,{ok:false,error:e.message},500)}});return;}
+  if(u.pathname==="/api/vision/analyze" && req.method==="POST"){
+    let body="";req.on("data",chunk=>{body+=chunk;if(body.length>30*1024*1024){req.destroy()}});req.on("end",async()=>{
+      const endpoint=process.env.FORGE_VISION_ENDPOINT;
+      if(!endpoint)return json(res,{ok:false,error:"FORGE_VISION_ENDPOINT is not configured on the Forge server"},503);
+      try{
+        const payload=JSON.parse(body||"{}");
+        const headers={"Content-Type":"application/json"};
+        if(process.env.FORGE_VISION_TOKEN)headers.Authorization="Bearer "+process.env.FORGE_VISION_TOKEN;
+        const upstream=await fetch(endpoint,{method:"POST",headers,body:JSON.stringify(payload)});
+        const text=await upstream.text();
+        let data;try{data=JSON.parse(text)}catch{data={raw:text}};
+        return json(res,data,upstream.status);
+      }catch(error){return json(res,{ok:false,error:error?.message||String(error)},502)}
+    });return;
+  }
   if(u.pathname==="/api/live/status")return json(res,{ok:true,agentConfigured:true,transport:"websocket",model:"forge-control-plane-v2",protocol:2});
   if(u.pathname==="/api/forge/command" && req.method==="POST"){let body="";req.on("data",c=>body+=c);req.on("end",()=>{let m={};try{m=JSON.parse(body)}catch(e){return json(res,{ok:false,error:"Invalid JSON"},400)};const msg=JSON.stringify({type:"forge-command",id:crypto.randomUUID(),command:m.command||m});for(const peer of clients)if(peer.readyState===1)peer.send(msg);return json(res,{ok:true,queued:true})});return;}let p=u.pathname==="/"?"/index.html":u.pathname;p=path.normalize(p).replace(/^([.][.][/\\])+/, "");const f=path.join(root,p);fs.stat(f,(e,s)=>{if(e||!s.isFile()){res.writeHead(404);return res.end("Not found")}res.writeHead(200,{"Content-Type":mime[path.extname(f)]||"application/octet-stream","Cache-Control":"no-cache"});fs.createReadStream(f).pipe(res)})});
 const wss=new WebSocketServer({noServer:true});const clients=new Set();wss.on("connection",ws=>{clients.add(ws);ws.on("close",()=>clients.delete(ws));ws.on("message",m=>{for(const p of clients)if(p!==ws&&p.readyState===1)p.send(m)})});
