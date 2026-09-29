@@ -270,11 +270,7 @@ function openPoseSearch(){
 }
 
 async function openAndroid(){
-  const d=modal("Forge Android Export",'<div class="fm-grid"><div class="fm-card"><h4>Installable Android target</h4><p>Packages the current Forge project and its real imported assets for the native Android shell.</p><div class="fm-actions"><button id="androidExport" class="primary">Export Android input</button><button id="androidStatus">Inspect project</button></div></div><div class="fm-card"><h4>Build pipeline</h4><pre class="fm-code">node scripts/export-android.mjs forge-project.json assets/
-gradle -p android assembleDebug
-
-APK:
-android/app/build/outputs/apk/debug/app-debug.apk</pre></div><div class="fm-card"><pre id="androidOut" class="fm-code"></pre></div></div>');
+  const d=modal("Forge Android Export",'<div class="fm-grid"><div class="fm-card"><h4>Installable Android target</h4><p>Packages the current Forge project and its real imported assets for the native Android shell.</p><div class="fm-actions"><button id="androidExport" class="primary">Export Android input</button><button id="androidStatus">Inspect project</button></div></div><div class="fm-card"><h4>Build pipeline</h4><pre class="fm-code">node scripts/export-android.mjs forge-project.json assets/<br>gradle -p android assembleDebug<br><br>APK: android/app/build/outputs/apk/debug/app-debug.apk</pre></div><div class="fm-card"><pre id="androidOut" class="fm-code"></pre></div></div>');
   const out=d.querySelector("#androidOut");
   const project=window.ForgeProject?.serialize?.()||null;
   const files=["android/settings.gradle","android/build.gradle","android/gradle.properties","android/app/build.gradle","android/app/proguard-rules.pro","android/app/src/main/AndroidManifest.xml","android/app/src/main/java/com/venom3byte/forgegame/MainActivity.java","android/app/src/main/res/values/styles.xml","android/app/src/main/res/values/strings.xml"];
