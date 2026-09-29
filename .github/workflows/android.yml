@@ -36,7 +36,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
         with:
-          packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
+          packages: 'platform-tools platforms;android-37.0 build-tools;36.0.0'
 
       - name: Export Forge runtime into Android assets
         run: node scripts/export-android.mjs android/demo-project.forge.json
