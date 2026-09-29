@@ -71,6 +71,10 @@ const ForgeAgent={
       case "terrain-generate": return window.ForgeTerrain.generate(c.name||"Terrain",c.options||{}).id;
       case "shader-apply": window.ForgeShaders.applyPreset(c.preset||"dissolve");return window.Forge.diagnostics();
       case "animation-state": return window.Forge.setAnimationState(c.id||window.Forge.selectedId,c.state||"Idle");
+      case "animation-graph-create": return window.ForgeAnimation.createGraph(c.id||window.Forge.selectedId,c.name||"Locomotion");
+      case "animation-graph-param": return window.ForgeAnimation.setParameter(c.graphId,c.key,c.value);
+      case "rig-profile": return window.ForgeAnimation.createRigProfile(c.id||window.Forge.selectedId,c.name||"Humanoid");
+      case "rig-validate": return window.ForgeAnimation.validateRig(c.rigId);
       case "replay-stop-play": window.ForgeReplay.stop();return window.ForgeReplay.status();
       case "replay-status": return window.ForgeReplay.status();
       case "build": if(P?.build) return P.build(); return{supported:false};
