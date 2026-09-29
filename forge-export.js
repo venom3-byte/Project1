@@ -1,4 +1,4 @@
-import{pc}from"./forge-engine.js";
+const pc=window.ForgePlayCanvas;
 const engine=window.Forge;
 
 function selected(){
