@@ -1,0 +1,1 @@
+Root-fix proof: deterministic ForgeReady publication, PWA cache v4, spatial AABB compatibility, terrain collider fallback, exact export fixtures.
