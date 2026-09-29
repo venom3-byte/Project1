@@ -25,6 +25,14 @@ jobs:
       - run: npm run test:forge
       - name: Run mobile studio smoke
         run: npm run test:mobile
+      - name: Verify GLB proof screenshot
+        run: test -s forge-glb-proof.png
+      - name: Upload GLB import proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-glb-import-proof
+          path: forge-glb-proof.png
+          retention-days: 14
       - name: Upload Forge QA report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
