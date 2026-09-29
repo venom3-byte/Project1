@@ -60,6 +60,7 @@ const ForgeAgent={
       case "stream": {if(!P)throw new Error("Production layer unavailable");P.world.updateStreaming(c.radius||2);return P.world.partition();}
       case "graph-run": {if(!P)throw new Error("Production layer unavailable");return P.graph.run();}
       case "project": return F.serialize();
+      case "project-meta": return window.ForgeProject?.setMeta?.(c.patch||{})||null;
       case "save": {const data=JSON.stringify(F.serialize(),null,2);return{fileName:"forge-project.forge.json",data};}
       case "asset-registry": return P?P.assets.all():[];
       case "qa": return window.ForgeQAPro?await window.ForgeQAPro.audit():F.diagnostics();
