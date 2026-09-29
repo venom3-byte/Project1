@@ -10,7 +10,7 @@ try{bootMessage("Starting renderer and physics…");await engine.init();window.F
   "./forge-production.js","./forge-project.js","./forge-render.js","./forge-ui-system.js","./forge-vfx.js",
   "./forge-2d.js","./forge-ai.js","./forge-gameplay-data.js","./forge-network.js","./forge-replay.js",
   "./forge-session.js","./forge-shader.js","./forge-terrain.js","./forge-qa.js","./forge-animation.js",
-  "./forge-runtime.js","./forge-gameplay.js","./live-vision.js","./forge-agent.js","./forge-export.js","./forge-gizmo.js"
+  "./forge-runtime.js","./forge-gameplay.js","./live-vision.js","./forge-agent.js","./forge-export.js"
 ]){
   bootMessage("Loading "+module+"…");
   const started=performance.now();
@@ -22,6 +22,26 @@ try{bootMessage("Starting renderer and physics…");await engine.init();window.F
 }}
 catch(error){window.ForgeBootState="error";bootMessage("Forge could not complete startup: "+(error?.message||String(error)),true);console.error(error);throw error}
 
+let forgeGizmoLoad=null;
+function ensureForgeGizmo(){
+  if(window.ForgeGizmo?.nativeReady) return Promise.resolve(window.ForgeGizmo);
+  if(forgeGizmoLoad) return forgeGizmoLoad;
+  forgeGizmoLoad=import("./forge-gizmo.js").then(()=>window.ForgeGizmo).catch(error=>{
+    forgeGizmoLoad=null;
+    write("Native gizmo load failed: "+error.message,"error");
+    return window.ForgeGizmo;
+  });
+  return forgeGizmoLoad;
+}
+if(!window.ForgeGizmo){
+  const state={mode:"translate",space:"world",layer:null,gizmos:{},ready:true,nativeReady:false,initializing:false};
+  window.ForgeGizmo={
+    state,
+    setMode(mode){if(!["translate","rotate","scale"].includes(mode))return false;state.mode=mode;return true},
+    setSpace(space){state.space=space==="local"?"local":"world";return state.space},
+    init(){return ensureForgeGizmo().then(g=>g?.init?.().then?.(()=>g)??g)}
+  };
+}
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function icon(k){return({box:"▣",sphere:"●",cylinder:"⬢",capsule:"◉",plane:"▱",camera:"◫",light:"☼",model:"◇",empty:"＋"})[k]||"•"}
 function matchesFilter(r){const q=String($("treeFilter")?.value||"").trim().toLowerCase();return !q||r.name.toLowerCase().includes(q)||r.kind.toLowerCase().includes(q)}
@@ -140,7 +160,7 @@ document.querySelectorAll("[data-gizmo]")?.forEach(b=>b.addEventListener("click"
   if(window.ForgeGizmo?.setMode(mode)){
     document.querySelectorAll("[data-gizmo]").forEach(x=>x.classList.toggle("active",x===b));
     write("Gizmo: "+mode);
-    requestAnimationFrame(()=>window.ForgeGizmo?.init?.());
+    requestAnimationFrame(()=>ensureForgeGizmo().then(g=>g?.init?.()));
   }
 }));
 $("spaceToggle")?.addEventListener("click",()=>{
@@ -182,7 +202,7 @@ $("visionOpen")?.addEventListener("click",()=>{if(!window.ForgeSpatial)return;$(
 $("visionSelect")?.addEventListener("click",()=>toast("Tap an object in the viewport to select it"));
 $("standaloneMode").textContent=location.protocol==="file:"?"Local file":(/github\.io$/i.test(location.hostname)?"Standalone PWA":"Server + WebSocket");
 engine.canvas.addEventListener("pointerdown",()=>{
-  requestAnimationFrame(()=>window.ForgeGizmo?.init?.());
+  requestAnimationFrame(()=>ensureForgeGizmo().then(g=>g?.init?.()));
   setTimeout(()=>{refresh();inspect()},0)
 });
 window.addEventListener("forge-selection",()=>{refresh();inspect()});
