@@ -42,6 +42,7 @@ class PrefabSystem{
   save(name,record){this.store.set(name,{name,record:JSON.parse(JSON.stringify(record))});this.persist();return this.store.get(name)}
   get(name){return this.store.get(name)?.record||null}
   list(){return [...this.store.keys()]}
+  spawn(name,position={x:0,y:0,z:0}){const d=this.get(name);if(!d)return null;let r;if(["box","sphere","cylinder","capsule","plane"].includes(d.kind))r=Forge.primitive(d.kind,name+" Instance");else r=Forge.add?Forge.add("empty",name+" Instance"):null;if(!r)return null;const p=d.transform?.position||[position.x,position.y,position.z];r.entity.setLocalPosition(...(position? [position.x,position.y,position.z]:p));if(d.transform?.rotation)r.entity.setLocalEulerAngles(...d.transform.rotation);if(d.transform?.scale)r.entity.setLocalScale(...d.transform.scale);if(d.components?.physics)Forge.setPhysics(r.id,d.components.physics.mode,d.components.physics.shape);return r}
   persist(){localStorage.setItem("forge.prefabs",JSON.stringify([...this.store.entries()]))}
 }
 
