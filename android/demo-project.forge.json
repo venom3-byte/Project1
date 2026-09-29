@@ -4,7 +4,16 @@
   "meta": {
     "name": "Forge Android Starter",
     "engine": "Forge Studio 2.0",
-    "androidExport": true
+    "androidExport": true,
+    "android": {
+      "applicationId": "com.venom3byte.forgegame",
+      "appName": "Forge Game",
+      "versionCode": 1,
+      "versionName": "0.1.0",
+      "minSdk": 24,
+      "targetSdk": 37,
+      "compileSdk": 37
+    }
   },
   "scene": {
     "format": "forge-scene",
