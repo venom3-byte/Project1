@@ -99,7 +99,8 @@ const ForgeAgent={
       case "ability-use": {const a=window.ForgeData.actor(c.actor||"player"),ab=a.abilities.get(c.id);if(!ab)throw new Error("Ability not found");return ab.activate(a,c.context||{});}
       case "quest-define": return window.ForgeData.quests.define(c.id,c.data||{});
       case "quest-progress": window.ForgeData.quests.progress(c.id,c.objectiveId,c.amount||1);return window.ForgeData.quests.status(c.id);
-      case "net-connect": window.ForgeNet.connect(c.room||"default",{peerId:c.peerId});return window.ForgeNet.status();
+      case "net-connect": window.ForgeNet.connect(c.room||"default",{peerId:c.peerId,url:c.url});return window.ForgeNet.status();
+      case "net-endpoint": return window.ForgeNet.setEndpoint(c.url||"");
       case "net-status": return window.ForgeNet.status();
       case "net-bind": window.ForgeNet.bindEntity(c.id||window.Forge.selectedId);return window.ForgeNet.status();
       case "net-publish": return window.ForgeNet.publishEntity();
