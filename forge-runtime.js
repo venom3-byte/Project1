@@ -57,10 +57,25 @@ class AudioSystem{
 
 class PrefabSystem{
   constructor(){this.store=new Map(JSON.parse(localStorage.getItem("forge.prefabs")||"[]"))}
-  save(name,record){this.store.set(name,{name,record:JSON.parse(JSON.stringify(record))});this.persist();return this.store.get(name)}
+  capture(id){
+    const r=Forge.entities.get(id);if(!r)return null;
+    const serializeEntity=e=>({name:e.name,kind:e.__forge?.kind||"empty",transform:{position:[e.getLocalPosition().x,e.getLocalPosition().y,e.getLocalPosition().z],rotation:[e.getLocalEulerAngles().x,e.getLocalEulerAngles().y,e.getLocalEulerAngles().z],scale:[e.getLocalScale().x,e.getLocalScale().y,e.getLocalScale().z]},components:JSON.parse(JSON.stringify(e.__forge?.components||{})),children:e.children.map(serializeEntity)});
+    return serializeEntity(r.entity)
+  }
+  save(name,recordOrId){const record=typeof recordOrId==="string"?this.capture(recordOrId):recordOrId;if(!record)throw new Error("Prefab source not found");this.store.set(name,{name,record:structuredClone(record)});this.persist();return this.store.get(name)}
   get(name){return this.store.get(name)?.record||null}
   list(){return [...this.store.keys()]}
-  spawn(name,position={x:0,y:0,z:0}){const d=this.get(name);if(!d)return null;let r;if(["box","sphere","cylinder","capsule","plane"].includes(d.kind))r=Forge.primitive(d.kind,name+" Instance");else r=Forge.add?Forge.add("empty",name+" Instance"):null;if(!r)return null;const p=d.transform?.position||[position.x,position.y,position.z];r.entity.setLocalPosition(...(position? [position.x,position.y,position.z]:p));if(d.transform?.rotation)r.entity.setLocalEulerAngles(...d.transform.rotation);if(d.transform?.scale)r.entity.setLocalScale(...d.transform.scale);if(d.components?.physics)Forge.setPhysics(r.id,d.components.physics.mode,d.components.physics.shape);return r}
+  spawn(name,position={x:0,y:0,z:0}){
+    const d=this.get(name);if(!d)return null;
+    const spawnNode=(data,parent=null,isRoot=false)=>{
+      let r;if(["box","sphere","cylinder","capsule","plane"].includes(data.kind))r=Forge.primitive(data.kind,data.name);else r=Forge.add("empty",data.name);
+      if(parent)r.entity.reparent(parent.entity);
+      const t=data.transform||{};r.entity.setLocalPosition(...(isRoot?[position.x,position.y,position.z]:(t.position||[0,0,0])));r.entity.setLocalEulerAngles(...(t.rotation||[0,0,0]));r.entity.setLocalScale(...(t.scale||[1,1,1]));
+      r.components=data.components||{};r.entity.__forge.components=r.components;if(r.components.physics)Forge.setPhysics(r.id,r.components.physics.mode,r.components.physics.shape);
+      for(const ch of data.children||[])spawnNode(ch,r,false);return r
+    };
+    return spawnNode(d,null,true)
+  }
   persist(){localStorage.setItem("forge.prefabs",JSON.stringify([...this.store.entries()]))}
 }
 
