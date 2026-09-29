@@ -26,7 +26,7 @@ function refresh(){
     row.onclick=()=>{engine.select(r.id);inspect();refresh()};
     tree.append(row)
   }
-  const s=engine.selected();$("selected").textContent=s?s.name:"None";$("sceneCount").textContent=engine.entities.size+" entities";updateSpatial();updateAssetPanel()
+  const s=engine.selected();$("selected").textContent=s?s.name:"None";$("sceneCount").textContent=engine.entities.size+" entities";$("hierarchyCount").textContent=engine.entities.size?String(engine.entities.size):"";updateSpatial();updateAssetPanel()
 }
 function inspect(){
   const r=engine.selected();$("empty").classList.toggle("hidden",!!r);$("form").classList.toggle("hidden",!r);$("kind").textContent=r?r.kind:"—";
@@ -82,6 +82,12 @@ $("exportManifest")?.addEventListener("click",()=>assetAction(()=>window.ForgeEx
 $("validateAsset")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.validateSelected(),"Asset validation"));
 $("assetQA")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.runExportQA(),"Export round-trip QA"));
 $("treeFilter")?.addEventListener("input",refresh);
+$("quickFocus")?.addEventListener("click",()=>engine.focus());
+$("quickFrame")?.addEventListener("click",()=>engine.frame());
+$("quickVision")?.addEventListener("click",()=>$("visionOpen")?.click());
+$("mFocus")?.addEventListener("click",()=>engine.focus());
+$("mFrame")?.addEventListener("click",()=>engine.frame());
+$("mExport")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.exportSource(),"Source export"));
 
 function smoke(){
   const d=engine.diagnostics(),s=window.ForgeSpatial?window.ForgeSpatial.sceneVision():null;
