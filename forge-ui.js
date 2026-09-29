@@ -77,6 +77,7 @@ $("saveProject").onclick=()=>{window.ForgeProject.download();toast("Complete For
 $("build").onclick=async()=>{if(window.ForgeProduction?.build){try{const r=await window.ForgeProduction.build();if(r?.url){location.href=r.url;return}}catch(e){write("Build failed: "+e.message,"error")}}window.ForgeProject.download("forge-project-3.0.forge.json");toast("Portable Forge project exported")};
 async function assetAction(fn,label){try{const r=await fn();$("assetReport").textContent=JSON.stringify(r,null,2);$("assetBadge").textContent=r.ok?"PASS":"CHECK";$("assetBadge").className="qa-badge "+(r.ok?"pass":"warn");toast(label+(r.ok?" — PASS":" — inspect report"))}catch(e){$("assetBadge").textContent="FAIL";$("assetBadge").className="qa-badge fail";$("assetReport").textContent=JSON.stringify({ok:false,error:e.message},null,2);toast(label+" — "+e.message)}}
 $("exportSource")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.exportSource(),"Source export"));
+$("exportGLB")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.exportSceneGLB(),"GLB export"));
 $("exportPreview")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.exportPreview(),"Viewport PNG"));
 $("exportManifest")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.exportManifest(),"Asset manifest"));
 $("validateAsset")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.validateSelected(),"Asset validation"));
