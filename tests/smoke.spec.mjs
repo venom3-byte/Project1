@@ -115,7 +115,7 @@ test("2D platformer template creates orthographic gameplay scene",async({page})=
   expect(result.player).toBeTruthy();
   const state=await page.evaluate(()=>window.Forge2D.status());
   expect(state.platformer.player).toBeTruthy();
-  const camera=await page.evaluate(()=>window.Forge.entities.get(state.platformer.camera)?.kind);
+  const camera=await page.evaluate(cameraId=>window.Forge.entities.get(cameraId)?.kind,state.platformer.camera);
   expect(camera).toBe("camera");
 });
 

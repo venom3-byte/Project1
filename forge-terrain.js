@@ -10,7 +10,7 @@ class ForgeTerrainSystem{
   }
   generate(name="Terrain",{size=60,subdivisions=96,seed=1337,height=7,materialColor=[.18,.36,.12]}={}){
     const n=Math.max(4,Math.min(192,subdivisions));const positions=[],uvs=[],indices=[],heights=new Float32Array((n+1)*(n+1));
-    for(let z=0;z<=n;z++){for(let x=0;x<=n;x++){const wx=x/n*size-size/2,wz=z/n*size-size/2,hy=this.height(wx,wz,seed,height);positions.push(wx,hy,wz);uvs.push(x/n,z/n);heights[z*(n+1)+x]=hy/Math.max(1,height)}}
+    for(let z=0;z<=n;z++){for(let x=0;x<=n;x++){const wx=x/n*size-size/2,wz=z/n*size-size/2,hy=this.height(wx,wz,seed,height);positions.push(wx,hy,wz);uvs.push(x/n,z/n);heights[x*(n+1)+z]=hy/Math.max(1,height)}}
     for(let z=0;z<n;z++)for(let x=0;x<n;x++){const a=z*(n+1)+x,b=a+1,c=a+(n+1),d=c+1;indices.push(a,c,b,b,c,d)}
     const normals=pc.calculateNormals(positions,indices),mesh=new pc.Mesh(Forge.app.graphicsDevice);mesh.setPositions(positions);mesh.setNormals(normals);mesh.setUvs(0,uvs);mesh.setIndices(indices);mesh.update();
     const r=Forge.add("terrain",name);const mat=Forge.material(materialColor);r.entity.addComponent("render",{meshInstances:[new pc.MeshInstance(mesh,mat)]});r.components.terrain={size,subdivisions,seed,height};

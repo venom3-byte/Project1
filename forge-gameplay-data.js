@@ -1,5 +1,5 @@
 
-class ForgeTags{
+export class ForgeTags{
   constructor(){this.tags=new Set()}
   add(...tags){for(const t of tags)if(typeof t==="string"&&t.trim())this.tags.add(t.trim());return this}
   remove(tag){this.tags.delete(tag);return this}

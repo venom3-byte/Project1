@@ -1,7 +1,7 @@
 import{ForgeEngine}from"./forge-engine.js";
 const $=id=>document.getElementById(id);const out=$("log");
 const write=(s,type="info")=>{out.textContent+="["+new Date().toLocaleTimeString()+"] "+s+"\n";out.scrollTop=out.scrollHeight;if(type==="error")console.error(s)};
-const toast=s=>{const e=document.createElement("div");e.textContent=s;Object.assign(e.style,{position:"fixed",bottom:"18px",left:"50%",transform:"translateX(-50%)",background:"#0b1d31",border:"1px solid #31506f",padding:"10px 14px",borderRadius:"10px",zIndex:99});document.body.appendChild(e);setTimeout(()=>e.remove(),1700)};
+const toast=s=>{const e=document.createElement("div");e.textContent=s;Object.assign(e.style,{position:"fixed",bottom:"18px",left:"50%",transform:"translateX(-50%)",background:"#0b1d31",border:"1px solid #31506f",padding:"10px 14px",borderRadius:"10px",zIndex:99,pointerEvents:"none"});document.body.appendChild(e);setTimeout(()=>e.remove(),1700)};
 const engine=new ForgeEngine($("viewport"),write);await engine.init();window.Forge=engine;
 function refresh(){const tree=$("tree");tree.innerHTML="";for(const r of engine.entities.values()){const row=document.createElement("div");row.className="tree-row"+(r.id===engine.selectedId?" active":"");row.innerHTML="<span>"+icon(r.kind)+"</span><span>"+r.name+"</span><small>"+r.kind+"</small>";row.onclick=()=>{engine.select(r.id);inspect();refresh()};tree.append(row)}const s=engine.selected();$("selected").textContent=s?s.name:"None";$("sceneCount").textContent=engine.entities.size+" entities"}
 function icon(k){return({box:"▣",sphere:"●",cylinder:"⬢",capsule:"◉",plane:"▱",camera:"◫",light:"☼",model:"◇",empty:"＋"})[k]||"•"}

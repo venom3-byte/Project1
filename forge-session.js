@@ -1,3 +1,4 @@
+import {ForgeTags} from "./forge-gameplay-data.js";
 
 class ForgePlayerState{
   constructor(id,name="Player"){this.id=id;this.name=name;this.tags=new ForgeTags();this.score=0;this.team=null;this.connected=true;this.custom={}}
