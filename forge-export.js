@@ -52,6 +52,16 @@ async function imageInfo(blob){
 function sniffMagic(b){
   return b.length>=4?String.fromCharCode(...b.slice(0,4)):"";
 }
+function imageSignature(b){
+  if(b.length>=8&&b[0]===137&&b[1]===80&&b[2]===78&&b[3]===71&&b[4]===13&&b[5]===10&&b[6]===26&&b[7]===10)return"PNG";
+  if(b.length>=3&&b[0]===255&&b[1]===216&&b[2]===255)return"JPEG";
+  if(b.length>=12&&String.fromCharCode(...b.slice(0,4))==="RIFF"&&String.fromCharCode(...b.slice(8,12))==="WEBP")return"WEBP";
+  if(b.length>=6){
+    const s=String.fromCharCode(...b.slice(0,6));
+    if(s==="GIF87a"||s==="GIF89a")return"GIF";
+  }
+  return null;
+}
 async function validateBlob(blob,type){
   const b=await bytes(blob),magic=sniffMagic(b),errors=[];
   if(type==="model"){
@@ -63,10 +73,10 @@ async function validateBlob(blob,type){
       if(declared!==b.byteLength)errors.push("GLB declared length does not match file length");
     }
   }else if(type==="image"){
-    const ok=/^(\\x89PNG|JFIF|RIFF)/.test(String.fromCharCode(...b.slice(0,12)))||magic==="\\x89PNG";
-    if(!ok&&!await imageInfo(blob))errors.push("Image decode failed");
+    const sig=imageSignature(b);
+    if(!sig&&!await imageInfo(blob))errors.push("Image decode failed or unsupported format");
   }
-  return{ok:errors.length===0,bytes:b.length,magic,errors};
+  return{ok:errors.length===0,bytes:b.length,magic,imageFormat:type==="image"?imageSignature(b):null,errors};
 }
 function assetType(r){
   const t=r?.components?.asset?.type;
