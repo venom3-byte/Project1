@@ -358,7 +358,7 @@ test("real animated GLB import exposes playable animation clips",async({page})=>
   expect(info.selected).toContain("Fox");
   expect(info.clips.length).toBeGreaterThan(0);
   expect(info.playing).toBeTruthy();
-  await page.screenshot({path:"test-results/fox-glb-forge-proof.png",fullPage:true});
+  await page.screenshot({path:"forge-glb-proof.png",fullPage:true});
 });
 
 
