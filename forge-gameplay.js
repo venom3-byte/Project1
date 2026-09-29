@@ -86,8 +86,8 @@ const ForgeGameplay = {
     const v=Forge.world.createVehicleController?Forge.world.createVehicleController(phys.body):new Forge.rapier.DynamicRayCastVehicleController(
       phys.body,Forge.world.broadPhase,Forge.world.narrowPhase,Forge.world.bodies,Forge.world.colliders
     );
-    v.setIndexUpAxis(1);
-    v.setIndexForwardAxis(2);
+    v.indexUpAxis=1;
+    v.indexForwardAxis=2;
     const wheelRadius=.34,track=.92,wheelBase=1.3;
     const wheelPositions=[
       {x:-track,z:wheelBase},{x:track,z:wheelBase},
