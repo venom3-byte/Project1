@@ -12,3 +12,5 @@ Recent stabilization areas:
 - Production toolbar moved away from timeline and viewport QA controls.
 
 The Android pipeline exports a bundled local runtime and verifies its generated package before Gradle builds.
+
+Current QA target: zero desktop smoke failures plus a real Pixel 7-class mobile smoke pass before the branch is considered stable.
