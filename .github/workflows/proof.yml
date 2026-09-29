@@ -7,6 +7,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: forge-proof
+  cancel-in-progress: true
 jobs:
   proof:
     runs-on: ubuntu-latest
