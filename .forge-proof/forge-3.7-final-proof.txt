@@ -1,0 +1,1 @@
+FINAL-PROOF-MARKER 3.7: visual-health CV diagnostics + asset browser + native gizmos + exact source exports + cooked GLB round-trip.
