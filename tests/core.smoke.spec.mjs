@@ -87,3 +87,23 @@ test("native transform gizmo layer is available and mode switches are determinis
   expect(result.space).toBe("local");
   expect(result.buttons).toEqual(["Move","Rotate","Scale"]);
 });
+
+
+test("asset browser filters and selects imported real assets",async({page})=>{
+  await page.goto("/");
+  const result=await page.evaluate(async()=>{
+    const canvas=document.createElement("canvas");canvas.width=2;canvas.height=2;
+    const blob=await new Promise(r=>{canvas.toBlob(r,"image/png")});
+    const file=new File([blob],"browser-proof.png",{type:"image/png"});
+    await window.Forge.importFile(file);
+    const rows=[...document.querySelectorAll(".asset-row")].map(x=>x.textContent.trim());
+    document.querySelector("#assetSearch").value="browser";
+    document.querySelector("#assetSearch").dispatchEvent(new Event("input",{bubbles:true}));
+    const filtered=[...document.querySelectorAll(".asset-row")].map(x=>x.textContent.trim());
+    document.querySelector(".asset-row")?.click();
+    return{rows,filtered,selected:window.Forge.selected()?.name};
+  });
+  expect(result.rows.some(x=>x.includes("browser-proof.png"))).toBeTruthy();
+  expect(result.filtered).toHaveLength(1);
+  expect(result.selected).toBe("browser-proof.png");
+});
