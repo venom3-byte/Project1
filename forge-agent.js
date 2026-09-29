@@ -45,6 +45,7 @@ const ForgeAgent={
       case "nav-path": {if(!window.ForgeRuntime)throw new Error("Runtime layer unavailable");return window.ForgeRuntime.nav.path(c.start,c.goal);}
       case "save-slot": {if(!window.ForgeRuntime)throw new Error("Runtime layer unavailable");window.ForgeRuntime.save.save(String(c.slot||"default"),c.data||F.serialize());return true;}
       case "load-slot": {if(!window.ForgeRuntime)throw new Error("Runtime layer unavailable");return window.ForgeRuntime.save.load(String(c.slot||"default"));}
+      case "prefab-spawn": {if(!window.ForgeRuntime)throw new Error("Runtime layer unavailable");const r=window.ForgeRuntime.prefabs.spawn(c.name||"Player",{x:c.x||0,y:c.y||0,z:c.z||0});if(!r)throw new Error("Prefab not found");return{id:r.id,name:r.name,kind:r.kind};}
       case "prefab-save": {if(!window.ForgeRuntime)throw new Error("Runtime layer unavailable");const r=F.selected();if(!r)throw new Error("Select entity first");return window.ForgeRuntime.prefabs.save(c.name||r.name,{name:r.name,kind:r.kind,components:r.components,transform:{position:[r.entity.getLocalPosition().x,r.entity.getLocalPosition().y,r.entity.getLocalPosition().z],rotation:[r.entity.getLocalEulerAngles().x,r.entity.getLocalEulerAngles().y,r.entity.getLocalEulerAngles().z],scale:[r.entity.getLocalScale().x,r.entity.getLocalScale().y,r.entity.getLocalScale().z]}});}
       case "template-third-person": return window.ForgeGameplay.createThirdPersonTemplate();
       case "template-racing": return window.ForgeGameplay.createRacingTemplate();
