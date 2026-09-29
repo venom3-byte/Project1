@@ -276,6 +276,17 @@ test("replay records and restores deterministic input frames",async({page})=>{
   expect(state.playing).toBeTruthy();
 });
 
+test("external vision bridge stores a provider-neutral analyzer configuration",async({page})=>{
+  await openForge(page);
+  const status=await page.evaluate(()=>{
+    const s=window.ForgeVision.configureExternal({endpoint:"/api/vision/analyze",provider:"generic"});
+    return window.ForgeVision.status().external;
+  });
+  expect(status.endpoint).toBe("/api/vision/analyze");
+  expect(status.provider).toBe("generic");
+  expect(status.configured).toBe(true);
+});
+
 test("network system accepts a persistent remote endpoint",async({page})=>{
   await openForge(page);
   const endpoint=await page.evaluate(()=>{
