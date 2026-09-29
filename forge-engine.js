@@ -51,6 +51,7 @@ export class ForgeEngine{
   serialize(){return{format:"forge-scene",version:2,meta:{engine:"Forge Studio 2.0",time:new Date().toISOString()},entities:[...this.entities.values()].map(r=>{const p=r.entity.getLocalPosition(),q=r.entity.getLocalEulerAngles(),s=r.entity.getLocalScale();return{id:r.id,name:r.name,kind:r.kind,transform:{p:[p.x,p.y,p.z],r:[q.x,q.y,q.z],s:[s.x,s.y,s.z]},components:r.components,keyframes:this.keyframes.get(r.id)||[],script:this.scripts.get(r.id)||null}})}}
   async load(data,{assetRoot=""}={}){for(const r of [...this.entities.values()]){this.removePhysics(r.id);r.entity.destroy()}this.entities.clear();this.selectedId=null;this.keyframes.clear();this.scripts.clear();
     for(const d of data.entities||[]){
+      if(d.kind==="terrain" && d.components?.terrain && window.ForgeTerrain){window.ForgeTerrain.generate(d.name,d.components.terrain);continue}
       const r=this.add(d.kind,d.name);const t=d.transform||{};
       r.entity.setLocalPosition(...(t.p||[0,0,0]));r.entity.setLocalEulerAngles(...(t.r||[0,0,0]));r.entity.setLocalScale(...(t.s||[1,1,1]));
       if(["box","sphere","cylinder","capsule","plane"].includes(d.kind)){
