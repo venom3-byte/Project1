@@ -1,4 +1,15 @@
-import "./forge-ui.js";
+const bootStarted=performance.now();
+const bootTimings=[];
+window.ForgeBoot={ok:false,phase:"starting",startedAt:Date.now(),startedPerf:bootStarted,modules:0,timings:bootTimings};
+
+const importTimed=async(url,phase)=>{
+  const t0=performance.now();
+  await import(url);
+  const ms=Number((performance.now()-t0).toFixed(2));
+  bootTimings.push({phase,url,ms});
+  window.ForgeBoot.timings=bootTimings;
+  return ms;
+};
 
 const modules=[
   "./forge-project.js",
@@ -24,12 +35,20 @@ const modules=[
 ];
 
 try{
-  for(const url of modules) await import(url);
-  window.ForgeBoot={ok:true,modules:modules.length,at:Date.now()};
+  await importTimed("./forge-ui.js","editor-core");
+  window.ForgeBoot.engineReadyMs=Number((performance.now()-bootStarted).toFixed(2));
+  window.ForgeBoot.phase="modules";
+  for(const url of modules) await importTimed(url,"module");
+  const totalMs=Number((performance.now()-bootStarted).toFixed(2));
+  window.ForgeBoot={...window.ForgeBoot,ok:true,phase:"ready",modules:modules.length,totalMs,readyAt:Date.now()};
+  document.documentElement.dataset.forgeBootMs=String(totalMs);
+  document.dispatchEvent(new CustomEvent("forgebootready",{detail:window.ForgeBoot}));
 }catch(error){
-  window.ForgeBoot={ok:false,error:error?.message||String(error),at:Date.now()};
+  const totalMs=Number((performance.now()-bootStarted).toFixed(2));
+  window.ForgeBoot={...window.ForgeBoot,ok:false,phase:"error",error:error?.message||String(error),totalMs,failedAt:Date.now()};
   console.error("[ForgeBoot]",error);
   const log=document.querySelector("#log");
   if(log)log.textContent+="[BOOT ERROR] "+(error?.stack||error)+"\n";
+  document.documentElement.dataset.forgeBootMs=String(totalMs);
   throw error;
 }
