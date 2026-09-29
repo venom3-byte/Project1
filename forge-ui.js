@@ -11,8 +11,16 @@ try{bootMessage("Starting renderer and physics…");await engine.init();window.F
   "./forge-2d.js","./forge-ai.js","./forge-gameplay-data.js","./forge-network.js","./forge-replay.js",
   "./forge-session.js","./forge-shader.js","./forge-terrain.js","./forge-qa.js","./forge-animation.js",
   "./forge-runtime.js","./forge-gameplay.js","./live-vision.js","./forge-agent.js","./forge-export.js","./forge-gizmo.js"
-]) await import(module);
-}catch(error){window.ForgeBootState="error";bootMessage("Forge could not complete startup: "+(error?.message||String(error)),true);console.error(error);throw error}
+]){
+  bootMessage("Loading "+module+"…");
+  const started=performance.now();
+  await Promise.race([
+    import(module),
+    new Promise((_,reject)=>setTimeout(()=>reject(new Error("Module load timeout after 15000ms: "+module)),15000))
+  ]);
+  write("Loaded "+module+" in "+Math.round(performance.now()-started)+"ms");
+}}
+catch(error){window.ForgeBootState="error";bootMessage("Forge could not complete startup: "+(error?.message||String(error)),true);console.error(error);throw error}
 
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function icon(k){return({box:"▣",sphere:"●",cylinder:"⬢",capsule:"◉",plane:"▱",camera:"◫",light:"☼",model:"◇",empty:"＋"})[k]||"•"}
