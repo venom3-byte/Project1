@@ -1,4 +1,4 @@
-import{pc}from"./forge-engine.js";
+const pc=window.ForgePlayCanvas;
 const F=window.Forge;
 const state={mode:"translate",space:"world",layer:null,gizmos:{},ready:true,nativeReady:false,initializing:false};
 function log(s){try{F.log(s)}catch{console.info("[Forge Gizmo]",s)}}
