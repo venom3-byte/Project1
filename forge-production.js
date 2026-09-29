@@ -261,7 +261,7 @@ async function openBuild(){
 
 function addBar(){
   const bar=document.createElement("div");bar.className="forge-prod";
-  const buttons=[["Asset Lab",openAssets],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],["Build Web",openBuild]];
+  const buttons=[["Asset Lab",openAssets],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],["Vision",()=>window.AssetForgeLiveVision?.open()],["Build Web",openBuild]];
   buttons.forEach(([t,f])=>{const b=document.createElement("button");b.textContent=t;b.onclick=f;bar.append(b)});document.body.append(bar);
 }
 addBar();
