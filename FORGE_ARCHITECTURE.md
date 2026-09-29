@@ -189,3 +189,20 @@ A production subsystem is not complete merely because the UI exists. It should h
 ## Research baseline
 
 The current design is informed by Unreal Engine 5.8 documentation and official release material, PlayCanvas Engine/Editor documentation and current glTF Transform/Meshopt package capabilities. These sources should be re-checked before each major subsystem implementation because all of these projects are actively changing.
+
+## Current integrated benchmark
+
+Forge now includes an integrated AAA Showcase benchmark that combines a player character, five AI enemies, physics cover, projectile combat, VFX, runtime HUD, gameplay Tags/Attributes/Inventory/Ability data, a quest, and GameSession state. This benchmark is used as an end-to-end target so new engine work is validated as a game system rather than as isolated editor widgets.
+
+## Current verification gates
+
+- Node syntax gate over all Forge runtime modules.
+- Playwright desktop and mobile browser proof suite.
+- Real animated Fox GLB import and animation playback check.
+- Real GLB Cook/LOD pipeline check.
+- Terrain/heightfield collision check.
+- Collision EventQueue check.
+- Gameplay/session/data-driven tests.
+- Multiplayer WebSocket room connection check.
+- Replay and prefab subtree tests.
+- In-engine visual regression baseline/diff.
