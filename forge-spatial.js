@@ -9,7 +9,9 @@ function expand(out,p){
 }
 function emptyBounds(){return{min:vec(Infinity,Infinity,Infinity),max:vec(-Infinity,-Infinity,-Infinity)}}
 function cornersFromAabb(aabb){
-  const mn=aabb.getMin(),mx=aabb.getMax();
+  const mn=typeof aabb?.getMin==="function"?aabb.getMin():aabb?.min;
+  const mx=typeof aabb?.getMax==="function"?aabb.getMax():aabb?.max;
+  if(!mn||!mx)return[];
   return [vec(mn.x,mn.y,mn.z),vec(mx.x,mn.y,mn.z),vec(mn.x,mx.y,mn.z),vec(mx.x,mx.y,mn.z),vec(mn.x,mn.y,mx.z),vec(mx.x,mn.y,mx.z),vec(mn.x,mx.y,mx.z),vec(mx.x,mx.y,mx.z)];
 }
 
