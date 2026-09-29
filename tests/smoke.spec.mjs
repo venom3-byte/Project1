@@ -254,3 +254,36 @@ test("real animated GLB import exposes playable animation clips",async({page})=>
   expect(info.clips.length).toBeGreaterThan(0);
   expect(info.playing).toBeTruthy();
 });
+
+
+test("Rapier collision events reach the Forge collision bus",async({page})=>{
+  await page.goto("/");
+  const hit=await page.evaluate(async()=>{
+    let started=false;
+    window.Forge.onCollision(e=>{if(e.started)started=true});
+    const ground=window.Forge.primitive("box","CollisionGround");
+    ground.entity.setLocalPosition(0,0,0);ground.entity.setLocalScale(5,.25,5);window.Forge.setPhysics(ground.id,"fixed","box");
+    const box=window.Forge.primitive("box","FallingBox");
+    box.entity.setLocalPosition(0,4,0);window.Forge.setPhysics(box.id,"dynamic","box");
+    await new Promise(r=>setTimeout(r,1400));
+    return started;
+  });
+  expect(hit).toBeTruthy();
+});
+
+test("Game session lifecycle is serializable and restartable",async({page})=>{
+  await page.goto("/");
+  const state=await page.evaluate(()=>{
+    window.ForgeSession.addPlayer("p1","Player One");
+    window.ForgeSession.mode.configure({winScore:10});
+    window.ForgeSession.start();
+    window.ForgeSession.state.set("score",3);
+    const data=window.ForgeSession.serialize();
+    window.ForgeSession.end({winner:"p1"});
+    window.ForgeSession.load(data);
+    return window.ForgeSession.serialize();
+  });
+  expect(state.state.phase).toBe("playing");
+  expect(state.players[0][1].name).toBe("Player One");
+  expect(state.state.values.score).toBe(3);
+});
