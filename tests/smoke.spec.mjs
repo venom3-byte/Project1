@@ -274,6 +274,16 @@ test("replay records and restores deterministic input frames",async({page})=>{
   expect(state.playing).toBeTruthy();
 });
 
+test("network system accepts a persistent remote endpoint",async({page})=>{
+  await page.goto("/");
+  const endpoint=await page.evaluate(()=>{
+    window.ForgeNet.setEndpoint("wss://example.invalid/forge");
+    return window.ForgeNet.status().endpoint;
+  });
+  expect(endpoint).toBe("wss://example.invalid/forge");
+  await page.evaluate(()=>window.ForgeNet.setEndpoint(""));
+});
+
 test("multiplayer WebSocket room relay accepts a client connection",async({page})=>{
   await page.goto("/");
   const result=await page.evaluate(()=>new Promise(resolve=>{
