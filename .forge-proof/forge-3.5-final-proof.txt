@@ -1,0 +1,1 @@
+FINAL-PROOF-MARKER: UI + native gizmos + visual captures + exact 2D source export + cooked 3D GLB round-trip.
