@@ -21,7 +21,7 @@ class InputSystem{
     const move=e=>{if(!active)return;const r=joy.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),m=45,l=Math.min(m,Math.hypot(dx,dy)),a=Math.atan2(dy,dx);const x=Math.cos(a)*l/m,y=Math.sin(a)*l/m;knob.style.transform="translate("+Math.round(x*36)+"px,"+Math.round(y*36)+"px)";this.virtualMove={x:x,z:-y}};
     const end=()=>{active=false;this.virtualMove={x:0,z:0};knob.style.transform=""};
     joy.addEventListener("pointerdown",e=>{active=true;joy.setPointerCapture(e.pointerId);move(e)});joy.addEventListener("pointermove",move);joy.addEventListener("pointerup",end);joy.addEventListener("pointercancel",end);
-    for(const b of root.querySelectorAll("[data-mobile]")){const a=b.dataset.mobile;b.addEventListener("pointerdown",e=>{e.preventDefault();this.down.add(a)});b.addEventListener("pointerup",()=>this.down.delete(a));b.addEventListener("pointercancel",()=>this.down.delete(a));b.addEventListener("pointerleave",()=>this.down.delete(a))}
+    for(const b of root.querySelectorAll("[data-mobile]")){const a=b.dataset.mobile;b.addEventListener("pointerdown",e=>{e.preventDefault();this.down.add(a);try{window.ForgeAndroid?.vibrate?.(a==="fire"?18:10)}catch{}});b.addEventListener("pointerup",()=>this.down.delete(a));b.addEventListener("pointercancel",()=>this.down.delete(a));b.addEventListener("pointerleave",()=>this.down.delete(a))}
     const show=()=>{root.style.display=(navigator.maxTouchPoints>0||matchMedia("(pointer:coarse)").matches)?"block":"none"};show();addEventListener("resize",show);
   }
 }
