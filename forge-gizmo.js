@@ -14,7 +14,11 @@ function attach(){
     state.gizmos.scale=new Scale(cam,state.layer);
     for(const[name,g]of Object.entries(state.gizmos)){
       g.off?.();
-      g.on("transform:end",()=>{window.dispatchEvent(new Event("forge-gizmo-transform"));});
+      g.on("transform:start",()=>{state.before=Object.fromEntries([...(F.selected?([F.selected()]:[]):[])].map(r=>[r.id,F._transformState?.(r)]));});
+      g.on("transform:end",()=>{
+        const r=F.selected?.();if(r&&state.before?.[r.id])F.recordTransformHistory?.(r.id,state.before[r.id],F._transformState?.(r));
+        window.dispatchEvent(new Event("forge-gizmo-transform"));
+      });
       g.coordSpace=state.space;
       g.snap=Boolean(F.snapEnabled);
       g.snapIncrement=Number(F.snapSize||.25);
