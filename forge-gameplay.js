@@ -16,6 +16,8 @@ const ForgeGameplay = {
   projectileSpeed:24,
   unsubscribePost:null,
 
+  setMode(mode){document.body.dataset.forgeMode=mode;window.dispatchEvent(new Event("forgegamemodechange"))},
+
   init(){
     if(this.running) return this;
     this.running=true;
@@ -234,7 +236,7 @@ const ForgeGameplay = {
   },
 
   createThirdPersonTemplate(){
-    this.init();this.clear();Forge.resetScene(false);
+    this.init();this.clear();Forge.resetScene(false);this.setMode("play");
     Forge.createPlane("Ground",40,40);const light=Forge.createLight("Sun");const player=this.createCharacter("Player",{x:0,y:1.2,z:0});
     const enemy1=this.createEnemy("Enemy_A",{x:7,y:1,z:6}),enemy2=this.createEnemy("Enemy_B",{x:-7,y:1,z:4}),enemy3=this.createEnemy("Enemy_C",{x:4,y:1,z:-8});
     for(let i=0;i<8;i++){const r=Forge.primitive("box","Cover_"+i);r.entity.setLocalPosition((i%4)*4-6,.75,Math.floor(i/4)*6-3);r.entity.setLocalScale(1.5,1.5,1.5);r.components.navObstacle=true;Forge.setPhysics(r.id,"fixed","box");}
@@ -243,7 +245,7 @@ const ForgeGameplay = {
   },
 
   createRacingTemplate(){
-    this.init();this.clear();Forge.resetScene(false);
+    this.init();this.clear();Forge.resetScene(false);this.setMode("play");
     Forge.createPlane("TrackGround",80,80);Forge.createLight("Sun");const car=this.createVehicle("PlayerCar",{x:0,y:1,z:0});
     for(let i=0;i<10;i++){const edge=Forge.primitive("box","TrackEdge_"+i);edge.entity.setLocalPosition(-6,1,-30+i*7);edge.entity.setLocalScale(.5,1,3);Forge.setPhysics(edge.id,"fixed","box");}
     for(let i=0;i<10;i++){const edge=Forge.primitive("box","TrackEdgeR_"+i);edge.entity.setLocalPosition(6,1,-30+i*7);edge.entity.setLocalScale(.5,1,3);Forge.setPhysics(edge.id,"fixed","box");}
@@ -254,6 +256,7 @@ const ForgeGameplay = {
   hydrate(config){
     if(!config?.type)return;
     this.characters.clear();this.vehicles.clear();this.agents.clear();this.projectiles=[];this.fireCooldown=0;
+    this.setMode("play");
     if(config.type==="third-person" || config.type==="showcase"){
       const p=Forge.entities.get(config.player);
       if(p){const phys=Forge.physics.get(p.id);const c=Forge.rapier?new Forge.rapier.KinematicCharacterController(.02,Forge.world.integrationParameters,Forge.world.broadPhase,Forge.world.narrowPhase,Forge.world.bodies,Forge.world.colliders):null;if(c){c.enableAutostep(.45,.2,true);c.enableSnapToGround(.2)}this.characters.set(p.id,{id:p.id,entity:p.entity,body:phys?.body,collider:phys?.collider,controller:c,speed:5.5,sprintSpeed:8.5,jumpSpeed:6.2,gravity:-18,verticalVelocity:0,grounded:false,cameraDistance:6,cameraHeight:2.8,damage:20,hp:100});}
@@ -267,7 +270,7 @@ const ForgeGameplay = {
   serialize(){return this.currentTemplate?structuredClone(this.currentTemplate):null},
 
   createShowcaseGame(){
-    this.init();this.clear();Forge.resetScene(false);
+    this.init();this.clear();Forge.resetScene(false);this.setMode("play");
     Forge.createPlane("ArenaGround",48,48);Forge.createLight("ArenaSun");
     const player=this.createCharacter("Hero",{x:0,y:1.2,z:0});
     const enemies=[];for(const pos of [{x:8,y:1,z:8},{x:-8,y:1,z:7},{x:7,y:1,z:-8},{x:-7,y:1,z:-7},{x:12,y:1,z:0}])enemies.push(this.createEnemy("Enemy_"+(enemies.length+1),pos));
