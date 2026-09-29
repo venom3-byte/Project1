@@ -37,6 +37,7 @@ class ForgeAbility{
     this.remaining=this.cooldown;return true
   }
   tick(dt){this.remaining=Math.max(0,this.remaining-dt)}
+  serialize(){return{id:this.id,cooldown:this.cooldown,remaining:this.remaining,cost:this.cost,effects:this.effects,tags:this.tags.all()}}
 }
 class ForgeActorData{
   constructor(id){
@@ -47,8 +48,8 @@ class ForgeActorData{
   grantItem(id,count=1){this.inventory.set(id,(this.inventory.get(id)||0)+count)}
   consumeItem(id,count=1){const n=this.inventory.get(id)||0;if(n<count)return false;this.inventory.set(id,n-count);return true}
   tick(dt){for(const a of this.abilities.values())a.tick(dt);this.effects=this.effects.filter(e=>e.tick(this,dt))}
-  serialize(){return{id:this.id,tags:this.tags.serialize(),attributes:this.attributes.serialize(),inventory:Object.fromEntries(this.inventory),state:this.state}}
-  load(d){this.tags.load(d?.tags||[]);this.attributes.load(d?.attributes||{});this.inventory=new Map(Object.entries(d?.inventory||{}));this.state=d?.state||{}}
+  serialize(){return{id:this.id,tags:this.tags.serialize(),attributes:this.attributes.serialize(),inventory:Object.fromEntries(this.inventory),state:this.state,abilities:[...this.abilities.values()].map(a=>a.serialize())}}
+  load(d){this.tags.load(d?.tags||[]);this.attributes.load(d?.attributes||{});this.inventory=new Map(Object.entries(d?.inventory||{}));this.state=d?.state||{};this.abilities=new Map((d?.abilities||[]).map(x=>{const a=new ForgeAbility(x.id,x);a.remaining=x.remaining||0;return[x.id,a]}))}
 }
 class ForgeDataRegistry{
   constructor(){this.assets=new Map()}
