@@ -4,7 +4,7 @@ import {spawnSync} from "node:child_process";
 
 const root=process.cwd();
 const files=[
-  "forge-engine.js","forge-ui.js","forge-spatial.js","forge-production.js","forge-project.js","forge-agent.js",
+  "forge-engine.js","forge-ui.js","forge-spatial.js","forge-export.js","forge-production.js","forge-project.js","forge-agent.js",
   "live-vision.js","forge-runtime.js","forge-gameplay.js","forge-render.js","forge-ui-system.js","forge-vfx.js",
   "forge-2d.js","forge-ai.js","forge-gameplay-data.js","forge-network.js","forge-replay.js","forge-session.js",
   "forge-shader.js","forge-terrain.js","forge-qa.js","server.mjs","forge-pipeline.mjs","sw.js"
