@@ -190,7 +190,7 @@ window.addEventListener("forge-assets-changed",()=>{refresh();inspect()});
 window.ForgeVision={scan:()=>window.ForgeSpatial?.sceneVision?.()||{},inspect:id=>{const r=engine.entities.get(id);return r?window.ForgeSpatial?.inspect?.(r):null},selectAt:(x,y)=>engine.pick({clientX:x,clientY:y})};
 function stats(){const d=engine.diagnostics();$("renderer").textContent=d.renderer;$("fps").textContent=d.fps;$("physics").textContent=d.physics;requestAnimationFrame(stats)}
 const initialDiagnostics={
-  renderer:engine.app?.graphicsDevice?.isWebGPU?"WebGPU":"WebGL2",
+  renderer:/webgpu/i.test(engine.app?.graphicsDevice?.constructor?.name||"")?"WebGPU":"WebGL2",
   physics:engine.physics?.size||0
 };
 $("renderer").textContent=initialDiagnostics.renderer;
