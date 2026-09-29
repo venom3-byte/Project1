@@ -1,9 +1,9 @@
 import{test,expect}from"@playwright/test";
-const openForge=async page=>{await page.goto("/");await page.waitForFunction(()=>window.ForgeBoot?.ok===true,{timeout:30000});};
+const openForge=async page=>{await page.goto("/");await page.waitForFunction(()=>window.ForgeBoot?.ok===true,{timeout:30000});return await page.evaluate(()=>window.ForgeBoot)};
 
-test("Forge boots with renderer and scene kernel",async({page})=>{
+test("Forge boots with renderer and scene kernel",async({page},testInfo)=>{
   const errors=[];page.on("pageerror",e=>errors.push(String(e)));page.on("console",m=>m.type()==="error"&&errors.push(m.text()));
-  await openForge(page);await expect(page.locator("#sceneCount")).toContainText("3 entities");await expect(page.locator("#renderer")).toHaveText(/WebGPU|WebGL2/);
+  const boot=await openForge(page);testInfo.annotations.push({type:"boot-ms",description:String(boot.totalMs)});expect(boot.totalMs).toBeLessThan(15000);await expect(page.locator("#sceneCount")).toContainText("3 entities");await expect(page.locator("#renderer")).toHaveText(/WebGPU|WebGL2/);
   const s=await page.evaluate(()=>window.Forge.diagnostics());expect(s.entities).toBe(3);expect(s.renderables).toBeGreaterThan(0);expect(errors).toEqual([]);
 });
 test("scene creation, selection, inspector and transform work",async({page})=>{
