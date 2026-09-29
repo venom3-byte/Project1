@@ -7,8 +7,8 @@ export class ForgeEngine{
     this.app=new pc.Application(this.canvas,{graphicsDeviceOptions:{antialias:true,alpha:false,powerPreference:"high-performance",preserveDrawingBuffer:true}});
     this.app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);this.app.setCanvasResolution(pc.RESOLUTION_AUTO);this.app.scene.gammaCorrection=pc.GAMMA_SRGB;this.app.scene.toneMapping=pc.TONEMAP_ACES;this.app.start();
     this.root=new pc.Entity("ForgeScene");this.app.root.addChild(this.root);
-    this.createCamera("Main Camera",{x:7,y:5,z:9});this.createLight("Sun");this.createPlane("Ground",30,30);
     await RAPIER.init();this.rapier=RAPIER;this.world=new RAPIER.World({x:0,y:-9.81,z:0});
+    this.createCamera("Main Camera",{x:7,y:5,z:9});this.createLight("Sun");this.createPlane("Ground",30,30);
     this.app.on("update",dt=>this.update(dt));this.canvas.addEventListener("pointerdown",e=>this.pick(e));window.addEventListener("resize",()=>this.app.resizeCanvas());this.app.resizeCanvas();this.log("Forge Engine 2.0 online");return this;
   }
   rec(name,kind,e){const id=crypto.randomUUID();e.__forge={id,kind,name,components:{}};const r={id,kind,name,entity:e,components:e.__forge.components};this.entities.set(id,r);return r}
@@ -38,7 +38,7 @@ export class ForgeEngine{
     const url=URL.createObjectURL(file);
     if(file.name.toLowerCase().endsWith(".forge.json"))return{type:"project",data:JSON.parse(await file.text())};
     if(/^image\//.test(file.type)){const bmp=await createImageBitmap(file),c=document.createElement("canvas");c.width=bmp.width;c.height=bmp.height;c.getContext("2d").drawImage(bmp,0,0);const tex=new pc.Texture(this.app.graphicsDevice,{width:bmp.width,height:bmp.height,format:pc.PIXELFORMAT_R8_G8_B8_A8});tex.setSource(c);const mat=this.material([1,1,1]);mat.diffuseMap=tex;mat.emissiveMap=tex;mat.emissive=new pc.Color(1,1,1);mat.update();const r=this.primitive("plane",file.name);r.entity.render.material=mat;r.components.asset={type:"image",name:file.name,width:bmp.width,height:bmp.height};return{type:"image",record:r}}
-    if(/\.(glb|gltf)$/i.test(file.name))return new Promise((resolve,reject)=>{const asset=new pc.Asset(file.name,"container",{url:url});this.app.assets.add(asset);asset.once("error",reject);asset.once("load",()=>{try{const e=asset.resource.instantiateRenderEntity({castShadows:true,receiveShadows:true});e.name=file.name.replace(/\.[^.]+$/,"");this.root.addChild(e);const r=this.rec(e.name,"model",e);r.components.asset={type:"model",name:file.name};this.select(r.id);resolve({type:"model",record:r})}catch(err){reject(err)}});this.app.assets.load(asset)});
+    if(/\.glb$/i.test(file.name))return new Promise((resolve,reject)=>{const asset=new pc.Asset(file.name,"container",{url:url});this.app.assets.add(asset);asset.once("error",reject);asset.once("load",()=>{try{const e=asset.resource.instantiateRenderEntity({castShadows:true,receiveShadows:true});e.name=file.name.replace(/\.[^.]+$/,"");this.root.addChild(e);const r=this.rec(e.name,"model",e);r.components.asset={type:"model",name:file.name};this.select(r.id);resolve({type:"model",record:r})}catch(err){reject(err)}});this.app.assets.load(asset)});
     return{type:"asset",name:file.name}
   }
   serialize(){return{format:"forge-scene",version:2,meta:{engine:"Forge Studio 2.0",time:new Date().toISOString()},entities:[...this.entities.values()].map(r=>{const p=r.entity.getLocalPosition(),q=r.entity.getLocalEulerAngles(),s=r.entity.getLocalScale();return{id:r.id,name:r.name,kind:r.kind,transform:{p:[p.x,p.y,p.z],r:[q.x,q.y,q.z],s:[s.x,s.y,s.z]},components:r.components,keyframes:this.keyframes.get(r.id)||[],script:this.scripts.get(r.id)||null}})}}
@@ -46,3 +46,4 @@ export class ForgeEngine{
   diagnostics(){return{ok:true,renderer:this.app?.graphicsDevice?.isWebGPU?"WebGPU":"WebGL2",fps:Number(this.fps.toFixed(1)),entities:this.entities.size,renderables:[...this.entities.values()].filter(r=>r.entity.render?.meshInstances?.length).length,physics:this.physics.size,scripts:this.scripts.size,tracks:this.keyframes.size,time:Number(this.timelineTime.toFixed(2))}}
 }
 export{pc,RAPIER};
+// Future importer adapters may register .gltf directory/zip packages here without changing the scene schema.
