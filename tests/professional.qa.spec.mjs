@@ -14,8 +14,11 @@ async function collectErrors(page){
 
 async function waitForForge(page){
   await page.goto("/");
-  await expect(page.locator("#sceneCount")).toContainText("3 entities",{timeout:15000});
-  await page.waitForFunction(()=>!!window.Forge&&!!window.ForgeSpatial&&!!window.ForgeExport,{timeout:15000});
+  await page.waitForFunction(()=>window.ForgeReady===true,{timeout:20000});
+  await page.waitForFunction(()=>{const d=window.Forge?.diagnostics?.();return d?.entities===3&&d?.renderables>0},{timeout:10000});
+  await expect(page.locator("#sceneCount")).toContainText("3 entities",{timeout:5000});
+  await page.waitForFunction(()=>!!window.Forge&&!!window.ForgeSpatial&&!!window.ForgeExport,{timeout:10000});
+  await page.waitForTimeout(120);
 }
 
 async function download(page,url){
