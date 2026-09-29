@@ -29,8 +29,12 @@ jobs:
           name: forge-syntax-report
           path: forge-syntax-report.json
           if-no-files-found: ignore
-      - name: Core + visual + export acceptance
-        run: npm run test:core && npm run validate:gltf
+      - name: Core + visual acceptance
+        run: npx playwright test tests/core.smoke.spec.mjs tests/asset-export.spec.mjs tests/visual.smoke.spec.mjs --project=desktop
+      - name: Professional real-asset acceptance
+        run: npm run test:professional
+      - name: Khronos glTF validation
+        run: npm run validate:gltf
       - name: Full regression suite
         run: npm run test:forge
       - name: Upload Playwright diagnostics
