@@ -16,7 +16,16 @@ const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=u
 const clients=new Set(),rooms=new Map();
 function json(res,o,status=200){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','Access-Control-Allow-Origin':'*'});res.end(JSON.stringify(o))}
 function body(req,max=64*1024){return new Promise((resolve,reject)=>{let raw='';req.on('data',chunk=>{raw+=chunk;if(raw.length>max){reject(new Error('Request body too large'));req.destroy()}});req.on('end',()=>{try{resolve(raw?JSON.parse(raw):{})}catch(e){reject(new Error('Invalid JSON'))}});req.on('error',reject)})}
-async function routeVisionAction(req,res){try{const q=await body(req);if(!q.action)return json(res,{ok:false,error:'Missing action'},400);return json(res,await vision.action(q.action,q.options||{}))}catch(e){return json(res,{ok:false,error:e.message||String(e)},500)}}
+async function routeVisionAction(req,res){
+  try{
+    const q=await body(req);
+    if(!q.action)return json(res,{ok:false,error:'Missing action'},400);
+    const result=await vision.action(q.action,q.options||{});
+    return json(res,{ok:true,result});
+  }catch(e){
+    return json(res,{ok:false,error:e.message||String(e),vision:vision.status()},500);
+  }
+}
 function safeFile(urlPath){let p=decodeURIComponent(urlPath||'/');if(p==='/'||p==='')p='/index.html';if(p.includes('..'))return null;const full=path.resolve(root,'.'+p);return full.startsWith(root+path.sep)?full:null}
 function serve(req,res){const u=new URL(req.url,'http://localhost');const file=safeFile(u.pathname);fs.stat(file||'',(err,st)=>{if(!err&&st.isFile()){const ext=path.extname(file).toLowerCase();res.writeHead(200,{'Content-Type':mime[ext]||'application/octet-stream','Cache-Control':ext==='.html'||ext==='.js'||ext==='.css'?'no-cache':'public, max-age=31536000, immutable','X-Content-Type-Options':'nosniff'});return fs.createReadStream(file).pipe(res)}if(u.pathname!=='/'&&!path.extname(u.pathname)){const fallback=path.join(root,'index.html');res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache'});return fs.createReadStream(fallback).on('error',()=>{res.writeHead(404);res.end('Not found')}).pipe(res)}res.writeHead(404);res.end('Not found')})}
 const srv=http.createServer(async (req,res)=>{const u=new URL(req.url,'http://localhost');if(req.method==='OPTIONS'){res.writeHead(204,{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'Content-Type'});return res.end()}
