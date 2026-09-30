@@ -9,18 +9,18 @@ class AssetPipeline {
   }
 
   async analyze(file) {
-    const base = {
-      id: crypto.randomUUID(),
-      name: file.name,
-      type: file.type || "application/octet-stream",
-      bytes: file.size,
-      modified: file.lastModified || Date.now()
-    };
-    if (/^image\//.test(file.type)) return Object.assign(base, await this.analyzeImage(file));
-    if (/\.glb$/i.test(file.name)) return Object.assign(base, await this.analyzeGLB(file));
-    if (/\.gltf$/i.test(file.name)) return Object.assign(base, { kind:"gltf", status:"package-required", warnings:["GLTF may reference external files; prefer GLB or import the full package."], optimization:[] });
-    if (/^audio\//.test(file.type) || /\.(wav|mp3|ogg|m4a)$/i.test(file.name)) return Object.assign(base,{kind:"audio",status:"ready",optimization:["Normalize loudness","Generate preview waveform","Create streaming/short-clip variants"]});
-    return Object.assign(base,{kind:"file",status:"ready",optimization:[]});
+    const base={id:crypto.randomUUID(),name:file.name,type:file.type||"application/octet-stream",bytes:file.size,modified:file.lastModified||Date.now(),extension:String(file.name).split(".").pop()?.toLowerCase()||""};
+    const n=String(file.name).toLowerCase();
+    const model=/.\(glb|gltf|fbx|obj|dae|3ds|stl|ply|off|3mf|dxf|ase|b3d|lwo|lxo|m3d|md2|md3|md5mesh|ms3d|smd|vta|x|x3d\)$/i.test(n);
+    if(/^image\//.test(file.type)||/\.(png|jpe?g|webp|avif|gif|bmp|tga|tif|tiff)$/i.test(n))return Object.assign(base,await this.analyzeImage(file));
+    if(/\.glb$/i.test(n))return Object.assign(base,await this.analyzeGLB(file));
+    if(/\.gltf$/i.test(n))return Object.assign(base,{kind:"gltf",status:"package-or-single-file",warnings:["External buffers/textures are automatically packaged when supplied together."],optimization:["Prefer GLB for portable delivery"]});
+    if(model)return Object.assign(base,{kind:"model-source",status:"conversion-capable",optimization:["Convert to GLB for native runtime","Preserve original source for re-export","Inspect materials, skeletons, animations and topology after conversion"]});
+    if(/^audio\//.test(file.type)||/\.(wav|mp3|ogg|m4a|aac|flac|webm)$/i.test(n))return Object.assign(base,{kind:"audio",status:"ready",optimization:["Generate streaming and short-clip variants","Analyze loudness and loop points"]});
+    if(/\.(ttf|ttc|otf)$/i.test(n))return Object.assign(base,{kind:"font",status:"source-ready",optimization:["Generate MSDF/SDF runtime atlas"]});
+    if(/\.(glsl|vert|frag|shader)$/i.test(n))return Object.assign(base,{kind:"shader",status:"source-ready",optimization:["Validate shader source","Generate platform variants"]});
+    if(/\.(json|xml|csv|txt|css|js|mjs|wasm)$/i.test(n))return Object.assign(base,{kind:"data",status:"source-ready",optimization:["Validate syntax/schema before runtime use"]});
+    return Object.assign(base,{kind:"source",status:"source-ready",optimization:["Preserve exact source bytes and provenance"]});
   }
 
   async analyzeImage(file) {
