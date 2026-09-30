@@ -4,6 +4,7 @@ import{writeFile}from"node:fs/promises";
 const FOX="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Fox/glTF-Binary/Fox.glb";
 const TOYCAR="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/ToyCar/glTF-Binary/ToyCar.glb";
 const EXAMPLE_PNG="https://upload.wikimedia.org/wikipedia/commons/7/70/Example.png";
+const asBytes=value=>value instanceof Uint8Array?value:new Uint8Array(value?.data||value);
 
 async function collectErrors(page){
   const errors=[];
@@ -157,7 +158,7 @@ test.describe("Forge professional acceptance",()=>{
     const png=await download(page,EXAMPLE_PNG);
     expect(png.length).toBeGreaterThan(100);
     const result=await page.evaluate(async(bytes)=>{
-      const file=new File([bytes],"developer-reference.png",{type:"image/png"});
+      const file=new File([asBytes(bytes)],"developer-reference.png",{type:"image/png"});
       await window.ForgeProduction.assets.storeFile(file);
       const imported=await window.Forge.importFile(file);
       const check=await window.ForgeExport.validateSelected();
@@ -195,7 +196,7 @@ test.describe("Forge professional acceptance",()=>{
     const originalSha=await sha(new Blob([glb]));
     await waitForForge(page);
     const result=await page.evaluate(async({bytes,originalSha})=>{
-      const file=new File([bytes],"Fox.glb",{type:"model/gltf-binary"});
+      const file=new File([asBytes(bytes)],"Fox.glb",{type:"model/gltf-binary"});
       await window.ForgeProduction.assets.storeFile(file);
       const imported=await window.Forge.importFile(file);
       const check=await window.ForgeExport.validateSelected();
@@ -243,7 +244,7 @@ test.describe("Forge professional acceptance",()=>{
     const originalSha=await sha(new Blob([glb]));
     await waitForForge(page);
     const result=await page.evaluate(async(bytes)=>{
-      const file=new File([bytes],"ToyCar.glb",{type:"model/gltf-binary"});
+      const file=new File([asBytes(bytes)],"ToyCar.glb",{type:"model/gltf-binary"});
       const imported=await window.Forge.importFile(file);
       const before=window.ForgeSpatial.inspect(imported.record);
       const qa=await window.ForgeExport.runExportQA();
@@ -271,7 +272,7 @@ test.describe("Forge professional acceptance",()=>{
     const glb=await download(page,FOX);
     await waitForForge(page);
     const result=await page.evaluate(async(bytes)=>{
-      const file=new File([bytes],"Fox.glb",{type:"model/gltf-binary"});
+      const file=new File([asBytes(bytes)],"Fox.glb",{type:"model/gltf-binary"});
       const imported=await window.Forge.importFile(file);
       const m=await window.ForgeExport.exportManifest({download:false});
       return{manifest:JSON.parse(await m.blob.text()),asset:imported.record};
