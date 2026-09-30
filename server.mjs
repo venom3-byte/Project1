@@ -5,6 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {WebSocketServer} from 'ws';
 import {cookGLB} from './forge-pipeline.mjs';
+import {VisionController} from './vision-controller.mjs';
 import {VisionController,installVisionShutdown} from './vision-control.mjs';
 
 const root=path.dirname(fileURLToPath(import.meta.url));
@@ -13,7 +14,8 @@ const host=process.env.HOST||'127.0.0.1';
 const vision=new VisionController({baseUrl:`http://127.0.0.1:${port}`});
 const removeVisionShutdown=installVisionShutdown(vision);
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.webmanifest':'application/manifest+json; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.svg':'image/svg+xml','.ico':'image/x-icon','.wasm':'application/wasm'};
-const clients=new Set(),rooms=new Map();
+const clients=new Set(),visionClients=new Set(),rooms=new Map();
+const vision=new VisionController({port:Number(process.env.FORGE_CDP_PORT||9222),host:process.env.FORGE_CDP_HOST||'127.0.0.1',broadcast:message=>{const raw=JSON.stringify(message);for(const peer of visionClients)if(peer.readyState===1)peer.send(raw)}});
 function json(res,o,status=200){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','Access-Control-Allow-Origin':'*'});res.end(JSON.stringify(o))}
 function body(req,max=64*1024){return new Promise((resolve,reject)=>{let raw='';req.on('data',chunk=>{raw+=chunk;if(raw.length>max){reject(new Error('Request body too large'));req.destroy()}});req.on('end',()=>{try{resolve(raw?JSON.parse(raw):{})}catch(e){reject(new Error('Invalid JSON'))}});req.on('error',reject)})}
 async function routeVisionAction(req,res){try{const q=await body(req);if(!q.action)return json(res,{ok:false,error:'Missing action'},400);return json(res,await vision.action(q.action,q.options||{}))}catch(e){return json(res,{ok:false,error:e.message||String(e)},500)}}
@@ -73,10 +75,12 @@ visionWss.on('connection',ws=>{
     }
   });
 });
+const visionWss=new WebSocketServer({noServer:true});
+visionWss.on('connection',ws=>{visionClients.add(ws);ws.send(JSON.stringify({type:'vision-state',state:vision.status()}));ws.on('close',()=>visionClients.delete(ws));});
 const netWss=new WebSocketServer({noServer:true});
 function joinRoom(room,ws,peerId){if(!rooms.has(room))rooms.set(room,new Set());const set=rooms.get(room);for(const p of set)if(p.readyState===1)p.send(JSON.stringify({type:'peer-join',peerId}));set.add(ws);ws.__room=room;ws.__peerId=peerId}
 function leaveRoom(ws){const room=ws.__room;if(!room||!rooms.has(room))return;const set=rooms.get(room);set.delete(ws);for(const p of set)if(p.readyState===1)p.send(JSON.stringify({type:'peer-leave',peerId:ws.__peerId}));if(!set.size)rooms.delete(room)}
 netWss.on('connection',ws=>{ws.on('close',()=>leaveRoom(ws));ws.on('message',message=>{let m;try{m=JSON.parse(message)}catch{return}if(m.type==='hello'){joinRoom(String(m.room||'default'),ws,String(m.peerId||crypto.randomUUID()));return}const room=rooms.get(ws.__room);if(!room)return;for(const p of room)if(p!==ws&&p.readyState===1)p.send(JSON.stringify(m))})});
-srv.on('upgrade',(req,socket,head)=>{const pathn=new URL(req.url,'http://localhost').pathname;if(pathn==='/live')return wss.handleUpgrade(req,socket,head,ws=>wss.emit('connection',ws,req));if(pathn==='/vision')return visionWss.handleUpgrade(req,socket,head,ws=>visionWss.emit('connection',ws,req));if(pathn==='/net')return netWss.handleUpgrade(req,socket,head,ws=>netWss.emit('connection',ws,req));socket.destroy()});
+srv.on('upgrade',(req,socket,head)=>{const pathn=new URL(req.url,'http://localhost').pathname;if(pathn==='/live')return wss.handleUpgrade(req,socket,head,ws=>wss.emit('connection',ws,req));if(pathn==='/vision')return visionWss.handleUpgrade(req,socket,head,ws=>visionWss.emit('connection',ws,req));if(pathn==='/vision')return visionWss.handleUpgrade(req,socket,head,ws=>visionWss.emit('connection',ws,req));if(pathn==='/net')return netWss.handleUpgrade(req,socket,head,ws=>netWss.emit('connection',ws,req));socket.destroy()});
 srv.listen(port,host,()=>console.log('Forge Studio 3.7 listening on http://'+host+':'+port));
 process.once('exit',removeVisionShutdown);
