@@ -20,7 +20,15 @@ jobs:
         with:
           node-version: 22
       - run: npm install
-      - run: npx playwright install --with-deps chromium
+      - name: Prepare browser runtime
+        shell: bash
+        run: |
+          if command -v google-chrome >/dev/null 2>&1; then
+            echo "PLAYWRIGHT_CHANNEL=chrome" >> "$GITHUB_ENV"
+            google-chrome --version
+          else
+            npx playwright install --with-deps chromium
+          fi
       - run: node scripts/validate-syntax.mjs
       - name: Upload syntax report
         if: always()
