@@ -244,7 +244,7 @@ export class ForgeEngine{
       mat.useLighting=false;mat.useTonemap=false;mat.cull=pc.CULLFACE_NONE;mat.blendType=pc.BLEND_NONE;mat.opacity=1;mat.alphaTest=0;mat.update();
       const r=this.primitive("plane",file.name);
       const h=2.6,w=Math.max(.25,h*(bmp.width/Math.max(1,bmp.height)));
-      r.entity.setLocalEulerAngles(-90,0,0);r.entity.setLocalScale(w,1,h);r.entity.setLocalPosition(0,h*.5,0);
+      r.entity.setLocalEulerAngles(90,0,0);r.entity.setLocalScale(w,1,h);r.entity.setLocalPosition(0,h*.5,0);
       r.entity.render.material=mat;r.entity.render.frustumCulling=false;
       r.components.asset={type:"image",name:file.name,width:bmp.width,height:bmp.height,analysis,sourceUnits:"pixels",presentation:"upright-2d-preview",pixelsPerWorldUnit:bmp.height/h,derivedDirty:false};
       this.assets.set(file.name,{type:"image",file,url});this.select(r.id);this.setView("front");this.frame();
