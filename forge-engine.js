@@ -192,6 +192,36 @@ export class ForgeEngine{
     return root.__forgeViewportPreview;
   }
 
+  async sha256(file){
+    const digest=await crypto.subtle.digest("SHA-256",await file.arrayBuffer());
+    return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,"0")).join("");
+  }
+  async fileToDataUri(file){
+    const bytes=new Uint8Array(await file.arrayBuffer());
+    let binary="";
+    for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,Math.min(i+0x8000,bytes.length)));
+    const ext=extOf(file);
+    const mime=file.type||({png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",webp:"image/webp",avif:"image/avif",gif:"image/gif",bmp:"image/bmp",tga:"image/x-tga",tif:"image/tiff",tiff:"image/tiff",bin:"application/octet-stream",glb:"model/gltf-binary",gltf:"model/gltf+json"}[ext]||"application/octet-stream");
+    return "data:"+mime+";base64,"+btoa(binary);
+  }
+  async packageGltfBundle(file,bundle=[]){
+    const files=[file,...(bundle||[])].filter(Boolean);
+    const json=JSON.parse(await file.text());
+    const byName=new Map(files.map(f=>[f.name.replaceAll("\\","/").split("/").at(-1).toLowerCase(),f]));
+    const patch=async(items)=>{
+      for(const item of items||[]){
+        const uri=item?.uri;
+        if(!uri||String(uri).startsWith("data:"))continue;
+        const clean=decodeURIComponent(String(uri).split(/[?#]/)[0]).replaceAll("\\","/").split("/").at(-1).toLowerCase();
+        const dep=byName.get(clean);
+        if(!dep)throw new Error("Missing glTF dependency: "+uri+" — select the complete model package.");
+        item.uri=await this.fileToDataUri(dep);
+      }
+    };
+    await patch(json.buffers);
+    await patch(json.images);
+    return new File([JSON.stringify(json)],file.name,{type:"model/gltf+json"});
+  }
   async convertLegacyModelToGLB(file,bundle=[]){
     const files=[file,...(bundle||[])].filter(Boolean);
     const unique=[...new Map(files.map(f=>[f.name.replaceAll("\\","/"),f])).values()];
@@ -216,9 +246,9 @@ export class ForgeEngine{
     const list=new ajs.FileList();
     for(const source of unique)list.AddFile(source.name.replaceAll("\\","/"),new Uint8Array(await source.arrayBuffer()));
     const result=ajs.ConvertFileList(list,"glb2");
-    if(!result?.IsSuccess?.()||!result?.FileCount?.())throw new Error("Legacy 3D conversion failed: "+String(result?.GetErrorCode?.()||"unknown AssimpJS error"));
+    if(!result?.IsSuccess?.()||!result?.FileCount?.())throw new Error("Legacy 3D conversion failed for ."+extOf(file)+": "+String(result?.GetErrorCode?.()||"unknown AssimpJS error"));
     const out=result.GetFile(0);
-    return new File([out.GetContent()],file.name.replace(/\.[^.]+$/,"")+".glb",{type:"model/gltf-binary"});
+    return new File([out.GetContent()],file.name.replace(/.[^.]+$/,"")+".glb",{type:"model/gltf-binary"});
   }
   async sanitizeGlbPreview(file){
     const name=String(file?.name||"").toLowerCase();
