@@ -276,6 +276,42 @@ test.describe("Forge professional acceptance",()=>{
     expect(result.diffuse.reduce((a,b)=>a+b,0)).toBeGreaterThan(.3);
     await page.screenshot({path:"test-results/pro-legacy-obj-editor.png",fullPage:true});
   });
+  test("built-in realistic car asset imports from the live CC0 catalog with real materials and animations",async({page})=>{
+    test.setTimeout(120000);
+    await waitForForge(page);
+    await expect(page.locator("#importRealCar")).toBeVisible();
+    await page.click("#importRealCar");
+    await page.waitForFunction(()=>window.Forge?.selected?.()?.components?.asset?.remoteSource?.includes("/assets/32487/v1/model.glb"),{timeout:60000});
+    const result=await page.evaluate(()=>{
+      const r=window.Forge.selected(),stack=[r?.entity],meshes=[];
+      while(stack.length){const n=stack.pop();for(const mi of n?.render?.meshInstances||[])meshes.push(mi);for(const c of n?.children||[])stack.push(c)}
+      const i=window.ForgeSpatial.inspect(r),materials=new Set(meshes.map(mi=>mi.material?.name||mi.material));
+      return{
+        name:r?.components?.asset?.name,
+        remoteSource:r?.components?.asset?.remoteSource,
+        license:r?.components?.asset?.license,
+        vertices:i?.geometry?.vertices||0,
+        triangles:i?.geometry?.triangles||0,
+        materials:Math.max(i?.geometry?.materials||0,materials.size),
+        animations:i?.geometry?.animations||0,
+        renderables:meshes.length,
+        textured:meshes.filter(mi=>!!mi.material?.diffuseMap).length,
+        world:i?.world?.size||null
+      };
+    });
+    expect(result.name).toBe("Forge-Realistic-City-Car.glb");
+    expect(result.remoteSource).toContain("/assets/32487/v1/model.glb");
+    expect(result.license).toContain("CC0");
+    expect(result.vertices).toBeGreaterThan(50000);
+    expect(result.triangles).toBeGreaterThan(25000);
+    expect(result.materials).toBeGreaterThanOrEqual(8);
+    expect(result.animations).toBeGreaterThanOrEqual(8);
+    expect(result.renderables).toBeGreaterThan(0);
+    expect(result.textured).toBeGreaterThan(0);
+    expect(result.world?.y).toBeGreaterThan(0.5);
+    await page.screenshot({path:"test-results/pro-realistic-car-editor.png",fullPage:true});
+  });
+
   test("real animated Fox GLB imports with animation clips and exact source export",async({page})=>{
     test.setTimeout(120000);
     const glb=await download(page,FOX);
