@@ -263,10 +263,10 @@ test.describe("Forge professional acceptance",()=>{
 
   test("legacy OBJ imports through the real browser conversion adapter and produces a renderable 3D asset",async({page})=>{
     test.setTimeout(120000);
-    const obj=new TextEncoder().encode([
+    const obj=Buffer.from([
       "o ForgeProof","v -0.7 0 -0.5","v 0.7 0 -0.5","v 0 1.4 -0.5","v -0.7 0 0.5","v 0.7 0 0.5","v 0 1.4 0.5",
       "f 1 2 3","f 4 6 5","f 1 4 5 2","f 2 5 6 3","f 3 6 4 1"
-    ].join("\n"));
+    ].join("\n"),"utf8");
     await waitForForge(page);
     await importViaInput(page,obj,"forge-proof.obj","model/obj",{renderable:true});
     const result=await page.evaluate(()=>{const r=window.Forge.selected(),spatial=window.ForgeSpatial.inspect(r);return{name:r?.components?.asset?.name,converted:r?.components?.asset?.converted===true,converter:r?.components?.asset?.converter,sourcePreserved:r?.components?.asset?.sourcePreserved===true,vertices:spatial?.geometry?.vertices||0,triangles:spatial?.geometry?.triangles||0,renderables:r?.entity?.render?.meshInstances?.length||0}});
