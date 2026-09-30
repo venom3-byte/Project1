@@ -207,30 +207,32 @@ function updateAssetBrowser(){
   const list=$("assetList");if(!list)return;
   const q=String($("assetSearch")?.value||"").trim().toLowerCase();
   list.innerHTML="";
-  const records=[...engine.entities.values()].filter(r=>r.components?.asset?.name).filter(r=>!q||r.name.toLowerCase().includes(q)||String(r.components.asset.type).toLowerCase().includes(q));
+  const sceneRecords=[...engine.entities.values()].filter(r=>r.components?.asset?.name).map(r=>({scene:r,asset:r.components.asset,entry:engine.assets?.get?.(r.components.asset.name)}));
+  const sourceRecords=[...engine.assets.entries()].filter(([,v])=>v?.sourceOnly).map(([name,entry])=>({scene:null,asset:{name,type:entry.type||"file"},entry}));
+  const records=[...sceneRecords,...sourceRecords].filter(x=>!q||String(x.asset.name).toLowerCase().includes(q)||String(x.asset.type).toLowerCase().includes(q));
   if(!records.length){const e=document.createElement("div");e.className="asset-empty";e.textContent="No imported assets";list.append(e);return}
-  for(const r of records){
-    const row=document.createElement("button");row.className="asset-row"+(r.id===engine.selectedId?" active":"");
-    const t=r.components.asset.type==="model"?"3D":r.components.asset.type==="image"?"2D":r.components.asset.type==="audio"?"AUD":"FILE";
+  for(const item of records){
+    const r=item.scene,a=item.asset,entry=item.entry;
+    const row=document.createElement("button");row.className="asset-row"+(r&&r.id===engine.selectedId?" active":"");
+    const t=a.type==="model"?"3D":a.type==="image"?"2D":a.type==="audio"?"AUD":a.type==="source"?"SRC":"FILE";
     const visual=document.createElement("span");visual.className="asset-visual";
-    const entry=engine.assets?.get?.(r.components.asset.name);
-    if(r.components.asset.type==="image"&&entry?.file){
+    if(a.type==="image"&&entry?.file){
       if(!entry.previewUrl){try{entry.previewUrl=URL.createObjectURL(entry.file)}catch{}}
-      if(entry.previewUrl){
-        const img=document.createElement("img");img.className="asset-thumb";img.alt="";img.src=entry.previewUrl;visual.append(img);
-      }else{
-        const ic=document.createElement("span");ic.className="asset-icon";ic.textContent=t;visual.append(ic);
-      }
-    }else{
-      const ic=document.createElement("span");ic.className="asset-icon";ic.textContent=t;visual.append(ic);
-    }
+      if(entry.previewUrl){const img=document.createElement("img");img.className="asset-thumb";img.alt="";img.src=entry.previewUrl;visual.append(img)}
+      else{const ic=document.createElement("span");ic.className="asset-icon";ic.textContent=t;visual.append(ic)}
+    }else{const ic=document.createElement("span");ic.className="asset-icon";ic.textContent=t;visual.append(ic)}
     row.append(visual);
-    const nameNode=document.createElement("span");nameNode.className="asset-name";nameNode.textContent=r.name;row.append(nameNode);
-    const kindNode=document.createElement("span");kindNode.className="asset-kind";kindNode.textContent=r.kind;row.append(kindNode);
-    row.onclick=()=>{engine.select(r.id);refresh();inspect();engine.focus()};
-    list.append(row)
+    const nameNode=document.createElement("span");nameNode.className="asset-name";nameNode.textContent=a.name;row.append(nameNode);
+    const kindNode=document.createElement("span");kindNode.className="asset-kind";kindNode.textContent=r?r.kind:(entry?.extension?entry.extension.toUpperCase():"SOURCE");row.append(kindNode);
+    row.title=r?"Open in scene":"Source asset preserved; select a renderable instance to edit";
+    row.onclick=()=>{
+      if(r){engine.select(r.id);refresh();inspect();engine.focus()}
+      else{const bytes=Number(entry?.file?.size||0);const hash=entry?.sourceSha256||"pending";write("Source asset preserved · "+a.name+" · "+bytes.toLocaleString()+" bytes · SHA-256 "+hash);toast("Source asset preserved — ready for a compatible importer")}
+    };
+    list.append(row);
   }
 }
+
 function apply(){
   const r=engine.selected();if(!r)return;
   engine.transform({x:+$("px").value,y:+$("py").value,z:+$("pz").value,rx:+$("rx").value,ry:+$("ry").value,rz:+$("rz").value,sx:+$("sx").value,sy:+$("sy").value,sz:+$("sz").value});
@@ -289,8 +291,8 @@ async function importRealisticCar(){
     engine.select(record.id);
     engine.focus();
     refresh();inspect();
-    toast("High-fidelity Car Concept imported into Forge viewport");
-    write("Imported Khronos Car Concept — native Forge 3D viewport — CC BY 4.0");
+    toast("High-fidelity 3D car imported into Forge viewport");
+    write("Imported high-fidelity glTF car into the native Forge 3D viewport");
     return result;
   }catch(error){
     if(error?.name==="AbortError")throw new Error("High-fidelity car download timed out after 45s");
