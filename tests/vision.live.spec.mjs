@@ -54,6 +54,7 @@ test.describe.serial("Forge Live Vision — real continuous vision + input",()=>
     controller.abort();
     expect(payload).toContain("--forge-frame");
     expect(payload).toContain("Content-Type: image/jpeg");
+
   });
 
   test("drives Forge through real pointer coordinates and verifies the resulting engine state",async({request})=>{
