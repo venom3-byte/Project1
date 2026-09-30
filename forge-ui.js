@@ -269,18 +269,19 @@ async function importRealisticCar(){
     const blob=await response.blob();
     const file=new File([blob],"Forge-Realistic-Supercar.glb",{type:"model/gltf-binary"});
     await window.ForgeProduction?.assets?.storeFile?.(file);
-    const result=await engine.importFile(file,{remoteSource:REALISTIC_CAR_URL});
-    if(result.type!=="model"||!result.record)throw new Error("Realistic car did not produce a 3D model record");
-    result.record.components.asset.remoteSource=REALISTIC_CAR_URL;
-    result.record.components.asset.license="CC-BY 3.0";
-    result.record.components.asset.catalogSource="Ignition Labs — CAR Model via Poly Pizza, mirrored in M-ZohaibAli/Velocity";
-    result.record.components.asset.qualityProfile="realistic-supercar-pbr";
-    engine.select(result.record.id);
-    engine.focus();
+    const existing=engine.assets.get(file.name);
+    if(existing)engine.assets.delete(file.name);
+    const record=engine.add("model",file.name.replace(/\.[^.]+$/,""));
+    record.components.asset={type:"model",name:file.name,analysis:await window.ForgeProduction?.assets?.analyze?.(file).catch?.(()=>null),sourceUnits:"source-native",sourcePreserved:true,previewOnly:true,previewRenderer:"three.js",remoteSource:REALISTIC_CAR_URL,license:"CC-BY 3.0",catalogSource:"Ignition Labs — CAR Model via Poly Pizza, mirrored in M-ZohaibAli/Velocity",qualityProfile:"realistic-supercar-pbr"};
+    engine.assets.set(file.name,{type:"model",file,url:URL.createObjectURL(file),remoteSource:REALISTIC_CAR_URL,previewOnly:true});
+    engine.select(record.id);
     refresh();inspect();
-    toast("Realistic supercar imported — CC-BY 3.0 source");
-    write("Imported Ignition Labs CAR Model — CC-BY 3.0");
-    return result;
+    const preview=await import("./forge-realcar-preview.js");
+    await preview.openRealCarPreview({file,name:record.name,meta:record.components.asset});
+    engine.select(record.id);refresh();inspect();
+    toast("Realistic supercar imported — real GLB rendered in 3D preview");
+    write("Imported Ignition Labs CAR Model — CC-BY 3.0 — Three.js preview");
+    return{type:"model",record,previewOnly:true};
   }finally{
     if(button){button.disabled=false;button.textContent=previous||"🚘 Import high-quality car"}
   }
