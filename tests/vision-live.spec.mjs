@@ -65,7 +65,7 @@ test.describe("Forge live computer vision bridge",()=>{
     }}});
     const typed=await request.post("/api/vision/control",{data:{action:{type:"typeText",text:"_VISION"}}});
     expect(typed.ok()).toBeTruthy();
-    await expect(page.locator("#name").inputValue()).resolves.toContain("_VISION");
+    expect(await page.locator("#name").inputValue()).toContain("_VISION");
 
     const slider=await page.locator("#time").boundingBox();
     expect(slider).toBeTruthy();
@@ -87,6 +87,7 @@ test.describe("Forge live computer vision bridge",()=>{
       b?.addEventListener("pointerdown",e=>{if(e.pointerType==="touch")window.__visionTouchCount++},{once:false});
       return b?.getBoundingClientRect().toJSON();
     });
+    expect(touchProbe).toBeTruthy();
     const touchStart=await request.post("/api/vision/control",{data:{action:{
       type:"touchStart",x:touchProbe.x+touchProbe.width/2,y:touchProbe.y+touchProbe.height/2,screenWidth:1440,screenHeight:900,id:41
     }}});
