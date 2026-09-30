@@ -26,12 +26,18 @@ async function download(page,url){
   expect(r.ok()).toBeTruthy();
   return r.body();
 }
-async function importViaInput(page,buffer,name,mimeType){
+async function importViaInput(page,buffer,name,mimeType,{renderable=false}={}){
   await page.locator("#assetInput").setInputFiles({name,mimeType,buffer});
   await page.waitForFunction(expected=>{
     const r=window.Forge?.selected?.();
     return r?.components?.asset?.name===expected;
   },name,{timeout:30000});
+  if(renderable){
+    await page.waitForFunction(()=>{
+      const r=window.Forge?.selected?.();
+      return !!r?.entity?.render?.meshInstances?.length;
+    },{timeout:30000});
+  }
 }
 
 async function sha(blob){return pageHash(await blob.arrayBuffer())}
@@ -165,7 +171,7 @@ test.describe("Forge professional acceptance",()=>{
     expect(png.length).toBeGreaterThan(100);
     await importViaInput(page,png,"developer-reference.png","image/png");
     const bytesLength=png.length;
-    const result=await page.evaluate(async()=>{
+    const result=await page.evaluate(async(bytesLength)=>{
       const imported=window.Forge.selected();
       const check=await window.ForgeExport.validateSelected();
       const source=await window.ForgeExport.exportSource({download:false});
@@ -181,7 +187,7 @@ test.describe("Forge professional acceptance",()=>{
         previewBytes:preview.blob.size,
         info
       };
-    },png);
+    },bytesLength);
     expect(result.name).toBe("developer-reference.png");
     expect(result.check.ok).toBeTruthy();
     expect(result.check.quality.hasBounds).toBeTruthy();
@@ -201,7 +207,7 @@ test.describe("Forge professional acceptance",()=>{
     expect(glb.length).toBeGreaterThan(100000);
     const originalSha=await sha(new Blob([glb]));
     await waitForForge(page);
-    await importViaInput(page,glb,"Fox.glb","model/gltf-binary");
+    await importViaInput(page,glb,"Fox.glb","model/gltf-binary",{renderable:true});
     const bytesLength=glb.length;
     const result=await page.evaluate(async(originalSha)=>{
       const imported=window.Forge.selected();
@@ -250,7 +256,7 @@ test.describe("Forge professional acceptance",()=>{
     expect(glb.length).toBeGreaterThan(5000000);
     const originalSha=await sha(new Blob([glb]));
     await waitForForge(page);
-    await importViaInput(page,glb,"ToyCar.glb","model/gltf-binary");
+    await importViaInput(page,glb,"ToyCar.glb","model/gltf-binary",{renderable:true});
     const result=await page.evaluate(async()=>{
       const imported=window.Forge.selected();
       const before=window.ForgeSpatial.inspect(imported.record);
@@ -278,7 +284,7 @@ test.describe("Forge professional acceptance",()=>{
     test.setTimeout(120000);
     const glb=await download(page,FOX);
     await waitForForge(page);
-    await importViaInput(page,glb,"Fox.glb","model/gltf-binary");
+    await importViaInput(page,glb,"Fox.glb","model/gltf-binary",{renderable:true});
     const result=await page.evaluate(async()=>{
       const imported=window.Forge.selected();
       const m=await window.ForgeExport.exportManifest({download:false});
