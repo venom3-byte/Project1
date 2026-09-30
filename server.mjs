@@ -10,6 +10,7 @@ import {VisionController,installVisionShutdown} from './vision-control.mjs';
 
 const root=path.dirname(fileURLToPath(import.meta.url));
 const port=Number(process.env.PORT||4173);
+const visionRemote=process.env.FORGE_VISION_REMOTE==='1';
 const host=process.env.HOST||'127.0.0.1';
 const vision=new VisionController({baseUrl:`http://127.0.0.1:${port}`});
 const removeVisionShutdown=installVisionShutdown(vision);
@@ -35,6 +36,11 @@ const vision=new VisionController({
     for(const peer of visionClients)if(peer.readyState===1)peer.send(raw)
   }
 });
+function trustedVisionRequest(req){
+  if(visionRemote)return true;
+  const ip=String(req.socket?.remoteAddress||'').replace(/^::ffff:/,'');
+  return ip==='127.0.0.1'||ip==='::1'||ip==='localhost';
+}
 function json(res,o,status=200){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','Access-Control-Allow-Origin':'*'});res.end(JSON.stringify(o))}
 function body(req,max=64*1024){return new Promise((resolve,reject)=>{let raw='';req.on('data',chunk=>{raw+=chunk;if(raw.length>max){reject(new Error('Request body too large'));req.destroy()}});req.on('end',()=>{try{resolve(raw?JSON.parse(raw):{})}catch(e){reject(new Error('Invalid JSON'))}});req.on('error',reject)})}
 async function routeVisionAction(req,res){try{const q=await body(req);if(!q.action)return json(res,{ok:false,error:'Missing action'},400);return json(res,await vision.action(q.action,q.options||{}))}catch(e){return json(res,{ok:false,error:e.message||String(e)},500)}}
@@ -95,7 +101,7 @@ visionWss.on('connection',ws=>{
   });
 });
 const visionWss=new WebSocketServer({noServer:true});
-visionWss.on('connection',ws=>{visionClients.add(ws);ws.send(JSON.stringify({type:'vision-state',state:vision.status()}));ws.on('close',()=>visionClients.delete(ws));});
+visionWss.on('connection',(ws,req)=>{if(!visionRemote&&!trustedVisionRequest(req)){ws.close(1008,'local-only');return}visionClients.add(ws);ws.send(JSON.stringify({type:'vision-state',state:vision.status()}));ws.on('close',()=>visionClients.delete(ws));});
 const netWss=new WebSocketServer({noServer:true});
 function joinRoom(room,ws,peerId){if(!rooms.has(room))rooms.set(room,new Set());const set=rooms.get(room);for(const p of set)if(p.readyState===1)p.send(JSON.stringify({type:'peer-join',peerId}));set.add(ws);ws.__room=room;ws.__peerId=peerId}
 function leaveRoom(ws){const room=ws.__room;if(!room||!rooms.has(room))return;const set=rooms.get(room);set.delete(ws);for(const p of set)if(p.readyState===1)p.send(JSON.stringify({type:'peer-leave',peerId:ws.__peerId}));if(!set.size)rooms.delete(room)}
