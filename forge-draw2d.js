@@ -159,9 +159,17 @@
   }
 
   function open(){
-    dialog()?.showModal();
+    const d=dialog();
+    if(!d)throw new Error("2D paint dialog is missing");
+    try{
+      if(!d.open)d.showModal();
+    }catch{
+      d.setAttribute("open","");
+      d.style.display="block";
+    }
     status("Ready");
     syncButtons();
+    return{open:!!d.open,ready:state.ready};
   }
 
   function init(){

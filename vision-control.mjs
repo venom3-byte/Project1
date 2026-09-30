@@ -438,8 +438,14 @@ export class VisionController extends EventEmitter{
       }
       case 'mouse.click':{
         const x=Number(action.x)||0,y=Number(action.y)||0,button=buttonValue(action.button);
+        const target=await this.page.evaluate(({x,y})=>{
+          const el=document.elementFromPoint(x,y);
+          if(!el)return null;
+          const r=el.getBoundingClientRect();
+          return{tag:el.tagName||'',id:el.id||'',className:typeof el.className==='string'?el.className:'',text:(el.textContent||'').trim().slice(0,120),x:r.x,y:r.y,width:r.width,height:r.height};
+        },{x,y});
         await this.page.mouse.click(x,y,{button,clickCount:Math.max(1,Math.min(3,Number(action.clickCount)||1)),delay:Math.max(0,Number(action.delay)||0)});
-        return{dispatched:true,type,x,y,button};
+        return{dispatched:true,type,x,y,button,target};
       }
       case 'mouse.dblclick':{
         const x=Number(action.x)||0,y=Number(action.y)||0,button=buttonValue(action.button);
