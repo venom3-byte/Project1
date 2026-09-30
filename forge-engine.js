@@ -312,6 +312,8 @@ export class ForgeEngine{
     try{analysis=await window.ForgeProduction?.assets?.analyze?.(file)}catch{}
     try{sourceSha256=await this.sha256(file)}catch{}
     try{await window.ForgeProduction?.assets?.storeFile?.(file)}catch(e){this.log("Asset vault store failed for "+file.name+": "+e.message,"error")}
+    const sourceEntry={type:"file",file,url,analysis,sourceSha256,sourcePreserved:true,extension:extOf(file),sourceOnly:true,state:"loading"};
+    this.assets.set(file.name,sourceEntry);
 
     if(/^audio\//.test(file.type)||AUDIO_EXT_RE.test(lower)){
       try{
@@ -326,7 +328,7 @@ export class ForgeEngine{
         r.entity.addComponent("sound",{positional:true,volume:1});
         r.entity.sound.addSlot("main",{asset:asset.id,autoPlay:false,loop:false,overlap:false,volume:1,pitch:1});
         r.components.asset={type:"audio",name:file.name,analysis,sourceSha256,sourcePreserved:true,derivedDirty:false};
-        this.assets.set(file.name,{type:"audio",file,url,resource:asset.resource,asset,analysis,sourceSha256});
+        this.assets.set(file.name,{type:"audio",file,url,resource:asset.resource,asset,analysis,sourceSha256,sourcePreserved:true,state:"ready"});
         this.select(r.id);window.dispatchEvent(new Event("forge-assets-changed"));window.ForgeRefreshUI?.();
         return{type:"audio",record:r,asset};
       }catch(error){
@@ -349,7 +351,7 @@ export class ForgeEngine{
         r.entity.setLocalEulerAngles(90,0,0);r.entity.setLocalScale(w,1,h);r.entity.setLocalPosition(0,h*.5,0);
         r.entity.render.material=mat;r.entity.render.frustumCulling=false;
         r.components.asset={type:"image",name:file.name,width:bmp.width,height:bmp.height,analysis,sourceUnits:"pixels",sourceSha256,sourcePreserved:true,presentation:"upright-2d-preview",pixelsPerWorldUnit:bmp.height/h,derivedDirty:false};
-        this.assets.set(file.name,{type:"image",file,url,analysis,sourceSha256});this.select(r.id);this.setView("front");this.frame();
+        this.assets.set(file.name,{type:"image",file,url,analysis,sourceSha256,sourcePreserved:true,state:"ready"});this.select(r.id);this.setView("front");this.frame();
         bmp.close?.();window.dispatchEvent(new Event("forge-assets-changed"));window.ForgeRefreshUI?.();
         return{type:"image",record:r};
       }catch(error){
@@ -363,7 +365,7 @@ export class ForgeEngine{
         const convertedResult=await this.importFile(converted,{internalConversion:true});
         const record=convertedResult.record,internalEntry=this.assets.get(converted.name);
         this.assets.delete(converted.name);
-        this.assets.set(file.name,{type:"model",file,url,resource:internalEntry?.resource,converted:true,convertedFrom:file.name,analysis,sourceSha256,sourcePreserved:true});
+        this.assets.set(file.name,{type:"model",file,url,resource:internalEntry?.resource,converted:true,convertedFrom:file.name,analysis,sourceSha256,sourcePreserved:true,state:"ready"});
         record.name=file.name.replace(/\.[^.]+$/,"");record.entity.name=record.name;
         const previous=record.components.asset||{};
         record.components.asset={...previous,type:"model",name:file.name,analysis:analysis||null,sourceUnits:"source-native",sourceSha256,sourcePreserved:true,converted:true,convertedFrom:file.name,converter:"AssimpJS",derivedDirty:false,importScale:previous.importScale||1,normalized:!!previous.normalized,viewportPreview:previous.viewportPreview||null};
@@ -397,7 +399,7 @@ export class ForgeEngine{
                 derivedDirty:false,viewportPreview:preview
               };
               const clips=this.attachAnimations(e,asset.resource,analysis?.animationNames||[]);if(clips.length)r.components.animation={clips,playing:true};
-              this.assets.set(file.name,{type:"model",file,url,resource:asset.resource,asset,viewportFile:previewSource.file,analysis,sourceSha256,sourcePreserved:true});
+              this.assets.set(file.name,{type:"model",file,url,resource:asset.resource,asset,viewportFile:previewSource.file,analysis,sourceSha256,sourcePreserved:true,state:"ready"});
               URL.revokeObjectURL(loadUrl);
               window.dispatchEvent(new Event("forge-assets-changed"));window.ForgeRefreshUI?.();
               requestAnimationFrame(()=>requestAnimationFrame(()=>{this.select(r.id);window.ForgeSpatial?.inspect?.(r);resolve({type:"model",record:r})}));
@@ -408,7 +410,7 @@ export class ForgeEngine{
       });
     }
 
-    const entry={type:"file",file,url,analysis,sourceSha256,sourcePreserved:true,extension:extOf(file),sourceOnly:true};
+    const entry=Object.assign(sourceEntry,{type:"file",state:"ready"});
     this.assets.set(file.name,entry);
     window.dispatchEvent(new Event("forge-assets-changed"));window.ForgeRefreshUI?.();
     return{type:"asset",name:file.name,analysis,sourceOnly:true,entry};
