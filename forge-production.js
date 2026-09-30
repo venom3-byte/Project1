@@ -80,7 +80,7 @@ class AssetPipeline {
     if(meshes.length>25) optimization.push("Consider mesh merging/instancing for repeated environment assets.");
     if(textures.length>0) optimization.push("Generate compressed runtime texture variants and mipmaps.");
     if(anims.length>0) optimization.push("Register animation clips and skeleton/retarget metadata.");
-    return {kind:"model",status:"ready",nodes:nodes.length,meshes:meshes.length,materials:mats.length,textures:textures.length,animations:anims.length,skins:skins.length,joints:skins.reduce((n,s)=>n+(s.joints||[]).length,0),vertices,triangles,optimization};
+    return {kind:"model",status:"ready",nodes:nodes.length,meshes:meshes.length,materials:mats.length,textures:textures.length,animations:anims.length,animationNames:anims.map(a=>a?.name).filter(Boolean),skins:skins.length,joints:skins.reduce((n,s)=>n+(s.joints||[]).length,0),vertices,triangles,optimization};
   }
 
   async prepare(file, options={}) {
