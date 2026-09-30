@@ -17,7 +17,7 @@
       '<div class="live-vision-head"><div><strong>FORGE VISION</strong><small>Live eyes + real hands · Spatial Core</small></div><button id="liveVisionClose">×</button></div>',
       '<div class="live-vision-status"><span id="liveVisionDot" class="live-dot"></span><span id="liveVisionState">Idle</span><span id="liveVisionFps">0 fps</span><span id="liveVisionTransport">—</span></div>',
       '<div class="live-vision-preview" id="liveVisionPreview"><video id="liveVisionVideo" autoplay muted playsinline></video><img id="liveVisionRemote" alt="Forge live vision stream"><div id="liveVisionCrosshair"></div></div>',
-      '<div class="live-vision-actions"><button id="liveVisionStart" class="primary">Start live eyes</button><button id="liveVisionPro">Pro CDP</button><button id="liveVisionStop">Stop</button></div>',
+      '<div class="live-vision-actions"><button id="liveVisionStart" class="primary">Start live eyes</button><button id="liveVisionPro">Pro CDP</button><button id="liveVisionStop">Stop</button><button id="liveVisionAgent">Run task</button></div>',
       '<div class="live-vision-actions compact"><button id="liveVisionMove">Move</button><button id="liveVisionDown">Mouse down</button><button id="liveVisionUp">Mouse up</button><button id="liveVisionWheel">Wheel</button></div>',
       '<label class="live-vision-field">Task <textarea id="liveVisionTask" rows="2" placeholder="Example: select Car, drag it to the center, press Play"></textarea></label>',
       '<div class="live-vision-log" id="liveVisionLog"></div>',
@@ -28,6 +28,7 @@
     $('#liveVisionStart').onclick=start;
     $('#liveVisionPro').onclick=connectPro;
     $('#liveVisionStop').onclick=stop;
+    $('#liveVisionAgent').onclick=runAgent;
     $('#liveVisionMove').onclick=()=>runManual({type:'move',x:innerWidth/2,y:innerHeight/2});
     $('#liveVisionDown').onclick=()=>runManual({type:'mouseDown',x:innerWidth/2,y:innerHeight/2});
     $('#liveVisionUp').onclick=()=>runManual({type:'mouseUp',x:innerWidth/2,y:innerHeight/2});
