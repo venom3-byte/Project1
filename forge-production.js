@@ -9,18 +9,18 @@ class AssetPipeline {
   }
 
   async analyze(file) {
-    const base = {
-      id: crypto.randomUUID(),
-      name: file.name,
-      type: file.type || "application/octet-stream",
-      bytes: file.size,
-      modified: file.lastModified || Date.now()
-    };
-    if (/^image\//.test(file.type)) return Object.assign(base, await this.analyzeImage(file));
-    if (/\.glb$/i.test(file.name)) return Object.assign(base, await this.analyzeGLB(file));
-    if (/\.gltf$/i.test(file.name)) return Object.assign(base, { kind:"gltf", status:"package-required", warnings:["GLTF may reference external files; prefer GLB or import the full package."], optimization:[] });
-    if (/^audio\//.test(file.type) || /\.(wav|mp3|ogg|m4a)$/i.test(file.name)) return Object.assign(base,{kind:"audio",status:"ready",optimization:["Normalize loudness","Generate preview waveform","Create streaming/short-clip variants"]});
-    return Object.assign(base,{kind:"file",status:"ready",optimization:[]});
+    const base={id:crypto.randomUUID(),name:file.name,type:file.type||"application/octet-stream",bytes:file.size,modified:file.lastModified||Date.now(),extension:String(file.name).split(".").pop()?.toLowerCase()||""};
+    const n=String(file.name).toLowerCase();
+    const model=/\.(glb|gltf|fbx|obj|dae|3ds|stl|ply|off|3mf|dxf|ase|b3d|lwo|lxo|m3d|md2|md3|md5mesh|ms3d|smd|vta|x|x3d)$/i.test(n);
+    if(/^image\//.test(file.type)||/\.(png|jpe?g|webp|avif|gif|bmp|tga|tif|tiff)$/i.test(n))return Object.assign(base,await this.analyzeImage(file));
+    if(/\.glb$/i.test(n))return Object.assign(base,await this.analyzeGLB(file));
+    if(/\.gltf$/i.test(n))return Object.assign(base,{kind:"gltf",status:"package-or-single-file",warnings:["External buffers/textures are automatically packaged when supplied together."],optimization:["Prefer GLB for portable delivery"]});
+    if(model)return Object.assign(base,{kind:"model-source",status:"conversion-capable",optimization:["Convert to GLB for native runtime","Preserve original source for re-export","Inspect materials, skeletons, animations and topology after conversion"]});
+    if(/^audio\//.test(file.type)||/\.(wav|mp3|ogg|m4a|aac|flac|webm)$/i.test(n))return Object.assign(base,{kind:"audio",status:"ready",optimization:["Generate streaming and short-clip variants","Analyze loudness and loop points"]});
+    if(/\.(ttf|ttc|otf)$/i.test(n))return Object.assign(base,{kind:"font",status:"source-ready",optimization:["Generate MSDF/SDF runtime atlas"]});
+    if(/\.(glsl|vert|frag|shader)$/i.test(n))return Object.assign(base,{kind:"shader",status:"source-ready",optimization:["Validate shader source","Generate platform variants"]});
+    if(/\.(json|xml|csv|txt|css|js|mjs|wasm)$/i.test(n))return Object.assign(base,{kind:"data",status:"source-ready",optimization:["Validate syntax/schema before runtime use"]});
+    return Object.assign(base,{kind:"source",status:"source-ready",optimization:["Preserve exact source bytes and provenance"]});
   }
 
   async analyzeImage(file) {
@@ -197,14 +197,14 @@ const assets=new AssetPipeline(),world=new WorldSystems(),graph=new ForgeGraph()
 window.ForgeProduction={assets,world,graph,profiler};
 
 const style=document.createElement("style");
-style.textContent=".forge-prod{position:fixed;right:14px;bottom:14px;z-index:90;display:flex;gap:5px;flex-wrap:wrap;max-width:430px}.forge-prod button{border:1px solid #29455f;background:#081727;color:#e8f1ff;border-radius:9px;padding:8px 10px;box-shadow:0 8px 26px #0007}.forge-modal{width:min(900px,94vw);border:1px solid #2d4e6d;background:#091523;color:#e8f1ff;border-radius:15px;padding:0}.forge-modal::backdrop{background:#000b;backdrop-filter:blur(8px)}.fm-head{display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #1b304a}.fm-body{padding:12px;max-height:70vh;overflow:auto}.fm-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.fm-card{border:1px solid #1b304a;background:#0b1727;border-radius:10px;padding:10px}.fm-card h4{margin:0 0 7px}.fm-actions{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.fm-table{width:100%;border-collapse:collapse;font-size:11px}.fm-table td,.fm-table th{padding:6px;border-bottom:1px solid #162a40;text-align:left}.fm-node{position:relative;border:1px solid #315a7e;background:#0d1f33;border-radius:8px;padding:8px;margin:5px 0}.fm-code{white-space:pre-wrap;font:11px ui-monospace,monospace;background:#06101b;padding:9px;border-radius:8px}.fm-good{color:#48e28a}.fm-warn{color:#ffca66}.fm-bad{color:#ff7f8d}@media(max-width:700px){.forge-prod{left:8px;right:8px;bottom:8px}.fm-grid{grid-template-columns:1fr}}";
+style.textContent=".forge-modal{width:min(900px,94vw);border:1px solid #2d4e6d;background:#091523;color:#e8f1ff;border-radius:15px;padding:0}.forge-modal::backdrop{background:#000b;backdrop-filter:blur(8px)}.fm-head{display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #1b304a}.fm-body{padding:12px;max-height:70vh;overflow:auto}.fm-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.fm-card{border:1px solid #1b304a;background:#0b1727;border-radius:10px;padding:10px}.fm-card h4{margin:0 0 7px}.fm-actions{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.fm-table{width:100%;border-collapse:collapse;font-size:11px}.fm-table td,.fm-table th{padding:6px;border-bottom:1px solid #162a40;text-align:left}.fm-node{position:relative;border:1px solid #315a7e;background:#0d1f33;border-radius:8px;padding:8px;margin:5px 0}.fm-code{white-space:pre-wrap;font:11px ui-monospace,monospace;background:#06101b;padding:9px;border-radius:8px}.fm-good{color:#48e28a}.fm-warn{color:#ffca66}.fm-bad{color:#ff7f8d}@media(max-width:700px){.fm-grid{grid-template-columns:1fr}}";
 document.head.appendChild(style);
 
 function modal(title,body){
   const d=document.createElement("dialog");d.className="forge-modal";d.innerHTML='<div class="fm-head"><b>'+title+'</b><button data-x>×</button></div><div class="fm-body">'+body+'</div>';d.querySelector("[data-x]").onclick=()=>d.close();document.body.appendChild(d);d.addEventListener("close",()=>d.remove(),{once:true});d.showModal();return d;
 }
 function openAssets(){
-  const d=modal("Forge Asset Lab",'<div class="fm-grid"><div class="fm-card"><h4>Production import</h4><input id="fmFiles" type="file" multiple accept=".glb,.gltf,.png,.jpg,.jpeg,.webp,.avif,.wav,.mp3,.ogg"><div class="fm-actions"><button id="fmAnalyze">Analyze</button><button id="fmPrepare">Prepare selected raster</button><button id="fmVariants">Texture variants</button><button id="fmAtlas">Pack atlas</button></div><div id="fmHint">Use Analyze to audit geometry, textures, animations, alpha, dimensions and optimization recommendations.</div></div><div class="fm-card"><h4>Registry</h4><div id="fmRegistry"></div></div></div>');
+  const d=modal("Forge Asset Lab",'<div class="fm-grid"><div class="fm-card"><h4>Production import</h4><input id="fmFiles" type="file" multiple><div class="fm-actions"><button id="fmAnalyze">Analyze</button><button id="fmPrepare">Prepare selected raster</button><button id="fmVariants">Texture variants</button><button id="fmAtlas">Pack atlas</button></div><div id="fmHint">Use Analyze to audit geometry, textures, animations, alpha, dimensions and optimization recommendations.</div></div><div class="fm-card"><h4>Registry</h4><div id="fmRegistry"></div></div></div>');
   const render=()=>{const box=d.querySelector("#fmRegistry"),list=assets.all();box.innerHTML=list.length?list.map(a=>'<div class="fm-node"><b>'+a.name+'</b><br>'+a.kind+' · '+(a.width?a.width+"×"+a.height:"")+" · "+(a.triangles?a.triangles+" triangles":"")+'<br><span class="fm-'+(a.status==="ready"?"good":"warn")+'">'+(a.optimization||[]).join(" · ")+'</span></div>').join(""):'<span class="fm-warn">Registry is empty.</span>'};
   d.querySelector("#fmAnalyze").onclick=async()=>{const fs=[...d.querySelector("#fmFiles").files];const r=await assets.process(fs);render();d.querySelector("#fmHint").textContent=r.map(x=>x.name+": "+x.status).join(" | ")||"No files selected"};
   const cook=document.createElement("button");cook.textContent="Cook GLB + LOD";cook.onclick=async()=>{const f=d.querySelector("#fmFiles").files[0];if(!f||!/\.glb$/i.test(f.name)){d.querySelector("#fmHint").textContent="Select a GLB first";return}try{const bytes=new Uint8Array(await f.arrayBuffer());let bin="";for(let i=0;i<bytes.length;i+=0x8000)bin+=String.fromCharCode(...bytes.subarray(i,i+0x8000));const resp=await fetch("/api/pipeline",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({operation:"cook-glb",base64:btoa(bin),options:{lods:[1,.5,.2,.05]}})});const data=await resp.json();if(!resp.ok||!data.ok)throw new Error(data.error||"Cook failed");const ZIPMOD=window.JSZipModule||(await import("https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm"));window.JSZipModule=ZIPMOD;const JSZip=ZIPMOD.default||ZIPMOD;const z=new JSZip();for(const item of data.files)z.file(item.name,Uint8Array.from(atob(item.base64),x=>x.charCodeAt(0)));z.file("cook-manifest.json",JSON.stringify(data.manifest,null,2));const blob=await z.generateAsync({type:"blob",compression:"DEFLATE"});const a=document.createElement("a");a.download=f.name.replace(/\.glb$/i,"")+"_cooked.zip";a.href=URL.createObjectURL(blob);a.click();d.querySelector("#fmHint").textContent="Cooked package: LOD0/LOD50/LOD80/LOD95 + manifest";toast("GLB cook completed")}catch(e){d.querySelector("#fmHint").textContent="Cook failed: "+e.message}};d.querySelector(".fm-actions").append(cook);
@@ -355,9 +355,34 @@ function open2D(){
   d.querySelector("#spriteImport2D").onclick=async()=>{const fs=[...d.querySelector("#spriteFiles2D").files];if(!fs.length)return;const r=await window.Forge2D.spriteFromFile(fs[0],"Sprite");Forge.select(r.id);refreshHierarchy();toast("Sprite imported")};
   d.querySelector("#twoDState").textContent=JSON.stringify(window.Forge2D?.status?.(),null,2);
 }
-function addBar(){
-  const bar=document.createElement("div");bar.className="forge-prod";
-  const buttons=[["Asset Lab",openAssets],["Material",openMaterial],["Shader",openShader],["Animation",openAnimation],["Anim Graph",openAnimationGraph],["Sequencer",openCinematics],["Render",openRender],["VFX",openVFX],["2D",open2D],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],["Vision",()=>window.AssetForgeLiveVision?.open()],["Runtime",openRuntime],["Build Web",openBuild]];
-  buttons.forEach(([t,f])=>{const b=document.createElement("button");b.textContent=t;b.onclick=f;bar.append(b)});document.body.append(bar);
+function openEditors(){
+  const d=modal("Forge Editors",'<div class="fm-grid">'+[
+    ["Asset Lab",openAssets,"Import, inspect and process source assets."],
+    ["Material Lab",openMaterial,"PBR material parameters and presets."],
+    ["Shader Lab",openShader,"Cross-platform shader presets and diagnostics."],
+    ["Animation",openAnimation,"Imported clips and playback."],
+    ["Animation Graph + Rig",openAnimationGraph,"State graphs and rig profiles."],
+    ["Sequencer",openCinematics,"Transform tracks and keyframes."],
+    ["Render",openRender,"Quality profiles and material graphs."],
+    ["VFX",openVFX,"Runtime particle/VFX controls."],
+    ["2D",open2D,"Raster/sprite authoring and import."],
+    ["World / PCG",openPCG,"Terrain and world generation systems."],
+    ["Logic Graph",openGraph,"Gameplay logic graph."],
+    ["Profiler",openProfiler,"Runtime performance diagnostics."],
+    ["Vision",()=>window.AssetForgeLiveVision?.open?.(),"Live browser vision and real input control."],
+    ["Runtime",openRuntime,"Game runtime, navigation, saves and networking."],
+    ["Build Web",openBuild,"Portable web runtime build."]
+  ].map(([t,f,desc])=>'<div class="fm-card"><h4>'+t+'</h4><div class="subtle">'+desc+'</div><div class="fm-actions"><button data-editor-tool="'+t+'">Open</button></div></div>').join("")+'</div>');
+  const map=new Map([
+    ["Asset Lab",openAssets],["Material Lab",openMaterial],["Shader Lab",openShader],["Animation",openAnimation],
+    ["Animation Graph + Rig",openAnimationGraph],["Sequencer",openCinematics],["Render",openRender],["VFX",openVFX],
+    ["2D",open2D],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],
+    ["Vision",()=>window.AssetForgeLiveVision?.open?.()],["Runtime",openRuntime],["Build Web",openBuild]
+  ]);
+  d.querySelectorAll("[data-editor-tool]").forEach(b=>b.onclick=()=>{
+    const fn=map.get(b.dataset.editorTool);if(!fn)return;
+    d.close();setTimeout(()=>{try{fn()}catch(e){toast("Editor failed: "+e.message)}},0);
+  });
+  return d;
 }
-addBar();
+window.ForgeProduction.openEditors=openEditors;

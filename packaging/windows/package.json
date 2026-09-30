@@ -1,0 +1,17 @@
+{
+  "name": "forge-windows-shell",
+  "productName": "Forge Game",
+  "version": "3.7.0",
+  "private": true,
+  "description": "Forge Studio game runtime",
+  "main": "main.cjs",
+  "scripts": {
+    "make": "electron-forge make"
+  },
+  "devDependencies": {
+    "electron": "44.0.0",
+    "@electron-forge/cli": "latest",
+    "@electron-forge/maker-squirrel": "latest",
+    "@electron-forge/maker-zip": "latest"
+  }
+}
