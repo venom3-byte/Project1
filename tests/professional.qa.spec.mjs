@@ -209,7 +209,7 @@ test.describe("Forge professional acceptance",()=>{
     await waitForForge(page);
     await importViaInput(page,glb,"Fox.glb","model/gltf-binary",{renderable:true});
     const bytesLength=glb.length;
-    const result=await page.evaluate(async(originalSha)=>{
+    const result=await page.evaluate(async({originalSha,bytesLength})=>{
       const imported=window.Forge.selected();
 
       const check=await window.ForgeExport.validateSelected();
@@ -232,7 +232,7 @@ test.describe("Forge professional acceptance",()=>{
         derived:scene.validation,
         round:{name:round.record.name,spatial:roundSpatial}
       };
-    },originalSha);
+    },{originalSha,bytesLength});
     expect(result.name).toBe("Fox");
     expect(result.clips.length).toBeGreaterThanOrEqual(3);
     expect(result.playing).toBeTruthy();
