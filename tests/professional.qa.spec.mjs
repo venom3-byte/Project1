@@ -277,6 +277,55 @@ test.describe("Forge professional acceptance",()=>{
     expect(result.diffuse.reduce((a,b)=>a+b,0)).toBeGreaterThan(.3);
     await page.screenshot({path:"test-results/pro-legacy-obj-editor.png",fullPage:true});
   });
+  test("universal STL source converts through the same production 3D pipeline",async({page})=>{
+    test.setTimeout(120000);
+    const stl=Buffer.from([
+      "solid ForgeSTL",
+      "facet normal 0 0 1",
+      " outer loop",
+      "  vertex 0 0 0",
+      "  vertex 1 0 0",
+      "  vertex 0 1 0",
+      " endloop",
+      "endfacet",
+      "facet normal 0 0 -1",
+      " outer loop",
+      "  vertex 0 0 0",
+      "  vertex 0 1 0",
+      "  vertex 1 0 0",
+      " endloop",
+      "endfacet",
+      "endsolid ForgeSTL"
+    ].join("\n"),"utf8");
+    await waitForForge(page);
+    await importViaInput(page,stl,"forge-proof.stl","model/stl",{renderable:true});
+    const result=await page.evaluate(()=>{
+      const r=window.Forge.selected(),s=window.ForgeSpatial.inspect(r);
+      return{name:r?.components?.asset?.name,converted:r?.components?.asset?.converted===true,converter:r?.components?.asset?.converter,sourcePreserved:r?.components?.asset?.sourcePreserved===true,hash:r?.components?.asset?.sourceSha256||"",vertices:s?.geometry?.vertices||0,triangles:s?.geometry?.triangles||0};
+    });
+    expect(result.name).toBe("forge-proof.stl");
+    expect(result.converted).toBeTruthy();
+    expect(result.converter).toBe("AssimpJS");
+    expect(result.sourcePreserved).toBeTruthy();
+    expect(result.hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.vertices).toBeGreaterThan(0);
+    expect(result.triangles).toBeGreaterThan(0);
+    await page.screenshot({path:"test-results/pro-universal-stl-editor.png",fullPage:true});
+  });
+
+  test("universal source fallback preserves arbitrary non-renderable files in the asset vault",async({page})=>{
+    await waitForForge(page);
+    const source=Buffer.from("Forge arbitrary source asset\nversion=1\n","utf8");
+    await importViaInput(page,source,"forge-proof.custom","application/octet-stream");
+    const result=await page.evaluate(()=>{const e=window.Forge.assets.get("forge-proof.custom");return{entry:!!e,sourceOnly:e?.sourceOnly===true,bytes:e?.file?.size||0,extension:e?.extension||"",hash:e?.sourceSha256||""}});
+    expect(result.entry).toBeTruthy();
+    expect(result.sourceOnly).toBeTruthy();
+    expect(result.bytes).toBe(source.length);
+    expect(result.extension).toBe("custom");
+    expect(result.hash).toMatch(/^[a-f0-9]{64}$/);
+    await expect(page.locator("#assetList .asset-row")).toHaveCount(1);
+  });
+
   test("built-in high-fidelity Car Concept imports as a native 3D asset in the Forge viewport",async({page})=>{
     test.setTimeout(150000);
     await waitForForge(page);
