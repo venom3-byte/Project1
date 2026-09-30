@@ -1,6 +1,6 @@
 # Forge Studio
 
-Forge is evolving into a browser-first, agent-native game and interactive-application development environment.
+Forge is evolving into a browser-first, agent-native game and interactive-application development environment. The 3.7 vision layer adds continuous live observation plus browser-native mouse, keyboard and touch control.
 
 ## Current Forge production stack
 
@@ -40,8 +40,9 @@ Forge now covers the full production loop from source asset to playable runtime 
 ### AI and vision
 - Structured Forge Agent Protocol over WebSocket.
 - HTTP command bridge at /api/forge/command.
-- Live Vision integration for screen-level interaction.
-- Engine-state commands are preferred over coordinate clicking.
+- Live Vision integration for continuous MediaStream/CDP screencast observation.
+- Pro Chromium CDP input bridge for mouse, drag, wheel, keyboard, text and touch events.
+- Engine-state commands are preferred for deterministic state changes; live vision is used to observe and verify the rendered UI.
 - Visual QA and browser automation are part of the development loop.
 
 ### Build
