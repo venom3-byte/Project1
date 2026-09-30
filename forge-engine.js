@@ -260,7 +260,7 @@ export class ForgeEngine{
           r.components.asset={type:"model",name:file.name,analysis:analysis||null,sourceUnits:"source-native",importScale:preview.normalized?.scale||1,normalized:!!preview.normalized?.ok,derivedDirty:false,viewportPreview:preview};
           const clips=this.attachAnimations(e,asset.resource,analysis?.animationNames||[]);if(clips.length)r.components.animation={clips,playing:true};
           this.assets.set(file.name,{type:"model",file,url,resource:asset.resource});window.dispatchEvent(new Event("forge-assets-changed"));window.ForgeRefreshUI?.();
-          requestAnimationFrame(()=>requestAnimationFrame(()=>{window.ForgeSpatial?.inspect?.(r);resolve({type:"model",record:r})}));
+          requestAnimationFrame(()=>requestAnimationFrame(()=>{this.select(r.id);window.ForgeSpatial?.inspect?.(r);resolve({type:"model",record:r})}));
         }catch(err){reject(err)}});
         this.app.assets.load(asset);
       });
