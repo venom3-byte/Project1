@@ -74,7 +74,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Install test dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
       - name: Prepare Web runtime
         run: node scripts/package-web-project.mjs --project packaging/sample-project.forge.json
-      - name: Validate packaged runtime
+      - name: Validate packaged runtime manifest
         run: node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('dist/forge-web/project.forge.json','utf8')); if(p.format!=='forge-project'||!fs.existsSync('dist/forge-web/index.html')||!fs.existsSync('dist/forge-web/build-info.json')) process.exit(1); console.log('Packaging manifest OK')"
+      - name: Browser boot proof for packaged runtime
+        run: npx playwright test tests/packaging-runtime.spec.mjs --project=desktop
+      - name: Upload packaged runtime proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-packaged-runtime-proof
+          path: test-results/packaged-runtime-proof.png
+          if-no-files-found: error
