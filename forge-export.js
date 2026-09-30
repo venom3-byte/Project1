@@ -104,6 +104,13 @@ async function exportPreview(opts={}){
   if(opts.download!==false)await save(blob,name,mime);
   return{ok:true,derived:true,name,bytes:blob.size,mime,blob};
 }
+async function waitForRenderable(root,frames=8){
+  for(let i=0;i<frames;i++){
+    if(hasRenderable(root))return true;
+    await new Promise(resolve=>requestAnimationFrame(resolve));
+  }
+  return hasRenderable(root);
+}
 function hasRenderable(root){
   if(!root)return false;
   const stack=[root];
@@ -116,11 +123,11 @@ function hasRenderable(root){
 }
 async function exportSceneGLB(opts={}){
   const r=selected();
-  if(!r||!hasRenderable(r.entity))throw new Error("Select a renderable 3D asset before exporting GLB.");
+  if(!r||!(await waitForRenderable(r.entity)))throw new Error("Select a renderable 3D asset before exporting GLB.");
   const Exporter=pc?.GltfExporter;
   if(typeof Exporter!=="function")throw new Error("PlayCanvas GLB exporter is unavailable in this engine build.");
   const exporter=new Exporter();
-  const ab=await exporter.build(r.entity,{maxTextureSize:4096,stripUnusedAttributes:false});
+  const ab=await exporter.build(r.entity,{maxTextureSize:2048,stripUnusedAttributes:false});
   const blob=new Blob([ab],{type:"model/gltf-binary"});
   const name=opts.name||((r.name||"forge-asset").replace(/\.[^.]+$/,"")+".glb");
   const validation=await validateBlob(blob,"model");
