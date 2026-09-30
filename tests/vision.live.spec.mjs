@@ -219,6 +219,8 @@ test.describe.serial("Forge Live Vision — continuous stream + real browser inp
     expect(importedState.meshInstances).toBeGreaterThan(0);
     expect(importedState.texturedMaterials).toBeGreaterThan(0);
     expect(importedState.preview?.textured).toBeGreaterThan(0);
+    expect(importedState.preview?.normalized?.ok).toBeTruthy();
+    expect(importedState.preview?.normalized?.scale).toBeGreaterThan(0);
     expect(importedState.entities).toBeGreaterThanOrEqual(4);
 
     const materialDiag=await request.post("/api/vision/action",{data:{action:{
