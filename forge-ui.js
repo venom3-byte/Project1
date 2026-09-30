@@ -258,7 +258,7 @@ $("draw2dOpen")?.addEventListener("click",()=>{
   const d=$("draw2dDialog");
   if(d&&!d.open)try{d.showModal()}catch{d.setAttribute("open","")}
 });
-const REALISTIC_CAR_URL="https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Assets@main/Models/CarConcept/GLB/CarConcept.glb";
+const REALISTIC_CAR_URL="https://raw.githubusercontent.com/Omid2831/threejs-3d-car-viewer/main/public/models/car.glb";
 async function importRealisticCar(){
   const button=$("importRealCar");
   const previous=button?.textContent;
@@ -267,14 +267,14 @@ async function importRealisticCar(){
     const response=await fetch(REALISTIC_CAR_URL,{mode:"cors",cache:"no-store"});
     if(!response.ok)throw new Error("Realistic car download failed: HTTP "+response.status);
     const blob=await response.blob();
-    const file=new File([blob],"Forge-High-Quality-Concept-Car.glb",{type:"model/gltf-binary"});
+    const file=new File([blob],"Forge-High-Quality-Realistic-Car.glb",{type:"model/gltf-binary"});
     await window.ForgeProduction?.assets?.storeFile?.(file);
     const result=await engine.importFile(file,{remoteSource:REALISTIC_CAR_URL});
     if(result.type!=="model"||!result.record)throw new Error("Realistic car did not produce a 3D model record");
     result.record.components.asset.remoteSource=REALISTIC_CAR_URL;
-    result.record.components.asset.license="CC BY 4.0";
-    result.record.components.asset.catalogSource="KhronosGroup glTF Sample Assets — Car Concept";
-    result.record.components.asset.qualityProfile="high-quality-pbr-concept-car";
+    result.record.components.asset.license="External demo model; source repository license applies to the project, model-specific license not stated in README";
+    result.record.components.asset.catalogSource="Omid2831 / threejs-3d-car-viewer — public/models/car.glb";
+    result.record.components.asset.qualityProfile="high-quality-realistic-car";
     engine.select(result.record.id);
     engine.focus();
     refresh();inspect();
