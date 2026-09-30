@@ -34,8 +34,15 @@ async function importViaInput(page,buffer,name,mimeType,{renderable=false}={}){
   },name,{timeout:30000});
   if(renderable){
     await page.waitForFunction(()=>{
-      const r=window.Forge?.selected?.();
-      return !!r?.entity?.render?.meshInstances?.length;
+      const root=window.Forge?.selected?.()?.entity;
+      if(!root)return false;
+      const stack=[root];
+      while(stack.length){
+        const node=stack.pop();
+        if(node?.render?.meshInstances?.length)return true;
+        for(const child of node?.children||[])stack.push(child);
+      }
+      return false;
     },{timeout:30000});
   }
 }
