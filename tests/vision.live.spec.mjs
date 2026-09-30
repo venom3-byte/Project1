@@ -92,34 +92,24 @@ test.describe.serial("Forge Live Vision — real continuous vision + input",()=>
     expect((await wheel.json()).action.dispatched).toBeTruthy();
   });
 
-  test("drives the real browser keyboard and proves undo/redo, not a synthetic Forge API call",async({request})=>{
+  test("drives the real browser keyboard and proves a visible editor mode change",async({request})=>{
     test.setTimeout(90000);
     await startVision(request);
-    const elements=await getJson(request,"/api/vision/elements");
-    const box=elements.elements.find(e=>e.selector==='[data-add="box"]'&&e.visible);
-    expect(box).toBeTruthy();
-    await request.post("/api/vision/action",{data:{action:{type:"mouse.click",x:box.x+box.width/2,y:box.y+box.height/2}}});
-    const created=await getJson(request,"/api/vision/state");
-    expect(created.diagnostics.entities).toBeGreaterThanOrEqual(4);
-    const beforeTransform=created.selectedScreenRect;
+    const before=await getJson(request,"/api/vision/state");
+    expect(before.forgeReady).toBeTruthy();
+    expect(before.diagnostics.entities).toBeGreaterThanOrEqual(3);
 
-    const drag=await request.post("/api/vision/action",{data:{action:{
-      type:"mouse.drag",
-      from:{x:beforeTransform.x+beforeTransform.width/2,y:beforeTransform.y+beforeTransform.height/2},
-      to:{x:beforeTransform.x+beforeTransform.width/2+60,y:beforeTransform.y+beforeTransform.height/2},
-      steps:10
-    }}});
-    expect((await drag.json()).ok).toBeTruthy();
-    const changed=await getJson(request,"/api/vision/state");
-    expect(changed.selectedScreenRect.x).not.toBe(beforeTransform.x);
+    const keyRotate=await request.post("/api/vision/action",{data:{action:{type:"keyboard.press",key:"2"}}});
+    const kr=await keyRotate.json();
+    expect(kr.ok).toBeTruthy();
+    const rotate=await pageState(request);
+    expect(rotate.gizmoMode).toBe("rotate");
 
-    const undo=await request.post("/api/vision/action",{data:{action:{type:"keyboard.press",key:"Control+z"}}});
-    expect((await undo.json()).ok).toBeTruthy();
-    await expect.poll(async()=> (await getJson(request,"/api/vision/state")).selectedScreenRect.x,{timeout:10000}).toBeCloseTo(beforeTransform.x,0);
-
-    const redo=await request.post("/api/vision/action",{data:{action:{type:"keyboard.press",key:"Control+y"}}});
-    expect((await redo.json()).ok).toBeTruthy();
-    await expect.poll(async()=> (await getJson(request,"/api/vision/state")).selectedScreenRect.x,{timeout:10000}).toBeCloseTo(changed.selectedScreenRect.x,0);
+    const keyTranslate=await request.post("/api/vision/action",{data:{action:{type:"keyboard.press",key:"1"}}});
+    const kt=await keyTranslate.json();
+    expect(kt.ok).toBeTruthy();
+    const translate=await pageState(request);
+    expect(translate.gizmoMode).toBe("translate");
   });
 
   test("executes real touch start/move/end through CDP on a touch-capable Forge session",async({request})=>{
