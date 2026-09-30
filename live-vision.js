@@ -108,9 +108,11 @@
   }
   function remotePoint(ev){
     const img=$('#liveVisionStream'),r=img.getBoundingClientRect(),v=state.session?.viewport||{width:innerWidth,height:innerHeight};
+    const iw=img.naturalWidth||v.width,ih=img.naturalHeight||v.height;
+    const scale=Math.min(r.width/Math.max(1,iw),r.height/Math.max(1,ih)),dw=iw*scale,dh=ih*scale,ox=(r.width-dw)/2,oy=(r.height-dh)/2;
     return{
-      x:Math.max(0,Math.min(v.width-1,(ev.clientX-r.left)*v.width/Math.max(1,r.width))),
-      y:Math.max(0,Math.min(v.height-1,(ev.clientY-r.top)*v.height/Math.max(1,r.height)))
+      x:Math.max(0,Math.min(v.width-1,(ev.clientX-r.left-ox)/Math.max(.0001,scale))),
+      y:Math.max(0,Math.min(v.height-1,(ev.clientY-r.top-oy)/Math.max(.0001,scale)))
     }
   }
   function bindPreviewControls(){
