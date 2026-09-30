@@ -97,7 +97,7 @@ export class ForgeEngine{
     }
     if(best)this.select(best.id);return best
   }
-  _transformState(r){if(!r)return null;const p=r.entity.getLocalPosition(),q=r.entity.getLocalEulerAngles(),s=r.entity.getLocalScale();return{p:[p.x,p.y,p.z],r:[q.x,q.y,q.z],s:[s.x,s.y,s.z]}}
+  _transformState(r){if(!r)return null;const p=r.entity.getLocalPosition(),q=r.entity.getLocalEulerAngles(),s=r.entity.getLocalScale(),nz=v=>Object.is(v,-0)?0:v;return{p:[nz(p.x),nz(p.y),nz(p.z)],r:[nz(q.x),nz(q.y),nz(q.z)],s:[nz(s.x),nz(s.y),nz(s.z)]}}
   _applyTransformState(r,state){if(!r||!state)return false;r.entity.setLocalPosition(...state.p);r.entity.setLocalEulerAngles(...state.r);r.entity.setLocalScale(...state.s);return true}
   recordTransformHistory(id,before,after){if(!id||!before||!after)return false;if(JSON.stringify(before)===JSON.stringify(after))return false;this.history.push({type:'transform',id,before,after});if(this.history.length>this.historyLimit)this.history.shift();this.redoStack.length=0;return true}
   transform(v,options={}){
