@@ -11,7 +11,8 @@
     "test:core": "playwright test tests/core.smoke.spec.mjs tests/asset-export.spec.mjs tests/visual.smoke.spec.mjs tests/professional.qa.spec.mjs --project=desktop",
     "test:professional": "playwright test tests/professional.qa.spec.mjs --project=desktop",
     "validate:gltf": "node scripts/validate-gltf-test-assets.mjs",
-    "test:vision": "playwright test tests/vision-live.spec.mjs --project=desktop"
+    "test:vision": "playwright test tests/vision.live.spec.mjs --project=desktop",
+    "test:vision:mobile": "playwright test tests/vision.live.spec.mjs --project=mobile"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
