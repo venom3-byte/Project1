@@ -233,7 +233,7 @@ test.describe("Forge professional acceptance",()=>{
       const check=await window.ForgeExport.validateSelected();
       const source=await window.ForgeExport.exportSource({download:false});
       const preview=await window.ForgeExport.exportPreview({download:false,name:"developer-reference-preview.png"});
-      const info=window.ForgeSpatial.inspect(imported.record);
+      const info=window.ForgeSpatial.inspect(imported);
       return{
         name:window.Forge.selected()?.name,
         check,
@@ -261,6 +261,18 @@ test.describe("Forge professional acceptance",()=>{
     await page.screenshot({path:"test-results/pro-2d-import.png",fullPage:true});
   });
 
+  test("legacy OBJ imports through the real browser conversion adapter and produces a renderable 3D asset",async({page})=>{
+    test.setTimeout(120000);
+    const obj=new TextEncoder().encode([
+      "o ForgeProof","v -0.7 0 -0.5","v 0.7 0 -0.5","v 0 1.4 -0.5","v -0.7 0 0.5","v 0.7 0 0.5","v 0 1.4 0.5",
+      "f 1 2 3","f 4 6 5","f 1 4 5 2","f 2 5 6 3","f 3 6 4 1"
+    ].join("\n"));
+    await waitForForge(page);
+    await importViaInput(page,obj,"forge-proof.obj","model/obj",{renderable:true});
+    const result=await page.evaluate(()=>{const r=window.Forge.selected(),spatial=window.ForgeSpatial.inspect(r);return{name:r?.components?.asset?.name,converted:r?.components?.asset?.converted===true,converter:r?.components?.asset?.converter,sourcePreserved:r?.components?.asset?.sourcePreserved===true,vertices:spatial?.geometry?.vertices||0,triangles:spatial?.geometry?.triangles||0,renderables:r?.entity?.render?.meshInstances?.length||0}});
+    expect(result.name).toBe("forge-proof.obj");expect(result.converted).toBeTruthy();expect(result.converter).toBe("AssimpJS");expect(result.sourcePreserved).toBeTruthy();expect(result.vertices).toBeGreaterThan(0);expect(result.triangles).toBeGreaterThan(0);expect(result.renderables).toBeGreaterThan(0);
+    await page.screenshot({path:"test-results/pro-legacy-obj-editor.png",fullPage:true});
+  });
   test("real animated Fox GLB imports with animation clips and exact source export",async({page})=>{
     test.setTimeout(120000);
     const glb=await download(page,FOX);
