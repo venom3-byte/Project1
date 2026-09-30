@@ -15,7 +15,26 @@ const vision=new VisionController({baseUrl:`http://127.0.0.1:${port}`});
 const removeVisionShutdown=installVisionShutdown(vision);
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.webmanifest':'application/manifest+json; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.svg':'image/svg+xml','.ico':'image/x-icon','.wasm':'application/wasm'};
 const clients=new Set(),visionClients=new Set(),rooms=new Map();
-const vision=new VisionController({port:Number(process.env.FORGE_CDP_PORT||9222),host:process.env.FORGE_CDP_HOST||'127.0.0.1',broadcast:message=>{const raw=JSON.stringify(message);for(const peer of visionClients)if(peer.readyState===1)peer.send(raw)}});
+const vision=new VisionController({
+  port:Number(process.env.FORGE_CDP_PORT||9222),
+  host:process.env.FORGE_CDP_HOST||'127.0.0.1',
+  broadcast:message=>{
+    if(message?.type==='vision-frame'&&message.data){
+      const jpeg=Buffer.from(message.data,'base64');
+      const header=Buffer.alloc(16);
+      header.writeUInt32BE(0x46563337,0);
+      header.writeUInt32BE(Number(message.seq)||0,4);
+      header.writeUInt16BE(Number(message.width)||0,8);
+      header.writeUInt16BE(Number(message.height)||0,10);
+      header.writeUInt32BE(Math.floor((Number(message.at)||Date.now())/1000),12);
+      const packet=Buffer.concat([header,jpeg]);
+      for(const peer of visionClients)if(peer.readyState===1)peer.send(packet);
+      return;
+    }
+    const raw=JSON.stringify(message);
+    for(const peer of visionClients)if(peer.readyState===1)peer.send(raw)
+  }
+});
 function json(res,o,status=200){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','Access-Control-Allow-Origin':'*'});res.end(JSON.stringify(o))}
 function body(req,max=64*1024){return new Promise((resolve,reject)=>{let raw='';req.on('data',chunk=>{raw+=chunk;if(raw.length>max){reject(new Error('Request body too large'));req.destroy()}});req.on('end',()=>{try{resolve(raw?JSON.parse(raw):{})}catch(e){reject(new Error('Invalid JSON'))}});req.on('error',reject)})}
 async function routeVisionAction(req,res){try{const q=await body(req);if(!q.action)return json(res,{ok:false,error:'Missing action'},400);return json(res,await vision.action(q.action,q.options||{}))}catch(e){return json(res,{ok:false,error:e.message||String(e)},500)}}
