@@ -98,8 +98,16 @@ test.describe.serial("Forge Live Vision — continuous stream + real browser inp
 
     const open=await request.get("/api/vision/elements");
     const openElements=(await open.json()).elements;
-    const drawOpen=openElements.find(e=>e.selector==="#draw2dOpen"&&e.visible);
+    let drawOpen=openElements.find(e=>e.selector==="#draw2dOpen"&&e.visible);
     expect(drawOpen).toBeTruthy();
+    for(let i=0;i<3&&drawOpen.y>850;i++){
+      const scroll=await request.post("/api/vision/action",{data:{action:{type:"mouse.wheel",deltaY:700}}});
+      expect((await scroll.json()).result.action.dispatched).toBeTruthy();
+      const refreshed=(await (await request.get("/api/vision/elements")).json()).elements;
+      drawOpen=refreshed.find(e=>e.selector==="#draw2dOpen"&&e.visible);
+      expect(drawOpen).toBeTruthy();
+    }
+    expect(drawOpen.y).toBeLessThan(900);
     const clickDraw=await request.post("/api/vision/action",{data:{action:{type:"mouse.click",x:drawOpen.x+drawOpen.width/2,y:drawOpen.y+drawOpen.height/2}}});
     const clickDrawBody=await clickDraw.json();
     expect(clickDrawBody.result.action.target).toMatchObject({id:"draw2dOpen"});
@@ -135,8 +143,8 @@ test.describe.serial("Forge Live Vision — continuous stream + real browser inp
 
     const data=await request.post("/api/vision/action",{data:{action:{type:"evaluate",expression:"window.ForgeDraw2D?.lastPngDataUrl || null"}}});
     const dataBody=await data.json();
-    expect(typeof dataBody.result.value).toBe("string");
-    const m=/^data:image\/png;base64,(.+)$/.exec(dataBody.result.value);
+    expect(typeof dataBody.result.action.value).toBe("string");
+    const m=/^data:image\/png;base64,(.+)$/.exec(dataBody.result.action.value);
     expect(m).toBeTruthy();
     const pngBytes=Buffer.from(m[1],"base64");
     expect(pngBytes.slice(0,8).toString("hex")).toBe("89504e470d0a1a0a");
