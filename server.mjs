@@ -33,6 +33,11 @@ const srv=http.createServer(async (req,res)=>{const u=new URL(req.url,'http://lo
   if(u.pathname==='/api/pipeline'&&req.method==='POST'){let body='';req.on('data',c=>body+=c);req.on('end',async()=>{try{const q=JSON.parse(body);if(q.operation!=='cook-glb')return json(res,{ok:false,error:'Unsupported pipeline operation'},400);const bytes=Buffer.from(q.base64||'','base64');if(!bytes.length)return json(res,{ok:false,error:'Empty asset'},400);if(bytes.length>80*1024*1024)return json(res,{ok:false,error:'Asset exceeds 80MB pipeline limit'},413);const cooked=await cookGLB(bytes,q.options||{});return json(res,{ok:true,...cooked})}catch(e){return json(res,{ok:false,error:e.message},500)}});return}
   if(u.pathname==='/api/live/status')return json(res,{ok:true,agentConfigured:true,transport:'websocket',model:'forge-control-plane-v4',protocol:4,vision:vision.status()});
   if(u.pathname==='/api/vision/status')return json(res,{ok:true,protocol:4,vision:vision.status(),capabilities:{liveScreencast:true,mouse:true,keyboard:true,touch:true,wheel:true,drag:true}});
+  if(u.pathname==='/api/vision/frame'){
+    if(!vision.latestFrame)return json(res,{ok:false,error:'Live Vision frame is not available'},503);
+    res.writeHead(200,{'Content-Type':'image/jpeg','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});
+    return res.end(vision.latestFrame);
+  }
   if(u.pathname==='/api/vision/stream')return vision.stream(req,res);
   if(u.pathname==='/api/vision/elements')return vision.elements().then(data=>json(res,{ok:true,...data})).catch(e=>json(res,{ok:false,error:e.message||String(e)},503));
   if(u.pathname==='/api/vision/state')return vision.state().then(data=>json(res,{ok:true,...data})).catch(e=>json(res,{ok:false,error:e.message||String(e)},503));

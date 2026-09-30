@@ -1,5 +1,6 @@
 import{test,expect}from"@playwright/test";
 import{WebSocket}from"ws";
+import{writeFile}from"node:fs/promises";
 
 const BASE="http://127.0.0.1:4173";
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -31,6 +32,11 @@ test.describe.serial("Forge Live Vision — continuous stream + real browser inp
     expect(body.session.running).toBeTruthy();
 
     await expect.poll(()=>frames.length,{timeout:20000}).toBeGreaterThanOrEqual(5);
+    const proof=await request.get("/api/vision/frame");
+    expect(proof.ok()).toBeTruthy();
+    const proofBytes=await proof.body();
+    expect(proofBytes.slice(0,2).toString("hex")).toBe("ffd8");
+    await writeFile("test-results/vision-live-proof.jpg",proofBytes);
     expect(frames.at(-1).seq).toBeGreaterThan(frames[0].seq);
     expect(frames[0].width).toBeGreaterThan(300);
     expect(frames[0].height).toBeGreaterThan(200);
@@ -86,9 +92,48 @@ test.describe.serial("Forge Live Vision — continuous stream + real browser inp
     const release=await request.post("/api/vision/action",{data:{action:{type:"releaseAll"}}});
     expect((await release.json()).result.action.released).toBeTruthy();
 
+    const drawn=(await request.post("/api/vision/action",{data:{action:{type:"mouse.click",x:61,y:106.5},options:{includeState:true}}})).json;
     const finalState=await (await request.get("/api/vision/state")).json();
     expect(finalState.forgeReady).toBeTruthy();
     expect(finalState.canvasRect).toBeTruthy();
+
+    const open=await request.get("/api/vision/elements");
+    const openElements=(await open.json()).elements;
+    const drawOpen=openElements.find(e=>e.selector==="#draw2dOpen"&&e.visible);
+    expect(drawOpen).toBeTruthy();
+    const clickDraw=await request.post("/api/vision/action",{data:{action:{type:"mouse.click",x:drawOpen.x+drawOpen.width/2,y:drawOpen.y+drawOpen.height/2}}});
+    expect((await clickDraw.json()).result.action.dispatched).toBeTruthy();
+
+    const drawingEls=(await (await request.get("/api/vision/elements")).json()).elements;
+    const canvas=drawingEls.find(e=>e.selector==="#drawCanvas"&&e.visible);
+    const add=drawingEls.find(e=>e.selector==="#drawAddToScene"&&e.visible);
+    expect(canvas).toBeTruthy(); expect(add).toBeTruthy();
+
+    const lines=[
+      {from:{x:canvas.x+canvas.width*.20,y:canvas.y+canvas.height*.25},to:{x:canvas.x+canvas.width*.80,y:canvas.y+canvas.height*.25}},
+      {from:{x:canvas.x+canvas.width*.20,y:canvas.y+canvas.height*.75},to:{x:canvas.x+canvas.width*.80,y:canvas.y+canvas.height*.75}},
+      {from:{x:canvas.x+canvas.width*.20,y:canvas.y+canvas.height*.25},to:{x:canvas.x+canvas.width*.20,y:canvas.y+canvas.height*.75}},
+      {from:{x:canvas.x+canvas.width*.80,y:canvas.y+canvas.height*.25},to:{x:canvas.x+canvas.width*.80,y:canvas.y+canvas.height*.75}}
+    ];
+    for(const line of lines){
+      const rr=await request.post("/api/vision/action",{data:{action:{type:"mouse.drag",from:line.from,to:line.to,steps:18}}});
+      expect((await rr.json()).result.action.dispatched).toBeTruthy();
+    }
+    const addResult=await request.post("/api/vision/action",{data:{action:{type:"mouse.click",x:add.x+add.width/2,y:add.y+add.height/2},options:{includeState:true}}});
+    const addBody=await addResult.json();
+    expect(addBody.ok).toBeTruthy();
+    expect(addBody.result?.state?.selected?.name).toBe("forge-drawing.png");
+    expect(addBody.result?.state?.selected?.kind).toBeTruthy();
+
+    const data=await request.post("/api/vision/action",{data:{action:{type:"evaluate",expression:"window.ForgeDraw2D?.lastPngDataUrl || null"}}});
+    const dataBody=await data.json();
+    expect(typeof dataBody.result.value).toBe("string");
+    const m=/^data:image\/png;base64,(.+)$/.exec(dataBody.result.value);
+    expect(m).toBeTruthy();
+    const pngBytes=Buffer.from(m[1],"base64");
+    expect(pngBytes.slice(0,8).toString("hex")).toBe("89504e470d0a1a0a");
+    expect(pngBytes.length).toBeGreaterThan(1000);
+    await writeFile("test-results/vision-drawn-asset.png",pngBytes);
   });
 
   test("file-input control is available for real asset import workflows",async({request})=>{

@@ -353,7 +353,7 @@ export class VisionController extends EventEmitter{
       '[data-add="box"]','[data-add="sphere"]','[data-add="cylinder"]',
       '#assetInput','#importAssets','#play','#build','#openProject','#saveProject',
       '#focus','#frame','#duplicate','#delete','#viewport','.viewport',
-      '#visionOpen','#selected','#sceneCount','#time','.topbar','.leftpanel','.rightpanel'
+      '#visionOpen','#selected','#sceneCount','#time','#draw2dOpen','#drawCanvas','#drawAddToScene','#drawClear','#drawUndo','#drawRedo','.topbar','.leftpanel','.rightpanel'
     ];
     const selectors=[...new Set(
       [...(Array.isArray(requestedSelectors)?requestedSelectors:[]),...defaults]
