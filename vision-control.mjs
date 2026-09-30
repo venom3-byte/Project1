@@ -276,11 +276,13 @@ export class VisionController extends EventEmitter{
       if(selected&&window.ForgeSpatial?.screenRect){
         try{selectedScreenRect=window.ForgeSpatial.screenRect(selected)}catch{}
       }
+      const canvasRect=document.querySelector('#viewport')?.getBoundingClientRect?.()?.toJSON?.()||null;
       return{
         forgeReady:window.ForgeReady===true,
         bootState:window.ForgeBootState||null,
         selected:selected?{id:selected.id,name:selected.name,kind:selected.kind}:null,
         selectedScreenRect,
+        canvasRect,
         diagnostics:diag,
         url:location.href,
         viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio||1}
