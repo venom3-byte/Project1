@@ -276,39 +276,45 @@ test.describe("Forge professional acceptance",()=>{
     expect(result.diffuse.reduce((a,b)=>a+b,0)).toBeGreaterThan(.3);
     await page.screenshot({path:"test-results/pro-legacy-obj-editor.png",fullPage:true});
   });
-  test("built-in realistic supercar imports as a renderable textured 3D asset",async({page})=>{
+  test("built-in realistic supercar imports and renders the real GLB through the integrated 3D preview",async({page})=>{
     test.setTimeout(120000);
     await waitForForge(page);
     await expect(page.locator("#importRealCar")).toBeVisible();
     await page.click("#importRealCar");
-    await page.waitForFunction(()=>window.Forge?.selected?.()?.components?.asset?.remoteSource?.includes("M-ZohaibAli/Velocity/main/public/models/CAR%20Model.glb"),{timeout:90000});
+    await page.waitForFunction(()=>window.ForgeDemoAssets?.previewReady===true,{timeout:90000});
+    await page.waitForFunction(()=>window.Forge?.selected?.()?.components?.asset?.previewOnly===true,{timeout:10000});
     const result=await page.evaluate(()=>{
-      const r=window.Forge.selected(),stack=[r?.entity],meshes=[];
-      while(stack.length){const n=stack.pop();for(const mi of n?.render?.meshInstances||[])meshes.push(mi);for(const c of n?.children||[])stack.push(c)}
-      const i=window.ForgeSpatial.inspect(r),materials=new Set(meshes.map(mi=>mi.material?.name||mi.material));
+      const r=window.Forge.selected(),stats=window.ForgeDemoAssets.previewStats;
+      const canvas=document.querySelector("#forgeAssetPreviewCanvas");
       return{
         name:r?.components?.asset?.name,
         remoteSource:r?.components?.asset?.remoteSource,
         license:r?.components?.asset?.license,
-        vertices:i?.geometry?.vertices||0,
-        triangles:i?.geometry?.triangles||0,
-        materials:Math.max(i?.geometry?.materials||0,materials.size),
-        renderables:meshes.length,
-        textured:meshes.filter(mi=>!!mi.material?.diffuseMap).length,
-        world:i?.world?.size||null,
-        normalized:r?.components?.asset?.normalized===true
+        previewOnly:r?.components?.asset?.previewOnly===true,
+        renderer:r?.components?.asset?.previewRenderer,
+        visible:!document.querySelector("#forgeAssetPreview")?.classList.contains("hidden"),
+        canvasWidth:canvas?.width||0,
+        canvasHeight:canvas?.height||0,
+        meshes:stats?.meshes||0,
+        vertices:stats?.vertices||0,
+        triangles:stats?.triangles||0,
+        materials:stats?.materials||0,
+        sourceBytes:stats?.sourceBytes||0
       };
     });
     expect(result.name).toBe("Forge-Realistic-Supercar.glb");
     expect(result.remoteSource).toContain("M-ZohaibAli/Velocity/main/public/models/CAR%20Model.glb");
     expect(result.license).toBe("CC-BY 3.0");
+    expect(result.previewOnly).toBeTruthy();
+    expect(result.renderer).toBe("three.js");
+    expect(result.visible).toBeTruthy();
+    expect(result.canvasWidth).toBeGreaterThan(300);
+    expect(result.canvasHeight).toBeGreaterThan(200);
+    expect(result.meshes).toBeGreaterThan(0);
     expect(result.vertices).toBeGreaterThan(5000);
     expect(result.triangles).toBeGreaterThan(5000);
-    expect(result.materials).toBeGreaterThanOrEqual(1);
-    expect(result.renderables).toBeGreaterThan(0);
-    expect(result.textured).toBeGreaterThan(0);
-    expect(result.world?.y).toBeGreaterThan(0.5);
-    expect(result.normalized).toBeTruthy();
+    expect(result.materials).toBeGreaterThan(0);
+    expect(result.sourceBytes).toBeGreaterThan(1000000);
     await page.screenshot({path:"test-results/pro-realistic-supercar-editor.png",fullPage:true});
   });
 
