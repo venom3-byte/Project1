@@ -42,10 +42,21 @@ export class ForgeEngine{
   selected(){return this.selectedId?this.entities.get(this.selectedId):null}
   select(id){this.selectedId=id;window.dispatchEvent(new CustomEvent('forge-selection',{detail:this.selected()}));return this.selected()}
   setView(mode){
-    const cam=this.camera();if(!cam?.camera)return false;const target=this.selected()?.entity.getPosition()||new pc.Vec3(0,1,0),dist=Math.max(6,target.distance(cam.getPosition())||10);
-    const positions={front:new pc.Vec3(0,target.y,target.z+dist),back:new pc.Vec3(0,target.y,target.z-dist),left:new pc.Vec3(-dist,target.y,target.z),right:new pc.Vec3(dist,target.y,target.z),top:new pc.Vec3(target.x,target.y+dist,target.z),bottom:new pc.Vec3(target.x,target.y-dist,target.z)};
-    if(mode==='perspective'){this.viewMode='perspective';cam.camera.projection=pc.PROJECTION_PERSPECTIVE;cam.setPosition(target.x+dist*.75,target.y+dist*.5,target.z+dist);cam.lookAt(target)}
-    else if(positions[mode]){this.viewMode=mode;cam.camera.projection=pc.PROJECTION_ORTHOGRAPHIC;cam.camera.orthoHeight=Math.max(.5,dist*.9);cam.setPosition(positions[mode]);cam.lookAt(target)}
+    const cam=this.camera();if(!cam?.camera)return false;
+    const selected=this.selected(),inspected=selected&&this.spatial?.inspect?.(selected);
+    const target=selected?.entity.getPosition()||new pc.Vec3(0,1,0);
+    const radius=Math.max(.5,Number(inspected?.world?.radius||0)||0.5);
+    const dist=Math.max(3,radius*3.2);
+    const positions={front:new pc.Vec3(target.x,target.y,target.z+dist),back:new pc.Vec3(target.x,target.y,target.z-dist),left:new pc.Vec3(target.x-dist,target.y,target.z),right:new pc.Vec3(target.x+dist,target.y,target.z),top:new pc.Vec3(target.x,target.y+dist,target.z),bottom:new pc.Vec3(target.x,target.y-dist,target.z)};
+    if(mode==='perspective'){
+      this.viewMode='perspective';cam.camera.projection=pc.PROJECTION_PERSPECTIVE;
+      cam.setPosition(target.x+dist*.75,target.y+dist*.5,target.z+dist);cam.lookAt(target)
+    }else if(positions[mode]){
+      this.viewMode=mode;cam.camera.projection=pc.PROJECTION_ORTHOGRAPHIC;
+      cam.camera.orthoHeight=Math.max(.5,radius*2.35);
+      cam.setPosition(positions[mode]);cam.lookAt(target)
+    }
+    this.app?.resizeCanvas?.();
     return true
   }
   applyMaterial(params={}){
@@ -139,27 +150,33 @@ export class ForgeEngine{
     let textured=0,previewAdjusted=0,cullAdjusted=0;
     root.forEach(n=>{
       for(const mi of n.render?.meshInstances||[]){
-        const mat=mi.material;if(!mat)continue;
-        if(mat.diffuseMap){
+        const mat=mi.material;
+        if(!mat)continue;
+        const preview=mat.clone?.()||this.material([.62,.68,.76]);
+        const hasMap=!!mat.diffuseMap;
+        if(hasMap){
           textured++;
-          const preview=mat.clone?.()||mat;
           preview.diffuse=new pc.Color(1,1,1);
           preview.diffuseMap=mat.diffuseMap;
           preview.emissiveMap=mat.diffuseMap;
           preview.emissive=new pc.Color(1,1,1);
-          preview.emissiveIntensity=1;
-          preview.useLighting=false;
-          preview.useMetalness=false;
-          preview.useTonemap=false;
-          if("cull" in preview)preview.cull=pc.CULLFACE_NONE;
-          if("blendType" in preview)preview.blendType=pc.BLEND_NONE;
-          if("opacity" in preview)preview.opacity=1;
-          if("alphaTest" in preview)preview.alphaTest=0;
-          preview.update?.();
-          mi.material=preview;
-          previewAdjusted++;
-          if(preview.cull===pc.CULLFACE_NONE)cullAdjusted++;
+          preview.emissiveIntensity=.75;
+        }else{
+          preview.diffuse=new pc.Color(.62,.68,.76);
+          preview.emissive=new pc.Color(.10,.12,.16);
+          preview.emissiveIntensity=.35;
         }
+        preview.useLighting=false;
+        preview.useMetalness=false;
+        preview.useTonemap=false;
+        if("cull" in preview)preview.cull=pc.CULLFACE_NONE;
+        if("blendType" in preview)preview.blendType=pc.BLEND_NONE;
+        if("opacity" in preview)preview.opacity=1;
+        if("alphaTest" in preview)preview.alphaTest=0;
+        preview.update?.();
+        mi.material=preview;
+        previewAdjusted++;
+        if(preview.cull===pc.CULLFACE_NONE)cullAdjusted++;
       }
     });
     const normalized=this.normalizeImportedModel(root,2.4);
