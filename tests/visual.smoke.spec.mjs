@@ -1,21 +1,33 @@
 import{test,expect}from"@playwright/test";
 
 async function pixelHealth(page){
-  return page.evaluate(()=>{
-    const canvas=document.getElementById("viewport");
-    const gl=canvas.getContext("webgl2",{preserveDrawingBuffer:true})||canvas.getContext("webgl",{preserveDrawingBuffer:true});
-    if(!gl)return{ok:false,reason:"no-webgl"};
-    const w=Math.min(canvas.width,320),h=Math.min(canvas.height,180);
-    const sx=Math.max(0,Math.floor((canvas.width-w)/2)),sy=Math.max(0,Math.floor((canvas.height-h)/2));
-    const px=new Uint8Array(w*h*4);gl.readPixels(sx,sy,w,h,gl.RGBA,gl.UNSIGNED_BYTE,px);
-    let nonDark=0,total=0,sum=0,sum2=0;
-    for(let i=0;i<px.length;i+=4){
-      const v=(px[i]+px[i+1]+px[i+2])/3;sum+=v;sum2+=v*v;total++;
-      if(v>9)nonDark++;
+  return page.evaluate(async()=>{
+    const source=document.getElementById("viewport");
+    if(!source)return{ok:false,reason:"no-viewport"};
+    const rect=source.getBoundingClientRect();
+    const width=Math.min(320,Math.max(1,source.width||Math.round(rect.width)));
+    const height=Math.min(180,Math.max(1,source.height||Math.round(rect.height)));
+    try{
+      const dataUrl=source.toDataURL("image/png");
+      const blob=await (await fetch(dataUrl)).blob();
+      const bmp=await createImageBitmap(blob);
+      const probe=document.createElement("canvas");
+      probe.width=width;probe.height=height;
+      const ctx=probe.getContext("2d",{willReadFrequently:true});
+      ctx.drawImage(bmp,0,0,width,height);
+      bmp.close?.();
+      const px=ctx.getImageData(0,0,width,height).data;
+      let nonDark=0,total=0,sum=0,sum2=0;
+      for(let i=0;i<px.length;i+=4){
+        const v=(px[i]+px[i+1]+px[i+2])/3;
+        sum+=v;sum2+=v*v;total++;
+        if(v>9)nonDark++;
+      }
+      const mean=sum/Math.max(1,total),variance=sum2/Math.max(1,total)-mean*mean;
+      return{ok:true,nonDarkRatio:nonDark/Math.max(1,total),variance,mean,width:rect.width,height:rect.height,method:"canvas-image-data"};
+    }catch(error){
+      return{ok:false,reason:String(error?.message||error)};
     }
-    const mean=sum/Math.max(1,total),variance=sum2/Math.max(1,total)-mean*mean;
-    const rect=canvas.getBoundingClientRect();
-    return{ok:true,nonDarkRatio:nonDark/Math.max(1,total),variance,mean,width:rect.width,height:rect.height};
   });
 }
 
