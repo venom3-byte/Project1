@@ -267,7 +267,7 @@ test.describe("Forge professional acceptance",()=>{
     await importViaInput(page,glb,"ToyCar.glb","model/gltf-binary",{renderable:true});
     const result=await page.evaluate(async()=>{
       const imported=window.Forge.selected();
-      const before=window.ForgeSpatial.inspect(imported.record);
+      const before=window.ForgeSpatial.inspect(imported);
       const qa=await window.ForgeExport.runExportQA();
       const source=await window.ForgeExport.exportSource({download:false});
       const derived=await window.ForgeExport.exportSceneGLB({download:false,name:"ToyCar-derived.glb"});
