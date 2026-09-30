@@ -104,9 +104,19 @@ async function exportPreview(opts={}){
   if(opts.download!==false)await save(blob,name,mime);
   return{ok:true,derived:true,name,bytes:blob.size,mime,blob};
 }
+function hasRenderable(root){
+  if(!root)return false;
+  const stack=[root];
+  while(stack.length){
+    const node=stack.pop();
+    if(node?.render?.meshInstances?.length)return true;
+    for(const child of node?.children||[])stack.push(child);
+  }
+  return false;
+}
 async function exportSceneGLB(opts={}){
   const r=selected();
-  if(!r?.entity?.render?.meshInstances?.length)throw new Error("Select a renderable 3D object before exporting GLB.");
+  if(!r||assetType(r)!=="model"||!hasRenderable(r.entity))throw new Error("Select an imported renderable 3D asset before exporting GLB.");
   const Exporter=pc?.GltfExporter;
   if(typeof Exporter!=="function")throw new Error("PlayCanvas GLB exporter is unavailable in this engine build.");
   const exporter=new Exporter();
