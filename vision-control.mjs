@@ -60,22 +60,25 @@ export class VisionController extends EventEmitter{
     this.lastStreamFrameAt=0;
     this.frameDrops=0;
     this.inputState={mouseButtons:new Set(),keys:new Set(),touchIds:new Set()};
+    this.starting=null;
   }
 
   async start(options={}){
-    const viewport={
-      width:clamp(options.viewport?.width??1440,320,2560),
-      height:clamp(options.viewport?.height??900,240,1800)
-    };
-    const touch=!!options.touch;
-    const mobile=!!options.mobile;
-    const target=normalizeUrl(options.url||options.target||this.baseUrl+'/',this.baseUrl);
-    this.streamFps=clamp(options.streamFps??30,5,60);
+    if(this.starting)return this.starting;
+    const run=async()=>{
+      const viewport={
+        width:clamp(options.viewport?.width??1440,320,2560),
+        height:clamp(options.viewport?.height??900,240,1800)
+      };
+      const touch=!!options.touch;
+      const mobile=!!options.mobile;
+      const target=normalizeUrl(options.url||options.target||this.baseUrl+'/',this.baseUrl);
+      this.streamFps=clamp(options.streamFps??30,5,60);
 
-    if(this.page && this.targetUrl===target &&
-       this.page.isClosed?.()===false) return this.status();
+      if(this.page && this.targetUrl===target &&
+         this.page.isClosed?.()===false) return this.status();
 
-    await this.stop();
+      await this.stop();
 
     let chromium;
     try{
@@ -114,22 +117,26 @@ export class VisionController extends EventEmitter{
       if(message.type()==='error') this.recordError('console: '+message.text());
     });
 
+    await this.page.goto(target,{waitUntil:'domcontentloaded',timeout:30000});
+    await this.page.waitForTimeout(50);
     await this.page.screencast.start({
       quality:72,
       size:viewport,
       onFrame:frame=>this.acceptFrame(frame)
     });
-
-    await this.page.goto(target,{waitUntil:'domcontentloaded',timeout:30000});
     try{
       await this.page.waitForFunction(()=>window.ForgeReady===true,{timeout:15000});
     }catch{
       // A live visual session is useful even while an application is still booting.
     }
     await this.page.waitForTimeout(250);
-    this.emit('started',this.status());
-    this.emitTelemetry();
-    return this.status();
+      this.emit('started',this.status());
+      this.emitTelemetry();
+      return this.status();
+    };
+    this.starting=run();
+    try{return await this.starting}
+    finally{this.starting=null}
   }
 
   recordError(message){

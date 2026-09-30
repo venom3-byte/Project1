@@ -28,8 +28,13 @@ const srv=http.createServer(async (req,res)=>{const u=new URL(req.url,'http://lo
   if(u.pathname==='/api/vision/elements')return vision.elements().then(data=>json(res,{ok:true,...data})).catch(e=>json(res,{ok:false,error:e.message||String(e)},503));
   if(u.pathname==='/api/vision/state')return vision.state().then(data=>json(res,{ok:true,...data})).catch(e=>json(res,{ok:false,error:e.message||String(e)},503));
   if(u.pathname==='/api/vision/session/start'&&req.method==='POST'){
-    try{const q=await body(req);const s=await vision.start({url:q.url||q.target||undefined,viewport:q.viewport,touch:q.touch,mobile:q.mobile,streamFps:q.streamFps});return json(res,{ok:true,session:s,stream:'/api/vision/stream',websocket:'/vision'})}
-    catch(e){return json(res,{ok:false,error:e.message||String(e)},500)}
+    try{
+      const q=await body(req);
+      const s=await vision.start({url:q.url||q.target||undefined,viewport:q.viewport,touch:q.touch,mobile:q.mobile,streamFps:q.streamFps});
+      return json(res,{ok:true,session:s,stream:'/api/vision/stream',websocket:'/vision'});
+    }catch(e){
+      return json(res,{ok:false,error:e.message||String(e),vision:vision.status()},500);
+    }
   }
   if(u.pathname==='/api/vision/session/stop'&&req.method==='POST'){
     try{await vision.stop();return json(res,{ok:true,session:vision.status()})}
