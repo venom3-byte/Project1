@@ -11,7 +11,7 @@ class AssetPipeline {
   async analyze(file) {
     const base={id:crypto.randomUUID(),name:file.name,type:file.type||"application/octet-stream",bytes:file.size,modified:file.lastModified||Date.now(),extension:String(file.name).split(".").pop()?.toLowerCase()||""};
     const n=String(file.name).toLowerCase();
-    const model=/.\(glb|gltf|fbx|obj|dae|3ds|stl|ply|off|3mf|dxf|ase|b3d|lwo|lxo|m3d|md2|md3|md5mesh|ms3d|smd|vta|x|x3d\)$/i.test(n);
+    const model=/\.(glb|gltf|fbx|obj|dae|3ds|stl|ply|off|3mf|dxf|ase|b3d|lwo|lxo|m3d|md2|md3|md5mesh|ms3d|smd|vta|x|x3d)$/i.test(n);
     if(/^image\//.test(file.type)||/\.(png|jpe?g|webp|avif|gif|bmp|tga|tif|tiff)$/i.test(n))return Object.assign(base,await this.analyzeImage(file));
     if(/\.glb$/i.test(n))return Object.assign(base,await this.analyzeGLB(file));
     if(/\.gltf$/i.test(n))return Object.assign(base,{kind:"gltf",status:"package-or-single-file",warnings:["External buffers/textures are automatically packaged when supplied together."],optimization:["Prefer GLB for portable delivery"]});
