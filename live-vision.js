@@ -1,310 +1,201 @@
 (() => {
   const $=(s,r=document)=>r.querySelector(s);
-  const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   const state={
-    ws:null,running:false,remote:false,busy:false,stream:null,frameSeq:0,lastFrameAt:0,
-    frameTimer:0,captureCanvas:null,captureCtx:null,captureWidth:960,captureHeight:540,
-    session:null,actionWaiters:new Map(),previewBound:false,pendingMove:null,touchId:1
+    ws:null,stream:null,running:false,busy:false,frameSeq:0,lastFrameAt:0,frameCount:0,frameWindowStart:0,
+    captureCanvas:null,captureCtx:null,captureTimer:0,remoteUrl:null,mode:"idle",pointerId:11
   };
-
   const serverCapable=()=>location.protocol!=='file:'&&!/github\.io$/i.test(location.hostname);
-  const style=()=>{
-    if($('#liveVisionStyle'))return;
-    const l=document.createElement('link');
-    l.id='liveVisionStyle';l.rel='stylesheet';l.href='./live-vision.css?v=3';
-    document.head.appendChild(l)
-  };
-
+  const wsUrl=()=>((location.protocol==='https:'?'wss:':'ws:')+'//'+location.host+'/vision');
+  function style(){if($('#liveVisionStyle'))return;const l=document.createElement('link');l.id='liveVisionStyle';l.rel='stylesheet';l.href='./live-vision.css?v=3';document.head.appendChild(l)}
   function mount(){
     if($('#liveVision'))return;
     const el=document.createElement('section');
-    el.id='liveVision';el.className='live-vision';
-    el.innerHTML=
-      '<div class="live-vision-head"><div><strong>FORGE VISION</strong><small>Continuous Eyes + Real Hands</small></div><button id="liveVisionClose">×</button></div>'+
-      '<div class="live-vision-status"><span id="liveVisionDot" class="live-dot"></span><span id="liveVisionState">Ready</span><span id="liveVisionFps">0 fps</span><span id="liveVisionSeq">frame 0</span></div>'+
-      '<div id="liveVisionPreview" class="live-vision-preview remote" tabindex="0" aria-label="Live Forge viewport">'+
-        '<img id="liveVisionStream" alt="Live Forge viewport stream" draggable="false">'+
-        '<video id="liveVisionVideo" autoplay muted playsinline></video><div id="liveVisionCrosshair"></div>'+
-      '</div>'+
-      '<div class="live-vision-actions"><button id="liveVisionStart" class="primary">Start live eyes</button><button id="liveVisionStop">Stop</button><button id="liveVisionAgent">Run task</button></div>'+
-      '<label class="live-vision-field">Task <textarea id="liveVisionTask" rows="2" placeholder="Example: create a box, focus, undo, or frame"></textarea></label>'+
-      '<div class="live-vision-log" id="liveVisionLog"></div>'+
-      '<div class="live-vision-foot"><strong>Live transport:</strong> continuous Playwright Screencast + real mouse/keyboard/touch/wheel control. Local screen-capture remains as fallback.</div>';
+    el.id='liveVision';
+    el.className='live-vision';
+    el.innerHTML=[
+      '<div class="live-vision-head"><div><strong>FORGE VISION</strong><small>Live eyes + real hands · Spatial Core</small></div><button id="liveVisionClose">×</button></div>',
+      '<div class="live-vision-status"><span id="liveVisionDot" class="live-dot"></span><span id="liveVisionState">Idle</span><span id="liveVisionFps">0 fps</span><span id="liveVisionTransport">—</span></div>',
+      '<div class="live-vision-preview" id="liveVisionPreview"><video id="liveVisionVideo" autoplay muted playsinline></video><img id="liveVisionRemote" alt="Forge live vision stream"><div id="liveVisionCrosshair"></div></div>',
+      '<div class="live-vision-actions"><button id="liveVisionStart" class="primary">Start live eyes</button><button id="liveVisionPro">Pro CDP</button><button id="liveVisionStop">Stop</button></div>',
+      '<div class="live-vision-actions compact"><button id="liveVisionMove">Move</button><button id="liveVisionDown">Mouse down</button><button id="liveVisionUp">Mouse up</button><button id="liveVisionWheel">Wheel</button></div>',
+      '<label class="live-vision-field">Task <textarea id="liveVisionTask" rows="2" placeholder="Example: select Car, drag it to the center, press Play"></textarea></label>',
+      '<div class="live-vision-log" id="liveVisionLog"></div>',
+      '<div class="live-vision-foot"><strong>Direct mode</strong> uses the live MediaStream. <strong>Pro CDP</strong> uses Chromium screencast + CDP mouse/keyboard/touch events; no screenshot request loop is used.</div>'
+    ].join('');
     document.body.appendChild(el);
     $('#liveVisionClose').onclick=()=>el.classList.remove('open');
     $('#liveVisionStart').onclick=start;
+    $('#liveVisionPro').onclick=connectPro;
     $('#liveVisionStop').onclick=stop;
-    $('#liveVisionAgent').onclick=runAgent;
-    bindPreviewControls();
+    $('#liveVisionMove').onclick=()=>runManual({type:'move',x:innerWidth/2,y:innerHeight/2});
+    $('#liveVisionDown').onclick=()=>runManual({type:'mouseDown',x:innerWidth/2,y:innerHeight/2});
+    $('#liveVisionUp').onclick=()=>runManual({type:'mouseUp',x:innerWidth/2,y:innerHeight/2});
+    $('#liveVisionWheel').onclick=()=>runManual({type:'wheel',x:innerWidth/2,y:innerHeight/2,deltaY:360});
   }
-
   function open(){mount();style();$('#liveVision').classList.add('open');connectVisionWs()}
-  function log(text,kind=''){
-    const box=$('#liveVisionLog');if(!box)return;
-    const row=document.createElement('div');row.className='live-log-row '+kind;
-    row.textContent=new Date().toLocaleTimeString()+'  '+text;
-    box.prepend(row);
-    while(box.children.length>30)box.lastElementChild.remove()
-  }
-  function stateText(text,on=state.running){
-    const s=$('#liveVisionState'),d=$('#liveVisionDot');
-    if(s)s.textContent=text;
-    if(d)d.classList.toggle('live-on',!!on);
-  }
-  function setMode(mode){
-    const preview=$('#liveVisionPreview');
-    if(preview){preview.classList.toggle('remote',mode==='remote');preview.classList.toggle('local',mode==='local')}
-  }
-  function updateTelemetry(s){
-    if(!s)return;
-    state.session=s;
-    state.frameSeq=Number(s.frameSeq||state.frameSeq||0);
-    state.lastFrameAt=Number(s.lastFrameAt||state.lastFrameAt||0);
-    $('#liveVisionFps').textContent=(Number(s.fps||0))+' fps';
-    $('#liveVisionSeq').textContent='frame '+state.frameSeq;
-    if(s.running)stateText('Live session · '+Math.max(0,Number(s.ageMs||0))+'ms',true);
-  }
+  function log(t,c=''){const b=$('#liveVisionLog');if(!b)return;const r=document.createElement('div');r.className='live-log-row '+c;r.textContent=new Date().toLocaleTimeString()+'  '+t;b.prepend(r);while(b.children.length>24)b.lastElementChild.remove()}
+  function stateText(t,on=state.running){const s=$('#liveVisionState'),d=$('#liveVisionDot');if(s)s.textContent=t;if(d)d.classList.toggle('live-on',!!on)}
+  function setTransport(t){const e=$('#liveVisionTransport');if(e)e.textContent=t||'—'}
   function connectVisionWs(){
     if(!serverCapable()||typeof WebSocket==='undefined')return;
     if(state.ws&&(state.ws.readyState===0||state.ws.readyState===1))return;
-    const proto=location.protocol==='https:'?'wss:':'ws:';
     try{
-      const ws=new WebSocket(proto+'//'+location.host+'/vision');
+      const ws=new WebSocket(wsUrl());
       state.ws=ws;
-      ws.onopen=()=>{
-        ws.send(JSON.stringify({type:'hello',protocol:4,role:'forge-vision-panel'}));
-        log('Live control channel connected','ok')
-      };
-      ws.onerror=()=>log('Live control channel unavailable','warn');
-      ws.onclose=()=>{
-        state.ws=null;
-        for(const [,p] of state.actionWaiters)p.reject(new Error('Vision control channel closed'));
-        state.actionWaiters.clear()
-      };
-      ws.onmessage=e=>{
-        let m;try{m=JSON.parse(e.data)}catch{return}
-        if(m.type==='vision-frame'||m.type==='vision-status')updateTelemetry(m);
-        if(m.type==='vision-hello')updateTelemetry(m.session);
-        if(m.type==='session-result'){updateTelemetry(m.session);log(m.ok?'Session command accepted':'Session command failed',m.ok?'ok':'error')}
-        if(m.type==='action-result'){
-          const waiter=state.actionWaiters.get(m.id);
-          if(waiter){state.actionWaiters.delete(m.id);m.ok?waiter.resolve(m):waiter.reject(new Error(m.error||'Vision action failed'))}
-          $('#liveVisionSeq').textContent='frame '+Number(m.afterFrame||state.frameSeq||0);
-        }
-      }
-    }catch(e){state.ws=null;log(e.message||String(e),'warn')}
-  }
-  function sendRemoteAction(action){
-    return new Promise((resolve,reject)=>{
-      if(!state.ws||state.ws.readyState!==1)return reject(new Error('Live vision control is not connected'));
-      const id=crypto.randomUUID();
-      state.actionWaiters.set(id,{resolve,reject});
-      state.ws.send(JSON.stringify({type:'action',id,action}));
-      setTimeout(()=>{
-        const w=state.actionWaiters.get(id);
-        if(w){state.actionWaiters.delete(id);reject(new Error('Vision action timeout'))}
-      },5000);
-    })
-  }
-  function remotePoint(ev){
-    const img=$('#liveVisionStream'),r=img.getBoundingClientRect(),v=state.session?.viewport||{width:innerWidth,height:innerHeight};
-    const iw=img.naturalWidth||v.width,ih=img.naturalHeight||v.height;
-    const scale=Math.min(r.width/Math.max(1,iw),r.height/Math.max(1,ih)),dw=iw*scale,dh=ih*scale,ox=(r.width-dw)/2,oy=(r.height-dh)/2;
-    return{
-      x:Math.max(0,Math.min(v.width-1,(ev.clientX-r.left-ox)/Math.max(.0001,scale))),
-      y:Math.max(0,Math.min(v.height-1,(ev.clientY-r.top-oy)/Math.max(.0001,scale)))
-    }
-  }
-  function bindPreviewControls(){
-    if(state.previewBound)return;state.previewBound=true;
-    const img=$('#liveVisionStream'),preview=$('#liveVisionPreview');if(!img||!preview)return;
-    img.addEventListener('pointerdown',e=>{
-      if(!state.remote)return;
-      preview.focus();
-      const p=remotePoint(e);
-      if(e.pointerType==='touch')sendRemoteAction({type:'touch.start',points:[{id:state.touchId,x:p.x,y:p.y,force:1}]}).catch(err=>log(err.message,'error'));
-      else sendRemoteAction({type:'mouse.down',button:e.button===2?'right':e.button===1?'middle':'left'}).catch(err=>log(err.message,'error'));
-      e.preventDefault()
-    });
-    img.addEventListener('pointermove',e=>{
-      if(!state.remote)return;
-      const p=remotePoint(e);
-      if(e.pointerType==='touch')sendRemoteAction({type:'touch.move',points:[{id:state.touchId,x:p.x,y:p.y,force:1}]}).catch(()=>{});
-      else{
-        clearTimeout(state.pendingMove);
-        state.pendingMove=setTimeout(()=>sendRemoteAction({type:'mouse.move',x:p.x,y:p.y,steps:1}).catch(()=>{}),16)
-      }
-      e.preventDefault()
-    });
-    img.addEventListener('pointerup',e=>{
-      if(!state.remote)return;
-      const p=remotePoint(e);
-      if(e.pointerType==='touch')sendRemoteAction({type:'touch.end'}).catch(err=>log(err.message,'error'));
-      else sendRemoteAction({type:'mouse.up',button:e.button===2?'right':e.button===1?'middle':'left'}).catch(err=>log(err.message,'error'));
-      e.preventDefault()
-    });
-    img.addEventListener('wheel',e=>{
-      if(!state.remote)return;
-      const p=remotePoint(e);
-      sendRemoteAction({type:'mouse.move',x:p.x,y:p.y}).catch(()=>{});
-      sendRemoteAction({type:'mouse.wheel',deltaX:e.deltaX,deltaY:e.deltaY}).catch(err=>log(err.message,'error'));
-      e.preventDefault()
-    },{passive:false});
-    preview.addEventListener('keydown',e=>{
-      if(!state.remote||['INPUT','TEXTAREA','SELECT'].includes(e.target?.tagName))return;
-      if(e.key===' ')e.preventDefault();
-      const modifier=e.ctrlKey?'Control+':e.metaKey?'Meta+':e.shiftKey?'Shift+':e.altKey?'Alt+':'';
-      sendRemoteAction({type:'keyboard.press',key:modifier+e.key}).catch(err=>log(err.message,'error'))
-    });
-    preview.addEventListener('contextmenu',e=>e.preventDefault());
-  }
-
-  async function startRemote(){
-    connectVisionWs();
-    const start=await fetch('./api/vision/session/start',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({target:'/',viewport:{width:1280,height:800},touch:false,mobile:false})
-    });
-    const result=await start.json();
-    if(!start.ok||!result.ok)throw new Error(result.error||'Could not start Live Vision session');
-    state.remote=true;state.running=true;state.session=result.session;setMode('remote');
-    const img=$('#liveVisionStream');
-    img.src='./api/vision/stream?session='+encodeURIComponent(result.session.sessionId||'')+'&t='+Date.now();
-    stateText('Live eyes + real input',true);log('Continuous browser screencast started','ok');
-    updateTelemetry(result.session)
-  }
-
-  async function startLocal(){
-    if(!navigator.mediaDevices?.getDisplayMedia)throw new Error('Browser screen capture is unavailable');
-    stopLocal();
-    const stream=await navigator.mediaDevices.getDisplayMedia({
-      video:{frameRate:{ideal:8,max:12},width:{ideal:1280,max:1920},height:{ideal:720,max:1080},displaySurface:'browser'},
-      audio:false,preferCurrentTab:true,selfBrowserSurface:'include',surfaceSwitching:'include'
-    });
-    state.stream=stream;state.running=true;state.remote=false;setMode('local');
-    const v=$('#liveVisionVideo');v.srcObject=stream;await v.play();
-    stream.getVideoTracks()[0].addEventListener('ended',stopLocal);
-    stateText('Local live screen capture',true);log('Local MediaStream capture started','ok');captureLoop()
-  }
-
-  async function start(){
-    mount();style();
-    if(state.running)return;
-    try{
-      if(serverCapable())await startRemote();
-      else await startLocal();
-    }catch(e){
-      state.remote=false;state.running=false;
-      stateText('Vision stopped',false);log(e.message||String(e),'error')
-    }
-  }
-  function stopLocal(){
-    state.running=false;cancelAnimationFrame(state.frameTimer);
-    if(state.stream){state.stream.getTracks().forEach(t=>t.stop());state.stream=null}
-    const v=$('#liveVisionVideo');if(v)v.srcObject=null
-  }
-  async function stopRemote(){
-    try{await fetch('./api/vision/session/stop',{method:'POST'})}catch{}
-    state.remote=false;state.session=null;state.running=false;
-    const img=$('#liveVisionStream');if(img)img.removeAttribute('src');
-  }
-  async function stop(){
-    if(state.remote)await stopRemote();else stopLocal();
-    setMode('remote');stateText(serverCapable()?'Bridge ready':'Standalone mode',false)
-  }
-
-  async function executeAction(action){
-    if(state.remote){
-      return sendRemoteAction(action)
-    }
-    const F=window.Forge,type=action?.type;
-    if(type==='vision'||type==='scene_scan')return F.spatial?.sceneVision?.()||{};
-    if(type==='visual_health'||type==='visual_qa')return visualHealth();
-    if(type==='select_entity'){
-      const r=action.id?F.select(action.id):[...F.entities.values()].find(x=>x.name.toLowerCase()===String(action.name||'').toLowerCase());
-      if(!r)throw new Error('Entity not found');
-      return F.spatial?.inspect?.(r)||{id:r.id,name:r.name,kind:r.kind}
-    }
-    if(type==='focus'){F.focus();return true}
-    if(type==='frame'){F.frame();return true}
-    if(type==='move_screen'){const r=F.selected();if(!r)throw new Error('No selected entity');return F.spatial?.moveToScreen?.(r.id,action.x,action.y,action.depth??.5,action.planeY??0)||false}
-    if(type==='transform'){if(action.id)F.select(action.id);F.transform(action);return F.spatial?.inspect?.(F.selected())||null}
-    if(type==='click'){const p=action;return executeAction({type:'mouse.click',x:p.x,y:p.y})}
-    if(type==='wait'){await sleep(Number(action.ms)||250);return true}
-    throw new Error('Unsupported local action '+type)
-  }
-
-  function visualHealth(){
-    const canvas=document.querySelector('#viewport');
-    if(!canvas)return{ok:false,reason:'viewport-missing'};
-    let pixels=null,w=Math.min(canvas.width||0,320),h=Math.min(canvas.height||0,180);
-    try{
-      const gl=canvas.getContext('webgl2',{preserveDrawingBuffer:true})||canvas.getContext('webgl',{preserveDrawingBuffer:true});
-      if(gl&&w>0&&h>0){
-        const sx=Math.max(0,Math.floor(((canvas.width||w)-w)/2)),sy=Math.max(0,Math.floor(((canvas.height||h)-h)/2));
-        pixels=new Uint8Array(w*h*4);gl.readPixels(sx,sy,w,h,gl.RGBA,gl.UNSIGNED_BYTE,pixels)
-      }
+      ws.onopen=()=>{ws.send(JSON.stringify({type:'hello',role:'vision-ui',protocol:4,viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio||1}}));log('Live vision WebSocket connected','ok')};
+      ws.onerror=()=>{};
+      ws.onclose=()=>{state.ws=null;if(state.mode==='cdp')stateText('CDP disconnected',false)};
+      ws.onmessage=onVisionMessage;
     }catch{}
-    if(!pixels)return{ok:true,renderer:window.Forge?.diagnostics?.().renderer||'unknown',sampling:'layout-only'};
-    let nonDark=0,sum=0,sum2=0,total=w*h;
-    for(let i=0;i<pixels.length;i+=4){const v=(pixels[i]+pixels[i+1]+pixels[i+2])/3;sum+=v;sum2+=v*v;if(v>9)nonDark++}
-    const mean=sum/Math.max(1,total),variance=sum2/Math.max(1,total)-mean*mean,rect=canvas.getBoundingClientRect();
-    return{ok:nonDark/Math.max(1,total)>.02&&variance>4,renderer:window.Forge?.diagnostics?.().renderer||'unknown',nonDarkRatio:nonDark/Math.max(1,total),mean,variance,viewport:{width:rect.width,height:rect.height},overflow:Math.max(0,document.documentElement.scrollWidth-innerWidth)}
   }
-
+  function onVisionMessage(e){
+    let m;try{m=JSON.parse(e.data)}catch{return}
+    if(m.type==='vision-state'){
+      const s=m.state||{};
+      if(s.connected&&s.streaming){state.mode='cdp';state.running=true;stateText('Direct Chromium live',true);setTransport('CDP');$('#liveVisionPreview').classList.add('remote');$('#liveVisionPreview').classList.remove('local')}
+      if(!s.connected&&state.mode==='cdp'){state.mode='idle';state.running=false;stateText('CDP disconnected',false)}
+      if(s.fps!=null)$('#liveVisionFps').textContent=Number(s.fps).toFixed(1)+' fps';
+    }
+    if(m.type==='vision-frame'&&m.data){
+      const img=$('#liveVisionRemote');if(!img)return;
+      try{
+        const bytes=Uint8Array.from(atob(m.data),c=>c.charCodeAt(0));
+        const url=URL.createObjectURL(new Blob([bytes],{type:'image/jpeg'}));
+        const old=state.remoteUrl;state.remoteUrl=url;img.onload=()=>{if(old)URL.revokeObjectURL(old)};img.src=url;
+        state.frameCount++;const now=Date.now();if(!state.frameWindowStart)state.frameWindowStart=now;
+        if(now-state.frameWindowStart>1000){$('#liveVisionFps').textContent=Number(state.frameCount*1000/(now-state.frameWindowStart)).toFixed(1)+' fps';state.frameCount=0;state.frameWindowStart=now}
+      }catch{}
+    }
+  }
+  function normalize(x,y,w,h){return{x:Math.max(0,Math.min(innerWidth-1,(Number(x)||0)*innerWidth/Math.max(1,w||innerWidth))),y:Math.max(0,Math.min(innerHeight-1,(Number(y)||0)*innerHeight/Math.max(1,h||innerHeight)))}}
+  function dispatchPointer(type,x,y,extra={}){
+    const el=document.elementFromPoint(x,y)||document.body;
+    const buttons=type==='pointerup'?0:(extra.buttons??1);
+    el.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,view:window,clientX:x,clientY:y,screenX:x,screenY:y,button:extra.button??0,buttons,pointerId:state.pointerId,pointerType:extra.pointerType||'mouse',isPrimary:true}));
+    return{tag:el.tagName||'',id:el.id||'',className:typeof el.className==='string'?el.className:''};
+  }
+  async function localControl(a){
+    const type=String(a.type||'');
+    if(type==='move'){const p=normalize(a.x,a.y,a.screenWidth,a.screenHeight);return dispatchPointer('pointermove',p.x,p.y,{buttons:a.buttons??0})}
+    if(type==='mouseDown'){const p=normalize(a.x,a.y,a.screenWidth,a.screenHeight);state.pointerId++;return dispatchPointer('pointerdown',p.x,p.y,{buttons:1})}
+    if(type==='mouseUp'){const p=normalize(a.x,a.y,a.screenWidth,a.screenHeight);return dispatchPointer('pointerup',p.x,p.y,{buttons:0})}
+    if(type==='click'||type==='doubleClick'){
+      const p=normalize(a.x,a.y,a.screenWidth,a.screenHeight);dispatchPointer('pointermove',p.x,p.y,{buttons:0});
+      const count=type==='doubleClick'?2:1;
+      for(let i=0;i<count;i++){dispatchPointer('pointerdown',p.x,p.y,{buttons:1});dispatchPointer('pointerup',p.x,p.y,{buttons:0});if(i+1<count)await sleep(55)}
+      return{ok:true,type,point:p};
+    }
+    if(type==='drag'){
+      const a0=normalize(a.x,a.y,a.screenWidth,a.screenHeight),b0=normalize(a.toX,a.toY,a.screenWidth,a.screenHeight),steps=Math.max(2,Math.min(60,a.steps||12));
+      dispatchPointer('pointermove',a0.x,a0.y,{buttons:0});dispatchPointer('pointerdown',a0.x,a0.y,{buttons:1});
+      for(let i=1;i<=steps;i++){const t=i/steps;dispatchPointer('pointermove',a0.x+(b0.x-a0.x)*t,a0.y+(b0.y-a0.y)*t,{buttons:1});await sleep(a.stepMs||8)}
+      dispatchPointer('pointerup',b0.x,b0.y,{buttons:0});return{ok:true,type,from:a0,to:b0,steps};
+    }
+    if(type==='wheel'){const p=normalize(a.x??innerWidth/2,a.y??innerHeight/2,a.screenWidth,a.screenHeight);const el=document.elementFromPoint(p.x,p.y)||document.body;el.dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,clientX:p.x,clientY:p.y,deltaX:a.deltaX||0,deltaY:a.deltaY||0}));return{ok:true,type,point:p}}
+    if(type==='press'||type==='keyDown'||type==='keyUp'||type==='typeText'){
+      const target=document.activeElement||document.body;
+      if(type==='typeText'){target.dispatchEvent(new InputEvent('beforeinput',{bubbles:true,inputType:'insertText',data:String(a.text||'')}));if('value' in target){target.value+=String(a.text||'');target.dispatchEvent(new Event('input',{bubbles:true}))}return{ok:true,type}}
+      const evName=type==='keyUp'?'keyup':'keydown';target.dispatchEvent(new KeyboardEvent(evName,{bubbles:true,cancelable:true,key:String(a.key||''),code:a.code||'',ctrlKey:!!a.ctrlKey,shiftKey:!!a.shiftKey,altKey:!!a.altKey,metaKey:!!a.metaKey}));if(type==='press')target.dispatchEvent(new KeyboardEvent('keyup',{bubbles:true,key:String(a.key||''),code:a.code||''}));return{ok:true,type,key:a.key};
+    }
+    if(type==='touchStart'||type==='touchMove'||type==='touchEnd'){
+      const p=normalize(a.x,a.y,a.screenWidth,a.screenHeight),el=document.elementFromPoint(p.x,p.y)||document.body;
+      const eventType=type==='touchStart'?'pointerdown':type==='touchMove'?'pointermove':'pointerup';
+      return dispatchPointer(eventType,p.x,p.y,{buttons:type==='touchEnd'?0:1,pointerType:'touch'});
+    }
+    throw new Error('Unsupported local control action: '+type);
+  }
+  async function runManual(action){try{const result=await control(action);log(JSON.stringify(result),'ok')}catch(e){log(e.message||String(e),'error')}}
+  async function control(action){
+    if(state.mode==='cdp'&&state.ws?.readyState===1){
+      const r=await fetch('./api/vision/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})});
+      const j=await r.json();if(!j.ok)throw new Error(j.error||'CDP control failed');return j.result;
+    }
+    return localControl(action);
+  }
+  async function connectPro(){
+    mount();connectVisionWs();
+    if(!serverCapable())return log('Pro CDP is only available from the local/server Forge build','warn');
+    try{
+      const targets=await fetch('./api/vision/targets').then(r=>r.json());
+      const list=targets.targets||[];
+      const target=list.find(t=>t.type==='page'&&/^https?:/i.test(t.url||''));
+      if(!target)throw new Error('No Chromium CDP target found on 127.0.0.1:9222');
+      const result=await fetch('./api/vision/connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetId:target.id,targetUrl:target.url,quality:55,maxWidth:1280,maxHeight:720,everyNthFrame:1})}).then(r=>r.json());
+      if(!result.ok)throw new Error(result.error||'CDP connect failed');
+      state.mode='cdp';state.running=true;stateText('Direct Chromium live',true);setTransport('CDP');log('CDP live stream started for '+target.url,'ok');
+    }catch(e){state.mode='idle';state.running=false;log(e.message||String(e),'error')}
+  }
+  function visualHealth(){
+    const canvas=document.querySelector('#viewport');if(!canvas)return{ok:false,reason:'viewport-missing'};
+    const rect=canvas.getBoundingClientRect();return{ok:rect.width>300&&rect.height>300,renderer:window.Forge?.diagnostics?.().renderer||'unknown',viewport:{width:rect.width,height:rect.height},overflow:Math.max(0,document.documentElement.scrollWidth-innerWidth)};
+  }
+  async function executeAction(a){
+    if(a.type==='vision'||a.type==='scene_scan')return window.Forge?.spatial?.sceneVision?.()||window.ForgeSpatial?.sceneVision?.()||{};
+    if(a.type==='visual_health'||a.type==='visual_qa')return visualHealth();
+    if(a.type==='select_entity'){const F=window.Forge,r=a.id?F.select(a.id):[...F.entities.values()].find(x=>x.name.toLowerCase()===String(a.name||'').toLowerCase());if(!r)throw new Error('Entity not found');return F.spatial?.inspect?.(r)||window.ForgeSpatial?.inspect?.(r)||{id:r.id,name:r.name,kind:r.kind}}
+    if(a.type==='focus'){window.Forge?.focus?.();return true}
+    if(a.type==='frame'){window.Forge?.frame?.();return true}
+    if(a.type==='transform'){if(a.id)window.Forge?.select?.(a.id);window.Forge?.transform?.(a);return window.ForgeSpatial?.inspect?.(window.Forge.selected())||null}
+    return control(a);
+  }
+  async function localAgent(task){
+    const F=window.Forge,s=String(task||'').trim(),lower=s.toLowerCase();
+    if(/scan|inspect|vision|understand/.test(lower))return executeAction({type:'vision'});
+    const names=[...F.entities.values()].map(r=>r.name).filter(Boolean),target=names.find(n=>lower.includes(n.toLowerCase()));
+    if(target){
+      await executeAction({type:'select_entity',name:target});
+      if(/delete|remove|erase/.test(lower)){F.delete();return{ok:true,action:'delete',entity:target}}
+      if(/duplicate|copy|clone/.test(lower)){const d=F.duplicate();return{ok:true,action:'duplicate',entity:d?.name||target}}
+      if(/center|middle/.test(lower)){F.spatial?.moveToScreen?.(F.selectedId,innerWidth/2,innerHeight/2,.5,0);return{ok:true,action:'move-center',entity:target}}
+      if(/focus/.test(lower)){F.focus();return{ok:true,action:'focus',entity:target}}
+    }
+    if(/play/.test(lower)){F.running=true;F.timelinePlaying=true;return{ok:true,action:'play'}}
+    if(/stop|pause/.test(lower)){F.running=false;F.timelinePlaying=false;return{ok:true,action:'stop'}}
+    if(/frame all|frame/.test(lower)){F.frame();return{ok:true,action:'frame'}}
+    if(/focus/.test(lower)){F.focus();return{ok:true,action:'focus'}}
+    throw new Error('Task not mapped. Use a deterministic command or a pixel action such as click/drag/wheel/press.');
+  }
   async function runAgent(){
     mount();
-    const task=$('#liveVisionTask')?.value?.trim();
-    if(!task)return log('Enter a task first','error');
-    if(state.busy)return;
-    state.busy=true;$('#liveVisionAgent').disabled=true;
+    const task=$('#liveVisionTask')?.value?.trim();if(!task)return log('Enter a task first','error');if(state.busy)return;
+    state.busy=true;$('#liveVisionStart').disabled=true;
     try{
-      const lower=task.toLowerCase();
-      if(state.remote){
-        const elRes=await fetch('./api/vision/elements',{cache:'no-store'}).then(r=>r.json());
-        const els=elRes.elements||[];
-        const box=els.find(e=>e.selector==='[data-add="box"]'&&e.visible);
-        if(/create|add|box/.test(lower)&&box){
-          const result=await executeAction({type:'mouse.click',x:box.x+box.width/2,y:box.y+box.height/2});
-          log('Created Box through live vision input','ok');return result
-        }
-        if(/undo/.test(lower)){const r=await executeAction({type:'keyboard.press',key:'Control+z'});log('Undo dispatched through live keyboard','ok');return r}
-        if(/redo/.test(lower)){const r=await executeAction({type:'keyboard.press',key:'Control+y'});log('Redo dispatched through live keyboard','ok');return r}
-        if(/focus/.test(lower)){const r=await executeAction({type:'mouse.click',x:(els.find(e=>e.selector==='#focus')||{}).x||0,y:(els.find(e=>e.selector==='#focus')||{}).y||0});log('Focus action dispatched','ok');return r}
-        if(/frame/.test(lower)){const r=await executeAction({type:'mouse.click',x:(els.find(e=>e.selector==='#frame')||{}).x||0,y:(els.find(e=>e.selector==='#frame')?.y||0)});log('Frame action dispatched','ok');return r}
-        const stateResult=await fetch('./api/vision/state',{cache:'no-store'}).then(r=>r.json());
-        log(JSON.stringify(stateResult),'ok');return stateResult
-      }
-      if(/scan|inspect|vision|understand/.test(lower))return executeAction({type:'vision'});
-      const names=[...window.Forge.entities.values()].map(r=>r.name).filter(Boolean),target=names.find(n=>lower.includes(n.toLowerCase()));
-      if(target){
-        await executeAction({type:'select_entity',name:target});
-        if(/delete|remove|erase/.test(lower)){window.Forge.delete();return{ok:true,action:'delete',entity:target}}
-        if(/duplicate|copy|clone/.test(lower)){const d=window.Forge.duplicate();return{ok:true,action:'duplicate',entity:d?.name||target}}
-        if(/center|middle/.test(lower)){const r=window.Forge.selected();window.ForgeSpatial?.moveToScreen?.(r.id,innerWidth/2,innerHeight/2,.5,0);return{ok:true,action:'move-center',entity:target}}
-        if(/focus/.test(lower)){window.Forge.focus();return{ok:true,action:'focus',entity:target}}
-      }
-      if(/frame all|frame/.test(lower)){window.Forge.frame();return{ok:true,action:'frame'}}
-      if(/focus/.test(lower)){window.Forge.focus();return{ok:true,action:'focus'}}
-      throw new Error('Task is not mapped to a deterministic vision action')
-    }catch(e){log(e.message||String(e),'error')}finally{state.busy=false;$('#liveVisionAgent').disabled=false}
+      let result;
+      if(serverCapable()&&state.mode==='cdp')result=await fetch('./api/forge/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command:{op:'agent-task',task}})}).then(r=>r.json());
+      else result=await localAgent(task);
+      log(JSON.stringify(result),'ok');
+    }catch(e){log(e.message||String(e),'error')}finally{state.busy=false;$('#liveVisionStart').disabled=false}
   }
-
-  function captureLoop(){
-    if(!state.running||state.remote||!state.stream)return;
+  async function start(){
+    mount();style();connectVisionWs();
+    if(state.mode==='cdp'){return log('CDP live is already active','ok')}
+    if(!navigator.mediaDevices?.getDisplayMedia){stateText('Spatial fallback',true);setTransport('Local DOM');log('Screen capture unavailable; local vision/control remains active','warn');return}
+    try{
+      stop();
+      const stream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:30,max:30},width:{ideal:1920,max:1920},height:{ideal:1080,max:1080},displaySurface:'browser'},audio:false,preferCurrentTab:true,selfBrowserSurface:'include',surfaceSwitching:'include'});
+      state.stream=stream;state.running=true;state.mode='local-media';stateText('Live MediaStream',true);setTransport('MediaStream');
+      const v=$('#liveVisionVideo');v.srcObject=stream;await v.play();$('#liveVisionPreview').classList.add('local');$('#liveVisionPreview').classList.remove('remote');
+      stream.getVideoTracks()[0].addEventListener('ended',stop);
+      sampleLiveFrames();
+    }catch(e){state.running=false;state.mode='idle';state.stream=null;stateText('Spatial fallback',true);setTransport('Local DOM');log(e.message||String(e),'warn')}
+  }
+  function sampleLiveFrames(){
+    if(!state.running||state.mode!=='local-media')return;
     const v=$('#liveVisionVideo');
-    state.captureCanvas ||= document.createElement('canvas');
-    state.captureCtx ||= state.captureCanvas.getContext('2d',{willReadFrequently:true});
-    const tr=state.stream.getVideoTracks()[0],settings=tr?.getSettings?.()||{},vw=settings.width||v.videoWidth||innerWidth,vh=settings.height||v.videoHeight||innerHeight,scale=Math.min(1,state.captureWidth/vw),cw=Math.max(320,Math.round(vw*scale)),ch=Math.max(180,Math.round(vh*scale));
-    state.captureCanvas.width=cw;state.captureCanvas.height=ch;state.captureCtx.drawImage(v,0,0,cw,ch);state.frameSeq++;state.lastFrameAt=Date.now();
-    $('#liveVisionFps').textContent='live';$('#liveVisionSeq').textContent='frame '+state.frameSeq;
-    state.frameTimer=requestAnimationFrame(captureLoop)
+    const tick=()=>{if(!state.running||state.mode!=='local-media')return;state.frameSeq++;state.lastFrameAt=Date.now();$('#liveVisionFps').textContent='live';if('requestVideoFrameCallback' in v)v.requestVideoFrameCallback(()=>setTimeout(sampleLiveFrames,120));else state.captureTimer=setTimeout(sampleLiveFrames,120)};
+    tick();
   }
-
+  async function stop(){
+    try{if(serverCapable())await fetch('./api/vision/disconnect',{method:'POST'}).catch(()=>{})}catch{}
+    state.running=false;state.mode='idle';if(state.stream){state.stream.getTracks().forEach(t=>t.stop());state.stream=null}
+    clearTimeout(state.captureTimer);const v=$('#liveVisionVideo');if(v)v.srcObject=null;
+    const img=$('#liveVisionRemote');if(img)img.removeAttribute('src');if(state.remoteUrl){URL.revokeObjectURL(state.remoteUrl);state.remoteUrl=null}
+    $('#liveVisionPreview')?.classList.remove('remote','local');stateText('Idle',false);setTransport('—');
+  }
   window.AssetForgeLiveVision={
-    open,start,stop,runAgent,executeAction,visualHealth,
-    status:()=>({running:state.running,remote:state.remote,connected:state.ws?.readyState===1,session:state.session,lastFrameAt:state.lastFrameAt,frames:state.frameSeq})
+    open,start,stop,runAgent,executeAction,visualHealth,connectPro,control,
+    status:()=>({mode:state.mode,running:state.running,connected:state.ws?.readyState===1,frames:state.frameSeq,lastFrameAt:state.lastFrameAt,transport:state.mode==='cdp'?'chromium-cdp':state.mode==='local-media'?'media-stream':'local-spatial'})
   };
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{mount();style()},{once:true});
-  else{mount();style()}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{mount();style()},{once:true});else{mount();style()}
 })();
