@@ -319,6 +319,35 @@ window.addEventListener("forge-assets-changed",()=>{try{refresh()}catch(e){write
 window.ForgeRefreshUI=()=>{refresh();inspect();};
 window.ForgeVision={scan:()=>window.ForgeSpatial?.sceneVision?.()||{},inspect:id=>{const r=engine.entities.get(id);return r?window.ForgeSpatial?.inspect?.(r):null},selectAt:(x,y)=>engine.pick({clientX:x,clientY:y})};
 function stats(){const d=engine.diagnostics();$("renderer").textContent=d.renderer;$("fps").textContent=d.fps;$("physics").textContent=d.physics;requestAnimationFrame(stats)}
+const waitForPublicAPIs=async()=>{
+  const required={
+    ForgeGameplay:["createThirdPersonTemplate","createRacingTemplate","createShowcaseGame","status"],
+    Forge2D:["createPlatformerTemplate","status"],
+    ForgeProject:["serialize","load"],
+    ForgeRender:["apply","quality","serialize"],
+    ForgeVFX:["spawn","status"],
+    ForgeRuntime:["snapshot","input"],
+    ForgeQAPro:["audit","saveBaseline","diff"],
+    ForgeTerrain:["generate","status"],
+    ForgeData:["actor","quests"],
+    ForgeReplay:["startRecord","recordStep","stopRecord","play","status"],
+    ForgeSession:["addPlayer","start","serialize","end","load"],
+    ForgeShaders:["applyPreset"],
+    ForgeAI:["status","createAgent"],
+    ForgeAnimation:["status"]
+  };
+  for(let i=0;i<120;i++){
+    let ok=true;
+    for(const[k,methods] of Object.entries(required)){
+      const api=window[k];
+      if(!api||methods.some(m=>typeof api[m]!=="function"&&typeof api[m]!=="object")){ok=false;break}
+    }
+    if(ok)return true;
+    await new Promise(r=>requestAnimationFrame(r));
+  }
+  return false;
+};
+await waitForPublicAPIs();
 window.ForgeReady=true;
 loadForgeRuntime().catch(error=>{window.ForgeRuntime.__runtimeLoadError=error?.message||String(error);write("Deferred runtime load failed: "+window.ForgeRuntime.__runtimeLoadError,"error")});
 window.ForgeBootState="ready";
