@@ -28,7 +28,7 @@ export class ForgeEngine{
     this.app.setCanvasFillMode(pc.FILLMODE_NONE);this.app.setCanvasResolution(pc.RESOLUTION_AUTO);this.app.scene.gammaCorrection=pc.GAMMA_SRGB;this.app.scene.toneMapping=pc.TONEMAP_ACES;this.app.scene.physicalUnits=true;this.app.scene.ambientLightColor=new pc.Color(.18,.22,.28);this.app.scene.ambientLightColor=new pc.Color(.18,.22,.28);
     this.root=new pc.Entity('ForgeScene');this.app.root.addChild(this.root);
     await RAPIER.init();this.rapier=RAPIER;this.world=new RAPIER.World({x:0,y:-9.81,z:0});this.eventQueue=new RAPIER.EventQueue(true);
-    this.createCamera('Main Camera',{x:7,y:5,z:9});this.createLight('Sun');this.createPlane('Ground',30,30);
+    this.createCamera('Main Camera',{x:7,y:5,z:9});this.createLight('Sun');this.createPlane('Ground',30,30);this.app.scene.ambientLight=new pc.Color(.16,.18,.22);this.app.scene.exposure=1.15;
     this.app.on('update',dt=>this.update(dt));this.canvas.addEventListener('pointerdown',e=>this.pick(e));window.addEventListener('resize',()=>this.app.resizeCanvas());this.app.resizeCanvas();this.app.autoRender=true;this.app.start();this.app.render?.();this.log('Forge Engine 3.0 online');return this
   }
   rec(name,kind,e){const id=crypto.randomUUID();e.__forge={id,kind,name,components:{}};const r={id,kind,name,entity:e,components:e.__forge.components};this.entities.set(id,r);return r}
@@ -113,6 +113,30 @@ export class ForgeEngine{
   evalAnimation(t){for(const[id,a]of this.keyframes){const r=this.entities.get(id);if(!r||!a.length)continue;let k=a[0];for(let i=0;i<a.length-1;i++)if(t>=a[i].time&&t<=a[i+1].time){const A=a[i],B=a[i+1],f=(t-A.time)/Math.max(.0001,B.time-A.time);k={p:A.p.map((v,j)=>v+(B.p[j]-v)*f),r:A.r.map((v,j)=>v+(B.r[j]-v)*f),s:A.s.map((v,j)=>v+(B.s[j]-v)*f)};break}r.entity.setLocalPosition(...k.p);r.entity.setLocalEulerAngles(...k.r);r.entity.setLocalScale(...k.s)}}
   attachScript(id,code){this.scripts.set(id,code)}
   runScripts(dt){for(const[id,code]of this.scripts){const r=this.entities.get(id);if(!r)continue;try{new Function('api',code)({entity:r.entity,time:this.timelineTime,dt,engine:this})}catch(e){this.log('Script error '+e.message,'error')}}}
+  prepareImportedModelPreview(root){
+    let textured=0,previewAdjusted=0;
+    root.forEach(n=>{
+      for(const mi of n.render?.meshInstances||[]){
+        const mat=mi.material,mesh=mi.mesh;
+        const format=mesh?.vertexBuffer?.getFormat?.();
+        const hasNormals=!!format?.elements?.some?.(e=>String(e.semantic||"").toUpperCase()==="NORMAL");
+        if(mat?.diffuseMap){
+          textured++;
+          if(!hasNormals){
+            const preview=mat.clone?.()||mat;
+            preview.useLighting=false;
+            preview.useTonemap=true;
+            preview.update?.();
+            mi.material=preview;
+            previewAdjusted++;
+          }
+        }
+      }
+    });
+    root.__forgeViewportPreview={textured,previewAdjusted};
+    return root.__forgeViewportPreview;
+  }
+
   async importFile(file){
     const url=URL.createObjectURL(file);if(file.name.toLowerCase().endsWith('.forge.json'))return{type:'project',data:JSON.parse(await file.text())};
     let analysis=null;try{analysis=await window.ForgeProduction?.assets?.analyze?.(file)}catch{}
@@ -137,7 +161,7 @@ export class ForgeEngine{
     if(/^image\//.test(file.type)){const bmp=await createImageBitmap(file),c=document.createElement('canvas');c.width=bmp.width;c.height=bmp.height;c.getContext('2d').drawImage(bmp,0,0);const tex=new pc.Texture(this.app.graphicsDevice,{width:bmp.width,height:bmp.height,format:pc.PIXELFORMAT_R8_G8_B8_A8});tex.setSource(c);const mat=this.material([1,1,1]);mat.diffuseMap=tex;mat.emissiveMap=tex;mat.emissive=new pc.Color(1,1,1);mat.update();const r=this.primitive('plane',file.name);r.entity.render.material=mat;r.components.asset={type:'image',name:file.name,width:bmp.width,height:bmp.height,analysis,derivedDirty:false};this.assets.set(file.name,{type:'image',file,url});this.select(r.id);window.dispatchEvent(new Event('forge-assets-changed'));window.ForgeRefreshUI?.();return{type:'image',record:r}}
     if(/\.(glb|gltf|fbx|obj|dae|3ds)$/i.test(file.name))return new Promise(async(resolve,reject)=>{
       if(/\.gltf$/i.test(file.name)){try{const json=JSON.parse(await file.text()),external=[...(json.buffers||[]),...(json.images||[])].some(x=>x?.uri&&!String(x.uri).startsWith('data:'));if(external)throw new Error('This glTF still references external files; select its dependency files together so Forge can package them.')}catch(e){reject(e);return}}
-      const asset=new pc.Asset(file.name,'container',{url});this.app.assets.add(asset);asset.once('error',reject);asset.once('load',()=>{try{const e=asset.resource.instantiateRenderEntity({castShadows:true,receiveShadows:true});e.name=file.name.replace(/\.[^.]+$/,'');this.root.addChild(e);const r=this.rec(e.name,'model',e);r.components.asset={type:'model',name:file.name,analysis:analysis||null,sourceUnits:'meters',importScale:1,derivedDirty:false};const clips=this.attachAnimations(e,asset.resource,analysis?.animationNames||[]);if(clips.length)r.components.animation={clips,playing:true};this.assets.set(file.name,{type:'model',file,url,resource:asset.resource});window.dispatchEvent(new Event('forge-assets-changed'));this.select(r.id);window.ForgeRefreshUI?.();requestAnimationFrame(()=>{requestAnimationFrame(()=>{window.ForgeSpatial?.inspect?.(r);resolve({type:'model',record:r})})})}catch(err){reject(err)}});this.app.assets.load(asset)
+      const asset=new pc.Asset(file.name,'container',{url});this.app.assets.add(asset);asset.once('error',reject);asset.once('load',()=>{try{const e=asset.resource.instantiateRenderEntity({castShadows:true,receiveShadows:true});e.name=file.name.replace(/\.[^.]+$/,'');this.root.addChild(e);const preview=this.prepareImportedModelPreview(e);const r=this.rec(e.name,'model',e);r.components.asset={type:'model',name:file.name,analysis:analysis||null,sourceUnits:'meters',importScale:1,derivedDirty:false,viewportPreview:preview};const clips=this.attachAnimations(e,asset.resource,analysis?.animationNames||[]);if(clips.length)r.components.animation={clips,playing:true};this.assets.set(file.name,{type:'model',file,url,resource:asset.resource});window.dispatchEvent(new Event('forge-assets-changed'));this.select(r.id);window.ForgeRefreshUI?.();requestAnimationFrame(()=>{requestAnimationFrame(()=>{window.ForgeSpatial?.inspect?.(r);resolve({type:'model',record:r})})})}catch(err){reject(err)}});this.app.assets.load(asset)
     });
     return{type:'asset',name:file.name,analysis}
   }

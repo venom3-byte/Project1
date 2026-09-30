@@ -209,7 +209,7 @@ test.describe.serial("Forge Live Vision — continuous stream + real browser inp
 
     const imported=await request.post("/api/vision/action",{data:{action:{
       type:"evaluate",
-      expression:"JSON.stringify((()=>{const r=window.Forge?.selected?.();const stack=r?.entity?[r.entity]:[];let meshes=0;while(stack.length){const n=stack.pop();meshes+=(n?.render?.meshInstances?.length||0);for(const c of n?.children||[])stack.push(c)}return{name:r?.components?.asset?.name,kind:r?.kind,assetType:r?.components?.asset?.type,meshInstances:meshes,entities:window.Forge?.diagnostics?.()?.entities||0}})())"
+      expression:"JSON.stringify((()=>{const r=window.Forge?.selected?.();const stack=r?.entity?[r.entity]:[];let meshes=0,textured=0;while(stack.length){const n=stack.pop();for(const mi of n?.render?.meshInstances||[]){meshes++;if(mi?.material?.diffuseMap)textured++;}for(const c of n?.children||[])stack.push(c)}return{name:r?.components?.asset?.name,kind:r?.kind,assetType:r?.components?.asset?.type,meshInstances:meshes,texturedMaterials:textured,preview:r?.entity?.__forgeViewportPreview||null,entities:window.Forge?.diagnostics?.()?.entities||0}})())"
     },options:{includeState:true}}});
     const importedBody=await imported.json();
     const importedState=JSON.parse(importedBody.result.action.value);
@@ -217,6 +217,8 @@ test.describe.serial("Forge Live Vision — continuous stream + real browser inp
     expect(importedState.kind).toBe("model");
     expect(importedState.assetType).toBe("model");
     expect(importedState.meshInstances).toBeGreaterThan(0);
+    expect(importedState.texturedMaterials).toBeGreaterThan(0);
+    expect(importedState.preview?.textured).toBeGreaterThan(0);
     expect(importedState.entities).toBeGreaterThanOrEqual(4);
 
     const frame=(await (await request.get("/api/vision/elements")).json()).elements.find(e=>e.selector==="#frame"&&e.visible);
