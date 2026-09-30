@@ -35,6 +35,8 @@ jobs:
         run: npm run test:professional
       - name: Live vision + real input acceptance
         run: npm run test:vision
+      - name: Live vision + real input acceptance
+        run: npm run test:vision
       - name: Khronos glTF validation
         run: npm run validate:gltf
       - name: Full regression suite
