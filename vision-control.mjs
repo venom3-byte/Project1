@@ -337,7 +337,7 @@ export class VisionController extends EventEmitter{
       touchPoints:type==='touchEnd'||type==='touchCancel'?[]:touchPoints,
       modifiers:Number(arguments[1]?.modifiers||0)
     });
-    return{type,touchPoints};
+    return{dispatched:true,type,touchPoints};
   }
 
   async perform(action){
