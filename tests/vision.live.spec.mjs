@@ -129,7 +129,7 @@ test.describe.serial("Forge Live Vision — real continuous vision + input",()=>
     const mr=await move.json();
     expect(mr.ok).toBeTruthy();
 
-    const end=await request.post("/api/vision/action",{data:{type:"touch.end"}});
+    const end=await request.post("/api/vision/action",{data:{action:{type:"touch.end"}}});
     const er=await end.json();
     expect(er.ok).toBeTruthy();
     expect(er.action.dispatched).toBeTruthy();
