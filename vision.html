@@ -97,7 +97,11 @@ async function start(){
 }
 async function stop(){try{await post('/api/vision/session/stop');setLive(false);$('stream').removeAttribute('src');log('Session stopped','warn')}catch(e){log(e.message,'err')}}
 function remotePoint(ev){
-  const r=$('stream').getBoundingClientRect();const v=session?.viewport||{width:1440,height:900};return{x:Math.max(0,Math.min(v.width-1,(ev.clientX-r.left)*v.width/Math.max(1,r.width))),y:Math.max(0,Math.min(v.height-1,(ev.clientY-r.top)*v.height/Math.max(1,r.height)))}
+  const img=$('stream'),r=img.getBoundingClientRect(),v=session?.viewport||{width:1440,height:900};
+  const iw=img.naturalWidth||v.width,ih=img.naturalHeight||v.height;
+  const scale=Math.min(r.width/Math.max(1,iw),r.height/Math.max(1,ih));
+  const dw=iw*scale,dh=ih*scale,ox=(r.width-dw)/2,oy=(r.height-dh)/2;
+  return{x:Math.max(0,Math.min(v.width-1,(ev.clientX-r.left-ox)/Math.max(.0001,scale))),y:Math.max(0,Math.min(v.height-1,(ev.clientY-r.top-oy)/Math.max(.0001,scale)))}
 }
 function send(action){
   if(!ws||ws.readyState!==1)return;
