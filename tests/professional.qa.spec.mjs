@@ -318,6 +318,7 @@ test.describe("Forge professional acceptance",()=>{
     const source=Buffer.from("Forge arbitrary source asset\nversion=1\n","utf8");
     await page.locator("#assetInput").setInputFiles({name:"forge-proof.custom",mimeType:"application/octet-stream",buffer:source});
     await page.waitForFunction(()=>window.Forge?.assets?.get?.("forge-proof.custom")?.sourceOnly===true,{timeout:30000});
+    const result=await page.evaluate(()=>{const e=window.Forge.assets.get("forge-proof.custom");return{entry:!!e,sourceOnly:e?.sourceOnly===true,bytes:e?.file?.size||0,extension:e?.extension||"",hash:e?.sourceSha256||""}});
     expect(result.entry).toBeTruthy();
     expect(result.sourceOnly).toBeTruthy();
     expect(result.bytes).toBe(source.length);
