@@ -212,6 +212,58 @@ export class ForgeEngine{
     const out=result.GetFile(0);
     return new File([out.GetContent()],file.name.replace(/\.[^.]+$/,"")+".glb",{type:"model/gltf-binary"});
   }
+  async sanitizeGlbPreview(file){
+    const name=String(file?.name||"").toLowerCase();
+    if(!name.endsWith(".glb"))return{file,sanitized:false,removedExtensions:[]};
+    const bytes=new Uint8Array(await file.arrayBuffer());
+    if(bytes.length<20)return{file,sanitized:false,removedExtensions:[]};
+    const dv=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+    if(dv.getUint32(0,true)!==0x46546c67||dv.getUint32(4,true)!==2)return{file,sanitized:false,removedExtensions:[]};
+    const total=dv.getUint32(8,true);
+    let off=12,json=null,chunks=[];
+    while(off+8<=Math.min(total,bytes.length)){
+      const length=dv.getUint32(off,true),type=dv.getUint32(off+4,true),start=off+8,end=start+length;
+      if(end>bytes.length)break;
+      const chunk=bytes.slice(start,end);
+      chunks.push({type,bytes:chunk});
+      if(type===0x4e4f534a)json=JSON.parse(new TextDecoder().decode(chunk).trim());
+      off=end;
+    }
+    if(!json)return{file,sanitized:false,removedExtensions:[]};
+    const unsupported=new Set([
+      "KHR_materials_clearcoat","KHR_materials_emissive_strength","KHR_materials_iridescence",
+      "KHR_materials_transmission","KHR_materials_variants","KHR_texture_transform"
+    ]);
+    const used=[...(json.extensionsUsed||[])].filter(x=>unsupported.has(x));
+    const required=[...(json.extensionsRequired||[])].filter(x=>unsupported.has(x));
+    if(required.length)throw new Error("GLB requires unsupported glTF extensions: "+required.join(", "));
+    if(!used.length)return{file,sanitized:false,removedExtensions:[]};
+    const strip=o=>{
+      if(!o||typeof o!=="object")return;
+      if(Array.isArray(o)){for(const v of o)strip(v);return}
+      if(o.extensions&&typeof o.extensions==="object"){
+        for(const k of unsupported)o.extensions[k]===undefined||delete o.extensions[k];
+        if(!Object.keys(o.extensions).length)delete o.extensions;
+      }
+      for(const v of Object.values(o))strip(v);
+    };
+    strip(json);
+    json.extensionsUsed=(json.extensionsUsed||[]).filter(x=>!unsupported.has(x));
+    json.extensionsRequired=(json.extensionsRequired||[]).filter(x=>!unsupported.has(x));
+    if(!json.extensionsUsed.length)delete json.extensionsUsed;
+    if(!json.extensionsRequired.length)delete json.extensionsRequired;
+    const encoder=new TextEncoder();
+    const jb=encoder.encode(JSON.stringify(json));
+    const pad4=n=>(n+3)&~3;
+    const jp=new Uint8Array(pad4(jb.length));jp.set(jb);jp.fill(0x20,jb.length);
+    const outChunks=[{type:0x4e4f534a,bytes:jp},...chunks.filter(c=>c.type!==0x4e4f534a).map(c=>({type:c.type,bytes:new Uint8Array(c.bytes)}))];
+    const totalLength=12+outChunks.reduce((n,c)=>n+8+c.bytes.length,0);
+    const out=new Uint8Array(totalLength),od=new DataView(out.buffer);od.setUint32(0,0x46546c67,true);od.setUint32(4,2,true);od.setUint32(8,totalLength,true);
+    let w=12;
+    for(const c of outChunks){od.setUint32(w,c.bytes.length,true);od.setUint32(w+4,c.type,true);out.set(c.bytes,w+8);w+=8+c.bytes.length}
+    return{file:new File([out],file.name,{type:"model/gltf-binary"}),sanitized:true,removedExtensions:used};
+  }
+
   async importFile(file,options={}){
     const url=URL.createObjectURL(file);if(file.name.toLowerCase().endsWith('.forge.json'))return{type:'project',data:JSON.parse(await file.text())};
     let analysis=null;try{analysis=await window.ForgeProduction?.assets?.analyze?.(file)}catch{}
@@ -264,22 +316,39 @@ export class ForgeEngine{
         return{type:"model",record,converted:true};
       }
       return new Promise(async(resolve,reject)=>{
-        if(/\.gltf$/i.test(file.name)){try{
-          const json=JSON.parse(await file.text());
-          const external=[...(json.buffers||[]),...(json.images||[])].some(x=>x?.uri&&!String(x.uri).startsWith("data:"));
-          if(external)throw new Error("This glTF still references external files; select its dependency files together so Forge can package them.");
-        }catch(e){reject(e);return}}
-        const asset=new pc.Asset(file.name,"container",{url});this.app.assets.add(asset);asset.once("error",reject);
-        asset.once("load",()=>{try{
-          const e=asset.resource.instantiateRenderEntity({castShadows:true,receiveShadows:true});
-          e.name=file.name.replace(/\.[^.]+$/,"");this.root.addChild(e);
-          const preview=this.prepareImportedModelPreview(e),r=this.rec(e.name,"model",e);
-          r.components.asset={type:"model",name:file.name,analysis:analysis||null,sourceUnits:"source-native",importScale:preview.normalized?.scale||1,normalized:!!preview.normalized?.ok,derivedDirty:false,viewportPreview:preview};
-          const clips=this.attachAnimations(e,asset.resource,analysis?.animationNames||[]);if(clips.length)r.components.animation={clips,playing:true};
-          this.assets.set(file.name,{type:"model",file,url,resource:asset.resource});window.dispatchEvent(new Event("forge-assets-changed"));window.ForgeRefreshUI?.();
-          requestAnimationFrame(()=>requestAnimationFrame(()=>{this.select(r.id);window.ForgeSpatial?.inspect?.(r);resolve({type:"model",record:r})}));
-        }catch(err){reject(err)}});
-        this.app.assets.load(asset);
+        try{
+          if(/\.gltf$/i.test(file.name)){
+            const json=JSON.parse(await file.text());
+            const external=[...(json.buffers||[]),...(json.images||[])].some(x=>x?.uri&&!String(x.uri).startsWith("data:"));
+            if(external)throw new Error("This glTF still references external files; select its dependency files together so Forge can package them.");
+          }
+          const previewSource=await this.sanitizeGlbPreview(file);
+          const loadFile=previewSource.file;
+          const loadUrl=URL.createObjectURL(loadFile);
+          const asset=new pc.Asset(file.name,"container",{url:loadUrl});
+          this.app.assets.add(asset);
+          asset.once("error",err=>{URL.revokeObjectURL(loadUrl);reject(err)});
+          asset.once("load",()=>{
+            try{
+              const e=asset.resource.instantiateRenderEntity({castShadows:true,receiveShadows:true});
+              e.name=file.name.replace(/\.[^.]+$/,"");this.root.addChild(e);
+              const preview=this.prepareImportedModelPreview(e),r=this.rec(e.name,"model",e);
+              r.components.asset={
+                type:"model",name:file.name,analysis:analysis||null,sourceUnits:"source-native",
+                sourcePreserved:true,viewportSanitized:previewSource.sanitized===true,
+                sanitizedExtensions:previewSource.removedExtensions||[],
+                importScale:preview.normalized?.scale||1,normalized:!!preview.normalized?.ok,
+                derivedDirty:false,viewportPreview:preview
+              };
+              const clips=this.attachAnimations(e,asset.resource,analysis?.animationNames||[]);if(clips.length)r.components.animation={clips,playing:true};
+              this.assets.set(file.name,{type:"model",file,url,resource:asset.resource,asset,viewportFile:loadFile});
+              URL.revokeObjectURL(loadUrl);
+              window.dispatchEvent(new Event("forge-assets-changed"));window.ForgeRefreshUI?.();
+              requestAnimationFrame(()=>requestAnimationFrame(()=>{this.select(r.id);window.ForgeSpatial?.inspect?.(r);resolve({type:"model",record:r})}));
+            }catch(err){URL.revokeObjectURL(loadUrl);reject(err)}
+          });
+          this.app.assets.load(asset);
+        }catch(err){reject(err)}
       });
     }
     return{type:'asset',name:file.name,analysis}
