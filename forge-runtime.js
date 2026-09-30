@@ -22,7 +22,13 @@ class InputSystem{
     const end=()=>{active=false;this.virtualMove={x:0,z:0};knob.style.transform=""};
     joy.addEventListener("pointerdown",e=>{active=true;joy.setPointerCapture(e.pointerId);move(e)});joy.addEventListener("pointermove",move);joy.addEventListener("pointerup",end);joy.addEventListener("pointercancel",end);
     for(const b of root.querySelectorAll("[data-mobile]")){const a=b.dataset.mobile;b.addEventListener("pointerdown",e=>{e.preventDefault();this.down.add(a)});b.addEventListener("pointerup",()=>this.down.delete(a));b.addEventListener("pointercancel",()=>this.down.delete(a));b.addEventListener("pointerleave",()=>this.down.delete(a))}
-    const show=()=>{root.style.display=(navigator.maxTouchPoints>0||matchMedia("(pointer:coarse)").matches)?"block":"none"};show();addEventListener("resize",show);
+    const show=()=>{
+  const editorPlayActive=document.body?.dataset?.forgeRuntimeActive==="1"||document.documentElement?.dataset?.forgeRuntimeActive==="1";
+  const standaloneRuntime=!document.getElementById("play");
+  const visible=standaloneRuntime||editorPlayActive;
+  root.style.display=visible&&(navigator.maxTouchPoints>0||matchMedia("(pointer:coarse)").matches)?"block":"none";
+};
+show();addEventListener("resize",show);addEventListener("forge-runtime-visibility",show);
   }
 }
 

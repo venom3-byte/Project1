@@ -182,7 +182,7 @@ function updateAssetPanel(){
   if(!label||!type)return;
   const a=r?.components?.asset;
   label.textContent=r?.name||"No asset selected";
-  type.textContent=a?.type?(a.type==="model"?"3D GLB":a.type==="image"?"2D Image":a.type==="audio"?"AUDIO":"FILE"):"Scene object";
+  type.textContent=a?.type?(a.type==="model"?"3D Model":a.type==="image"?"2D Image":a.type==="audio"?"AUDIO":a.type==="file"?"SOURCE FILE":"FILE"):"Scene object";
   const play=$("assetPlay");
   if(play){
     const isAudio=a?.type==="audio"&&!!r?.entity?.sound?.slot?.("main");
@@ -250,16 +250,71 @@ document.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>{
 $("apply").onclick=apply;["px","py","pz","rx","ry","rz","sx","sy","sz","name"].forEach(id=>$(id).onchange=apply);
 $("duplicate").onclick=()=>{if(engine.duplicate()){refresh();inspect()}};$("undo")?.addEventListener("click",()=>{if(engine.undo()){refresh();inspect()}});$("redo")?.addEventListener("click",()=>{if(engine.redo()){refresh();inspect()}});
 $("delete").onclick=()=>{engine.delete();refresh();inspect()};$("focus").onclick=()=>engine.focus();$("frame").onclick=()=>engine.frame();$("reset")?.addEventListener("click",()=>location.reload());
-$("play").onclick=()=>{$("play").textContent=engine.running?"❚❚ Play":"▶ Play";engine.running=!engine.running;engine.timelinePlaying=engine.running};$("timelinePlay").onclick=()=>$("play").click();
+const setForgeRuntimeActive=active=>{document.body.dataset.forgeRuntimeActive=active?"1":"0";document.documentElement.dataset.forgeRuntimeActive=active?"1":"0";window.dispatchEvent(new Event("forge-runtime-visibility"))};
+setForgeRuntimeActive(false);
+$("play").onclick=()=>{$("play").textContent=engine.running?"❚❚ Play":"▶ Play";engine.running=!engine.running;engine.timelinePlaying=engine.running;setForgeRuntimeActive(engine.running)};$("timelinePlay").onclick=()=>$("play").click();
 $("rewind").onclick=()=>{engine.timelineTime=0;$("time").value=0;engine.evalAnimation(0);inspect()};$("time").oninput=e=>{engine.timelineTime=+e.target.value||0;engine.evalAnimation(engine.timelineTime);$("playhead").style.left=(engine.timelineTime*60)+"px";inspect()};$("key").onclick=()=>{engine.key();toast("Keyframe added")};
 $("draw2dOpen")?.addEventListener("click",()=>{
   const d=$("draw2dDialog");
   if(d&&!d.open)try{d.showModal()}catch{d.setAttribute("open","")}
 });
 $("importAssets").onclick=()=>$("assetInput").click();$("assetInput").onchange=e=>loadFiles([...e.target.files]);
-async function loadFiles(files){for(const f of files)try{await window.ForgeProduction?.assets?.storeFile?.(f);const r=await engine.importFile(f);if(r.type==="project")await engine.load(r.data);write("Imported "+f.name)}catch(e){write("Import failed "+f.name+": "+e.message,"error")}refresh();inspect()}
+async async function fileDataUri(file){
+  const bytes=new Uint8Array(await file.arrayBuffer());
+  let binary="";
+  const chunk=0x8000;
+  for(let i=0;i<bytes.length;i+=chunk)binary+=String.fromCharCode(...bytes.subarray(i,Math.min(bytes.length,i+chunk)));
+  const mime=file.type||(()=>{const e=file.name.toLowerCase().split(".").pop();return({png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",webp:"image/webp",avif:"image/avif",gif:"image/gif",bmp:"image/bmp",wav:"audio/wav",mp3:"audio/mpeg",ogg:"audio/ogg"}[e]||"application/octet-stream")})();
+  return "data:"+mime+";base64,"+btoa(binary);
+}
+async function packageGltfWithSelectedFiles(gltf,files){
+  const json=JSON.parse(await gltf.text());
+  const byName=new Map(files.map(f=>[f.name.replaceAll("\\","/").split("/").at(-1).toLowerCase(),f]));
+  const patchUris=async group=>{
+    for(const item of group||[]){
+      const uri=item?.uri;
+      if(!uri||String(uri).startsWith("data:"))continue;
+      const clean=decodeURIComponent(String(uri).split(/[?#]/)[0]).replaceAll("\\","/").split("/").at(-1).toLowerCase();
+      const f=byName.get(clean);
+      if(!f)throw new Error("Missing glTF dependency: "+uri);
+      item.uri=await fileDataUri(f);
+    }
+  };
+  await patchUris(json.buffers);
+  await patchUris(json.images);
+  return new File([JSON.stringify(json)],gltf.name,{type:"model/gltf+json"});
+}
+async function loadFiles(files){
+  const list=[...(files||[])].filter(Boolean);
+  for(const f of list)try{await window.ForgeProduction?.assets?.storeFile?.(f)}catch(e){write("Asset vault store failed "+f.name+": "+e.message,"error")}
+  const gltf=list.find(f=>/\.gltf$/i.test(f.name));
+  if(gltf){
+    try{
+      const packaged=await packageGltfWithSelectedFiles(gltf,list);
+      const r=await engine.importFile(packaged);
+      if(r.type==="project")await engine.load(r.data);
+      write("Imported packaged glTF "+gltf.name);
+      refresh();inspect();
+      return;
+    }catch(e){
+      write("glTF package import failed; source files remain in Content Browser: "+e.message,"error");
+    }
+  }
+  for(const f of list){
+    if(gltf&&f===gltf)continue;
+    try{
+      const r=await engine.importFile(f);
+      if(r.type==="project")await engine.load(r.data);
+      write("Imported "+f.name);
+    }catch(e){
+      write("Import failed "+f.name+": "+e.message,"error");
+    }
+  }
+  refresh();inspect();
+}
 document.addEventListener("dragover",e=>{e.preventDefault();$("dropOverlay").classList.remove("hidden")});document.addEventListener("drop",e=>{e.preventDefault();$("dropOverlay").classList.add("hidden");if(e.dataTransfer?.files?.length)loadFiles([...e.dataTransfer.files])});
 $("saveProject").onclick=()=>{window.ForgeProject.download();toast("Complete Forge project saved")};$("openProject").onclick=()=>$("projectInput").click();$("projectInput").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{await window.ForgeProject.load(JSON.parse(await f.text()));refresh();inspect();toast("Complete Forge project loaded")}catch(err){write("Project load failed: "+err.message,"error")}};
+$("openEditors")?.addEventListener("click",()=>window.ForgeProduction?.openEditors?.());
 $("build").onclick=async()=>{if(window.ForgeProduction?.build){try{const r=await window.ForgeProduction.build();if(r?.url){location.href=r.url;return}}catch(e){write("Build failed: "+e.message,"error")}}window.ForgeProject.download("forge-project-3.5.forge.json");toast("Portable Forge project exported")};
 async function assetAction(fn,label){try{const r=await fn();$("assetReport").textContent=JSON.stringify(r,null,2);$("assetBadge").textContent=r.ok?"PASS":"CHECK";$("assetBadge").className="qa-badge "+(r.ok?"pass":"warn");toast(label+(r.ok?" — PASS":" — inspect report"))}catch(e){$("assetBadge").textContent="FAIL";$("assetBadge").className="qa-badge fail";$("assetReport").textContent=JSON.stringify({ok:false,error:e.message},null,2);toast(label+" — "+e.message)}}
 $("exportSource")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.exportSource(),"Source export"));

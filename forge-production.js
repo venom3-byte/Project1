@@ -355,9 +355,34 @@ function open2D(){
   d.querySelector("#spriteImport2D").onclick=async()=>{const fs=[...d.querySelector("#spriteFiles2D").files];if(!fs.length)return;const r=await window.Forge2D.spriteFromFile(fs[0],"Sprite");Forge.select(r.id);refreshHierarchy();toast("Sprite imported")};
   d.querySelector("#twoDState").textContent=JSON.stringify(window.Forge2D?.status?.(),null,2);
 }
-function addBar(){
-  const bar=document.createElement("div");bar.className="forge-prod";
-  const buttons=[["Asset Lab",openAssets],["Material",openMaterial],["Shader",openShader],["Animation",openAnimation],["Anim Graph",openAnimationGraph],["Sequencer",openCinematics],["Render",openRender],["VFX",openVFX],["2D",open2D],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],["Vision",()=>window.AssetForgeLiveVision?.open()],["Runtime",openRuntime],["Build Web",openBuild]];
-  buttons.forEach(([t,f])=>{const b=document.createElement("button");b.textContent=t;b.onclick=f;bar.append(b)});document.body.append(bar);
+function openEditors(){
+  const d=modal("Forge Editors",'<div class="fm-grid">'+[
+    ["Asset Lab",openAssets,"Import, inspect and process source assets."],
+    ["Material Lab",openMaterial,"PBR material parameters and presets."],
+    ["Shader Lab",openShader,"Cross-platform shader presets and diagnostics."],
+    ["Animation",openAnimation,"Imported clips and playback."],
+    ["Animation Graph + Rig",openAnimationGraph,"State graphs and rig profiles."],
+    ["Sequencer",openCinematics,"Transform tracks and keyframes."],
+    ["Render",openRender,"Quality profiles and material graphs."],
+    ["VFX",openVFX,"Runtime particle/VFX controls."],
+    ["2D",open2D,"Raster/sprite authoring and import."],
+    ["World / PCG",openPCG,"Terrain and world generation systems."],
+    ["Logic Graph",openGraph,"Gameplay logic graph."],
+    ["Profiler",openProfiler,"Runtime performance diagnostics."],
+    ["Vision",()=>window.AssetForgeLiveVision?.open?.(),"Live browser vision and real input control."],
+    ["Runtime",openRuntime,"Game runtime, navigation, saves and networking."],
+    ["Build Web",openBuild,"Portable web runtime build."]
+  ].map(([t,f,desc])=>'<div class="fm-card"><h4>'+esc(t)+'</h4><div class="subtle">'+esc(desc)+'</div><div class="fm-actions"><button data-editor-tool="'+esc(t)+'">Open</button></div></div>').join("")+'</div>');
+  const map=new Map([
+    ["Asset Lab",openAssets],["Material Lab",openMaterial],["Shader Lab",openShader],["Animation",openAnimation],
+    ["Animation Graph + Rig",openAnimationGraph],["Sequencer",openCinematics],["Render",openRender],["VFX",openVFX],
+    ["2D",open2D],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],
+    ["Vision",()=>window.AssetForgeLiveVision?.open?.()],["Runtime",openRuntime],["Build Web",openBuild]
+  ]);
+  d.querySelectorAll("[data-editor-tool]").forEach(b=>b.onclick=()=>{
+    const fn=map.get(b.dataset.editorTool);if(!fn)return;
+    d.close();setTimeout(()=>{try{fn()}catch(e){toast("Editor failed: "+e.message)}},0);
+  });
+  return d;
 }
-addBar();
+window.ForgeProduction.openEditors=openEditors;

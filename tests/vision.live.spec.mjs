@@ -3,6 +3,7 @@ import{WebSocket}from"ws";
 import{mkdir,writeFile}from"node:fs/promises";
 
 const BASE="http://127.0.0.1:4173";
+const FOX="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Fox/glTF-Binary/Fox.glb";
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
 test.describe.serial("Forge Live Vision — continuous stream + real browser input",()=>{
@@ -165,6 +166,65 @@ test.describe.serial("Forge Live Vision — continuous stream + real browser inp
     expect(pngBytes.slice(0,8).toString("hex")).toBe("89504e470d0a1a0a");
     expect(pngBytes.length).toBeGreaterThan(1000);
     await writeFile("vision-proof/vision-drawn-asset.png",pngBytes);
+  });
+
+  test("real 3D model is imported and visibly rendered under live Vision control",async({request})=>{
+    test.setTimeout(120000);
+    await mkdir("vision-proof",{recursive:true});
+    const fox=await request.get(FOX,{timeout:30000});
+    expect(fox.ok()).toBeTruthy();
+    const foxBytes=await fox.body();
+    expect(foxBytes.slice(0,4).toString()).toBe("glTF");
+    await writeFile("vision-proof/Fox.glb",foxBytes);
+
+    const start=await request.post("/api/vision/session/start",{data:{
+      target:"/",viewport:{width:1440,height:900},touch:true,mobile:true,streamFps:30
+    },timeout:45000});
+    expect(start.ok()).toBeTruthy();
+
+    const controls=await request.post("/api/vision/action",{data:{action:{
+      type:"evaluate",
+      expression:"JSON.stringify({visible:(()=>{const e=document.querySelector('#forgeMobileControls');return !!e&&getComputedStyle(e).display!=='none'&&getComputedStyle(e).visibility!=='hidden'})(),buttons:[...document.querySelectorAll('#forgeMobileControls [data-mobile]')].map(x=>x.textContent)})"
+    }}}); 
+    const controlsState=JSON.parse((await controls.json()).result.action.value);
+    expect(controlsState.visible).toBeFalsy();
+
+    const input=await request.post("/api/vision/action",{data:{action:{
+      type:"file.setInputFiles",selector:"#assetInput",paths:["vision-proof/Fox.glb"]
+    },options:{includeState:true}}});
+    const inputBody=await input.json();
+    expect(inputBody.ok).toBeTruthy();
+
+    await expect.poll(async()=>{
+      const st=await (await request.get("/api/vision/state")).json();
+      return st.selected?.kind||"";
+    },{timeout:30000}).toBe("model");
+
+    const imported=await request.post("/api/vision/action",{data:{action:{
+      type:"evaluate",
+      expression:"JSON.stringify((()=>{const r=window.Forge?.selected?.();const stack=r?.entity?[r.entity]:[];let meshes=0;while(stack.length){const n=stack.pop();meshes+=(n?.render?.meshInstances?.length||0);for(const c of n?.children||[])stack.push(c)}return{name:r?.components?.asset?.name,kind:r?.kind,assetType:r?.components?.asset?.type,meshInstances:meshes,entities:window.Forge?.diagnostics?.()?.entities||0}})())"
+    },options:{includeState:true}}});
+    const importedBody=await imported.json();
+    const importedState=JSON.parse(importedBody.result.action.value);
+    expect(importedState.name).toBe("Fox.glb");
+    expect(importedState.kind).toBe("model");
+    expect(importedState.assetType).toBe("model");
+    expect(importedState.meshInstances).toBeGreaterThan(0);
+    expect(importedState.entities).toBeGreaterThanOrEqual(4);
+
+    const frame=(await (await request.get("/api/vision/elements")).json()).elements.find(e=>e.selector==="#frame"&&e.visible);
+    expect(frame).toBeTruthy();
+    const frameClick=await request.post("/api/vision/action",{data:{action:{
+      type:"mouse.click",x:frame.x+frame.width/2,y:frame.y+frame.height/2
+    }}});
+    expect((await frameClick.json()).result.action.target.id).toBe("frame");
+
+    await sleep(700);
+    const proof=await request.get("/api/vision/frame");
+    expect(proof.ok()).toBeTruthy();
+    const bytes=await proof.body();
+    expect(bytes.slice(0,2).toString("hex")).toBe("ffd8");
+    await writeFile("vision-proof/vision-real-3d-asset-proof.jpg",bytes);
   });
 
   test("file-input control is available for real asset import workflows",async({request})=>{
