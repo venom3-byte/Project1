@@ -387,6 +387,10 @@ export class VisionController extends EventEmitter{
       case 'touch.tap':
         await this.page.touchscreen.tap(Number(action.x)||0,Number(action.y)||0);
         return{dispatched:true,type,x:Number(action.x)||0,y:Number(action.y)||0};
+      case 'touch.tapSelector':
+        if(!action.selector)throw new Error('touch.tapSelector requires selector');
+        await this.page.locator(String(action.selector)).tap({timeout:10000});
+        return{dispatched:true,type,selector:String(action.selector)};
       case 'touch.start':
         return this.touchEvent('touchStart',action.points||[]);
       case 'touch.move':
