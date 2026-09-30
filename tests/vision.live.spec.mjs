@@ -101,14 +101,25 @@ test.describe.serial("Forge Live Vision — real continuous vision + input",()=>
     await request.post("/api/vision/action",{data:{action:{type:"mouse.click",x:box.x+box.width/2,y:box.y+box.height/2}}});
     const created=await getJson(request,"/api/vision/state");
     expect(created.diagnostics.entities).toBeGreaterThanOrEqual(4);
+    const beforeTransform=created.selectedScreenRect;
+
+    const drag=await request.post("/api/vision/action",{data:{action:{
+      type:"mouse.drag",
+      from:{x:beforeTransform.x+beforeTransform.width/2,y:beforeTransform.y+beforeTransform.height/2},
+      to:{x:beforeTransform.x+beforeTransform.width/2+60,y:beforeTransform.y+beforeTransform.height/2},
+      steps:10
+    }}});
+    expect((await drag.json()).ok).toBeTruthy();
+    const changed=await getJson(request,"/api/vision/state");
+    expect(changed.selectedScreenRect.x).not.toBe(beforeTransform.x);
 
     const undo=await request.post("/api/vision/action",{data:{action:{type:"keyboard.press",key:"Control+z"}}});
     expect((await undo.json()).ok).toBeTruthy();
-    await expect.poll(async()=> (await getJson(request,"/api/vision/state")).diagnostics.entities,{timeout:10000}).toBe(3);
+    await expect.poll(async()=> (await getJson(request,"/api/vision/state")).selectedScreenRect.x,{timeout:10000}).toBeCloseTo(beforeTransform.x,0);
 
     const redo=await request.post("/api/vision/action",{data:{action:{type:"keyboard.press",key:"Control+y"}}});
     expect((await redo.json()).ok).toBeTruthy();
-    await expect.poll(async()=> (await getJson(request,"/api/vision/state")).diagnostics.entities,{timeout:10000}).toBeGreaterThanOrEqual(4);
+    await expect.poll(async()=> (await getJson(request,"/api/vision/state")).selectedScreenRect.x,{timeout:10000}).toBeCloseTo(changed.selectedScreenRect.x,0);
   });
 
   test("executes real touch start/move/end through CDP on a touch-capable Forge session",async({request})=>{
