@@ -303,66 +303,84 @@ export class ForgeEngine{
   }
 
   async importFile(file,options={}){
-    const url=URL.createObjectURL(file);if(file.name.toLowerCase().endsWith('.forge.json'))return{type:'project',data:JSON.parse(await file.text())};
-    let analysis=null;try{analysis=await window.ForgeProduction?.assets?.analyze?.(file)}catch{}
-    if(/^audio\//.test(file.type) || /\.(wav|mp3|ogg|m4a|aac|flac|webm)$/i.test(file.name)){
-      let asset=null;
-      await new Promise((resolve,reject)=>{
-        this.app.assets.loadFromUrlAndFilename(url,file.name,'audio',(err,loaded)=>{
-          if(err){reject(err);return}
-          asset=loaded;resolve();
+    if(!file||!file.name)throw new Error("Forge import requires a File-like source.");
+    const lower=String(file.name).toLowerCase();
+    if(lower.endsWith(".forge.json"))return{type:"project",data:JSON.parse(await file.text())};
+
+    const url=URL.createObjectURL(file);
+    let analysis=null,sourceSha256=null;
+    try{analysis=await window.ForgeProduction?.assets?.analyze?.(file)}catch{}
+    try{sourceSha256=await this.sha256(file)}catch{}
+    try{await window.ForgeProduction?.assets?.storeFile?.(file)}catch(e){this.log("Asset vault store failed for "+file.name+": "+e.message,"error")}
+
+    if(/^audio\//.test(file.type)||AUDIO_EXT_RE.test(lower)){
+      try{
+        let asset=null;
+        await new Promise((resolve,reject)=>{
+          this.app.assets.loadFromUrlAndFilename(url,file.name,"audio",(err,loaded)=>{
+            if(err){reject(err);return}
+            asset=loaded;resolve();
+          });
         });
-      });
-      const r=this.add('audio',file.name);
-      r.entity.addComponent('sound',{positional:true,volume:1});
-      r.entity.sound.addSlot('main',{asset:asset.id,autoPlay:false,loop:false,overlap:false,volume:1,pitch:1});
-      r.components.asset={type:'audio',name:file.name,analysis,derivedDirty:false};
-      this.assets.set(file.name,{type:'audio',file,url,resource:asset.resource,asset});
-      this.select(r.id);
-      window.dispatchEvent(new Event('forge-assets-changed'));
-      window.ForgeRefreshUI?.();
-      return{type:'audio',record:r,asset};
+        const r=this.add("audio",file.name);
+        r.entity.addComponent("sound",{positional:true,volume:1});
+        r.entity.sound.addSlot("main",{asset:asset.id,autoPlay:false,loop:false,overlap:false,volume:1,pitch:1});
+        r.components.asset={type:"audio",name:file.name,analysis,sourceSha256,sourcePreserved:true,derivedDirty:false};
+        this.assets.set(file.name,{type:"audio",file,url,resource:asset.resource,asset,analysis,sourceSha256});
+        this.select(r.id);window.dispatchEvent(new Event("forge-assets-changed"));window.ForgeRefreshUI?.();
+        return{type:"audio",record:r,asset};
+      }catch(error){
+        this.log("Audio preview unavailable for "+file.name+"; preserving source asset: "+error.message,"error");
+      }
     }
-    if(/^image\//.test(file.type)){
-      const bmp=await createImageBitmap(file);
-      const c=document.createElement("canvas");c.width=bmp.width;c.height=bmp.height;c.getContext("2d").drawImage(bmp,0,0);
-      const tex=new pc.Texture(this.app.graphicsDevice,{width:bmp.width,height:bmp.height,format:pc.PIXELFORMAT_R8_G8_B8_A8});
-      tex.setSource(c);
-      const mat=new pc.StandardMaterial();
-      mat.diffuse=new pc.Color(1,1,1);mat.diffuseMap=tex;
-      mat.emissive=new pc.Color(1,1,1);mat.emissiveMap=tex;mat.emissiveIntensity=.35;
-      mat.useLighting=false;mat.useTonemap=false;mat.cull=pc.CULLFACE_NONE;mat.blendType=pc.BLEND_NONE;mat.opacity=1;mat.alphaTest=0;mat.update();
-      const r=this.primitive("plane",file.name);
-      const h=2.6,w=Math.max(.25,h*(bmp.width/Math.max(1,bmp.height)));
-      r.entity.setLocalEulerAngles(90,0,0);r.entity.setLocalScale(w,1,h);r.entity.setLocalPosition(0,h*.5,0);
-      r.entity.render.material=mat;r.entity.render.frustumCulling=false;
-      r.components.asset={type:"image",name:file.name,width:bmp.width,height:bmp.height,analysis,sourceUnits:"pixels",presentation:"upright-2d-preview",pixelsPerWorldUnit:bmp.height/h,derivedDirty:false};
-      this.assets.set(file.name,{type:"image",file,url});this.select(r.id);this.setView("front");this.frame();
-      window.dispatchEvent(new Event("forge-assets-changed"));window.ForgeRefreshUI?.();
-      return{type:"image",record:r};
+
+    if(/^image\//.test(file.type)||IMAGE_EXT_RE.test(lower)){
+      try{
+        const bmp=await createImageBitmap(file);
+        const c=document.createElement("canvas");c.width=bmp.width;c.height=bmp.height;c.getContext("2d").drawImage(bmp,0,0);
+        const tex=new pc.Texture(this.app.graphicsDevice,{width:bmp.width,height:bmp.height,format:pc.PIXELFORMAT_R8_G8_B8_A8});
+        tex.setSource(c);
+        const mat=new pc.StandardMaterial();
+        mat.diffuse=new pc.Color(1,1,1);mat.diffuseMap=tex;
+        mat.emissive=new pc.Color(1,1,1);mat.emissiveMap=tex;mat.emissiveIntensity=.35;
+        mat.useLighting=false;mat.useTonemap=false;mat.cull=pc.CULLFACE_NONE;mat.blendType=pc.BLEND_NONE;mat.opacity=1;mat.alphaTest=0;mat.update();
+        const r=this.primitive("plane",file.name);
+        const h=2.6,w=Math.max(.25,h*(bmp.width/Math.max(1,bmp.height)));
+        r.entity.setLocalEulerAngles(90,0,0);r.entity.setLocalScale(w,1,h);r.entity.setLocalPosition(0,h*.5,0);
+        r.entity.render.material=mat;r.entity.render.frustumCulling=false;
+        r.components.asset={type:"image",name:file.name,width:bmp.width,height:bmp.height,analysis,sourceUnits:"pixels",sourceSha256,sourcePreserved:true,presentation:"upright-2d-preview",pixelsPerWorldUnit:bmp.height/h,derivedDirty:false};
+        this.assets.set(file.name,{type:"image",file,url,analysis,sourceSha256});this.select(r.id);this.setView("front");this.frame();
+        bmp.close?.();window.dispatchEvent(new Event("forge-assets-changed"));window.ForgeRefreshUI?.();
+        return{type:"image",record:r};
+      }catch(error){
+        this.log("Raster preview unavailable for "+file.name+"; preserving source asset: "+error.message,"error");
+      }
     }
-    if(/\.(glb|gltf|fbx|obj|dae|3ds)$/i.test(file.name)){
-      if(/\.(fbx|obj|dae|3ds)$/i.test(file.name)){
+
+    if(isModelFile(file)){
+      if(MODEL_CONVERT_RE.test(lower)&&!MODEL_DIRECT_RE.test(lower)){
         const converted=await this.convertLegacyModelToGLB(file,options?.files||[file]);
         const convertedResult=await this.importFile(converted,{internalConversion:true});
         const record=convertedResult.record,internalEntry=this.assets.get(converted.name);
         this.assets.delete(converted.name);
-        this.assets.set(file.name,{type:"model",file,url,resource:internalEntry?.resource,converted:true,convertedFrom:file.name});
+        this.assets.set(file.name,{type:"model",file,url,resource:internalEntry?.resource,converted:true,convertedFrom:file.name,analysis,sourceSha256,sourcePreserved:true});
         record.name=file.name.replace(/\.[^.]+$/,"");record.entity.name=record.name;
-        record.components.asset={type:"model",name:file.name,analysis:analysis||null,sourceUnits:"source-native",converted:true,convertedFrom:file.name,converter:"AssimpJS",sourcePreserved:true,derivedDirty:false,importScale:record.components.asset?.importScale||1,normalized:!!record.components.asset?.normalized,viewportPreview:record.components.asset?.viewportPreview||null};
+        const previous=record.components.asset||{};
+        record.components.asset={...previous,type:"model",name:file.name,analysis:analysis||null,sourceUnits:"source-native",sourceSha256,sourcePreserved:true,converted:true,convertedFrom:file.name,converter:"AssimpJS",derivedDirty:false,importScale:previous.importScale||1,normalized:!!previous.normalized,viewportPreview:previous.viewportPreview||null};
         this.select(record.id);window.dispatchEvent(new Event("forge-assets-changed"));window.ForgeRefreshUI?.();
         return{type:"model",record,converted:true};
       }
+
       return new Promise(async(resolve,reject)=>{
         try{
+          let loadFile=file;
           if(/\.gltf$/i.test(file.name)){
             const json=JSON.parse(await file.text());
-            const external=[...(json.buffers||[]),...(json.images||[])].some(x=>x?.uri&&!String(x.uri).startsWith("data:"));
-            if(external)throw new Error("This glTF still references external files; select its dependency files together so Forge can package them.");
+            const hasExternal=[...(json.buffers||[]),...(json.images||[])].some(x=>x?.uri&&!String(x.uri).startsWith("data:"));
+            loadFile=hasExternal?await this.packageGltfBundle(file,options?.files||[file]):file;
           }
-          const previewSource=await this.sanitizeGlbPreview(file);
-          const loadFile=previewSource.file;
-          const loadUrl=URL.createObjectURL(loadFile);
+          const previewSource=await this.sanitizeGlbPreview(loadFile);
+          const loadUrl=URL.createObjectURL(previewSource.file);
           const asset=new pc.Asset(file.name,"container",{url:loadUrl});
           this.app.assets.add(asset);
           asset.once("error",err=>{URL.revokeObjectURL(loadUrl);reject(err)});
@@ -373,13 +391,13 @@ export class ForgeEngine{
               const preview=this.prepareImportedModelPreview(e),r=this.rec(e.name,"model",e);
               r.components.asset={
                 type:"model",name:file.name,analysis:analysis||null,sourceUnits:"source-native",
-                sourcePreserved:true,viewportSanitized:previewSource.sanitized===true,
-                sanitizedExtensions:previewSource.removedExtensions||[],
+                sourceSha256,sourcePreserved:true,viewportSanitized:previewSource.sanitized===true,
+                sanitizedExtensions:previewSource.removedExtensions||[],previewInput:loadFile.name,
                 importScale:preview.normalized?.scale||1,normalized:!!preview.normalized?.ok,
                 derivedDirty:false,viewportPreview:preview
               };
               const clips=this.attachAnimations(e,asset.resource,analysis?.animationNames||[]);if(clips.length)r.components.animation={clips,playing:true};
-              this.assets.set(file.name,{type:"model",file,url,resource:asset.resource,asset,viewportFile:loadFile});
+              this.assets.set(file.name,{type:"model",file,url,resource:asset.resource,asset,viewportFile:previewSource.file,analysis,sourceSha256,sourcePreserved:true});
               URL.revokeObjectURL(loadUrl);
               window.dispatchEvent(new Event("forge-assets-changed"));window.ForgeRefreshUI?.();
               requestAnimationFrame(()=>requestAnimationFrame(()=>{this.select(r.id);window.ForgeSpatial?.inspect?.(r);resolve({type:"model",record:r})}));
@@ -389,8 +407,13 @@ export class ForgeEngine{
         }catch(err){reject(err)}
       });
     }
-    return{type:'asset',name:file.name,analysis}
+
+    const entry={type:"file",file,url,analysis,sourceSha256,sourcePreserved:true,extension:extOf(file),sourceOnly:true};
+    this.assets.set(file.name,entry);
+    window.dispatchEvent(new Event("forge-assets-changed"));window.ForgeRefreshUI?.();
+    return{type:"asset",name:file.name,analysis,sourceOnly:true,entry};
   }
+
   attachAnimations(entity,resource,names=[]){const tracks=resource?.animations||[];if(!tracks.length)return[];try{if(!entity.anim)entity.addComponent('anim',{activate:true,speed:1});const clips=[];for(let i=0;i<tracks.length;i++){const name=names[i]||tracks[i]?.name||('Clip_'+i);entity.anim.assignAnimation(name,tracks[i],undefined,1,true);clips.push(name)}entity.anim.playing=true;return clips}catch(e){this.log('Animation attach failed: '+e.message,'error');return[]}}
   setAnimationState(id,state){const r=this.entities.get(id);if(!r?.entity?.anim?.baseLayer)return false;try{r.entity.anim.baseLayer.play(state);return true}catch{return false}}
   serialize(){return{format:'forge-scene',version:3,meta:{engine:'Forge Studio 3.0',time:new Date().toISOString(),units:'meters'},entities:[...this.entities.values()].map(r=>{const p=r.entity.getLocalPosition(),q=r.entity.getLocalEulerAngles(),s=r.entity.getLocalScale();return{id:r.id,name:r.name,kind:r.kind,transform:{p:[p.x,p.y,p.z],r:[q.x,q.y,q.z],s:[s.x,s.y,s.z]},components:r.components,keyframes:this.keyframes.get(r.id)||[],script:this.scripts.get(r.id)||null}})}}
