@@ -258,6 +258,34 @@ $("draw2dOpen")?.addEventListener("click",()=>{
   const d=$("draw2dDialog");
   if(d&&!d.open)try{d.showModal()}catch{d.setAttribute("open","")}
 });
+const REALISTIC_CAR_URL="https://cdn.3dassets.dev/assets/32487/v1/model.glb";
+async function importRealisticCar(){
+  const button=$("importRealCar");
+  const previous=button?.textContent;
+  try{
+    if(button){button.disabled=true;button.textContent="🚗 Loading real car…"}
+    const response=await fetch(REALISTIC_CAR_URL,{mode:"cors",cache:"no-store"});
+    if(!response.ok)throw new Error("Realistic car download failed: HTTP "+response.status);
+    const blob=await response.blob();
+    const file=new File([blob],"Forge-Realistic-City-Car.glb",{type:"model/gltf-binary"});
+    await window.ForgeProduction?.assets?.storeFile?.(file);
+    const result=await engine.importFile(file,{remoteSource:REALISTIC_CAR_URL});
+    if(result.type!=="model"||!result.record)throw new Error("Realistic car did not produce a 3D model record");
+    result.record.components.asset.remoteSource=REALISTIC_CAR_URL;
+    result.record.components.asset.license="CC0 1.0 Universal";
+    result.record.components.asset.catalogSource="3DAssets.dev — City car / Car Park and Road Vehicle Fleet";
+    result.record.components.asset.qualityProfile="realistic-road-vehicle";
+    engine.select(result.record.id);
+    engine.focus();
+    refresh();inspect();
+    toast("Realistic car imported — 31k triangles / 8 materials / 8 animations");
+    write("Imported real CC0 realistic city car from 3DAssets.dev");
+    return result;
+  }finally{
+    if(button){button.disabled=false;button.textContent=previous||"🚗 Import realistic car"}
+  }
+}
+window.ForgeDemoAssets={importRealisticCar,REALISTIC_CAR_URL};
 $("importAssets").onclick=()=>$("assetInput").click();$("assetInput").onchange=e=>loadFiles([...e.target.files]);
 async function fileDataUri(file){
   const bytes=new Uint8Array(await file.arrayBuffer());
