@@ -452,9 +452,12 @@ export class VisionController extends EventEmitter{
         await this.page.mouse.dblclick(x,y,{button,delay:Math.max(0,Number(action.delay)||0)});
         return{dispatched:true,type,x,y,button};
       }
-      case 'mouse.wheel':
+      case 'mouse.wheel':{
+        const x=Number(action.x),y=Number(action.y);
+        if(Number.isFinite(x)&&Number.isFinite(y))await this.page.mouse.move(x,y,{steps:Math.max(1,Number(action.steps)||1)});
         await this.page.mouse.wheel(Number(action.deltaX)||0,Number(action.deltaY)||0);
-        return{dispatched:true,type,deltaX:Number(action.deltaX)||0,deltaY:Number(action.deltaY)||0};
+        return{dispatched:true,type,x:Number.isFinite(x)?x:null,y:Number.isFinite(y)?y:null,deltaX:Number(action.deltaX)||0,deltaY:Number(action.deltaY)||0};
+      }
       case 'mouse.drag':{
         const from=action.from||{},to=action.to||{},button=buttonValue(action.button);
         await this.page.mouse.move(Number(from.x)||0,Number(from.y)||0);

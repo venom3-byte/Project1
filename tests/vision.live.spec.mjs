@@ -101,7 +101,7 @@ test.describe.serial("Forge Live Vision — continuous stream + real browser inp
     let drawOpen=openElements.find(e=>e.selector==="#draw2dOpen"&&e.visible);
     expect(drawOpen).toBeTruthy();
     for(let i=0;i<3&&drawOpen.y>850;i++){
-      const scroll=await request.post("/api/vision/action",{data:{action:{type:"mouse.wheel",deltaY:700}}});
+      const scroll=await request.post("/api/vision/action",{data:{action:{type:"mouse.wheel",x:110,y:450,deltaY:700}}});
       expect((await scroll.json()).result.action.dispatched).toBeTruthy();
       const refreshed=(await (await request.get("/api/vision/elements")).json()).elements;
       drawOpen=refreshed.find(e=>e.selector==="#draw2dOpen"&&e.visible);
