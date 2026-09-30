@@ -9,6 +9,7 @@ import {VisionController,installVisionShutdown} from './vision-control.mjs';
 
 const root=path.dirname(fileURLToPath(import.meta.url));
 const port=Number(process.env.PORT||4173);
+const host=process.env.HOST||'127.0.0.1';
 const vision=new VisionController({baseUrl:`http://127.0.0.1:${port}`});
 const removeVisionShutdown=installVisionShutdown(vision);
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.webmanifest':'application/manifest+json; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.svg':'image/svg+xml','.ico':'image/x-icon','.wasm':'application/wasm'};
@@ -77,5 +78,5 @@ function joinRoom(room,ws,peerId){if(!rooms.has(room))rooms.set(room,new Set());
 function leaveRoom(ws){const room=ws.__room;if(!room||!rooms.has(room))return;const set=rooms.get(room);set.delete(ws);for(const p of set)if(p.readyState===1)p.send(JSON.stringify({type:'peer-leave',peerId:ws.__peerId}));if(!set.size)rooms.delete(room)}
 netWss.on('connection',ws=>{ws.on('close',()=>leaveRoom(ws));ws.on('message',message=>{let m;try{m=JSON.parse(message)}catch{return}if(m.type==='hello'){joinRoom(String(m.room||'default'),ws,String(m.peerId||crypto.randomUUID()));return}const room=rooms.get(ws.__room);if(!room)return;for(const p of room)if(p!==ws&&p.readyState===1)p.send(JSON.stringify(m))})});
 srv.on('upgrade',(req,socket,head)=>{const pathn=new URL(req.url,'http://localhost').pathname;if(pathn==='/live')return wss.handleUpgrade(req,socket,head,ws=>wss.emit('connection',ws,req));if(pathn==='/vision')return visionWss.handleUpgrade(req,socket,head,ws=>visionWss.emit('connection',ws,req));if(pathn==='/net')return netWss.handleUpgrade(req,socket,head,ws=>netWss.emit('connection',ws,req));socket.destroy()});
-srv.listen(port,()=>console.log('Forge Studio 3.7 listening on '+port));
+srv.listen(port,host,()=>console.log('Forge Studio 3.7 listening on http://'+host+':'+port));
 process.once('exit',removeVisionShutdown);
