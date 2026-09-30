@@ -102,13 +102,13 @@ test.describe.serial("Forge Live Vision — real continuous vision + input",()=>
     const keyRotate=await request.post("/api/vision/action",{data:{action:{type:"keyboard.press",key:"2"}}});
     const kr=await keyRotate.json();
     expect(kr.ok).toBeTruthy();
-    const rotate=await pageState(request);
+    const rotate=await getJson(request,"/api/vision/state");
     expect(rotate.gizmoMode).toBe("rotate");
 
     const keyTranslate=await request.post("/api/vision/action",{data:{action:{type:"keyboard.press",key:"1"}}});
     const kt=await keyTranslate.json();
     expect(kt.ok).toBeTruthy();
-    const translate=await pageState(request);
+    const translate=await getJson(request,"/api/vision/state");
     expect(translate.gizmoMode).toBe("translate");
   });
 
@@ -116,19 +116,26 @@ test.describe.serial("Forge Live Vision — real continuous vision + input",()=>
     test.setTimeout(90000);
     const session=await startVision(request,{viewport:{width:390,height:844},touch:true,mobile:true});
     expect(session.viewport.width).toBe(390);
-    const start=await request.post("/api/vision/action",{data:{action:{type:"touch.start",points:[{id:1,x:195,y:420,force:1}]}}});
+    const elements=await getJson(request,"/api/vision/elements");
+    const box=elements.elements.find(e=>e.selector==='[data-add="box"]'&&e.visible);
+    expect(box).toBeTruthy();
+    const bx=box.x+box.width/2,by=box.y+box.height/2;
+    const start=await request.post("/api/vision/action",{data:{action:{type:"touch.start",points:[{id:1,x:bx,y:by,force:1}]}}});
     const sr=await start.json();
     expect(sr.ok).toBeTruthy();
     expect(sr.action.dispatched).toBeTruthy();
 
-    const move=await request.post("/api/vision/action",{data:{action:{type:"touch.move",points:[{id:1,x:205,y:430,force:1}]}}});
+    const move=await request.post("/api/vision/action",{data:{action:{type:"touch.move",points:[{id:1,x:bx+2,y:by+2,force:1}]}}});
     const mr=await move.json();
     expect(mr.ok).toBeTruthy();
 
-    const end=await request.post("/api/vision/action",{data:{action:{type:"touch.end"}}});
+    const end=await request.post("/api/vision/action",{data:{type:"touch.end"}});
     const er=await end.json();
     expect(er.ok).toBeTruthy();
     expect(er.action.dispatched).toBeTruthy();
+
+    const afterTouch=await getJson(request,"/api/vision/state");
+    expect(afterTouch.diagnostics.entities).toBeGreaterThanOrEqual(4);
 
     const status=await getJson(request,"/api/vision/status");
     expect(status.vision.frameSeq).toBeGreaterThan(3);
