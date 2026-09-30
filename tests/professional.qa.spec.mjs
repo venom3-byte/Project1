@@ -222,15 +222,15 @@ test.describe("Forge professional acceptance",()=>{
 
       const check=await window.ForgeExport.validateSelected();
       const source=await window.ForgeExport.exportSource({download:false});
-      const spatial=window.ForgeSpatial.inspect(imported.record);
+      const spatial=window.ForgeSpatial.inspect(imported);
       const scene=await window.ForgeExport.exportSceneGLB({download:false,name:"Fox-derived.glb"});
       const derivedFile=new File([scene.blob],"Fox-derived.glb",{type:"model/gltf-binary"});
       const round=await window.Forge.importFile(derivedFile);
       const roundSpatial=window.ForgeSpatial.inspect(round.record);
       return{
-        name:imported.record.name,
-        clips:imported.record.components.animation?.clips||[],
-        playing:!!imported.record.entity.anim?.playing,
+        name:imported.name,
+        clips:imported.components.animation?.clips||[],
+        playing:!!imported.entity.anim?.playing,
         check,
         sourceBytes:source.blob.size,
         exportedBytes:source.blob.size,
