@@ -1,6 +1,6 @@
 import{test,expect}from"@playwright/test";
 import{WebSocket}from"ws";
-import{writeFile}from"node:fs/promises";
+import{mkdir,writeFile}from"node:fs/promises";
 
 const BASE="http://127.0.0.1:4173";
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -12,6 +12,7 @@ test.describe.serial("Forge Live Vision — continuous stream + real browser inp
 
   test("continuous frames are pushed over one live WebSocket channel",async({request})=>{
     test.setTimeout(90000);
+    await mkdir("vision-proof",{recursive:true});
     const socket=new WebSocket(BASE.replace("http","ws")+"/vision");
     const frames=[];
     const open=new Promise((resolve,reject)=>{
