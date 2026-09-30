@@ -12,7 +12,8 @@
     redo: [],
     maxHistory: 24,
     ready: false,
-    lastPngDataUrl: null
+    lastPngDataUrl: null,
+    importPromise: null
   };
 
   function dialog(){ return $("draw2dDialog"); }
@@ -180,7 +181,12 @@
     $("drawUndo")?.addEventListener("click",undo);
     $("drawRedo")?.addEventListener("click",redo);
     $("drawDownload")?.addEventListener("click",download);
-    $("drawAddToScene")?.addEventListener("click",()=>addToScene().catch(e=>status("Import failed: "+(e?.message||String(e)))));
+    $("drawAddToScene")?.addEventListener("click",()=>{
+      state.importPromise=addToScene().catch(e=>{
+        status("Import failed: "+(e?.message||String(e)));
+        throw e;
+      }).finally(()=>{state.importPromise=null});
+    });
     $("drawColor")?.addEventListener("input",e=>{state.color=e.target.value||"#ffffff"});
     $("drawSize")?.addEventListener("input",e=>{state.brush=Math.max(1,Math.min(120,Number(e.target.value)||18));$("drawSizeValue").textContent=state.brush+" px"});
     $("drawEraser")?.addEventListener("click",()=>{state.erasing=!state.erasing;syncButtons()});
@@ -201,7 +207,8 @@
     addToScene,
     exportDataUrl:dataUrl,
     status:()=>({ready:state.ready,drawing:state.drawing,brush:state.brush,color:state.color,erasing:state.erasing,history:state.history.length,redo:state.redo.length}),
-    get lastPngDataUrl(){ return state.lastPngDataUrl; }
+    get lastPngDataUrl(){ return state.lastPngDataUrl; },
+    waitForImport:()=>state.importPromise||Promise.resolve(true)
   };
 
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});
