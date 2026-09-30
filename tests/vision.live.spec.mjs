@@ -36,7 +36,7 @@ test.describe.serial("Forge Live Vision — continuous stream + real browser inp
     expect(proof.ok()).toBeTruthy();
     const proofBytes=await proof.body();
     expect(proofBytes.slice(0,2).toString("hex")).toBe("ffd8");
-    await writeFile("test-results/vision-live-proof.jpg",proofBytes);
+    await writeFile("vision-proof/vision-live-proof.jpg",proofBytes);
     expect(frames.at(-1).seq).toBeGreaterThan(frames[0].seq);
     expect(frames[0].width).toBeGreaterThan(300);
     expect(frames[0].height).toBeGreaterThan(200);
@@ -139,7 +139,7 @@ test.describe.serial("Forge Live Vision — continuous stream + real browser inp
     expect(canvasProof.ok()).toBeTruthy();
     const canvasProofBytes=await canvasProof.body();
     expect(canvasProofBytes.slice(0,2).toString("hex")).toBe("ffd8");
-    await writeFile("test-results/vision-drawing-canvas-proof.jpg",canvasProofBytes);
+    await writeFile("vision-proof/vision-drawing-canvas-proof.jpg",canvasProofBytes);
     const addResult=await request.post("/api/vision/action",{data:{action:{type:"mouse.click",x:add.x+add.width/2,y:add.y+add.height/2},options:{includeState:true}}});
     const addBody=await addResult.json();
     expect(addBody.ok).toBeTruthy();
@@ -153,7 +153,7 @@ test.describe.serial("Forge Live Vision — continuous stream + real browser inp
     expect(importedState.selected?.kind).toBeTruthy();
     const importedProof=await request.get("/api/vision/frame");
     expect(importedProof.ok()).toBeTruthy();
-    await writeFile("test-results/vision-imported-asset-proof.jpg",await importedProof.body());
+    await writeFile("vision-proof/vision-imported-asset-proof.jpg",await importedProof.body());
 
     const data=await request.post("/api/vision/action",{data:{action:{type:"evaluate",expression:"window.ForgeDraw2D?.lastPngDataUrl || null"}}});
     const dataBody=await data.json();
@@ -163,7 +163,7 @@ test.describe.serial("Forge Live Vision — continuous stream + real browser inp
     const pngBytes=Buffer.from(m[1],"base64");
     expect(pngBytes.slice(0,8).toString("hex")).toBe("89504e470d0a1a0a");
     expect(pngBytes.length).toBeGreaterThan(1000);
-    await writeFile("test-results/vision-drawn-asset.png",pngBytes);
+    await writeFile("vision-proof/vision-drawn-asset.png",pngBytes);
   });
 
   test("file-input control is available for real asset import workflows",async({request})=>{

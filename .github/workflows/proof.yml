@@ -48,4 +48,5 @@ jobs:
             playwright-report
             test-results
             gltf-validation-report.json
+vision-proof
           if-no-files-found: ignore
