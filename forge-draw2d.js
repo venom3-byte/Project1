@@ -211,6 +211,5 @@
     waitForImport:()=>state.importPromise||Promise.resolve(true)
   };
 
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});
-  else init();
+  init();
 })();

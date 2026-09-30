@@ -92,7 +92,6 @@ test.describe.serial("Forge Live Vision — continuous stream + real browser inp
     const release=await request.post("/api/vision/action",{data:{action:{type:"releaseAll"}}});
     expect((await release.json()).result.action.released).toBeTruthy();
 
-    const drawn=(await request.post("/api/vision/action",{data:{action:{type:"mouse.click",x:61,y:106.5},options:{includeState:true}}})).json;
     const finalState=await (await request.get("/api/vision/state")).json();
     expect(finalState.forgeReady).toBeTruthy();
     expect(finalState.canvasRect).toBeTruthy();
@@ -104,6 +103,7 @@ test.describe.serial("Forge Live Vision — continuous stream + real browser inp
     const clickDraw=await request.post("/api/vision/action",{data:{action:{type:"mouse.click",x:drawOpen.x+drawOpen.width/2,y:drawOpen.y+drawOpen.height/2}}});
     expect((await clickDraw.json()).result.action.dispatched).toBeTruthy();
 
+    await expect.poll(async()=>((await (await request.get("/api/vision/elements")).json()).elements.some(e=>e.selector==="#drawCanvas"&&e.visible)),{timeout:5000}).toBeTruthy();
     const drawingEls=(await (await request.get("/api/vision/elements")).json()).elements;
     const canvas=drawingEls.find(e=>e.selector==="#drawCanvas"&&e.visible);
     const add=drawingEls.find(e=>e.selector==="#drawAddToScene"&&e.visible);
