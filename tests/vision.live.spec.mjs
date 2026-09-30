@@ -188,6 +188,13 @@ test.describe.serial("Forge Live Vision — continuous stream + real browser inp
     }}}); 
     const controlsState=JSON.parse((await controls.json()).result.action.value);
     expect(controlsState.visible).toBeFalsy();
+    const editorChrome=await request.post("/api/vision/action",{data:{action:{
+      type:"evaluate",
+      expression:"JSON.stringify({floatingTools:!!document.querySelector('.forge-prod'),editorButton:!!document.querySelector('#openEditors')})"
+    }}});
+    const editorChromeState=JSON.parse((await editorChrome.json()).result.action.value);
+    expect(editorChromeState.floatingTools).toBeFalsy();
+    expect(editorChromeState.editorButton).toBeTruthy();
 
     const input=await request.post("/api/vision/action",{data:{action:{
       type:"file.setInputFiles",selector:"#assetInput",paths:["vision-proof/Fox.glb"]

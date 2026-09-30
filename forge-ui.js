@@ -259,7 +259,7 @@ $("draw2dOpen")?.addEventListener("click",()=>{
   if(d&&!d.open)try{d.showModal()}catch{d.setAttribute("open","")}
 });
 $("importAssets").onclick=()=>$("assetInput").click();$("assetInput").onchange=e=>loadFiles([...e.target.files]);
-async async function fileDataUri(file){
+async function fileDataUri(file){
   const bytes=new Uint8Array(await file.arrayBuffer());
   let binary="";
   const chunk=0x8000;

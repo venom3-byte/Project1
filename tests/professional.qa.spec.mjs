@@ -78,6 +78,20 @@ test.describe("Forge professional acceptance",()=>{
     await page.screenshot({path:"test-results/pro-startup-desktop.png",fullPage:true});
   });
 
+  test("editor chrome stays docked and advanced tools do not float over the viewport",async({page})=>{
+    await waitForForge(page);
+    await expect(page.locator(".forge-prod")).toHaveCount(0);
+    await expect(page.locator("#openEditors")).toBeVisible();
+    await page.click("#openEditors");
+    await expect(page.locator(".forge-modal")).toBeVisible();
+    await expect(page.locator('[data-editor-tool="Asset Lab"]')).toBeVisible();
+    await expect(page.locator('[data-editor-tool="Material Lab"]')).toBeVisible();
+    await expect(page.locator('[data-editor-tool="Animation Graph + Rig"]')).toBeVisible();
+    await page.locator(".forge-modal [data-x]").click();
+    await expect(page.locator(".forge-modal")).toHaveCount(0);
+    await expect(page.locator("#forgeMobileControls")).toHaveCount(0);
+  });
+
   test("desktop editor layout follows professional viewport/hierarchy/inspector separation",async({page})=>{
     await waitForForge(page);
     const layout=await page.evaluate(()=>({
