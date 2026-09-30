@@ -16,6 +16,14 @@ function rayTriangle(ro,rd,a,b,c){
   const v=q.cross(e1).dot(rd)*inv;if(v<0||u+v>1)return null;const t=e2.dot(q.cross(e1))*inv;return t>=0?t:null
 }
 
+
+const IMAGE_EXT_RE=/\.(png|jpe?g|webp|avif|gif|bmp|tga|tif|tiff)$/i;
+const AUDIO_EXT_RE=/\.(wav|mp3|ogg|m4a|aac|flac|webm)$/i;
+const MODEL_DIRECT_RE=/\.(glb|gltf)$/i;
+const MODEL_CONVERT_RE=/\.(fbx|obj|dae|3ds|stl|ply|off|3mf|dxf|ase|b3d|lwo|lxo|m3d|md2|md3|md5mesh|ms3d|smd|vta|x|x3d)$/i;
+const SOURCE_ONLY_EXT_RE=/\.(ttf|ttc|otf|wasm|json|xml|csv|txt|css|js|mjs|glsl|vert|frag|shader|zip|rar|7z|pdf|blend|usd|usda|usdc|usdz)$/i;
+const extOf=file=>String(file?.name||"").toLowerCase().match(/\.([^.]+)$/)?.[1]||"";
+const isModelFile=file=>MODEL_DIRECT_RE.test(String(file?.name||""))||MODEL_CONVERT_RE.test(String(file?.name||""));
 export class ForgeEngine{
   constructor(canvas,log=()=>{}){
     this.canvas=canvas;this.log=log;this.app=null;this.root=null;this.entities=new Map();this.selectedId=null;this.assets=new Map();
