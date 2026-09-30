@@ -197,7 +197,9 @@ function updateAssetPanel(){
       const bytes=Number(entry?.file?.size||0);
       const mime=entry?.file?.type||"application/octet-stream";
       const dims=a.width&&a.height?(" · "+a.width+"×"+a.height+"px"):"";
-      meta.textContent="SOURCE · "+a.name+" · "+bytes.toLocaleString()+" bytes · "+mime+dims;
+      const license=a.license?(" · "+a.license):"";
+      const source=a.remoteSource?(" · REMOTE SOURCE"):(" · LOCAL SOURCE");
+      meta.textContent="SOURCE · "+a.name+" · "+bytes.toLocaleString()+" bytes · "+mime+dims+license+source;
     }
   }
 }
