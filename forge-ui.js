@@ -300,7 +300,16 @@ async function loadFiles(files){
       write("glTF package import failed; source files remain in Content Browser: "+e.message,"error");
     }
   }
+  const legacyModels=list.filter(f=>/\.(fbx|obj|dae|3ds)$/i.test(f.name));
+  const legacyDependencyNames=new Set(list.filter(f=>/\.(mtl|tga|dds)$/i.test(f.name)).map(f=>f.name));
+  for(const f of legacyModels){
+    try{await engine.importFile(f,{files:list});write("Imported and converted "+f.name+" to an internal GLB representation")}
+    catch(e){write("Legacy 3D conversion failed "+f.name+": "+e.message,"error")}
+  }
   for(const f of list){
+    if(gltf&&f===gltf)continue;
+    if(legacyModels.includes(f))continue;
+    if(legacyDependencyNames.has(f.name))continue;
     if(gltf&&f===gltf)continue;
     try{
       const r=await engine.importFile(f);
