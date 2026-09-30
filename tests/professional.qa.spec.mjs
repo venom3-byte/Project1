@@ -316,8 +316,8 @@ test.describe("Forge professional acceptance",()=>{
   test("universal source fallback preserves arbitrary non-renderable files in the asset vault",async({page})=>{
     await waitForForge(page);
     const source=Buffer.from("Forge arbitrary source asset\nversion=1\n","utf8");
-    await importViaInput(page,source,"forge-proof.custom","application/octet-stream");
-    const result=await page.evaluate(()=>{const e=window.Forge.assets.get("forge-proof.custom");return{entry:!!e,sourceOnly:e?.sourceOnly===true,bytes:e?.file?.size||0,extension:e?.extension||"",hash:e?.sourceSha256||""}});
+    await page.locator("#assetInput").setInputFiles({name:"forge-proof.custom",mimeType:"application/octet-stream",buffer:source});
+    await page.waitForFunction(()=>window.Forge?.assets?.get?.("forge-proof.custom")?.sourceOnly===true,{timeout:30000});
     expect(result.entry).toBeTruthy();
     expect(result.sourceOnly).toBeTruthy();
     expect(result.bytes).toBe(source.length);
