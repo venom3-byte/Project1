@@ -117,12 +117,12 @@ export class ForgeEngine{
     const url=URL.createObjectURL(file);if(file.name.toLowerCase().endsWith('.forge.json'))return{type:'project',data:JSON.parse(await file.text())};
     let analysis=null;try{analysis=await window.ForgeProduction?.assets?.analyze?.(file)}catch{}
     if(/^audio\//.test(file.type) || /\.(wav|mp3|ogg|m4a|aac|flac|webm)$/i.test(file.name)){
-      const asset=new pc.Asset(file.name,'audio',{url});
-      this.app.assets.add(asset);
+      let asset=null;
       await new Promise((resolve,reject)=>{
-        asset.once('error',reject);
-        asset.once('load',()=>resolve());
-        this.app.assets.load(asset);
+        this.app.assets.loadFromUrlAndFilename(url,file.name,'audio',(err,loaded)=>{
+          if(err){reject(err);return}
+          asset=loaded;resolve();
+        });
       });
       const r=this.add('audio',file.name);
       r.entity.addComponent('sound',{positional:true,volume:1});
