@@ -246,6 +246,10 @@ $("duplicate").onclick=()=>{if(engine.duplicate()){refresh();inspect()}};$("undo
 $("delete").onclick=()=>{engine.delete();refresh();inspect()};$("focus").onclick=()=>engine.focus();$("frame").onclick=()=>engine.frame();$("reset")?.addEventListener("click",()=>location.reload());
 $("play").onclick=()=>{$("play").textContent=engine.running?"❚❚ Play":"▶ Play";engine.running=!engine.running;engine.timelinePlaying=engine.running};$("timelinePlay").onclick=()=>$("play").click();
 $("rewind").onclick=()=>{engine.timelineTime=0;$("time").value=0;engine.evalAnimation(0);inspect()};$("time").oninput=e=>{engine.timelineTime=+e.target.value||0;engine.evalAnimation(engine.timelineTime);$("playhead").style.left=(engine.timelineTime*60)+"px";inspect()};$("key").onclick=()=>{engine.key();toast("Keyframe added")};
+$("draw2dOpen")?.addEventListener("click",()=>{
+  const d=$("draw2dDialog");
+  if(d&&!d.open)try{d.showModal()}catch{d.setAttribute("open","")}
+});
 $("importAssets").onclick=()=>$("assetInput").click();$("assetInput").onchange=e=>loadFiles([...e.target.files]);
 async function loadFiles(files){for(const f of files)try{await window.ForgeProduction?.assets?.storeFile?.(f);const r=await engine.importFile(f);if(r.type==="project")await engine.load(r.data);write("Imported "+f.name)}catch(e){write("Import failed "+f.name+": "+e.message,"error")}refresh();inspect()}
 document.addEventListener("dragover",e=>{e.preventDefault();$("dropOverlay").classList.remove("hidden")});document.addEventListener("drop",e=>{e.preventDefault();$("dropOverlay").classList.add("hidden");if(e.dataTransfer?.files?.length)loadFiles([...e.dataTransfer.files])});

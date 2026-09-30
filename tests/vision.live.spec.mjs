@@ -101,6 +101,11 @@ test.describe.serial("Forge Live Vision — continuous stream + real browser inp
     const drawOpen=openElements.find(e=>e.selector==="#draw2dOpen"&&e.visible);
     expect(drawOpen).toBeTruthy();
     const clickDraw=await request.post("/api/vision/action",{data:{action:{type:"mouse.click",x:drawOpen.x+drawOpen.width/2,y:drawOpen.y+drawOpen.height/2}}});
+    const drawStatus=await request.post("/api/vision/action",{data:{action:{type:"evaluate",expression:"JSON.stringify({api:!!window.ForgeDraw2D,ready:window.ForgeDraw2D?.status?.().ready||false,open:document.querySelector('#draw2dDialog')?.open||false})"}}});
+    const drawStatusBody=await drawStatus.json();
+    expect(JSON.parse(drawStatusBody.result.value).api).toBeTruthy();
+    expect(JSON.parse(drawStatusBody.result.value).ready).toBeTruthy();
+    expect(JSON.parse(drawStatusBody.result.value).open).toBeTruthy();
     expect((await clickDraw.json()).result.action.dispatched).toBeTruthy();
 
     await expect.poll(async()=>((await (await request.get("/api/vision/elements")).json()).elements.some(e=>e.selector==="#drawCanvas"&&e.visible)),{timeout:5000}).toBeTruthy();
