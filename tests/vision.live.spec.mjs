@@ -221,7 +221,14 @@ test.describe.serial("Forge Live Vision — continuous stream + real browser inp
     expect(importedState.preview?.textured).toBeGreaterThan(0);
     expect(importedState.entities).toBeGreaterThanOrEqual(4);
 
-    const frame=(await (await request.get("/api/vision/elements")).json()).elements.find(e=>e.selector==="#frame"&&e.visible);
+    const materialDiag=await request.post("/api/vision/action",{data:{action:{
+      type:"evaluate",
+      expression:"JSON.stringify((()=>{const r=window.Forge?.selected?.();const root=r?.entity;let out=[];if(root)root.forEach?.(n=>{for(const mi of n?.render?.meshInstances||[]){const m=mi.material,map=m?.diffuseMap,src=map?.getSource?.();const els=mi?.mesh?.vertexBuffer?.getFormat?.()?.elements||[];out.push({diffuse:m?.diffuse?[m.diffuse.r,m.diffuse.g,m.diffuse.b]:null,useLighting:m?.useLighting,diffuseMap:!!map,textureSize:map?[map.width,map.height]:null,textureSource:!!src,meshSemantics:els.map(e=>e.semantic)})}});return out})())"
+    }}}); 
+    const materialDiagBody=await materialDiag.json();
+    const materialDiagValue=JSON.parse(materialDiagBody.result.action.value);
+    expect(materialDiagValue.length).toBeGreaterThan(0);
+    require("node:fs").writeFileSync("vision-proof/vision-model-material.json",JSON.stringify(materialDiagValue,null,2));    const frame=(await (await request.get("/api/vision/elements")).json()).elements.find(e=>e.selector==="#frame"&&e.visible);
     expect(frame).toBeTruthy();
     const frameClick=await request.post("/api/vision/action",{data:{action:{
       type:"mouse.click",x:frame.x+frame.width/2,y:frame.y+frame.height/2
