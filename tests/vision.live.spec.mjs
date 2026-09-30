@@ -134,7 +134,7 @@ test.describe.serial("Forge Live Vision — real continuous vision + input",()=>
     expect(er.ok).toBeTruthy();
     expect(er.action.dispatched).toBeTruthy();
 
-    const tap=await request.post("/api/vision/action",{data:{action:{type:"touch.tap",x:bx,y:by}}});
+    const tap=await request.post("/api/vision/action",{data:{action:{type:"touch.tapSelector",selector:'[data-add="box"]'}}});
     const tr=await tap.json();
     expect(tr.ok).toBeTruthy();
     expect(tr.action.dispatched).toBeTruthy();
