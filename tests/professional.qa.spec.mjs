@@ -189,9 +189,10 @@ test.describe("Forge professional acceptance",()=>{
         check,
         sourceSha:await window.ForgeExport.sha256(source.blob),
         previewSha:await window.ForgeExport.sha256(preview.blob),
-        sourceBytes:bytesLength,
+        sourceBytes:source.blob.size,
         exportedBytes:source.blob.size,
         previewBytes:preview.blob.size,
+        sourceBytes:source.blob.size,
         info
       };
     },bytesLength);
@@ -231,7 +232,7 @@ test.describe("Forge professional acceptance",()=>{
         clips:imported.record.components.animation?.clips||[],
         playing:!!imported.record.entity.anim?.playing,
         check,
-        sourceBytes:bytesLength,
+        sourceBytes:source.blob.size,
         exportedBytes:source.blob.size,
         sourceSha:await window.ForgeExport.sha256(source.blob),
         originalSha,
