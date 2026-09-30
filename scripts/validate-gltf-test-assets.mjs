@@ -3,7 +3,7 @@ import{join,relative,resolve}from"node:path";
 import * as ValidatorNS from"gltf-validator";
 
 const validator=ValidatorNS.default||ValidatorNS;
-const root=resolve("test-results");
+const roots=[resolve("scripts/fixtures"),resolve("test-results")];
 const reportPath="gltf-validation-report.json";
 
 async function walk(dir){
@@ -18,7 +18,7 @@ async function walk(dir){
   return out;
 }
 
-const files=await walk(root);
+const files=[...new Set((await Promise.all(roots.map(walk))).flat())];
 const results=[];
 for(const file of files){
   try{

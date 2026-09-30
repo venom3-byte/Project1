@@ -30,3 +30,22 @@ dialog{border:1px solid #2b4d6e;background:#091523;color:var(--txt);border-radiu
 
 .forge-boot{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:radial-gradient(circle at 50% 42%,#132b45,#06101d 62%,#02050a);transition:opacity .25s ease,visibility .25s ease}.forge-boot.hidden{opacity:0;visibility:hidden;pointer-events:none}.forge-boot-card{width:min(420px,88vw);padding:24px;border:1px solid #24425f;border-radius:16px;background:#081523ee;box-shadow:0 18px 70px #0008;display:grid;gap:8px;text-align:center}.forge-boot-mark{width:52px;height:52px;margin:0 auto 2px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,#4dd7ff,#756cff);color:#00101b;font-weight:900;font-size:24px}.forge-boot-card strong{font-size:17px;letter-spacing:1px}.forge-boot-card span{color:#c9ddf1;line-height:1.5}.forge-boot-card small{color:#6f8aa2;font-size:10px}
 .editor-grid{position:absolute;inset:0;pointer-events:none;z-index:2;background-image:linear-gradient(rgba(100,160,210,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(100,160,210,.07) 1px,transparent 1px);background-size:32px 32px;mask-image:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.8) 22%,rgba(0,0,0,.9) 100%);}.editor-grid:after{content:"";position:absolute;left:50%;top:50%;width:1px;height:100%;background:rgba(120,210,255,.12);box-shadow:0 0 0 1px rgba(120,210,255,.02)}.editor-grid:before{content:"";position:absolute;left:0;top:50%;height:1px;width:100%;background:rgba(255,120,120,.10)}.inspector{min-height:150px}
+.draw-card{background:linear-gradient(180deg,#0c1c2f,#0a1726)}
+.draw-dialog{width:min(920px,96vw);max-height:94vh}
+.draw-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px;border-bottom:1px solid var(--line);background:#071321}
+.draw-tools label{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:10px}
+.draw-tools input[type=range]{width:180px}
+.draw-tools input[type=color]{width:44px;height:30px;padding:2px}
+.draw-tools button.active{background:#3a1f2b;border-color:#7a4b5b;color:#ffe3eb}
+.draw-canvas-wrap{padding:14px;background:#030811;display:grid;place-items:center}
+#drawCanvas{width:min(100%,768px);height:auto;aspect-ratio:3/2;background:
+  linear-gradient(45deg,#0e1c2a 25%,transparent 25%,transparent 75%,#0e1c2a 75%),
+  linear-gradient(45deg,#0e1c2a 25%,transparent 25%,transparent 75%,#0e1c2a 75%);
+  background-size:28px 28px;background-position:0 0,14px 14px;
+  border:1px solid #294760;border-radius:10px;box-shadow:0 16px 50px #0006;touch-action:none;cursor:crosshair}
+.draw-status{padding:7px 10px;color:#8bb2d5;background:#06101b;border-top:1px solid var(--line);font:10px ui-monospace,SFMono-Regular,monospace}
+@media(max-width:800px){
+  .draw-dialog{width:96vw}
+  .draw-tools input[type=range]{width:130px}
+  #drawCanvas{width:100%}
+}

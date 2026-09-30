@@ -139,7 +139,7 @@ if(!window.ForgeGizmo){
   };
 }
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-function icon(k){return({box:"▣",sphere:"●",cylinder:"⬢",capsule:"◉",plane:"▱",camera:"◫",light:"☼",model:"◇",empty:"＋"})[k]||"•"}
+function icon(k){return({box:"▣",sphere:"●",cylinder:"⬢",capsule:"◉",plane:"▱",camera:"◫",light:"☼",model:"◇",audio:"♫",empty:"＋"})[k]||"•"}
 function matchesFilter(r){const q=String($("treeFilter")?.value||"").trim().toLowerCase();return !q||r.name.toLowerCase().includes(q)||r.kind.toLowerCase().includes(q)}
 function refresh(){
   const tree=$("tree");tree.innerHTML="";
@@ -182,7 +182,13 @@ function updateAssetPanel(){
   if(!label||!type)return;
   const a=r?.components?.asset;
   label.textContent=r?.name||"No asset selected";
-  type.textContent=a?.type?(a.type==="model"?"3D GLB":a.type==="image"?"2D Image":a.type.toUpperCase()):"Scene object";
+  type.textContent=a?.type?(a.type==="model"?"3D GLB":a.type==="image"?"2D Image":a.type==="audio"?"AUDIO":"FILE"):"Scene object";
+  const play=$("assetPlay");
+  if(play){
+    const isAudio=a?.type==="audio"&&!!r?.entity?.sound?.slot?.("main");
+    play.disabled=!isAudio;
+    play.textContent=isAudio?(r.entity.sound.slot("main").isPlaying?"■ Stop Audio":"▶ Play Audio"):"▶ Play Audio";
+  }
   if(meta){
     if(!a){
       meta.textContent="Select an imported asset to inspect source metadata.";
@@ -203,7 +209,7 @@ function updateAssetBrowser(){
   if(!records.length){const e=document.createElement("div");e.className="asset-empty";e.textContent="No imported assets";list.append(e);return}
   for(const r of records){
     const row=document.createElement("button");row.className="asset-row"+(r.id===engine.selectedId?" active":"");
-    const t=r.components.asset.type==="model"?"3D":r.components.asset.type==="image"?"2D":"FILE";
+    const t=r.components.asset.type==="model"?"3D":r.components.asset.type==="image"?"2D":r.components.asset.type==="audio"?"AUD":"FILE";
     const visual=document.createElement("span");visual.className="asset-visual";
     const entry=engine.assets?.get?.(r.components.asset.name);
     if(r.components.asset.type==="image"&&entry?.file){
@@ -246,6 +252,10 @@ $("duplicate").onclick=()=>{if(engine.duplicate()){refresh();inspect()}};$("undo
 $("delete").onclick=()=>{engine.delete();refresh();inspect()};$("focus").onclick=()=>engine.focus();$("frame").onclick=()=>engine.frame();$("reset")?.addEventListener("click",()=>location.reload());
 $("play").onclick=()=>{$("play").textContent=engine.running?"❚❚ Play":"▶ Play";engine.running=!engine.running;engine.timelinePlaying=engine.running};$("timelinePlay").onclick=()=>$("play").click();
 $("rewind").onclick=()=>{engine.timelineTime=0;$("time").value=0;engine.evalAnimation(0);inspect()};$("time").oninput=e=>{engine.timelineTime=+e.target.value||0;engine.evalAnimation(engine.timelineTime);$("playhead").style.left=(engine.timelineTime*60)+"px";inspect()};$("key").onclick=()=>{engine.key();toast("Keyframe added")};
+$("draw2dOpen")?.addEventListener("click",()=>{
+  const d=$("draw2dDialog");
+  if(d&&!d.open)try{d.showModal()}catch{d.setAttribute("open","")}
+});
 $("importAssets").onclick=()=>$("assetInput").click();$("assetInput").onchange=e=>loadFiles([...e.target.files]);
 async function loadFiles(files){for(const f of files)try{await window.ForgeProduction?.assets?.storeFile?.(f);const r=await engine.importFile(f);if(r.type==="project")await engine.load(r.data);write("Imported "+f.name)}catch(e){write("Import failed "+f.name+": "+e.message,"error")}refresh();inspect()}
 document.addEventListener("dragover",e=>{e.preventDefault();$("dropOverlay").classList.remove("hidden")});document.addEventListener("drop",e=>{e.preventDefault();$("dropOverlay").classList.add("hidden");if(e.dataTransfer?.files?.length)loadFiles([...e.dataTransfer.files])});
@@ -258,6 +268,14 @@ $("exportPreview")?.addEventListener("click",()=>assetAction(()=>window.ForgeExp
 $("exportManifest")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.exportManifest(),"Asset manifest"));
 $("validateAsset")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.validateSelected(),"Asset validation"));
 $("assetQA")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.runExportQA(),"Export round-trip QA"));
+$("assetPlay")?.addEventListener("click",()=>{
+  const r=engine.selected(),slot=r?.entity?.sound?.slot?.("main");
+  if(!slot)return;
+  try{
+    if(slot.isPlaying)slot.stop();else slot.play();
+    updateAssetPanel();
+  }catch(e){write("Audio playback failed: "+e.message,"error")}
+});
 $("treeFilter")?.addEventListener("input",refresh);
 $("assetSearch")?.addEventListener("input",updateAssetBrowser);
 $("quickFocus")?.addEventListener("click",()=>engine.focus());

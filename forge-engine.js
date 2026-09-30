@@ -36,7 +36,7 @@ export class ForgeEngine{
   material(color=[.22,.62,.9]){const m=new pc.StandardMaterial();m.diffuse=new pc.Color(...color);m.emissive=new pc.Color(...color);m.emissiveIntensity=2;m.metalness=.0;m.gloss=.5;m.useMetalness=false;m.useLighting=false;m.useTonemap=false;m.specular=new pc.Color(0,0,0);m.update();return m}
   primitive(kind,name){const r=this.add(kind,name||kind+'-'+(this.entities.size+1)),type=kind==='sphere'?'sphere':kind==='cylinder'?'cylinder':kind==='capsule'?'capsule':kind==='plane'?'plane':'box';r.entity.addComponent('render',{type});r.entity.render.layers=[pc.LAYERID_WORLD];r.entity.render.frustumCulling=false;r.entity.render.enabled=true;r.entity.render.material=this.material(kind==='plane'?[.08,.15,.2]:[.22,.62,.9]);if(kind!=='plane')r.entity.setLocalPosition((Math.random()-.5)*4,1+(Math.random()*1.7),(Math.random()-.5)*4);r.components.geometry={sourceUnits:'meters'};return r}
   createPlane(name,w=30,d=30){const r=this.primitive('plane',name);r.entity.setLocalScale(w,1,d);r.entity.setLocalPosition(0,0,0);if(name==='Ground')r.entity.render.layers=[];this.setPhysics(r.id,'fixed','box');return r}
-  createCamera(name,pos){const r=this.add('camera',name);r.entity.addComponent('camera',{clearColor:new pc.Color(.035,.07,.12),clearColorBuffer:true,clearDepthBuffer:true,fov:60,nearClip:.01,farClip:10000,enabled:true,layers:[pc.LAYERID_WORLD]});r.entity.setLocalPosition(pos.x,pos.y,pos.z);r.entity.lookAt(0,1,0);r.components.camera={active:true};r.entity.camera.enabled=true;return r}
+  createCamera(name,pos){const r=this.add('camera',name);r.entity.addComponent('camera',{clearColor:new pc.Color(.035,.07,.12),clearColorBuffer:true,clearDepthBuffer:true,fov:60,nearClip:.01,farClip:10000,enabled:true,layers:[pc.LAYERID_WORLD]});r.entity.addComponent('audiolistener');r.entity.setLocalPosition(pos.x,pos.y,pos.z);r.entity.lookAt(0,1,0);r.components.camera={active:true};r.entity.camera.enabled=true;return r}
   createLight(name){const r=this.add('light',name);r.entity.addComponent('light',{type:'directional',color:new pc.Color(1,.96,.88),intensity:2.5,castShadows:true,shadowDistance:80,enabled:true,layers:[pc.LAYERID_WORLD]});r.entity.setEulerAngles(48,-32,0);r.components.light={type:'directional'};return r}
   camera(){return[...this.entities.values()].find(r=>r.kind==='camera'&&r.components.camera?.active)?.entity}
   selected(){return this.selectedId?this.entities.get(this.selectedId):null}
@@ -116,6 +116,24 @@ export class ForgeEngine{
   async importFile(file){
     const url=URL.createObjectURL(file);if(file.name.toLowerCase().endsWith('.forge.json'))return{type:'project',data:JSON.parse(await file.text())};
     let analysis=null;try{analysis=await window.ForgeProduction?.assets?.analyze?.(file)}catch{}
+    if(/^audio\//.test(file.type) || /\.(wav|mp3|ogg|m4a|aac|flac|webm)$/i.test(file.name)){
+      let asset=null;
+      await new Promise((resolve,reject)=>{
+        this.app.assets.loadFromUrlAndFilename(url,file.name,'audio',(err,loaded)=>{
+          if(err){reject(err);return}
+          asset=loaded;resolve();
+        });
+      });
+      const r=this.add('audio',file.name);
+      r.entity.addComponent('sound',{positional:true,volume:1});
+      r.entity.sound.addSlot('main',{asset:asset.id,autoPlay:false,loop:false,overlap:false,volume:1,pitch:1});
+      r.components.asset={type:'audio',name:file.name,analysis,derivedDirty:false};
+      this.assets.set(file.name,{type:'audio',file,url,resource:asset.resource,asset});
+      this.select(r.id);
+      window.dispatchEvent(new Event('forge-assets-changed'));
+      window.ForgeRefreshUI?.();
+      return{type:'audio',record:r,asset};
+    }
     if(/^image\//.test(file.type)){const bmp=await createImageBitmap(file),c=document.createElement('canvas');c.width=bmp.width;c.height=bmp.height;c.getContext('2d').drawImage(bmp,0,0);const tex=new pc.Texture(this.app.graphicsDevice,{width:bmp.width,height:bmp.height,format:pc.PIXELFORMAT_R8_G8_B8_A8});tex.setSource(c);const mat=this.material([1,1,1]);mat.diffuseMap=tex;mat.emissiveMap=tex;mat.emissive=new pc.Color(1,1,1);mat.update();const r=this.primitive('plane',file.name);r.entity.render.material=mat;r.components.asset={type:'image',name:file.name,width:bmp.width,height:bmp.height,analysis,derivedDirty:false};this.assets.set(file.name,{type:'image',file,url});this.select(r.id);window.dispatchEvent(new Event('forge-assets-changed'));window.ForgeRefreshUI?.();return{type:'image',record:r}}
     if(/\.(glb|gltf)$/i.test(file.name))return new Promise(async(resolve,reject)=>{
       if(/\.gltf$/i.test(file.name)){try{const json=JSON.parse(await file.text()),external=[...(json.buffers||[]),...(json.images||[])].some(x=>x?.uri&&!String(x.uri).startsWith('data:'));if(external)throw new Error('This .gltf references external files. Use a packaged .glb so Forge can preserve the asset without path breakage')}catch(e){reject(e);return}}
@@ -156,7 +174,22 @@ export class ForgeEngine{
       if(d.script)this.scripts.set(r.id,d.script);
 
       const asset=d.components?.asset;
-      if(asset?.name&&assetRoot&&asset.type==='model'){
+      if(asset?.name&&assetRoot&&asset.type==='audio'){
+        const a=new pc.Asset(asset.name,'audio',{url:assetRoot+'assets/'+encodeURIComponent(asset.name)});
+        this.app.assets.add(a);
+        await new Promise((resolve,reject)=>{
+          a.once('error',reject);
+          a.once('load',()=>{
+            try{
+              if(!r.entity.sound)r.entity.addComponent('sound',{positional:true,volume:1});
+              if(!r.entity.sound.slot('main'))r.entity.sound.addSlot('main',{asset:a.id,autoPlay:false,loop:false,overlap:false,volume:1,pitch:1});
+              this.assets.set(asset.name,{type:'audio',file:null,url:a.getFileUrl?.()||assetRoot+'assets/'+encodeURIComponent(asset.name),resource:a.resource,asset:a});
+              resolve();
+            }catch(err){reject(err)}
+          });
+          this.app.assets.load(a);
+        });
+      } else if(asset?.name&&assetRoot&&asset.type==='model'){
         const a=new pc.Asset(asset.name,'container',{url:assetRoot+'assets/'+encodeURIComponent(asset.name)});
         this.app.assets.add(a);
         await new Promise((resolve,reject)=>{
