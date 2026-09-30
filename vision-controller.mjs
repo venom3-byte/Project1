@@ -24,6 +24,9 @@ export class VisionController{
     this.startedAt=0;
     this.lastFrameAt=0;
     this.viewport={width:1280,height:720,dpr:1};
+    this.lastPoint={x:0,y:0};
+    this.buttonsDown=new Set();
+    this.keysDown=new Set();
   }
 
   endpoint(){
@@ -85,6 +88,7 @@ export class VisionController{
   }
 
   async disconnect(){
+    try{await this.releaseAll()}catch{}
     try{await this.stopStream()}catch{}
     try{this.socket?.close()}catch{}
     this.#reset("manual");
@@ -107,6 +111,14 @@ export class VisionController{
     };
   }
 
+  async releaseAll(){
+    if(!this.connected)return{ok:true,buttons:0,keys:0};
+    for(const button of [...this.buttonsDown]){try{await this.command('Input.dispatchMouseEvent',{type:'mouseReleased',x:this.lastPoint.x,y:this.lastPoint.y,button,buttons:0,clickCount:1})}catch{}this.buttonsDown.delete(button)}
+    for(const key of [...this.keysDown]){try{await this.command('Input.dispatchKeyEvent',{type:'keyUp',key})}catch{}this.keysDown.delete(key)}
+    try{await this.command('Emulation.setTouchEmulationEnabled',{enabled:false})}catch{}
+    return{ok:true,buttons:this.buttonsDown.size,keys:this.keysDown.size};
+  }
+
   async control(action={}){
     if(!this.connected)await this.connect({});
     const a=action||{};
@@ -121,13 +133,17 @@ export class VisionController{
     switch(String(a.type||"")){
       case "move":{
         const p=point(a.x,a.y,a.screenWidth,a.screenHeight);
+        this.lastPoint=p;
         await this.command("Input.dispatchMouseEvent",{type:"mouseMoved",x:p.x,y:p.y,button:"none",buttons:Number(a.buttons)||0});
         return {ok:true,type:a.type,point:p};
       }
       case "mouseDown":
       case "mouseUp":{
         const p=point(a.x,a.y,a.screenWidth,a.screenHeight);
-        await this.command("Input.dispatchMouseEvent",{type:a.type==="mouseDown"?"mousePressed":"mouseReleased",x:p.x,y:p.y,button:a.button||"left",buttons:a.type==="mouseDown"?1:0,clickCount:Number(a.clickCount)||1});
+        this.lastPoint=p;
+        const button=a.button||"left";
+        await this.command("Input.dispatchMouseEvent",{type:a.type==="mouseDown"?"mousePressed":"mouseReleased",x:p.x,y:p.y,button,buttons:a.type==="mouseDown"?1:0,clickCount:Number(a.clickCount)||1});
+        if(a.type==='mouseDown')this.buttonsDown.add(button);else this.buttonsDown.delete(button);
         return {ok:true,type:a.type,point:p};
       }
       case "click":
@@ -146,14 +162,22 @@ export class VisionController{
         const from=point(a.x,a.y,a.screenWidth,a.screenHeight);
         const to=point(a.toX,a.toY,a.screenWidth,a.screenHeight);
         const steps=Math.max(2,Math.min(60,Number(a.steps)||12));
+        const button=a.button||"left";
+        this.lastPoint=from;
         await this.command("Input.dispatchMouseEvent",{type:"mouseMoved",x:from.x,y:from.y,button:"none"});
-        await this.command("Input.dispatchMouseEvent",{type:"mousePressed",x:from.x,y:from.y,button:a.button||"left",buttons:1,clickCount:1});
-        for(let i=1;i<=steps;i++){
-          const t=i/steps,x=from.x+(to.x-from.x)*t,y=from.y+(to.y-from.y)*t;
-          await this.command("Input.dispatchMouseEvent",{type:"mouseMoved",x,y,button:a.button||"left",buttons:1});
-          await sleep(Math.max(1,Number(a.stepMs)||8));
+        await this.command("Input.dispatchMouseEvent",{type:"mousePressed",x:from.x,y:from.y,button,buttons:1,clickCount:1});
+        this.buttonsDown.add(button);
+        try{
+          for(let i=1;i<=steps;i++){
+            const t=i/steps,x=from.x+(to.x-from.x)*t,y=from.y+(to.y-from.y)*t;
+            this.lastPoint={x,y};
+            await this.command("Input.dispatchMouseEvent",{type:"mouseMoved",x,y,button,buttons:1});
+            await sleep(Math.max(1,Number(a.stepMs)||8));
+          }
+        }finally{
+          this.lastPoint=to;
+          try{await this.command("Input.dispatchMouseEvent",{type:"mouseReleased",x:to.x,y:to.y,button,buttons:0,clickCount:1})}finally{this.buttonsDown.delete(button)}
         }
-        await this.command("Input.dispatchMouseEvent",{type:"mouseReleased",x:to.x,y:to.y,button:a.button||"left",buttons:0,clickCount:1});
         return {ok:true,type:a.type,from,to,steps};
       }
       case "wheel":{
@@ -162,11 +186,15 @@ export class VisionController{
         return {ok:true,type:a.type,point:p};
       }
       case "keyDown":{
-        await this.command("Input.dispatchKeyEvent",{type:"keyDown",key:String(a.key||""),code:a.code||undefined,text:a.text||undefined,unmodifiedText:a.text||undefined,modifiers:Number(a.modifiers)||0});
+        const key=String(a.key||"");
+        await this.command("Input.dispatchKeyEvent",{type:"keyDown",key,code:a.code||undefined,text:a.text||undefined,unmodifiedText:a.text||undefined,modifiers:Number(a.modifiers)||0});
+        this.keysDown.add(key);
         return {ok:true,type:a.type,key:a.key};
       }
       case "keyUp":{
-        await this.command("Input.dispatchKeyEvent",{type:"keyUp",key:String(a.key||""),code:a.code||undefined,modifiers:Number(a.modifiers)||0});
+        const key=String(a.key||"");
+        await this.command("Input.dispatchKeyEvent",{type:"keyUp",key,code:a.code||undefined,modifiers:Number(a.modifiers)||0});
+        this.keysDown.delete(key);
         return {ok:true,type:a.type,key:a.key};
       }
       case "press":{
@@ -188,6 +216,7 @@ export class VisionController{
         await this.command("Input.dispatchTouchEvent",{type:eventType,touchPoints,modifiers:Number(a.modifiers)||0});
         return {ok:true,type:a.type,point:p};
       }
+      case "releaseAll":return this.releaseAll();
       case "navigate":{await this.command("Page.navigate",{url:String(a.url||"")});return {ok:true,type:a.type,url:String(a.url||"")};}
       case "evaluate":{
         const expression=String(a.expression||"");
