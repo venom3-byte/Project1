@@ -258,31 +258,43 @@ $("draw2dOpen")?.addEventListener("click",()=>{
   const d=$("draw2dDialog");
   if(d&&!d.open)try{d.showModal()}catch{d.setAttribute("open","")}
 });
-const REALISTIC_CAR_URL="https://raw.githubusercontent.com/M-ZohaibAli/Velocity/main/public/models/CAR%20Model.glb";
+const REALISTIC_CAR_URL="https://sceneview.github.io/models/platforms/CarConcept.glb";
 async function importRealisticCar(){
   const button=$("importRealCar");
   const previous=button?.textContent;
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),45000);
   try{
-    if(button){button.disabled=true;button.textContent="🚘 Loading high-quality car…"}
-    const response=await fetch(REALISTIC_CAR_URL,{mode:"cors",cache:"no-store"});
-    if(!response.ok)throw new Error("Realistic car download failed: HTTP "+response.status);
+    if(button){button.disabled=true;button.textContent="🚘 Loading high-fidelity car…"}
+    const response=await fetch(REALISTIC_CAR_URL,{mode:"cors",cache:"no-store",signal:controller.signal});
+    if(!response.ok)throw new Error("High-fidelity car download failed: HTTP "+response.status);
     const blob=await response.blob();
-    const file=new File([blob],"Forge-Realistic-Supercar.glb",{type:"model/gltf-binary"});
+    if(blob.size<5_000_000)throw new Error("High-fidelity car asset is unexpectedly small ("+blob.size+" bytes)");
+    const file=new File([blob],"Forge-CarConcept-Khronos.glb",{type:"model/gltf-binary"});
     await window.ForgeProduction?.assets?.storeFile?.(file);
-    const existing=engine.assets.get(file.name);
-    if(existing)engine.assets.delete(file.name);
-    const record=engine.add("model",file.name.replace(/\.[^.]+$/,""));
-    record.components.asset={type:"model",name:file.name,analysis:await window.ForgeProduction?.assets?.analyze?.(file).catch?.(()=>null),sourceUnits:"source-native",sourcePreserved:true,previewOnly:true,previewRenderer:"three.js",remoteSource:REALISTIC_CAR_URL,license:"CC-BY 3.0",catalogSource:"Ignition Labs — CAR Model via Poly Pizza, mirrored in M-ZohaibAli/Velocity",qualityProfile:"realistic-supercar-pbr"};
-    engine.assets.set(file.name,{type:"model",file,url:URL.createObjectURL(file),remoteSource:REALISTIC_CAR_URL,previewOnly:true});
+    const result=await engine.importFile(file,{remoteSource:REALISTIC_CAR_URL});
+    if(result?.type!=="model"||!result.record)throw new Error("High-fidelity car did not produce a native Forge 3D model");
+    const record=result.record,entry=engine.assets.get(file.name);
+    const sourceSha256=await forgeExportProxy.sha256(file);
+    record.components.asset.remoteSource=REALISTIC_CAR_URL;
+    record.components.asset.sourceSha256=sourceSha256;
+    record.components.asset.license="CC BY 4.0";
+    record.components.asset.licenseUrl="https://creativecommons.org/licenses/by/4.0/";
+    record.components.asset.attribution="Darmstadt Graphics Group GmbH + Eric Chadwick (glTF conversion/optimization); Unity Fan (original Sketchfab model, CC0)";
+    record.components.asset.catalogSource="KhronosGroup/glTF-Sample-Assets — CarConcept";
+    record.components.asset.qualityProfile="high-fidelity-production-car-concept";
+    if(entry)Object.assign(entry,{remoteSource:REALISTIC_CAR_URL,sourceSha256,license:"CC BY 4.0",catalogSource:"KhronosGroup/glTF-Sample-Assets — CarConcept"});
     engine.select(record.id);
+    engine.focus();
     refresh();inspect();
-    const preview=await import("./forge-realcar-preview.js");
-    await preview.openRealCarPreview({file,name:record.name,meta:record.components.asset});
-    engine.select(record.id);refresh();inspect();
-    toast("Realistic supercar imported — real GLB rendered in 3D preview");
-    write("Imported Ignition Labs CAR Model — CC-BY 3.0 — Three.js preview");
-    return{type:"model",record,previewOnly:true};
+    toast("High-fidelity Car Concept imported into Forge viewport");
+    write("Imported Khronos Car Concept — native Forge 3D viewport — CC BY 4.0");
+    return result;
+  }catch(error){
+    if(error?.name==="AbortError")throw new Error("High-fidelity car download timed out after 45s");
+    throw error;
   }finally{
+    clearTimeout(timer);
     if(button){button.disabled=false;button.textContent=previous||"🚘 Import high-quality car"}
   }
 }
