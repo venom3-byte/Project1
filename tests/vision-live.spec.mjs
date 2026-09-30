@@ -1,5 +1,6 @@
 import{test,expect,chromium}from"@playwright/test";
 import{writeFile}from"node:fs/promises";
+import{WebSocket as NodeWebSocket}from"ws";
 
 test.describe("Forge live computer vision bridge",()=>{
   test("continuous CDP vision stream and real input controls change Forge",async({request})=>{
@@ -20,15 +21,17 @@ test.describe("Forge live computer vision bridge",()=>{
     const target=targets.find(t=>t.type==="page"&&t.url.includes("127.0.0.1:4173"));
     expect(target?.id).toBeTruthy();
 
-    const streamWs=new WebSocket("ws://127.0.0.1:4173/vision");
+    const streamWs=new NodeWebSocket("ws://127.0.0.1:4173/vision");
     const frames=[];
     const states=[];
     streamWs.on("message",data=>{
-      try{
-        const m=JSON.parse(data.toString());
-        if(m.type==="vision-state")states.push(m.state);
-        if(m.type==="vision-frame")frames.push(m);
-      }catch{}
+      if(Buffer.isBuffer(data)){
+        if(data.length>16&&data.readUInt32BE(0)===0x46563337)frames.push({
+          seq:data.readUInt32BE(4),width:data.readUInt16BE(8),height:data.readUInt16BE(10),data:data.subarray(16)
+        });
+        return;
+      }
+      try{const m=JSON.parse(data.toString());if(m.type==="vision-state")states.push(m.state)}catch{}
     });
     const connect=await request.post("/api/vision/connect",{data:{
       targetId:target.id,targetUrl:target.url,quality:55,maxWidth:960,maxHeight:540,everyNthFrame:1
@@ -41,7 +44,7 @@ test.describe("Forge live computer vision bridge",()=>{
 
     await expect.poll(()=>frames.length,{timeout:15000}).toBeGreaterThanOrEqual(3);
     expect(frames[0].data.length).toBeGreaterThan(1000);
-    await writeFile("test-results/pro-vision-live-frame.jpg",Buffer.from(frames.at(-1).data,"base64"));
+    await writeFile("test-results/pro-vision-live-frame.jpg",Buffer.from(frames.at(-1).data));
 
     const box=await page.locator('[data-add="box"]').boundingBox();
     expect(box).toBeTruthy();
