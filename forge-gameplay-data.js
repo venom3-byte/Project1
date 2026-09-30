@@ -64,12 +64,13 @@ class ForgeQuestSystem{
   constructor(){this.quests=new Map()}
   define(id,data){this.quests.set(id,{id,title:data.title||id,objectives:(data.objectives||[]).map(o=>({...o,current:0,complete:false})),rewards:data.rewards||{},state:"active"});return this.quests.get(id)}
   progress(id,objectiveId,amount=1){const q=this.quests.get(id);if(!q)return false;const o=q.objectives.find(x=>x.id===objectiveId);if(!o||o.complete)return false;o.current=Math.min(o.target||1,o.current+amount);o.complete=o.current>=(o.target||1);if(q.objectives.every(x=>x.complete))q.state="complete";return true}
-  status(id){return id?this.quests.get(id)||null:[...this.quests.values()]}
+  status(id){return id?[this.quests.get(id)].filter(Boolean):[...this.quests.values()]}
   serialize(){return[...this.quests.values()]}
   load(items=[]){this.quests=new Map(items.map(q=>[q.id,q]))}
 }
 const actorMap=new Map();
 function actor(id){if(!actorMap.has(id))actorMap.set(id,new ForgeActorData(id));return actorMap.get(id)}
+window.ForgeTags=ForgeTags;
 window.ForgeData={
   registry:new ForgeDataRegistry(),
   quests:new ForgeQuestSystem(),
