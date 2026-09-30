@@ -13,7 +13,8 @@
     "validate:gltf": "node scripts/validate-gltf-test-assets.mjs"
   },
   "devDependencies": {
-    "@playwright/test": "^1.55.0"
+    "@playwright/test": "^1.55.0",
+    "pngjs": "^7.0.0"
   },
   "dependencies": {
     "ws": "^8.18.3",
