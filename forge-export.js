@@ -116,7 +116,7 @@ function hasRenderable(root){
 }
 async function exportSceneGLB(opts={}){
   const r=selected();
-  if(!r||assetType(r)!=="model"||!hasRenderable(r.entity))throw new Error("Select an imported renderable 3D asset before exporting GLB.");
+  if(!r||!hasRenderable(r.entity))throw new Error("Select a renderable 3D asset before exporting GLB.");
   const Exporter=pc?.GltfExporter;
   if(typeof Exporter!=="function")throw new Error("PlayCanvas GLB exporter is unavailable in this engine build.");
   const exporter=new Exporter();
