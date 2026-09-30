@@ -1,6 +1,6 @@
 import{test,expect}from"@playwright/test";
 async function waitForForge(page){
-  await waitForForge(page);
+  await page.goto("/");
   await page.waitForFunction(()=>window.ForgeReady===true,{timeout:20000});
   await page.waitForFunction(()=>{
     const required=[
