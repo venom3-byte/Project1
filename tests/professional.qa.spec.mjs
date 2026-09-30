@@ -1,5 +1,6 @@
 import{test,expect}from"@playwright/test";
 import{writeFile}from"node:fs/promises";
+import{PNG}from"pngjs";
 
 const FOX="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Fox/glTF-Binary/Fox.glb";
 const TOYCAR="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/ToyCar/glTF-Binary/ToyCar.glb";
@@ -276,46 +277,67 @@ test.describe("Forge professional acceptance",()=>{
     expect(result.diffuse.reduce((a,b)=>a+b,0)).toBeGreaterThan(.3);
     await page.screenshot({path:"test-results/pro-legacy-obj-editor.png",fullPage:true});
   });
-  test("built-in realistic supercar imports and renders the real GLB through the integrated 3D preview",async({page})=>{
-    test.setTimeout(120000);
+  test("built-in high-fidelity Car Concept imports as a native 3D asset in the Forge viewport",async({page})=>{
+    test.setTimeout(150000);
     await waitForForge(page);
     await expect(page.locator("#importRealCar")).toBeVisible();
     await page.click("#importRealCar");
-    await page.waitForFunction(()=>window.ForgeDemoAssets?.previewReady===true,{timeout:90000});
-    await page.waitForFunction(()=>window.Forge?.selected?.()?.components?.asset?.previewOnly===true,{timeout:10000});
+    await page.waitForFunction(()=>window.Forge?.selected?.()?.components?.asset?.remoteSource?.includes("sceneview.github.io/models/platforms/CarConcept.glb"),{timeout:90000});
     const result=await page.evaluate(()=>{
-      const r=window.Forge.selected(),stats=window.ForgeDemoAssets.previewStats;
-      const canvas=document.querySelector("#forgeAssetPreviewCanvas");
+      const r=window.Forge.selected();
+      const stack=[r?.entity],meshes=[];
+      while(stack.length){
+        const n=stack.pop();
+        for(const mi of n?.render?.meshInstances||[])meshes.push(mi);
+        for(const c of n?.children||[])stack.push(c);
+      }
+      const spatial=window.ForgeSpatial.inspect(r);
+      const materials=new Set(meshes.map(mi=>mi.material?.name||mi.material).filter(Boolean));
       return{
         name:r?.components?.asset?.name,
         remoteSource:r?.components?.asset?.remoteSource,
+        sourceSha256:r?.components?.asset?.sourceSha256,
         license:r?.components?.asset?.license,
-        previewOnly:r?.components?.asset?.previewOnly===true,
-        renderer:r?.components?.asset?.previewRenderer,
-        visible:!document.querySelector("#forgeAssetPreview")?.classList.contains("hidden"),
-        canvasWidth:canvas?.width||0,
-        canvasHeight:canvas?.height||0,
-        meshes:stats?.meshes||0,
-        vertices:stats?.vertices||0,
-        triangles:stats?.triangles||0,
-        materials:stats?.materials||0,
-        sourceBytes:stats?.sourceBytes||0
+        attribution:r?.components?.asset?.attribution,
+        catalogSource:r?.components?.asset?.catalogSource,
+        viewportSanitized:r?.components?.asset?.viewportSanitized===true,
+        sanitizedExtensions:r?.components?.asset?.sanitizedExtensions||[],
+        vertices:spatial?.geometry?.vertices||0,
+        triangles:spatial?.geometry?.triangles||0,
+        spatialMaterials:spatial?.geometry?.materials||0,
+        materials:Math.max(spatial?.geometry?.materials||0,materials.size),
+        renderables:meshes.length,
+        textured:meshes.filter(mi=>!!mi.material?.diffuseMap).length,
+        world:spatial?.world?.size||null,
+        screen:window.ForgeSpatial.screenRect(r)
       };
     });
-    expect(result.name).toBe("Forge-Realistic-Supercar.glb");
-    expect(result.remoteSource).toContain("M-ZohaibAli/Velocity/main/public/models/CAR%20Model.glb");
-    expect(result.license).toBe("CC-BY 3.0");
-    expect(result.previewOnly).toBeTruthy();
-    expect(result.renderer).toBe("three.js");
-    expect(result.visible).toBeTruthy();
-    expect(result.canvasWidth).toBeGreaterThan(300);
-    expect(result.canvasHeight).toBeGreaterThan(200);
-    expect(result.meshes).toBeGreaterThan(0);
+    expect(result.name).toBe("Forge-CarConcept-Khronos.glb");
+    expect(result.remoteSource).toContain("sceneview.github.io/models/platforms/CarConcept.glb");
+    expect(result.sourceSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.license).toBe("CC BY 4.0");
+    expect(result.attribution).toContain("Darmstadt Graphics Group GmbH");
+    expect(result.catalogSource).toContain("KhronosGroup/glTF-Sample-Assets");
     expect(result.vertices).toBeGreaterThan(5000);
     expect(result.triangles).toBeGreaterThan(5000);
-    expect(result.materials).toBeGreaterThan(0);
-    expect(result.sourceBytes).toBeGreaterThan(1000000);
-    await page.screenshot({path:"test-results/pro-realistic-supercar-editor.png",fullPage:true});
+    expect(result.materials).toBeGreaterThanOrEqual(3);
+    expect(result.renderables).toBeGreaterThan(0);
+    expect(result.textured).toBeGreaterThan(0);
+    expect(result.world?.y).toBeGreaterThan(0.5);
+    expect(result.screen?.width).toBeGreaterThan(250);
+    expect(result.screen?.height).toBeGreaterThan(140);
+    const shot=await page.locator("#viewport").screenshot();
+    expect(shot.length).toBeGreaterThan(12000);
+    const png=PNG.sync.read(shot);
+    let active=0,total=0;
+    for(let y=0;y<png.height;y+=8)for(let x=0;x<png.width;x+=8){
+      const i=(y*png.width+x)*4,r=png.data[i],g=png.data[i+1],b=png.data[i+2];
+      const spread=Math.max(r,g,b)-Math.min(r,g,b);
+      if((r+g+b)/3>28&&spread>10)active++;
+      total++;
+    }
+    expect(active/Math.max(1,total)).toBeGreaterThan(0.01);
+    await page.screenshot({path:"test-results/pro-high-fidelity-car-editor.png",fullPage:true});
   });
 
   test("real animated Fox GLB imports with animation clips and exact source export",async({page})=>{
