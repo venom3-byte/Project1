@@ -124,7 +124,12 @@ export class ForgeEngine{
           textured++;
           if(!hasNormals){
             const preview=mat.clone?.()||mat;
+            preview.diffuse=new pc.Color(1,1,1);
+            preview.emissiveMap=mat.diffuseMap;
+            preview.emissive=new pc.Color(1,1,1);
+            preview.emissiveIntensity=1;
             preview.useLighting=false;
+            preview.useMetalness=false;
             preview.useTonemap=true;
             preview.update?.();
             mi.material=preview;
