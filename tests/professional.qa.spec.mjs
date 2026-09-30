@@ -164,6 +164,7 @@ test.describe("Forge professional acceptance",()=>{
     const png=await download(page,EXAMPLE_PNG);
     expect(png.length).toBeGreaterThan(100);
     await importViaInput(page,png,"developer-reference.png","image/png");
+    const bytesLength=png.length;
     const result=await page.evaluate(async()=>{
       const imported=window.Forge.selected();
       const check=await window.ForgeExport.validateSelected();
@@ -175,7 +176,7 @@ test.describe("Forge professional acceptance",()=>{
         check,
         sourceSha:await window.ForgeExport.sha256(source.blob),
         previewSha:await window.ForgeExport.sha256(preview.blob),
-        sourceBytes:file.size,
+        sourceBytes:bytesLength,
         exportedBytes:source.blob.size,
         previewBytes:preview.blob.size,
         info
@@ -201,6 +202,7 @@ test.describe("Forge professional acceptance",()=>{
     const originalSha=await sha(new Blob([glb]));
     await waitForForge(page);
     await importViaInput(page,glb,"Fox.glb","model/gltf-binary");
+    const bytesLength=glb.length;
     const result=await page.evaluate(async(originalSha)=>{
       const imported=window.Forge.selected();
 
@@ -216,7 +218,7 @@ test.describe("Forge professional acceptance",()=>{
         clips:imported.record.components.animation?.clips||[],
         playing:!!imported.record.entity.anim?.playing,
         check,
-        sourceBytes:file.size,
+        sourceBytes:bytesLength,
         exportedBytes:source.blob.size,
         sourceSha:await window.ForgeExport.sha256(source.blob),
         originalSha,
