@@ -29,15 +29,15 @@ export class ForgeEngine{
     this.root=new pc.Entity('ForgeScene');this.app.root.addChild(this.root);
     await RAPIER.init();this.rapier=RAPIER;this.world=new RAPIER.World({x:0,y:-9.81,z:0});this.eventQueue=new RAPIER.EventQueue(true);
     this.createCamera('Main Camera',{x:7,y:5,z:9});this.createLight('Sun');this.createPlane('Ground',30,30);
-    this.app.on('update',dt=>this.update(dt));this.canvas.addEventListener('pointerdown',e=>this.pick(e));window.addEventListener('resize',()=>this.app.resizeCanvas());this.app.resizeCanvas();this.app.start();this.app.render?.();this.log('Forge Engine 3.0 online');return this
+    this.app.on('update',dt=>this.update(dt));this.canvas.addEventListener('pointerdown',e=>this.pick(e));window.addEventListener('resize',()=>this.app.resizeCanvas());this.app.resizeCanvas();this.app.autoRender=true;this.app.start();this.app.render?.();this.log('Forge Engine 3.0 online');return this
   }
   rec(name,kind,e){const id=crypto.randomUUID();e.__forge={id,kind,name,components:{}};const r={id,kind,name,entity:e,components:e.__forge.components};this.entities.set(id,r);return r}
   add(kind,name){const e=new pc.Entity(name);this.root.addChild(e);return this.rec(name,kind,e)}
-  material(color=[.22,.62,.9]){const m=new pc.StandardMaterial();m.diffuse=new pc.Color(...color);m.emissive=new pc.Color(...color);m.emissiveIntensity=.35;m.metalness=.05;m.gloss=.5;m.useMetalness=true;m.update();return m}
+  material(color=[.22,.62,.9]){const m=new pc.StandardMaterial();m.diffuse=new pc.Color(...color);m.emissive=new pc.Color(...color);m.emissiveIntensity=.8;m.metalness=.05;m.gloss=.5;m.useMetalness=true;m.useLighting=false;m.update();return m}
   primitive(kind,name){const r=this.add(kind,name||kind+'-'+(this.entities.size+1)),type=kind==='sphere'?'sphere':kind==='cylinder'?'cylinder':kind==='capsule'?'capsule':kind==='plane'?'plane':'box';r.entity.addComponent('render',{type});r.entity.render.material=this.material(kind==='plane'?[.08,.15,.2]:[.22,.62,.9]);if(kind!=='plane')r.entity.setLocalPosition((Math.random()-.5)*4,1+(Math.random()*1.7),(Math.random()-.5)*4);r.components.geometry={sourceUnits:'meters'};return r}
   createPlane(name,w=30,d=30){const r=this.primitive('plane',name);r.entity.setLocalScale(w,1,d);r.entity.setLocalPosition(0,0,0);this.setPhysics(r.id,'fixed','box');return r}
-  createCamera(name,pos){const r=this.add('camera',name);r.entity.addComponent('camera',{clearColor:new pc.Color(.02,.05,.09),fov:60,nearClip:.01,farClip:10000});r.entity.setLocalPosition(pos.x,pos.y,pos.z);r.entity.lookAt(0,1,0);r.components.camera={active:true};return r}
-  createLight(name){const r=this.add('light',name);r.entity.addComponent('light',{type:'directional',color:new pc.Color(1,.96,.88),intensity:2,castShadows:true,shadowDistance:80});r.entity.setEulerAngles(48,-32,0);r.components.light={type:'directional'};return r}
+  createCamera(name,pos){const r=this.add('camera',name);r.entity.addComponent('camera',{clearColor:new pc.Color(.035,.07,.12),clearColorBuffer:true,clearDepthBuffer:true,fov:60,nearClip:.01,farClip:10000,enabled:true});r.entity.setLocalPosition(pos.x,pos.y,pos.z);r.entity.lookAt(0,1,0);r.components.camera={active:true};r.entity.camera.enabled=true;return r}
+  createLight(name){const r=this.add('light',name);r.entity.addComponent('light',{type:'directional',color:new pc.Color(1,.96,.88),intensity:2.5,castShadows:true,shadowDistance:80,enabled:true});r.entity.setEulerAngles(48,-32,0);r.components.light={type:'directional'};return r}
   camera(){return[...this.entities.values()].find(r=>r.kind==='camera'&&r.components.camera?.active)?.entity}
   selected(){return this.selectedId?this.entities.get(this.selectedId):null}
   select(id){this.selectedId=id;window.dispatchEvent(new CustomEvent('forge-selection',{detail:this.selected()}));return this.selected()}
