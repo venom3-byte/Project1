@@ -43,6 +43,7 @@
     if(state.ws&&(state.ws.readyState===0||state.ws.readyState===1))return;
     try{
       const ws=new WebSocket(wsUrl());
+      ws.binaryType='arraybuffer';
       state.ws=ws;
       ws.onopen=()=>{ws.send(JSON.stringify({type:'hello',role:'vision-ui',protocol:4,viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio||1}}));log('Live vision WebSocket connected','ok')};
       ws.onerror=()=>{};
@@ -50,23 +51,27 @@
       ws.onmessage=onVisionMessage;
     }catch{}
   }
-  function onVisionMessage(e){
+  async function onVisionMessage(e){
+    if(typeof e.data!=='string'){
+      try{
+        const buf=e.data instanceof ArrayBuffer?e.data:await e.data.arrayBuffer();
+        if(buf.byteLength<16)return;
+        const dv=new DataView(buf),magic=dv.getUint32(0),seq=dv.getUint32(4),w=dv.getUint16(8),h=dv.getUint16(10);
+        if(magic!==0x46563337)return;
+        const jpeg=buf.slice(16),img=$('#liveVisionRemote');if(!img)return;
+        const url=URL.createObjectURL(new Blob([jpeg],{type:'image/jpeg'}));
+        const old=state.remoteUrl;state.remoteUrl=url;img.onload=()=>{if(old)URL.revokeObjectURL(old)};img.src=url;
+        state.frameSeq=seq;state.frameCount++;const now=Date.now();if(!state.frameWindowStart)state.frameWindowStart=now;
+        if(now-state.frameWindowStart>1000){$('#liveVisionFps').textContent=Number(state.frameCount*1000/(now-state.frameWindowStart)).toFixed(1)+' fps';state.frameCount=0;state.frameWindowStart=now}
+      }catch{}
+      return;
+    }
     let m;try{m=JSON.parse(e.data)}catch{return}
     if(m.type==='vision-state'){
       const s=m.state||{};
       if(s.connected&&s.streaming){state.mode='cdp';state.running=true;stateText('Direct Chromium live',true);setTransport('CDP');$('#liveVisionPreview').classList.add('remote');$('#liveVisionPreview').classList.remove('local')}
       if(!s.connected&&state.mode==='cdp'){state.mode='idle';state.running=false;stateText('CDP disconnected',false)}
       if(s.fps!=null)$('#liveVisionFps').textContent=Number(s.fps).toFixed(1)+' fps';
-    }
-    if(m.type==='vision-frame'&&m.data){
-      const img=$('#liveVisionRemote');if(!img)return;
-      try{
-        const bytes=Uint8Array.from(atob(m.data),c=>c.charCodeAt(0));
-        const url=URL.createObjectURL(new Blob([bytes],{type:'image/jpeg'}));
-        const old=state.remoteUrl;state.remoteUrl=url;img.onload=()=>{if(old)URL.revokeObjectURL(old)};img.src=url;
-        state.frameCount++;const now=Date.now();if(!state.frameWindowStart)state.frameWindowStart=now;
-        if(now-state.frameWindowStart>1000){$('#liveVisionFps').textContent=Number(state.frameCount*1000/(now-state.frameWindowStart)).toFixed(1)+' fps';state.frameCount=0;state.frameWindowStart=now}
-      }catch{}
     }
   }
   function normalize(x,y,w,h){return{x:Math.max(0,Math.min(innerWidth-1,(Number(x)||0)*innerWidth/Math.max(1,w||innerWidth))),y:Math.max(0,Math.min(innerHeight-1,(Number(y)||0)*innerHeight/Math.max(1,h||innerHeight)))}}
