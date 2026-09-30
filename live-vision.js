@@ -81,9 +81,9 @@
     if(type==='mouseDown'){const p=normalize(a.x,a.y,a.screenWidth,a.screenHeight);state.pointerId++;return dispatchPointer('pointerdown',p.x,p.y,{buttons:1})}
     if(type==='mouseUp'){const p=normalize(a.x,a.y,a.screenWidth,a.screenHeight);return dispatchPointer('pointerup',p.x,p.y,{buttons:0})}
     if(type==='click'||type==='doubleClick'){
-      const p=normalize(a.x,a.y,a.screenWidth,a.screenHeight);dispatchPointer('pointermove',p.x,p.y,{buttons:0});
+      const p=normalize(a.x,a.y,a.screenWidth,a.screenHeight);const el=document.elementFromPoint(p.x,p.y)||document.body;dispatchPointer('pointermove',p.x,p.y,{buttons:0});
       const count=type==='doubleClick'?2:1;
-      for(let i=0;i<count;i++){dispatchPointer('pointerdown',p.x,p.y,{buttons:1});dispatchPointer('pointerup',p.x,p.y,{buttons:0});if(i+1<count)await sleep(55)}
+      for(let i=0;i<count;i++){dispatchPointer('pointerdown',p.x,p.y,{buttons:1});dispatchPointer('pointerup',p.x,p.y,{buttons:0});el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window,clientX:p.x,clientY:p.y,button:a.button==='right'?2:0,detail:i+1}));if(i+1<count)await sleep(55)}
       return{ok:true,type,point:p};
     }
     if(type==='drag'){
