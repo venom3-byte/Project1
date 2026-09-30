@@ -181,12 +181,14 @@ export class VisionController{
       case "touchStart":
       case "touchMove":
       case "touchEnd":{
+        await this.command("Emulation.setTouchEmulationEnabled",{enabled:true,maxTouchPoints:5});
         const p=point(a.x,a.y,a.screenWidth,a.screenHeight);
         const eventType=a.type==="touchStart"?"touchStart":a.type==="touchMove"?"touchMove":"touchEnd";
         const touchPoints=eventType==="touchEnd"?[]:[{x:p.x,y:p.y,force:1,id:Number(a.id)||1,radiusX:1,radiusY:1}];
         await this.command("Input.dispatchTouchEvent",{type:eventType,touchPoints,modifiers:Number(a.modifiers)||0});
         return {ok:true,type:a.type,point:p};
       }
+      case "navigate":{await this.command("Page.navigate",{url:String(a.url||"")});return {ok:true,type:a.type,url:String(a.url||"")};}
       case "evaluate":{
         const expression=String(a.expression||"");
         if(!expression)throw new Error("Missing expression");
