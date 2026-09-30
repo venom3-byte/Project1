@@ -23,21 +23,13 @@ test.describe("Forge live computer vision bridge",()=>{
     const streamWs=new WebSocket("ws://127.0.0.1:4173/vision");
     const frames=[];
     const states=[];
-    await new Promise((resolve,reject)=>{
-      const timer=setTimeout(()=>reject(new Error("vision websocket timeout")),15000);
-      streamWs.on("message",data=>{
-        try{
-          const m=JSON.parse(data.toString());
-          if(m.type==="vision-state")states.push(m.state);
-          if(m.type==="vision-frame"){
-            frames.push(m);
-            if(frames.length>=3){clearTimeout(timer);resolve();}
-          }
-        }catch{}
-      });
-      streamWs.on("error",reject);
+    streamWs.on("message",data=>{
+      try{
+        const m=JSON.parse(data.toString());
+        if(m.type==="vision-state")states.push(m.state);
+        if(m.type==="vision-frame")frames.push(m);
+      }catch{}
     });
-
     const connect=await request.post("/api/vision/connect",{data:{
       targetId:target.id,targetUrl:target.url,quality:55,maxWidth:960,maxHeight:540,everyNthFrame:1
     }});
