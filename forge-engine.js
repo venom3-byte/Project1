@@ -113,32 +113,57 @@ export class ForgeEngine{
   evalAnimation(t){for(const[id,a]of this.keyframes){const r=this.entities.get(id);if(!r||!a.length)continue;let k=a[0];for(let i=0;i<a.length-1;i++)if(t>=a[i].time&&t<=a[i+1].time){const A=a[i],B=a[i+1],f=(t-A.time)/Math.max(.0001,B.time-A.time);k={p:A.p.map((v,j)=>v+(B.p[j]-v)*f),r:A.r.map((v,j)=>v+(B.r[j]-v)*f),s:A.s.map((v,j)=>v+(B.s[j]-v)*f)};break}r.entity.setLocalPosition(...k.p);r.entity.setLocalEulerAngles(...k.r);r.entity.setLocalScale(...k.s)}}
   attachScript(id,code){this.scripts.set(id,code)}
   runScripts(dt){for(const[id,code]of this.scripts){const r=this.entities.get(id);if(!r)continue;try{new Function('api',code)({entity:r.entity,time:this.timelineTime,dt,engine:this})}catch(e){this.log('Script error '+e.message,'error')}}}
-  prepareImportedModelPreview(root){
-    let textured=0,previewAdjusted=0;
+  importedModelBounds(root){
+    const min=new pc.Vec3(Infinity,Infinity,Infinity),max=new pc.Vec3(-Infinity,-Infinity,-Infinity);
+    root.syncHierarchy?.();
     root.forEach(n=>{
       for(const mi of n.render?.meshInstances||[]){
-        const mat=mi.material,mesh=mi.mesh;
-        const format=mesh?.vertexBuffer?.getFormat?.();
-        const hasNormals=!!format?.elements?.some?.(e=>String(e.semantic||"").toUpperCase()==="NORMAL");
-        if(mat?.diffuseMap){
+        const a=mi.aabb,mn=a?.getMin?.()||a?.min,mx=a?.getMax?.()||a?.max;
+        if(!mn||!mx)continue;
+        min.x=Math.min(min.x,mn.x);min.y=Math.min(min.y,mn.y);min.z=Math.min(min.z,mn.z);
+        max.x=Math.max(max.x,mx.x);max.y=Math.max(max.y,mx.y);max.z=Math.max(max.z,mx.z);
+      }
+    });
+    if(!Number.isFinite(min.x))return null;
+    return{min,max,size:new pc.Vec3(max.x-min.x,max.y-min.y,max.z-min.z),center:new pc.Vec3((min.x+max.x)/2,(min.y+max.y)/2,(min.z+max.z)/2)};
+  }
+  normalizeImportedModel(root,targetSize=2.4){
+    const b=this.importedModelBounds(root);if(!b)return{ok:false,scale:1};
+    const extent=Math.max(b.size.x,b.size.y,b.size.z),scale=extent>1e-6?targetSize/extent:1;
+    root.setLocalScale(scale,scale,scale);
+    root.setLocalPosition(-b.center.x*scale,targetSize*.5-b.center.y*scale,-b.center.z*scale);
+    root.syncHierarchy?.();
+    return{ok:true,scale,sourceSize:[b.size.x,b.size.y,b.size.z],targetSize};
+  }
+  prepareImportedModelPreview(root){
+    let textured=0,previewAdjusted=0,cullAdjusted=0;
+    root.forEach(n=>{
+      for(const mi of n.render?.meshInstances||[]){
+        const mat=mi.material;if(!mat)continue;
+        if(mat.diffuseMap){
           textured++;
-          if(!hasNormals){
-            const preview=mat.clone?.()||mat;
-            preview.diffuse=new pc.Color(1,1,1);
-            preview.emissiveMap=mat.diffuseMap;
-            preview.emissive=new pc.Color(1,1,1);
-            preview.emissiveIntensity=1;
-            preview.useLighting=false;
-            preview.useMetalness=false;
-            preview.useTonemap=true;
-            preview.update?.();
-            mi.material=preview;
-            previewAdjusted++;
-          }
+          const preview=mat.clone?.()||mat;
+          preview.diffuse=new pc.Color(1,1,1);
+          preview.diffuseMap=mat.diffuseMap;
+          preview.emissiveMap=mat.diffuseMap;
+          preview.emissive=new pc.Color(1,1,1);
+          preview.emissiveIntensity=1;
+          preview.useLighting=false;
+          preview.useMetalness=false;
+          preview.useTonemap=false;
+          if("cull" in preview)preview.cull=pc.CULLFACE_NONE;
+          if("blendType" in preview)preview.blendType=pc.BLEND_NONE;
+          if("opacity" in preview)preview.opacity=1;
+          if("alphaTest" in preview)preview.alphaTest=0;
+          preview.update?.();
+          mi.material=preview;
+          previewAdjusted++;
+          if(preview.cull===pc.CULLFACE_NONE)cullAdjusted++;
         }
       }
     });
-    root.__forgeViewportPreview={textured,previewAdjusted};
+    const normalized=this.normalizeImportedModel(root,2.4);
+    root.__forgeViewportPreview={textured,previewAdjusted,cullAdjusted,normalized};
     return root.__forgeViewportPreview;
   }
 
@@ -163,10 +188,10 @@ export class ForgeEngine{
       window.ForgeRefreshUI?.();
       return{type:'audio',record:r,asset};
     }
-    if(/^image\//.test(file.type)){const bmp=await createImageBitmap(file),c=document.createElement('canvas');c.width=bmp.width;c.height=bmp.height;c.getContext('2d').drawImage(bmp,0,0);const tex=new pc.Texture(this.app.graphicsDevice,{width:bmp.width,height:bmp.height,format:pc.PIXELFORMAT_R8_G8_B8_A8});tex.setSource(c);const mat=this.material([1,1,1]);mat.diffuseMap=tex;mat.emissiveMap=tex;mat.emissive=new pc.Color(1,1,1);mat.update();const r=this.primitive('plane',file.name);r.entity.render.material=mat;r.components.asset={type:'image',name:file.name,width:bmp.width,height:bmp.height,analysis,derivedDirty:false};this.assets.set(file.name,{type:'image',file,url});this.select(r.id);window.dispatchEvent(new Event('forge-assets-changed'));window.ForgeRefreshUI?.();return{type:'image',record:r}}
+    if(/^image\//.test(file.type)){const bmp=await createImageBitmap(file),c=document.createElement('canvas');c.width=bmp.width;c.height=bmp.height;c.getContext('2d').drawImage(bmp,0,0);const tex=new pc.Texture(this.app.graphicsDevice,{width:bmp.width,height:bmp.height,format:pc.PIXELFORMAT_R8_G8_B8_A8});tex.setSource(c);const mat=new pc.StandardMaterial();mat.diffuse=new pc.Color(1,1,1);mat.diffuseMap=tex;mat.emissive=new pc.Color(1,1,1);mat.emissiveMap=tex;mat.emissiveIntensity=1;mat.useLighting=false;mat.useTonemap=false;mat.cull=pc.CULLFACE_NONE;mat.update();const r=this.primitive('plane',file.name);r.entity.setLocalEulerAngles(-90,0,0);const h=2,w=Math.max(.25,h*(bmp.width/Math.max(1,bmp.height)));r.entity.setLocalScale(w,1,h);r.entity.setLocalPosition(0,h*.5,0);r.entity.render.material=mat;r.components.asset={type:'image',name:file.name,width:bmp.width,height:bmp.height,analysis,sourceUnits:'pixels',derivedDirty:false};this.assets.set(file.name,{type:'image',file,url});this.select(r.id);window.dispatchEvent(new Event('forge-assets-changed'));window.ForgeRefreshUI?.();return{type:'image',record:r}}
     if(/\.(glb|gltf|fbx|obj|dae|3ds)$/i.test(file.name))return new Promise(async(resolve,reject)=>{
       if(/\.gltf$/i.test(file.name)){try{const json=JSON.parse(await file.text()),external=[...(json.buffers||[]),...(json.images||[])].some(x=>x?.uri&&!String(x.uri).startsWith('data:'));if(external)throw new Error('This glTF still references external files; select its dependency files together so Forge can package them.')}catch(e){reject(e);return}}
-      const asset=new pc.Asset(file.name,'container',{url});this.app.assets.add(asset);asset.once('error',reject);asset.once('load',()=>{try{const e=asset.resource.instantiateRenderEntity({castShadows:true,receiveShadows:true});e.name=file.name.replace(/\.[^.]+$/,'');this.root.addChild(e);const preview=this.prepareImportedModelPreview(e);const r=this.rec(e.name,'model',e);r.components.asset={type:'model',name:file.name,analysis:analysis||null,sourceUnits:'meters',importScale:1,derivedDirty:false,viewportPreview:preview};const clips=this.attachAnimations(e,asset.resource,analysis?.animationNames||[]);if(clips.length)r.components.animation={clips,playing:true};this.assets.set(file.name,{type:'model',file,url,resource:asset.resource});window.dispatchEvent(new Event('forge-assets-changed'));this.select(r.id);window.ForgeRefreshUI?.();requestAnimationFrame(()=>{requestAnimationFrame(()=>{window.ForgeSpatial?.inspect?.(r);resolve({type:'model',record:r})})})}catch(err){reject(err)}});this.app.assets.load(asset)
+      const asset=new pc.Asset(file.name,'container',{url});this.app.assets.add(asset);asset.once('error',reject);asset.once('load',()=>{try{const e=asset.resource.instantiateRenderEntity({castShadows:true,receiveShadows:true});e.name=file.name.replace(/\.[^.]+$/,'');this.root.addChild(e);const preview=this.prepareImportedModelPreview(e);const r=this.rec(e.name,'model',e);r.components.asset={type:'model',name:file.name,analysis:analysis||null,sourceUnits:'source-native',importScale:preview.normalized?.scale||1,normalized:!!preview.normalized?.ok,derivedDirty:false,viewportPreview:preview};const clips=this.attachAnimations(e,asset.resource,analysis?.animationNames||[]);if(clips.length)r.components.animation={clips,playing:true};this.assets.set(file.name,{type:'model',file,url,resource:asset.resource});window.dispatchEvent(new Event('forge-assets-changed'));this.select(r.id);window.ForgeRefreshUI?.();requestAnimationFrame(()=>{requestAnimationFrame(()=>{window.ForgeSpatial?.inspect?.(r);resolve({type:'model',record:r})})})}catch(err){reject(err)}});this.app.assets.load(asset)
     });
     return{type:'asset',name:file.name,analysis}
   }
