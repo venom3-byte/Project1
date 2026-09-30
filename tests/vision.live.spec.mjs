@@ -135,11 +135,25 @@ test.describe.serial("Forge Live Vision — continuous stream + real browser inp
       const rr=await request.post("/api/vision/action",{data:{action:{type:"mouse.drag",from:line.from,to:line.to,steps:18}}});
       expect((await rr.json()).result.action.dispatched).toBeTruthy();
     }
+    const canvasProof=await request.get("/api/vision/frame");
+    expect(canvasProof.ok()).toBeTruthy();
+    const canvasProofBytes=await canvasProof.body();
+    expect(canvasProofBytes.slice(0,2).toString("hex")).toBe("ffd8");
+    await writeFile("test-results/vision-drawing-canvas-proof.jpg",canvasProofBytes);
     const addResult=await request.post("/api/vision/action",{data:{action:{type:"mouse.click",x:add.x+add.width/2,y:add.y+add.height/2},options:{includeState:true}}});
     const addBody=await addResult.json();
     expect(addBody.ok).toBeTruthy();
-    expect(addBody.result?.state?.selected?.name).toBe("forge-drawing.png");
-    expect(addBody.result?.state?.selected?.kind).toBeTruthy();
+    expect(addBody.result.action.target).toMatchObject({id:"drawAddToScene"});
+    await expect.poll(async()=>{
+      const st=await (await request.get("/api/vision/state")).json();
+      return st.selected?.name||"";
+    },{timeout:12000}).toBe("forge-drawing.png");
+    const importedState=await (await request.get("/api/vision/state")).json();
+    expect(importedState.selected?.name).toBe("forge-drawing.png");
+    expect(importedState.selected?.kind).toBeTruthy();
+    const importedProof=await request.get("/api/vision/frame");
+    expect(importedProof.ok()).toBeTruthy();
+    await writeFile("test-results/vision-imported-asset-proof.jpg",await importedProof.body());
 
     const data=await request.post("/api/vision/action",{data:{action:{type:"evaluate",expression:"window.ForgeDraw2D?.lastPngDataUrl || null"}}});
     const dataBody=await data.json();
