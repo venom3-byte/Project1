@@ -272,7 +272,7 @@ async function importRealisticCar(){
     const result=await engine.importFile(file,{remoteSource:REALISTIC_CAR_URL});
     if(result.type!=="model"||!result.record)throw new Error("Realistic car did not produce a 3D model record");
     result.record.components.asset.remoteSource=REALISTIC_CAR_URL;
-    result.record.components.asset.license="CC0 1.0 Universal";
+    result.record.components.asset.license="CC BY 4.0";
     result.record.components.asset.catalogSource="KhronosGroup glTF Sample Assets — Car Concept";
     result.record.components.asset.qualityProfile="high-quality-pbr-concept-car";
     engine.select(result.record.id);
