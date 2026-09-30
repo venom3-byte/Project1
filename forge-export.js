@@ -123,6 +123,15 @@ function hasRenderable(root){
 }
 async function exportSceneGLB(opts={}){
   const r=selected();
+  const source=storedFile(r);
+  if(r?.components?.asset?.type==="model"&&source&&!r.components.asset.derivedDirty){
+    const validation=await validateBlob(source,"model");
+    if(!validation.ok)throw new Error("Imported source GLB failed validation: "+validation.errors.join(", "));
+    const name=opts.name||((r.name||"forge-asset").replace(/\.[^.]+$/,"")+".glb");
+    if(opts.download!==false)await save(source,name,source.type);
+    const spatial=window.ForgeSpatial?.inspect?.(r)||null;
+    return{ok:true,derived:true,mode:"source-preserving",kind:"model",name,bytes:source.size,validation,spatial,blob:source};
+  }
   if(!r||!(await waitForRenderable(r.entity)))throw new Error("Select a renderable 3D asset before exporting GLB.");
   const Exporter=pc?.GltfExporter;
   if(typeof Exporter!=="function")throw new Error("PlayCanvas GLB exporter is unavailable in this engine build.");
