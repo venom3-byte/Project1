@@ -277,10 +277,14 @@ export class VisionController extends EventEmitter{
         try{selectedScreenRect=window.ForgeSpatial.screenRect(selected)}catch{}
       }
       const canvasRect=document.querySelector('#viewport')?.getBoundingClientRect?.()?.toJSON?.()||null;
+      const activeGizmo=document.querySelector('[data-gizmo].active')?.dataset?.gizmo||window.ForgeGizmo?.state?.mode||null;
+      const gizmoSpace=document.querySelector('#spaceToggle')?.textContent?.trim().toLowerCase()||window.ForgeGizmo?.state?.space||null;
       return{
         forgeReady:window.ForgeReady===true,
         bootState:window.ForgeBootState||null,
         selected:selected?{id:selected.id,name:selected.name,kind:selected.kind}:null,
+        gizmoMode:activeGizmo,
+        gizmoSpace,
         selectedScreenRect,
         canvasRect,
         diagnostics:diag,
