@@ -1,0 +1,166 @@
+{
+  "format": "forge-project",
+  "version": 5,
+  "meta": {
+    "name": "Forge Packaging Proof",
+    "engine": "Forge Studio 3.7",
+    "createdAt": "2026-09-30T00:00:00.000Z",
+    "units": "meters",
+    "coordinateSystem": "right-handed +Y up +Z forward"
+  },
+  "scene": {
+    "format": "forge-scene",
+    "version": 3,
+    "meta": {
+      "engine": "Forge Studio 3.7",
+      "time": "2026-09-30T00:00:00.000Z",
+      "units": "meters"
+    },
+    "entities": [
+      {
+        "id": "pkg-camera",
+        "name": "Main Camera",
+        "kind": "camera",
+        "transform": {
+          "p": [
+            7,
+            5,
+            9
+          ],
+          "r": [
+            -20,
+            35,
+            0
+          ],
+          "s": [
+            1,
+            1,
+            1
+          ]
+        },
+        "components": {
+          "camera": {
+            "active": true
+          }
+        },
+        "keyframes": [],
+        "script": null
+      },
+      {
+        "id": "pkg-sun",
+        "name": "Sun",
+        "kind": "light",
+        "transform": {
+          "p": [
+            0,
+            4,
+            0
+          ],
+          "r": [
+            48,
+            -32,
+            0
+          ],
+          "s": [
+            1,
+            1,
+            1
+          ]
+        },
+        "components": {
+          "light": {
+            "type": "directional"
+          }
+        },
+        "keyframes": [],
+        "script": null
+      },
+      {
+        "id": "pkg-ground",
+        "name": "Ground",
+        "kind": "plane",
+        "transform": {
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": [
+            0,
+            0,
+            0
+          ],
+          "s": [
+            30,
+            1,
+            30
+          ]
+        },
+        "components": {
+          "physics": {
+            "mode": "fixed",
+            "shape": "box"
+          }
+        },
+        "keyframes": [],
+        "script": null
+      },
+      {
+        "id": "pkg-box",
+        "name": "Packaging Proof Box",
+        "kind": "box",
+        "transform": {
+          "p": [
+            0,
+            1,
+            0
+          ],
+          "r": [
+            0,
+            25,
+            0
+          ],
+          "s": [
+            2,
+            2,
+            2
+          ]
+        },
+        "components": {
+          "physics": {
+            "mode": "dynamic",
+            "shape": "box"
+          }
+        },
+        "keyframes": [],
+        "script": null
+      }
+    ]
+  },
+  "production": {
+    "assets": [],
+    "graph": null,
+    "world": null,
+    "profiler": null
+  },
+  "runtime": {
+    "input": null,
+    "prefabs": [],
+    "slots": [],
+    "audio": null
+  },
+  "gameplay": null,
+  "session": null,
+  "gameplayData": null,
+  "twoD": null,
+  "rendering": null,
+  "cinematics": null,
+  "ui": null,
+  "vfx": null,
+  "terrain": null,
+  "shader": null,
+  "animation": null,
+  "network": null,
+  "replay": null,
+  "spatial": null
+}
