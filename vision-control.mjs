@@ -347,14 +347,18 @@ export class VisionController extends EventEmitter{
     });
   }
 
-  async elements(){
+  async elements(requestedSelectors=[]){
     if(!this.page||this.page.isClosed())throw new Error('Vision session is not running');
-    const selectors=[
+    const defaults=[
       '[data-add="box"]','[data-add="sphere"]','[data-add="cylinder"]',
       '#assetInput','#importAssets','#play','#build','#openProject','#saveProject',
       '#focus','#frame','#duplicate','#delete','#viewport','.viewport',
-      '#visionOpen','#selected','#sceneCount','.topbar','.leftpanel','.rightpanel'
+      '#visionOpen','#selected','#sceneCount','#time','.topbar','.leftpanel','.rightpanel'
     ];
+    const selectors=[...new Set(
+      [...(Array.isArray(requestedSelectors)?requestedSelectors:[]),...defaults]
+        .map(s=>String(s||'').trim()).filter(Boolean).slice(0,64)
+    )];
     return this.page.evaluate(selectors=>({
       viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio||1},
       elements:selectors.map(selector=>{
