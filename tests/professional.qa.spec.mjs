@@ -47,6 +47,11 @@ async function importViaInput(page,buffer,name,mimeType,{renderable=false}={}){
   }
 }
 
+function wavSilence(seconds=.25,sampleRate=8000){
+  const frames=Math.floor(seconds*sampleRate),bytes=44+frames*2,b=Buffer.alloc(bytes);
+  b.write("RIFF",0);b.writeUInt32LE(bytes-8,4);b.write("WAVE",8);b.write("fmt ",12);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(sampleRate,24);b.writeUInt32LE(sampleRate*2,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write("data",36);b.writeUInt32LE(frames*2,40);
+  return b;
+}
 async function sha(blob){return pageHash(await blob.arrayBuffer())}
 async function pageHash(buf){
   const d=await crypto.subtle.digest("SHA-256",buf);
@@ -170,6 +175,37 @@ test.describe("Forge professional acceptance",()=>{
     expect(result.redo).toBeTruthy();
     expect(result.undone).toEqual(result.before);
     expect(result.redone).toEqual(result.changed);
+  });
+
+  test("real audio WAV imports as an Engine Audio Asset with a Sound Slot and listener",async({page})=>{
+    await waitForForge(page);
+    const wav=wavSilence();
+    await importViaInput(page,wav,"forge-proof.wav","audio/wav");
+    const info=await page.evaluate(()=>{
+      const r=window.Forge.selected();
+      const slot=r?.entity?.sound?.slot?.("main");
+      const cam=window.Forge.camera();
+      return{
+        kind:r?.kind,
+        asset:r?.components?.asset?.type,
+        assetName:r?.components?.asset?.name,
+        sound:!!r?.entity?.sound,
+        slot:!!slot,
+        slotLoaded:!!slot?.isLoaded,
+        listener:!!cam?.audiolistener,
+        registry:window.Forge.assets.has("forge-proof.wav")
+      };
+    });
+    expect(info.kind).toBe("audio");
+    expect(info.asset).toBe("audio");
+    expect(info.assetName).toBe("forge-proof.wav");
+    expect(info.sound).toBeTruthy();
+    expect(info.slot).toBeTruthy();
+    expect(info.listener).toBeTruthy();
+    expect(info.registry).toBeTruthy();
+    await page.click("#assetPlay");
+    await page.waitForTimeout(120);
+    expect(await page.locator("#assetPlay").isEnabled()).toBeTruthy();
   });
 
   test("real 2D PNG survives source round-trip, validates dimensions, and generates a real viewport PNG",async({page})=>{
