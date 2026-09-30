@@ -287,6 +287,7 @@ async function importRealisticCar(){
   }
 }
 window.ForgeDemoAssets={importRealisticCar,REALISTIC_CAR_URL};
+$("importRealCar")?.addEventListener("click",()=>importRealisticCar().catch(e=>write("Realistic supercar import failed: "+e.message,"error")));
 $("importAssets").onclick=()=>$("assetInput").click();$("assetInput").onchange=e=>loadFiles([...e.target.files]);
 async function fileDataUri(file){
   const bytes=new Uint8Array(await file.arrayBuffer());
