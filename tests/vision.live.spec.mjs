@@ -30,7 +30,7 @@ async function getJson(request,path){
 test.describe.serial("Forge Live Vision — real continuous vision + input",()=>{
   test.afterEach(async({request})=>{await stopVision(request)});
 
-  test("publishes a continuous screencast stream rather than one-shot screenshots",async({request})=>{
+  test("publishes a continuous screencast stream rather than one-shot screenshots",async({page,request})=>{
     test.setTimeout(60000);
     const initial=await startVision(request);
     await sleep(1200);
