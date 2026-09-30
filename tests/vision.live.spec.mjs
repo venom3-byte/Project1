@@ -228,7 +228,7 @@ test.describe.serial("Forge Live Vision — continuous stream + real browser inp
     const materialDiagBody=await materialDiag.json();
     const materialDiagValue=JSON.parse(materialDiagBody.result.action.value);
     expect(materialDiagValue.length).toBeGreaterThan(0);
-    require("node:fs").writeFileSync("vision-proof/vision-model-material.json",JSON.stringify(materialDiagValue,null,2));    const frame=(await (await request.get("/api/vision/elements")).json()).elements.find(e=>e.selector==="#frame"&&e.visible);
+    await writeFile("vision-proof/vision-model-material.json",JSON.stringify(materialDiagValue,null,2));    const frame=(await (await request.get("/api/vision/elements")).json()).elements.find(e=>e.selector==="#frame"&&e.visible);
     expect(frame).toBeTruthy();
     const frameClick=await request.post("/api/vision/action",{data:{action:{
       type:"mouse.click",x:frame.x+frame.width/2,y:frame.y+frame.height/2
