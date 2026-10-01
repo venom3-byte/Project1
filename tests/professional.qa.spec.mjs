@@ -192,6 +192,48 @@ test.describe("Forge professional acceptance",()=>{
     expect(result.redone).toEqual(result.changed);
   });
 
+  test("universal importer exposes broad 3D format coverage without collapsing everything to one native path",async({page})=>{
+    await waitForForge(page);
+    const caps=await page.evaluate(()=>window.Forge.assetImportCapabilities());
+    expect(caps.native3D).toEqual(expect.arrayContaining(["glb","gltf"]));
+    expect(caps.assimpWasm).toEqual(expect.arrayContaining(["fbx","obj","dae","3ds","3mf","stl","ply","ifc","usd"]));
+    expect(caps.assimpWasm.length).toBeGreaterThanOrEqual(40);
+    expect(caps.images).toEqual(expect.arrayContaining(["png","webp","avif","tga","dds","ktx2"]));
+  });
+
+  test("Assimp compatibility path imports STL and preserves the original source",async({page})=>{
+    test.setTimeout(120000);
+    const stl=Buffer.from([
+      "solid ForgeTest",
+      "facet normal 0 0 1",
+      " outer loop",
+      "  vertex 0 0 0",
+      "  vertex 1 0 0",
+      "  vertex 0 1 0",
+      " endloop",
+      "endfacet",
+      "facet normal 0 0 -1",
+      " outer loop",
+      "  vertex 0 0 1",
+      "  vertex 0 1 1",
+      "  vertex 1 0 1",
+      " endloop",
+      "endfacet",
+      "endsolid ForgeTest"
+    ].join("\n"),"utf8");
+    await waitForForge(page);
+    await importViaInput(page,stl,"forge-proof.stl","model/stl",{renderable:true});
+    const result=await page.evaluate(()=>{const r=window.Forge.selected(),s=window.ForgeSpatial.inspect(r);return{name:r?.components?.asset?.name,converted:r?.components?.asset?.converted===true,converter:r?.components?.asset?.converter,sourcePreserved:r?.components?.asset?.sourcePreserved===true,sha:r?.components?.asset?.sourceSha256||"",vertices:s?.geometry?.vertices||0,triangles:s?.geometry?.triangles||0}});
+    expect(result.name).toBe("forge-proof.stl");
+    expect(result.converted).toBeTruthy();
+    expect(result.converter).toBe("AssimpJS");
+    expect(result.sourcePreserved).toBeTruthy();
+    expect(result.sha).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.vertices).toBeGreaterThan(0);
+    expect(result.triangles).toBeGreaterThan(0);
+    await page.screenshot({path:"test-results/pro-universal-stl-editor.png",fullPage:true});
+  });
+
   test("real audio WAV imports as an Engine Audio Asset with a Sound Slot and listener",async({page})=>{
     await waitForForge(page);
     const wav=wavSilence();
@@ -297,6 +339,7 @@ test.describe("Forge professional acceptance",()=>{
         name:r?.components?.asset?.name,
         remoteSource:r?.components?.asset?.remoteSource,
         sourceSha256:r?.components?.asset?.sourceSha256,
+        pbrPreserved:r?.components?.asset?.viewportPreview?.pbrPreserved||0,
         license:r?.components?.asset?.license,
         attribution:r?.components?.asset?.attribution,
         catalogSource:r?.components?.asset?.catalogSource,
@@ -323,6 +366,7 @@ test.describe("Forge professional acceptance",()=>{
     expect(result.materials).toBeGreaterThanOrEqual(3);
     expect(result.renderables).toBeGreaterThan(0);
     expect(result.textured).toBeGreaterThan(0);
+    expect(result.pbrPreserved).toBeGreaterThan(0);
     expect(result.world?.y).toBeGreaterThan(0.5);
     expect(result.screen?.width).toBeGreaterThan(250);
     expect(result.screen?.height).toBeGreaterThan(140);
