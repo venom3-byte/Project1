@@ -267,15 +267,16 @@ export class ForgeEngine{
           textured++;
           preview.diffuse=new pc.Color(1,1,1);
           preview.diffuseMap=mat.diffuseMap;
-          if(!mat.emissiveMap){
-            preview.emissiveMap=mat.diffuseMap;
-            preview.emissive=new pc.Color(1,1,1);
-            preview.emissiveIntensity=Math.min(.18,Number(mat.emissiveIntensity||.18));
-          }
-        }else if(!preview.diffuse){
+          // Keep the source PBR material data, but add a preview-emission path so
+          // assets that depend on environment lighting still remain visibly textured
+          // in Forge's editor viewport.
+          preview.emissiveMap=mat.diffuseMap;
+          preview.emissive=new pc.Color(1,1,1);
+          preview.emissiveIntensity=Math.max(.22,Math.min(.42,Number(mat.emissiveIntensity||.28)));
+        }else{
           preview.diffuse=new pc.Color(.62,.68,.76);
-          preview.emissive=new pc.Color(.06,.08,.11);
-          preview.emissiveIntensity=.08;
+          preview.emissive=new pc.Color(.08,.10,.14);
+          preview.emissiveIntensity=.12;
         }
         preview.useLighting=true;
         preview.useMetalness=true;
