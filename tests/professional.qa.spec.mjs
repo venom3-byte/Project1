@@ -324,7 +324,7 @@ test.describe("Forge professional acceptance",()=>{
     await waitForForge(page);
     await expect(page.locator("#importRealCar")).toBeVisible();
     await page.click("#importRealCar");
-    await page.waitForFunction(()=>window.Forge?.selected?.()?.components?.asset?.remoteSource?.includes("sceneview.github.io/models/platforms/CarConcept.glb"),{timeout:90000});
+    await page.waitForFunction(()=>{const a=window.Forge?.selected?.()?.components?.asset;return a?.remoteSource?.includes("sceneview.github.io/models/platforms/CarConcept.glb")&&a?.license==="CC BY 4.0";},{timeout:90000});
     const result=await page.evaluate(()=>{
       const r=window.Forge.selected();
       const stack=[r?.entity],meshes=[];
