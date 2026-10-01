@@ -303,60 +303,43 @@ async function importRealisticCar(){
 window.ForgeDemoAssets={importRealisticCar,REALISTIC_CAR_URL};
 $("importRealCar")?.addEventListener("click",()=>importRealisticCar().catch(e=>write("High-fidelity car import failed: "+e.message,"error")));
 $("importAssets").onclick=()=>$("assetInput").click();$("assetInput").onchange=e=>loadFiles([...e.target.files]);
-async function fileDataUri(file){
-  const bytes=new Uint8Array(await file.arrayBuffer());
-  let binary="";
-  const chunk=0x8000;
-  for(let i=0;i<bytes.length;i+=chunk)binary+=String.fromCharCode(...bytes.subarray(i,Math.min(bytes.length,i+chunk)));
-  const mime=file.type||(()=>{const e=file.name.toLowerCase().split(".").pop();return({png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",webp:"image/webp",avif:"image/avif",gif:"image/gif",bmp:"image/bmp",wav:"audio/wav",mp3:"audio/mpeg",ogg:"audio/ogg"}[e]||"application/octet-stream")})();
-  return "data:"+mime+";base64,"+btoa(binary);
-}
-async function packageGltfWithSelectedFiles(gltf,files){
-  const json=JSON.parse(await gltf.text());
-  const byName=new Map(files.map(f=>[f.name.replaceAll("\\","/").split("/").at(-1).toLowerCase(),f]));
-  const patchUris=async group=>{
-    for(const item of group||[]){
-      const uri=item?.uri;
-      if(!uri||String(uri).startsWith("data:"))continue;
-      const clean=decodeURIComponent(String(uri).split(/[?#]/)[0]).replaceAll("\\","/").split("/").at(-1).toLowerCase();
-      const f=byName.get(clean);
-      if(!f)throw new Error("Missing glTF dependency: "+uri);
-      item.uri=await fileDataUri(f);
-    }
-  };
-  await patchUris(json.buffers);
-  await patchUris(json.images);
-  return new File([JSON.stringify(json)],gltf.name,{type:"model/gltf+json"});
-}
 async function loadFiles(files){
   const list=[...(files||[])].filter(Boolean);
+  if(!list.length)return;
   for(const f of list)try{await window.ForgeProduction?.assets?.storeFile?.(f)}catch(e){write("Asset vault store failed "+f.name+": "+e.message,"error")}
-  const gltf=list.find(f=>/\.gltf$/i.test(f.name));
-  if(gltf){
+
+  const nativeModels=new Set(["glb","gltf"]);
+  const extensionOf=f=>String(f.name||"").toLowerCase().split(".").pop();
+  const referenced=new Set();
+  for(const gltf of list.filter(f=>/\.gltf$/i.test(f.name))){
     try{
-      const packaged=await packageGltfWithSelectedFiles(gltf,list);
-      const r=await engine.importFile(packaged);
+      const json=JSON.parse(await gltf.text());
+      for(const item of [...(json.buffers||[]),...(json.images||[])]){
+        const uri=item?.uri;
+        if(uri&&!String(uri).startsWith("data:"))referenced.add(decodeURIComponent(String(uri).split(/[?#]/)[0]).replaceAll("\\","/").split("/").at(-1).toLowerCase());
+      }
+    }catch{}
+  }
+  const assimpExts=new Set(window.Forge?.assetImportCapabilities?.().assimpWasm||[]);
+  const modelFiles=list.filter(f=>{
+    const ext=extensionOf(f);
+    return nativeModels.has(ext)||assimpExts.has(ext);
+  });
+  const modelDependencies=new Set(list.filter(f=>referenced.has(f.name.toLowerCase())).map(f=>f.name));
+
+  for(const f of modelFiles){
+    try{
+      const r=await engine.importFile(f,{files:list});
       if(r.type==="project")await engine.load(r.data);
-      write("Imported packaged glTF "+gltf.name);
-      refresh();inspect();
-      return;
-    }catch(e){
-      write("glTF package import failed; source files remain in Content Browser: "+e.message,"error");
-    }
+      write("Imported 3D asset "+f.name+(r.converted?" → normalized GLB":""));
+    }catch(e){write("3D import failed "+f.name+": "+e.message,"error")}
   }
-  const legacyModels=list.filter(f=>/\.(fbx|obj|dae|3ds)$/i.test(f.name));
-  const legacyDependencyNames=new Set(list.filter(f=>/\.(mtl|tga|dds)$/i.test(f.name)).map(f=>f.name));
-  for(const f of legacyModels){
-    try{await engine.importFile(f,{files:list});write("Imported and converted "+f.name+" to an internal GLB representation")}
-    catch(e){write("Legacy 3D conversion failed "+f.name+": "+e.message,"error")}
-  }
+
+  const alreadyHandled=new Set(modelFiles.map(f=>f.name));
   for(const f of list){
-    if(gltf&&f===gltf)continue;
-    if(legacyModels.includes(f))continue;
-    if(legacyDependencyNames.has(f.name))continue;
-    if(gltf&&f===gltf)continue;
+    if(alreadyHandled.has(f.name)||modelDependencies.has(f.name))continue;
     try{
-      const r=await engine.importFile(f);
+      const r=await engine.importFile(f,{files:list});
       if(r.type==="project")await engine.load(r.data);
       write("Imported "+f.name);
     }catch(e){
