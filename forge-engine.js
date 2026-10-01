@@ -364,52 +364,79 @@ export class ForgeEngine{
       window.dispatchEvent(new Event("forge-assets-changed"));window.ForgeRefreshUI?.();
       return{type:"image",record:r};
     }
-    if(/\.(glb|gltf|fbx|obj|dae|3ds)$/i.test(file.name)){
-      if(/\.(fbx|obj|dae|3ds)$/i.test(file.name)){
-        const converted=await this.convertLegacyModelToGLB(file,options?.files||[file]);
-        const convertedResult=await this.importFile(converted,{internalConversion:true,sourceFile:file,remoteSource:options.remoteSource,files:options.files});
+    const extension=extOf(file.name);
+    if(MODEL_EXTENSIONS.has(extension)){
+      const sourceFile=options?.sourceFile||file;
+      const dependencies=options?.files?.length?options.files:[sourceFile];
+      const sourceSha256=options?.sourceSha256||await this.sha256File(sourceFile);
+      if(ASSIMP_MODEL_EXTENSIONS.has(extension)){
+        const converted=await this.convertLegacyModelToGLB(sourceFile,dependencies);
+        const convertedResult=await this.importFile(converted,{internalConversion:true,sourceFile,sourceSha256,remoteSource:options.remoteSource,files:dependencies});
         const record=convertedResult.record,internalEntry=this.assets.get(converted.name);
         this.assets.delete(converted.name);
-        this.assets.set(file.name,{type:"model",file,url,resource:internalEntry?.resource,converted:true,convertedFrom:file.name});
-        record.name=file.name.replace(/\.[^.]+$/,"");record.entity.name=record.name;
-        record.components.asset={...record.components.asset,type:"model",name:file.name,analysis:analysis||null,sourceUnits:"source-native",sourceBytes:file.size,sourceSha256:await this.sha256File(file),remoteSource:options.remoteSource||null,converted:true,convertedFrom:file.name,converter:"AssimpJS",sourcePreserved:true,dependencyFiles:(options.files||[]).map(f=>f.name).filter(n=>n!==file.name),derivedDirty:false,importScale:record.components.asset?.importScale||1,normalized:!!record.components.asset?.normalized,viewportPreview:record.components.asset?.viewportPreview||null};
+        record.name=sourceFile.name.replace(/\.[^.]+$/,"");
+        record.entity.name=record.name;
+        record.components.asset={
+          ...record.components.asset,
+          type:"model",name:sourceFile.name,analysis:analysis||record.components.asset?.analysis||null,
+          sourceUnits:"source-native",sourceBytes:sourceFile.size,sourceSha256,remoteSource:options.remoteSource||null,
+          converted:true,convertedFrom:sourceFile.name,converter:"AssimpJS",sourcePreserved:true,
+          dependencyFiles:dependencies.map(f=>String(f.webkitRelativePath||f.name)).filter(n=>n!==String(sourceFile.webkitRelativePath||sourceFile.name)),
+          derivedDirty:false
+        };
+        this.assets.set(sourceFile.name,{type:"model",file:sourceFile,url:URL.createObjectURL(sourceFile),resource:internalEntry?.resource,converted:true,convertedFrom:sourceFile.name,dependencies});
         this.select(record.id);window.dispatchEvent(new Event("forge-assets-changed"));window.ForgeRefreshUI?.();
         return{type:"model",record,converted:true};
       }
-      return new Promise(async(resolve,reject)=>{
-        try{
-          if(/\.gltf$/i.test(file.name)){
-            const json=JSON.parse(await file.text());
-            const external=[...(json.buffers||[]),...(json.images||[])].some(x=>x?.uri&&!String(x.uri).startsWith("data:"));
-            if(external)throw new Error("This glTF still references external files; select its dependency files together so Forge can package them.");
-          }
-          const previewSource=await this.sanitizeGlbPreview(file);
-          const loadFile=previewSource.file;
-          const loadUrl=URL.createObjectURL(loadFile);
-          const asset=new pc.Asset(file.name,"container",{url:loadUrl});
-          this.app.assets.add(asset);
-          asset.once("error",err=>{URL.revokeObjectURL(loadUrl);reject(err)});
-          asset.once("load",()=>{
-            try{
-              const e=asset.resource.instantiateRenderEntity({castShadows:true,receiveShadows:true});
-              e.name=file.name.replace(/\.[^.]+$/,"");this.root.addChild(e);
-              const preview=this.prepareImportedModelPreview(e),r=this.rec(e.name,"model",e);
-              r.components.asset={
-                type:"model",name:file.name,analysis:analysis||null,sourceUnits:"source-native",sourceBytes:file.size,sourceSha256:await this.sha256File(file),remoteSource:options.remoteSource||null,dependencyFiles:(options.files||[]).map(f=>f.name).filter(n=>n!==file.name),
-                sourcePreserved:true,viewportSanitized:previewSource.sanitized===true,
-                sanitizedExtensions:previewSource.removedExtensions||[],
-                importScale:preview.normalized?.scale||1,normalized:!!preview.normalized?.ok,
-                derivedDirty:false,viewportPreview:preview
-              };
-              const clips=this.attachAnimations(e,asset.resource,analysis?.animationNames||[]);if(clips.length)r.components.animation={clips,playing:true};
-              this.assets.set((sourceFile||file).name,{type:"model",file:sourceFile||file,url,resource:asset.resource,asset,viewportFile:loadFile,dependencies:options.files||[sourceFile||file]});
-              URL.revokeObjectURL(loadUrl);
-              window.dispatchEvent(new Event("forge-assets-changed"));window.ForgeRefreshUI?.();
-              requestAnimationFrame(()=>requestAnimationFrame(()=>{this.select(r.id);window.ForgeSpatial?.inspect?.(r);resolve({type:"model",record:r})}));
-            }catch(err){URL.revokeObjectURL(loadUrl);reject(err)}
-          });
-          this.app.assets.load(asset);
-        }catch(err){reject(err)}
+
+      let loadInput=file;
+      if(extension==="gltf"){
+        const json=JSON.parse(await file.text());
+        const external=[...(json.buffers||[]),...(json.images||[])].some(x=>x?.uri&&!String(x.uri).startsWith("data:"));
+        if(external)loadInput=await this.packageExternalGltf(file,dependencies);
+      }
+
+      let previewSource;
+      try{
+        previewSource=await this.sanitizeGlbPreview(loadInput);
+      }catch(nativeError){
+        if(options?.internalConversion||options?.disableAssimpFallback)throw nativeError;
+        this.log("Native glTF preview rejected; retrying through AssimpJS compatibility path: "+nativeError.message,"warn");
+        const converted=await this.convertLegacyModelToGLB(sourceFile,dependencies);
+        const convertedResult=await this.importFile(converted,{internalConversion:true,sourceFile,sourceSha256,remoteSource:options.remoteSource,files:dependencies});
+        const record=convertedResult.record;
+        record.name=sourceFile.name.replace(/\.[^.]+$/,"");record.entity.name=record.name;
+        record.components.asset={...record.components.asset,name:sourceFile.name,sourceBytes:sourceFile.size,sourceSha256,remoteSource:options.remoteSource||null,converted:true,converter:"AssimpJS compatibility fallback",sourcePreserved:true};
+        this.select(record.id);return convertedResult;
+      }
+
+      const loadFile=previewSource.file,loadUrl=URL.createObjectURL(loadFile),asset=new pc.Asset(sourceFile.name,"container",{url:loadUrl});
+      this.app.assets.add(asset);
+      return await new Promise((resolve,reject)=>{
+        asset.once("error",err=>{URL.revokeObjectURL(loadUrl);reject(err)});
+        asset.once("load",()=>{
+          try{
+            const e=asset.resource.instantiateRenderEntity({castShadows:true,receiveShadows:true});
+            e.name=sourceFile.name.replace(/\.[^.]+$/,"");this.root.addChild(e);
+            const preview=this.prepareImportedModelPreview(e),r=this.rec(e.name,"model",e);
+            r.components.asset={
+              type:"model",name:sourceFile.name,analysis:analysis||null,sourceUnits:"source-native",
+              sourceBytes:sourceFile.size,sourceSha256,remoteSource:options.remoteSource||null,
+              dependencyFiles:dependencies.map(f=>String(f.webkitRelativePath||f.name)).filter(n=>n!==String(sourceFile.webkitRelativePath||sourceFile.name)),
+              sourcePreserved:true,viewportSanitized:previewSource.sanitized===true,
+              sanitizedExtensions:previewSource.removedExtensions||[],
+              importScale:preview.normalized?.scale||1,normalized:!!preview.normalized?.ok,
+              derivedDirty:false,viewportPreview:preview
+            };
+            const clips=this.attachAnimations(e,asset.resource,analysis?.animationNames||[]);
+            if(clips.length)r.components.animation={clips,playing:true};
+            this.assets.set(sourceFile.name,{type:"model",file:sourceFile,url:URL.createObjectURL(sourceFile),resource:asset.resource,asset,viewportFile:loadFile,dependencies});
+            URL.revokeObjectURL(loadUrl);
+            window.dispatchEvent(new Event("forge-assets-changed"));window.ForgeRefreshUI?.();
+            requestAnimationFrame(()=>requestAnimationFrame(()=>{this.select(r.id);window.ForgeSpatial?.inspect?.(r);resolve({type:"model",record:r})}));
+          }catch(err){URL.revokeObjectURL(loadUrl);reject(err)}
+        });
+        this.app.assets.load(asset);
       });
     }
     return{type:'asset',name:file.name,analysis,sourceBytes:file.size,sourceSha256:await this.sha256File(file),extension,kind:SOURCE_EXTENSIONS.has(extension)?"source":"file"}
