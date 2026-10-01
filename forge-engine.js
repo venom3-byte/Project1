@@ -195,7 +195,7 @@ export class ForgeEngine{
     const exporter=new bridge.GLTFExporter();
     const result=await exporter.parseAsync(root,{binary:true,onlyVisible:false,trs:false,animations});
     if(!(result instanceof ArrayBuffer))throw new Error("Three.js compatibility bridge did not return GLB bytes");
-    return new File([result],file.name.replace(/.[^.]+$/i,"")+".glb",{type:"model/gltf-binary"});
+    return new File([result],file.name.replace(/\.[^.]+$/i,"")+".glb",{type:"model/gltf-binary"});
   }
   async sha256File(file){
     const bytes=await file.arrayBuffer();
@@ -462,11 +462,13 @@ export class ForgeEngine{
       }catch(nativeError){
         if(options?.internalConversion||options?.disableAssimpFallback)throw nativeError;
         this.log("Native glTF preview rejected; retrying through AssimpJS compatibility path: "+nativeError.message,"warn");
-        const converted=await this.convertWithThreeBridge(loadInput,"gltf").catch(async()=>this.convertLegacyModelToGLB(sourceFile,dependencies));
+        let converted,converter;
+        try{converted=await this.convertWithThreeBridge(loadInput,"gltf");converter="Three.js GLTF compatibility bridge"}
+        catch{converted=await this.convertLegacyModelToGLB(sourceFile,dependencies);converter="AssimpJS compatibility fallback"}
         const convertedResult=await this.importFile(converted,{internalConversion:true,sourceFile,sourceSha256,remoteSource:options.remoteSource,files:dependencies});
         const record=convertedResult.record;
         record.name=sourceFile.name.replace(/\.[^.]+$/,"");record.entity.name=record.name;
-        record.components.asset={...record.components.asset,name:sourceFile.name,sourceBytes:sourceFile.size,sourceSha256,remoteSource:options.remoteSource||null,converted:true,converter:converted===converted?((converted.name.startsWith(sourceFile.name.replace(/\.[^.]+$/,"")+"_")||converted.name.includes("glb"))?"Three.js GLTF compatibility bridge":"AssimpJS compatibility fallback"):"compatibility fallback",sourcePreserved:true};
+        record.components.asset={...record.components.asset,name:sourceFile.name,sourceBytes:sourceFile.size,sourceSha256,remoteSource:options.remoteSource||null,converted:true,converter,sourcePreserved:true};
         this.select(record.id);return convertedResult;
       }
 
