@@ -1,5 +1,6 @@
 import{test,expect}from"@playwright/test";
 import{writeFile}from"node:fs/promises";
+import{PNG}from"pngjs";
 
 const FOX="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Fox/glTF-Binary/Fox.glb";
 const TOYCAR="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/ToyCar/glTF-Binary/ToyCar.glb";
@@ -47,6 +48,11 @@ async function importViaInput(page,buffer,name,mimeType,{renderable=false}={}){
   }
 }
 
+function wavSilence(seconds=.25,sampleRate=8000){
+  const frames=Math.floor(seconds*sampleRate),bytes=44+frames*2,b=Buffer.alloc(bytes);
+  b.write("RIFF",0);b.writeUInt32LE(bytes-8,4);b.write("WAVE",8);b.write("fmt ",12);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(sampleRate,24);b.writeUInt32LE(sampleRate*2,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write("data",36);b.writeUInt32LE(frames*2,40);
+  return b;
+}
 async function sha(blob){return pageHash(await blob.arrayBuffer())}
 async function pageHash(buf){
   const d=await crypto.subtle.digest("SHA-256",buf);
@@ -71,6 +77,20 @@ test.describe("Forge professional acceptance",()=>{
     expect(elapsed).toBeLessThan(12000);
     expect(Number(nav?.domContentLoadedEventEnd||0)).toBeLessThan(10000);
     await page.screenshot({path:"test-results/pro-startup-desktop.png",fullPage:true});
+  });
+
+  test("editor chrome stays docked and advanced tools do not float over the viewport",async({page})=>{
+    await waitForForge(page);
+    await expect(page.locator(".forge-prod")).toHaveCount(0);
+    await expect(page.locator("#openEditors")).toBeVisible();
+    await page.click("#openEditors");
+    await expect(page.locator(".forge-modal")).toBeVisible();
+    await expect(page.locator('[data-editor-tool="Asset Lab"]')).toBeVisible();
+    await expect(page.locator('[data-editor-tool="Material Lab"]')).toBeVisible();
+    await expect(page.locator('[data-editor-tool="Animation Graph + Rig"]')).toBeVisible();
+    await page.locator(".forge-modal [data-x]").click();
+    await expect(page.locator(".forge-modal")).toHaveCount(0);
+    await expect(page.locator("#forgeMobileControls")).toHaveCount(0);
   });
 
   test("desktop editor layout follows professional viewport/hierarchy/inspector separation",async({page})=>{
@@ -172,6 +192,79 @@ test.describe("Forge professional acceptance",()=>{
     expect(result.redone).toEqual(result.changed);
   });
 
+  test("universal importer exposes broad 3D format coverage without collapsing everything to one native path",async({page})=>{
+    await waitForForge(page);
+    const caps=await page.evaluate(()=>window.Forge.assetImportCapabilities());
+    expect(caps.native3D).toEqual(expect.arrayContaining(["glb","gltf"]));
+    expect(caps.assimpWasm).toEqual(expect.arrayContaining(["fbx","obj","dae","3ds","3mf","stl","ply","ifc","usd"]));
+    expect(caps.assimpWasm.length).toBeGreaterThanOrEqual(40);
+    expect(caps.images).toEqual(expect.arrayContaining(["png","webp","avif","tga","dds","ktx2"]));
+  });
+
+  test("Assimp compatibility path imports STL and preserves the original source",async({page})=>{
+    test.setTimeout(120000);
+    const stl=Buffer.from([
+      "solid ForgeTest",
+      "facet normal 0 0 1",
+      " outer loop",
+      "  vertex 0 0 0",
+      "  vertex 1 0 0",
+      "  vertex 0 1 0",
+      " endloop",
+      "endfacet",
+      "facet normal 0 0 -1",
+      " outer loop",
+      "  vertex 0 0 1",
+      "  vertex 0 1 1",
+      "  vertex 1 0 1",
+      " endloop",
+      "endfacet",
+      "endsolid ForgeTest"
+    ].join("\n"),"utf8");
+    await waitForForge(page);
+    await importViaInput(page,stl,"forge-proof.stl","model/stl",{renderable:true});
+    const result=await page.evaluate(()=>{const r=window.Forge.selected(),s=window.ForgeSpatial.inspect(r);return{name:r?.components?.asset?.name,converted:r?.components?.asset?.converted===true,converter:r?.components?.asset?.converter,sourcePreserved:r?.components?.asset?.sourcePreserved===true,sha:r?.components?.asset?.sourceSha256||"",vertices:s?.geometry?.vertices||0,triangles:s?.geometry?.triangles||0}});
+    expect(result.name).toBe("forge-proof.stl");
+    expect(result.converted).toBeTruthy();
+    expect(result.converter).toBe("AssimpJS");
+    expect(result.sourcePreserved).toBeTruthy();
+    expect(result.sha).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.vertices).toBeGreaterThan(0);
+    expect(result.triangles).toBeGreaterThan(0);
+    await page.screenshot({path:"test-results/pro-universal-stl-editor.png",fullPage:true});
+  });
+
+  test("real audio WAV imports as an Engine Audio Asset with a Sound Slot and listener",async({page})=>{
+    await waitForForge(page);
+    const wav=wavSilence();
+    await importViaInput(page,wav,"forge-proof.wav","audio/wav");
+    const info=await page.evaluate(()=>{
+      const r=window.Forge.selected();
+      const slot=r?.entity?.sound?.slot?.("main");
+      const cam=window.Forge.camera();
+      return{
+        kind:r?.kind,
+        asset:r?.components?.asset?.type,
+        assetName:r?.components?.asset?.name,
+        sound:!!r?.entity?.sound,
+        slot:!!slot,
+        slotLoaded:!!slot?.isLoaded,
+        listener:!!cam?.audiolistener,
+        registry:window.Forge.assets.has("forge-proof.wav")
+      };
+    });
+    expect(info.kind).toBe("audio");
+    expect(info.asset).toBe("audio");
+    expect(info.assetName).toBe("forge-proof.wav");
+    expect(info.sound).toBeTruthy();
+    expect(info.slot).toBeTruthy();
+    expect(info.listener).toBeTruthy();
+    expect(info.registry).toBeTruthy();
+    await page.click("#assetPlay");
+    await page.waitForTimeout(120);
+    expect(await page.locator("#assetPlay").isEnabled()).toBeTruthy();
+  });
+
   test("real 2D PNG survives source round-trip, validates dimensions, and generates a real viewport PNG",async({page})=>{
     await waitForForge(page);
     const png=await download(page,EXAMPLE_PNG);
@@ -183,7 +276,7 @@ test.describe("Forge professional acceptance",()=>{
       const check=await window.ForgeExport.validateSelected();
       const source=await window.ForgeExport.exportSource({download:false});
       const preview=await window.ForgeExport.exportPreview({download:false,name:"developer-reference-preview.png"});
-      const info=window.ForgeSpatial.inspect(imported.record);
+      const info=window.ForgeSpatial.inspect(imported);
       return{
         name:window.Forge.selected()?.name,
         check,
@@ -203,10 +296,92 @@ test.describe("Forge professional acceptance",()=>{
     expect(result.sourceSha).toBe(await sha(new Blob([png])));
     expect(result.exportedBytes).toBe(result.sourceBytes);
     expect(result.previewBytes).toBeGreaterThan(50);
+    expect(result.info.world.size.y).toBeGreaterThan(0.1);
+    expect(result.info.world.size.y).toBeLessThan(4);
+    const screen=await page.evaluate(()=>window.ForgeSpatial.screenRect(window.Forge.selected()));
+    expect(screen.height).toBeGreaterThan(220);
     expect(await page.locator(".asset-row .asset-thumb").evaluate(img=>img.complete&&img.naturalWidth>0)).toBeTruthy();
     expect(await page.locator("#assetMeta").textContent()).toContain("developer-reference.png");
     await writeFile("test-results/pro-2d-source.png",png);
     await page.screenshot({path:"test-results/pro-2d-import.png",fullPage:true});
+  });
+
+  test("legacy OBJ imports through the real browser conversion adapter and produces a renderable 3D asset",async({page})=>{
+    test.setTimeout(120000);
+    const obj=Buffer.from([
+      "o ForgeProof","v -0.7 0 -0.5","v 0.7 0 -0.5","v 0 1.4 -0.5","v -0.7 0 0.5","v 0.7 0 0.5","v 0 1.4 0.5",
+      "f 1 2 3","f 4 6 5","f 1 4 5 2","f 2 5 6 3","f 3 6 4 1"
+    ].join("\n"),"utf8");
+    await waitForForge(page);
+    await importViaInput(page,obj,"forge-proof.obj","model/obj",{renderable:true});
+    const result=await page.evaluate(()=>{const r=window.Forge.selected(),spatial=window.ForgeSpatial.inspect(r);const stack=[r?.entity],meshes=[];while(stack.length){const n=stack.pop();for(const mi of n?.render?.meshInstances||[])meshes.push(mi);for(const c of n?.children||[])stack.push(c)}const m=meshes[0]?.material;return{name:r?.components?.asset?.name,converted:r?.components?.asset?.converted===true,converter:r?.components?.asset?.converter,sourcePreserved:r?.components?.asset?.sourcePreserved===true,vertices:spatial?.geometry?.vertices||0,triangles:spatial?.geometry?.triangles||0,renderables:meshes.length,diffuse:m?.diffuse?[m.diffuse.r,m.diffuse.g,m.diffuse.b]:[0,0,0]}});
+    expect(result.name).toBe("forge-proof.obj");expect(result.converted).toBeTruthy();expect(result.converter).toBe("AssimpJS");expect(result.sourcePreserved).toBeTruthy();expect(result.vertices).toBeGreaterThan(0);expect(result.triangles).toBeGreaterThan(0);expect(result.renderables).toBeGreaterThan(0);
+    expect(result.diffuse.reduce((a,b)=>a+b,0)).toBeGreaterThan(.3);
+    await page.screenshot({path:"test-results/pro-legacy-obj-editor.png",fullPage:true});
+  });
+  test("built-in high-fidelity Car Concept imports as a native 3D asset in the Forge viewport",async({page})=>{
+    test.setTimeout(150000);
+    await waitForForge(page);
+    await expect(page.locator("#importRealCar")).toBeVisible();
+    await page.click("#importRealCar");
+    await page.waitForFunction(()=>{const a=window.Forge?.selected?.()?.components?.asset;return a?.remoteSource?.includes("sceneview.github.io/models/platforms/CarConcept.glb")&&a?.license==="CC BY 4.0";},{timeout:90000});
+    const result=await page.evaluate(()=>{
+      const r=window.Forge.selected();
+      const stack=[r?.entity],meshes=[];
+      while(stack.length){
+        const n=stack.pop();
+        for(const mi of n?.render?.meshInstances||[])meshes.push(mi);
+        for(const c of n?.children||[])stack.push(c);
+      }
+      const spatial=window.ForgeSpatial.inspect(r);
+      const materials=new Set(meshes.map(mi=>mi.material?.name||mi.material).filter(Boolean));
+      return{
+        name:r?.components?.asset?.name,
+        remoteSource:r?.components?.asset?.remoteSource,
+        sourceSha256:r?.components?.asset?.sourceSha256,
+        pbrPreserved:r?.components?.asset?.viewportPreview?.pbrPreserved||0,
+        license:r?.components?.asset?.license,
+        attribution:r?.components?.asset?.attribution,
+        catalogSource:r?.components?.asset?.catalogSource,
+        viewportSanitized:r?.components?.asset?.viewportSanitized===true,
+        sanitizedExtensions:r?.components?.asset?.sanitizedExtensions||[],
+        vertices:spatial?.geometry?.vertices||0,
+        triangles:spatial?.geometry?.triangles||0,
+        spatialMaterials:spatial?.geometry?.materials||0,
+        materials:Math.max(spatial?.geometry?.materials||0,materials.size),
+        renderables:meshes.length,
+        textured:meshes.filter(mi=>!!mi.material?.diffuseMap).length,
+        world:spatial?.world?.size||null,
+        screen:window.ForgeSpatial.screenRect(r)
+      };
+    });
+    expect(result.name).toBe("Forge-CarConcept-Khronos.glb");
+    expect(result.remoteSource).toContain("sceneview.github.io/models/platforms/CarConcept.glb");
+    expect(result.sourceSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.license).toBe("CC BY 4.0");
+    expect(result.attribution).toContain("Darmstadt Graphics Group GmbH");
+    expect(result.catalogSource).toContain("KhronosGroup/glTF-Sample-Assets");
+    expect(result.vertices).toBeGreaterThan(5000);
+    expect(result.triangles).toBeGreaterThan(5000);
+    expect(result.materials).toBeGreaterThanOrEqual(3);
+    expect(result.renderables).toBeGreaterThan(0);
+    expect(result.textured).toBeGreaterThan(0);
+    expect(result.pbrPreserved).toBeGreaterThan(0);
+    expect(result.world?.y).toBeGreaterThan(0.5);
+    expect(result.screen?.width).toBeGreaterThan(250);
+    expect(result.screen?.height).toBeGreaterThan(140);
+    const shot=await page.locator("#viewport").screenshot();
+    expect(shot.length).toBeGreaterThan(12000);
+    const png=PNG.sync.read(shot);
+    let active=0,total=0;
+    for(let y=0;y<png.height;y+=8)for(let x=0;x<png.width;x+=8){
+      const i=(y*png.width+x)*4,r=png.data[i],g=png.data[i+1],b=png.data[i+2];
+      const spread=Math.max(r,g,b)-Math.min(r,g,b);
+      if((r+g+b)/3>28&&spread>10)active++;
+      total++;
+    }
+    expect(active/Math.max(1,total)).toBeGreaterThan(0.01);
+    await page.screenshot({path:"test-results/pro-high-fidelity-car-editor.png",fullPage:true});
   });
 
   test("real animated Fox GLB imports with animation clips and exact source export",async({page})=>{

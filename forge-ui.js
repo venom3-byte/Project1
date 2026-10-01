@@ -139,7 +139,7 @@ if(!window.ForgeGizmo){
   };
 }
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-function icon(k){return({box:"▣",sphere:"●",cylinder:"⬢",capsule:"◉",plane:"▱",camera:"◫",light:"☼",model:"◇",empty:"＋"})[k]||"•"}
+function icon(k){return({box:"▣",sphere:"●",cylinder:"⬢",capsule:"◉",plane:"▱",camera:"◫",light:"☼",model:"◇",audio:"♫",empty:"＋"})[k]||"•"}
 function matchesFilter(r){const q=String($("treeFilter")?.value||"").trim().toLowerCase();return !q||r.name.toLowerCase().includes(q)||r.kind.toLowerCase().includes(q)}
 function refresh(){
   const tree=$("tree");tree.innerHTML="";
@@ -182,7 +182,13 @@ function updateAssetPanel(){
   if(!label||!type)return;
   const a=r?.components?.asset;
   label.textContent=r?.name||"No asset selected";
-  type.textContent=a?.type?(a.type==="model"?"3D GLB":a.type==="image"?"2D Image":a.type.toUpperCase()):"Scene object";
+  type.textContent=a?.type?(a.type==="model"?"3D Model":a.type==="image"?"2D Image":a.type==="audio"?"AUDIO":a.type==="file"?"SOURCE FILE":"FILE"):"Scene object";
+  const play=$("assetPlay");
+  if(play){
+    const isAudio=a?.type==="audio"&&!!r?.entity?.sound?.slot?.("main");
+    play.disabled=!isAudio;
+    play.textContent=isAudio?(r.entity.sound.slot("main").isPlaying?"■ Stop Audio":"▶ Play Audio"):"▶ Play Audio";
+  }
   if(meta){
     if(!a){
       meta.textContent="Select an imported asset to inspect source metadata.";
@@ -191,7 +197,9 @@ function updateAssetPanel(){
       const bytes=Number(entry?.file?.size||0);
       const mime=entry?.file?.type||"application/octet-stream";
       const dims=a.width&&a.height?(" · "+a.width+"×"+a.height+"px"):"";
-      meta.textContent="SOURCE · "+a.name+" · "+bytes.toLocaleString()+" bytes · "+mime+dims;
+      const license=a.license?(" · "+a.license):"";
+      const source=a.remoteSource?(" · REMOTE SOURCE"):(" · LOCAL SOURCE");
+      meta.textContent="SOURCE · "+a.name+" · "+bytes.toLocaleString()+" bytes · "+mime+dims+license+source;
     }
   }
 }
@@ -203,7 +211,7 @@ function updateAssetBrowser(){
   if(!records.length){const e=document.createElement("div");e.className="asset-empty";e.textContent="No imported assets";list.append(e);return}
   for(const r of records){
     const row=document.createElement("button");row.className="asset-row"+(r.id===engine.selectedId?" active":"");
-    const t=r.components.asset.type==="model"?"3D":r.components.asset.type==="image"?"2D":"FILE";
+    const t=r.components.asset.type==="model"?"3D":r.components.asset.type==="image"?"2D":r.components.asset.type==="audio"?"AUD":"FILE";
     const visual=document.createElement("span");visual.className="asset-visual";
     const entry=engine.assets?.get?.(r.components.asset.name);
     if(r.components.asset.type==="image"&&entry?.file){
@@ -244,12 +252,105 @@ document.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>{
 $("apply").onclick=apply;["px","py","pz","rx","ry","rz","sx","sy","sz","name"].forEach(id=>$(id).onchange=apply);
 $("duplicate").onclick=()=>{if(engine.duplicate()){refresh();inspect()}};$("undo")?.addEventListener("click",()=>{if(engine.undo()){refresh();inspect()}});$("redo")?.addEventListener("click",()=>{if(engine.redo()){refresh();inspect()}});
 $("delete").onclick=()=>{engine.delete();refresh();inspect()};$("focus").onclick=()=>engine.focus();$("frame").onclick=()=>engine.frame();$("reset")?.addEventListener("click",()=>location.reload());
-$("play").onclick=()=>{$("play").textContent=engine.running?"❚❚ Play":"▶ Play";engine.running=!engine.running;engine.timelinePlaying=engine.running};$("timelinePlay").onclick=()=>$("play").click();
+const setForgeRuntimeActive=active=>{document.body.dataset.forgeRuntimeActive=active?"1":"0";document.documentElement.dataset.forgeRuntimeActive=active?"1":"0";window.dispatchEvent(new Event("forge-runtime-visibility"))};
+setForgeRuntimeActive(false);
+$("play").onclick=()=>{$("play").textContent=engine.running?"❚❚ Play":"▶ Play";engine.running=!engine.running;engine.timelinePlaying=engine.running;setForgeRuntimeActive(engine.running)};$("timelinePlay").onclick=()=>$("play").click();
 $("rewind").onclick=()=>{engine.timelineTime=0;$("time").value=0;engine.evalAnimation(0);inspect()};$("time").oninput=e=>{engine.timelineTime=+e.target.value||0;engine.evalAnimation(engine.timelineTime);$("playhead").style.left=(engine.timelineTime*60)+"px";inspect()};$("key").onclick=()=>{engine.key();toast("Keyframe added")};
+$("draw2dOpen")?.addEventListener("click",()=>{
+  const d=$("draw2dDialog");
+  if(d&&!d.open)try{d.showModal()}catch{d.setAttribute("open","")}
+});
+const REALISTIC_CAR_URL="https://sceneview.github.io/models/platforms/CarConcept.glb";
+async function importRealisticCar(){
+  const button=$("importRealCar");
+  const previous=button?.textContent;
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),45000);
+  try{
+    if(button){button.disabled=true;button.textContent="🚘 Loading high-fidelity car…"}
+    const response=await fetch(REALISTIC_CAR_URL,{mode:"cors",cache:"no-store",signal:controller.signal});
+    if(!response.ok)throw new Error("High-fidelity car download failed: HTTP "+response.status);
+    const blob=await response.blob();
+    if(blob.size<5_000_000)throw new Error("High-fidelity car asset is unexpectedly small ("+blob.size+" bytes)");
+    const file=new File([blob],"Forge-CarConcept-Khronos.glb",{type:"model/gltf-binary"});
+    await window.ForgeProduction?.assets?.storeFile?.(file);
+    const result=await engine.importFile(file,{remoteSource:REALISTIC_CAR_URL});
+    if(result?.type!=="model"||!result.record)throw new Error("High-fidelity car did not produce a native Forge 3D model");
+    const record=result.record,entry=engine.assets.get(file.name);
+    const sourceSha256=await forgeExportProxy.sha256(file);
+    record.components.asset.remoteSource=REALISTIC_CAR_URL;
+    record.components.asset.sourceSha256=sourceSha256;
+    record.components.asset.license="CC BY 4.0";
+    record.components.asset.licenseUrl="https://creativecommons.org/licenses/by/4.0/";
+    record.components.asset.attribution="Darmstadt Graphics Group GmbH + Eric Chadwick (glTF conversion/optimization); Unity Fan (original Sketchfab model, CC0)";
+    record.components.asset.catalogSource="KhronosGroup/glTF-Sample-Assets — CarConcept";
+    record.components.asset.qualityProfile="high-fidelity-production-car-concept";
+    if(entry)Object.assign(entry,{remoteSource:REALISTIC_CAR_URL,sourceSha256,license:"CC BY 4.0",catalogSource:"KhronosGroup/glTF-Sample-Assets — CarConcept"});
+    engine.select(record.id);
+    engine.focus();
+    refresh();inspect();
+    toast("High-fidelity Car Concept imported into Forge viewport");
+    write("Imported Khronos Car Concept — native Forge 3D viewport — CC BY 4.0");
+    return result;
+  }catch(error){
+    if(error?.name==="AbortError")throw new Error("High-fidelity car download timed out after 45s");
+    throw error;
+  }finally{
+    clearTimeout(timer);
+    if(button){button.disabled=false;button.textContent=previous||"🚘 Import high-quality car"}
+  }
+}
+window.ForgeDemoAssets={importRealisticCar,REALISTIC_CAR_URL};
+$("importRealCar")?.addEventListener("click",()=>importRealisticCar().catch(e=>write("High-fidelity car import failed: "+e.message,"error")));
 $("importAssets").onclick=()=>$("assetInput").click();$("assetInput").onchange=e=>loadFiles([...e.target.files]);
-async function loadFiles(files){for(const f of files)try{await window.ForgeProduction?.assets?.storeFile?.(f);const r=await engine.importFile(f);if(r.type==="project")await engine.load(r.data);write("Imported "+f.name)}catch(e){write("Import failed "+f.name+": "+e.message,"error")}refresh();inspect()}
+async function loadFiles(files){
+  const list=[...(files||[])].filter(Boolean);
+  if(!list.length)return;
+  for(const f of list)try{await window.ForgeProduction?.assets?.storeFile?.(f)}catch(e){write("Asset vault store failed "+f.name+": "+e.message,"error")}
+
+  const nativeModels=new Set(["glb","gltf"]);
+  const extensionOf=f=>String(f.name||"").toLowerCase().split(".").pop();
+  const referenced=new Set();
+  for(const gltf of list.filter(f=>/\.gltf$/i.test(f.name))){
+    try{
+      const json=JSON.parse(await gltf.text());
+      for(const item of [...(json.buffers||[]),...(json.images||[])]){
+        const uri=item?.uri;
+        if(uri&&!String(uri).startsWith("data:"))referenced.add(decodeURIComponent(String(uri).split(/[?#]/)[0]).replaceAll("\\","/").split("/").at(-1).toLowerCase());
+      }
+    }catch{}
+  }
+  const assimpExts=new Set(window.Forge?.assetImportCapabilities?.().assimpWasm||[]);
+  const modelFiles=list.filter(f=>{
+    const ext=extensionOf(f);
+    return nativeModels.has(ext)||assimpExts.has(ext);
+  });
+  const modelDependencies=new Set(list.filter(f=>referenced.has(f.name.toLowerCase())).map(f=>f.name));
+
+  for(const f of modelFiles){
+    try{
+      const r=await engine.importFile(f,{files:list});
+      if(r.type==="project")await engine.load(r.data);
+      write("Imported 3D asset "+f.name+(r.converted?" → normalized GLB":""));
+    }catch(e){write("3D import failed "+f.name+": "+e.message,"error")}
+  }
+
+  const alreadyHandled=new Set(modelFiles.map(f=>f.name));
+  for(const f of list){
+    if(alreadyHandled.has(f.name)||modelDependencies.has(f.name))continue;
+    try{
+      const r=await engine.importFile(f,{files:list});
+      if(r.type==="project")await engine.load(r.data);
+      write("Imported "+f.name);
+    }catch(e){
+      write("Import failed "+f.name+": "+e.message,"error");
+    }
+  }
+  refresh();inspect();
+}
 document.addEventListener("dragover",e=>{e.preventDefault();$("dropOverlay").classList.remove("hidden")});document.addEventListener("drop",e=>{e.preventDefault();$("dropOverlay").classList.add("hidden");if(e.dataTransfer?.files?.length)loadFiles([...e.dataTransfer.files])});
 $("saveProject").onclick=()=>{window.ForgeProject.download();toast("Complete Forge project saved")};$("openProject").onclick=()=>$("projectInput").click();$("projectInput").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{await window.ForgeProject.load(JSON.parse(await f.text()));refresh();inspect();toast("Complete Forge project loaded")}catch(err){write("Project load failed: "+err.message,"error")}};
+$("openEditors")?.addEventListener("click",()=>window.ForgeProduction?.openEditors?.());
 $("build").onclick=async()=>{if(window.ForgeProduction?.build){try{const r=await window.ForgeProduction.build();if(r?.url){location.href=r.url;return}}catch(e){write("Build failed: "+e.message,"error")}}window.ForgeProject.download("forge-project-3.5.forge.json");toast("Portable Forge project exported")};
 async function assetAction(fn,label){try{const r=await fn();$("assetReport").textContent=JSON.stringify(r,null,2);$("assetBadge").textContent=r.ok?"PASS":"CHECK";$("assetBadge").className="qa-badge "+(r.ok?"pass":"warn");toast(label+(r.ok?" — PASS":" — inspect report"))}catch(e){$("assetBadge").textContent="FAIL";$("assetBadge").className="qa-badge fail";$("assetReport").textContent=JSON.stringify({ok:false,error:e.message},null,2);toast(label+" — "+e.message)}}
 $("exportSource")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.exportSource(),"Source export"));
@@ -258,6 +359,14 @@ $("exportPreview")?.addEventListener("click",()=>assetAction(()=>window.ForgeExp
 $("exportManifest")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.exportManifest(),"Asset manifest"));
 $("validateAsset")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.validateSelected(),"Asset validation"));
 $("assetQA")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.runExportQA(),"Export round-trip QA"));
+$("assetPlay")?.addEventListener("click",()=>{
+  const r=engine.selected(),slot=r?.entity?.sound?.slot?.("main");
+  if(!slot)return;
+  try{
+    if(slot.isPlaying)slot.stop();else slot.play();
+    updateAssetPanel();
+  }catch(e){write("Audio playback failed: "+e.message,"error")}
+});
 $("treeFilter")?.addEventListener("input",refresh);
 $("assetSearch")?.addEventListener("input",updateAssetBrowser);
 $("quickFocus")?.addEventListener("click",()=>engine.focus());

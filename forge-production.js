@@ -197,7 +197,7 @@ const assets=new AssetPipeline(),world=new WorldSystems(),graph=new ForgeGraph()
 window.ForgeProduction={assets,world,graph,profiler};
 
 const style=document.createElement("style");
-style.textContent=".forge-prod{position:fixed;right:14px;bottom:14px;z-index:90;display:flex;gap:5px;flex-wrap:wrap;max-width:430px}.forge-prod button{border:1px solid #29455f;background:#081727;color:#e8f1ff;border-radius:9px;padding:8px 10px;box-shadow:0 8px 26px #0007}.forge-modal{width:min(900px,94vw);border:1px solid #2d4e6d;background:#091523;color:#e8f1ff;border-radius:15px;padding:0}.forge-modal::backdrop{background:#000b;backdrop-filter:blur(8px)}.fm-head{display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #1b304a}.fm-body{padding:12px;max-height:70vh;overflow:auto}.fm-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.fm-card{border:1px solid #1b304a;background:#0b1727;border-radius:10px;padding:10px}.fm-card h4{margin:0 0 7px}.fm-actions{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.fm-table{width:100%;border-collapse:collapse;font-size:11px}.fm-table td,.fm-table th{padding:6px;border-bottom:1px solid #162a40;text-align:left}.fm-node{position:relative;border:1px solid #315a7e;background:#0d1f33;border-radius:8px;padding:8px;margin:5px 0}.fm-code{white-space:pre-wrap;font:11px ui-monospace,monospace;background:#06101b;padding:9px;border-radius:8px}.fm-good{color:#48e28a}.fm-warn{color:#ffca66}.fm-bad{color:#ff7f8d}@media(max-width:700px){.forge-prod{left:8px;right:8px;bottom:8px}.fm-grid{grid-template-columns:1fr}}";
+style.textContent=".forge-modal{width:min(900px,94vw);border:1px solid #2d4e6d;background:#091523;color:#e8f1ff;border-radius:15px;padding:0}.forge-modal::backdrop{background:#000b;backdrop-filter:blur(8px)}.fm-head{display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #1b304a}.fm-body{padding:12px;max-height:70vh;overflow:auto}.fm-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.fm-card{border:1px solid #1b304a;background:#0b1727;border-radius:10px;padding:10px}.fm-card h4{margin:0 0 7px}.fm-actions{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.fm-table{width:100%;border-collapse:collapse;font-size:11px}.fm-table td,.fm-table th{padding:6px;border-bottom:1px solid #162a40;text-align:left}.fm-node{position:relative;border:1px solid #315a7e;background:#0d1f33;border-radius:8px;padding:8px;margin:5px 0}.fm-code{white-space:pre-wrap;font:11px ui-monospace,monospace;background:#06101b;padding:9px;border-radius:8px}.fm-good{color:#48e28a}.fm-warn{color:#ffca66}.fm-bad{color:#ff7f8d}@media(max-width:700px){.fm-grid{grid-template-columns:1fr}}";
 document.head.appendChild(style);
 
 function modal(title,body){
@@ -355,9 +355,34 @@ function open2D(){
   d.querySelector("#spriteImport2D").onclick=async()=>{const fs=[...d.querySelector("#spriteFiles2D").files];if(!fs.length)return;const r=await window.Forge2D.spriteFromFile(fs[0],"Sprite");Forge.select(r.id);refreshHierarchy();toast("Sprite imported")};
   d.querySelector("#twoDState").textContent=JSON.stringify(window.Forge2D?.status?.(),null,2);
 }
-function addBar(){
-  const bar=document.createElement("div");bar.className="forge-prod";
-  const buttons=[["Asset Lab",openAssets],["Material",openMaterial],["Shader",openShader],["Animation",openAnimation],["Anim Graph",openAnimationGraph],["Sequencer",openCinematics],["Render",openRender],["VFX",openVFX],["2D",open2D],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],["Vision",()=>window.AssetForgeLiveVision?.open()],["Runtime",openRuntime],["Build Web",openBuild]];
-  buttons.forEach(([t,f])=>{const b=document.createElement("button");b.textContent=t;b.onclick=f;bar.append(b)});document.body.append(bar);
+function openEditors(){
+  const d=modal("Forge Editors",'<div class="fm-grid">'+[
+    ["Asset Lab",openAssets,"Import, inspect and process source assets."],
+    ["Material Lab",openMaterial,"PBR material parameters and presets."],
+    ["Shader Lab",openShader,"Cross-platform shader presets and diagnostics."],
+    ["Animation",openAnimation,"Imported clips and playback."],
+    ["Animation Graph + Rig",openAnimationGraph,"State graphs and rig profiles."],
+    ["Sequencer",openCinematics,"Transform tracks and keyframes."],
+    ["Render",openRender,"Quality profiles and material graphs."],
+    ["VFX",openVFX,"Runtime particle/VFX controls."],
+    ["2D",open2D,"Raster/sprite authoring and import."],
+    ["World / PCG",openPCG,"Terrain and world generation systems."],
+    ["Logic Graph",openGraph,"Gameplay logic graph."],
+    ["Profiler",openProfiler,"Runtime performance diagnostics."],
+    ["Vision",()=>window.AssetForgeLiveVision?.open?.(),"Live browser vision and real input control."],
+    ["Runtime",openRuntime,"Game runtime, navigation, saves and networking."],
+    ["Build Web",openBuild,"Portable web runtime build."]
+  ].map(([t,f,desc])=>'<div class="fm-card"><h4>'+t+'</h4><div class="subtle">'+desc+'</div><div class="fm-actions"><button data-editor-tool="'+t+'">Open</button></div></div>').join("")+'</div>');
+  const map=new Map([
+    ["Asset Lab",openAssets],["Material Lab",openMaterial],["Shader Lab",openShader],["Animation",openAnimation],
+    ["Animation Graph + Rig",openAnimationGraph],["Sequencer",openCinematics],["Render",openRender],["VFX",openVFX],
+    ["2D",open2D],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],
+    ["Vision",()=>window.AssetForgeLiveVision?.open?.()],["Runtime",openRuntime],["Build Web",openBuild]
+  ]);
+  d.querySelectorAll("[data-editor-tool]").forEach(b=>b.onclick=()=>{
+    const fn=map.get(b.dataset.editorTool);if(!fn)return;
+    d.close();setTimeout(()=>{try{fn()}catch(e){toast("Editor failed: "+e.message)}},0);
+  });
+  return d;
 }
-addBar();
+window.ForgeProduction.openEditors=openEditors;

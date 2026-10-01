@@ -13,18 +13,50 @@ class InputSystem{
   snapshot(){return Object.fromEntries([...this.bindings].map(([k])=>[k,this.isDown(k)]))}
 
   mountMobileControls(){
-    if(document.getElementById("forgeMobileControls"))return;
-    const root=document.createElement("div");root.id="forgeMobileControls";Object.assign(root.style,{position:"fixed",inset:"0",zIndex:"110",pointerEvents:"none",display:"none"});
-    root.innerHTML='<div id="forgeJoy" style="position:absolute;left:22px;bottom:22px;width:120px;height:120px;border-radius:50%;border:1px solid #ffffff55;background:#07132166;pointer-events:auto"><div id="forgeKnob" style="position:absolute;left:38px;top:38px;width:44px;height:44px;border-radius:50%;background:#4dd7ffaa"></div></div><div style="position:absolute;right:22px;bottom:22px;display:flex;gap:12px"><button data-mobile="sprint" style="pointer-events:auto;border-radius:50%;width:58px;height:58px">RUN</button><button data-mobile="jump" style="pointer-events:auto;border-radius:50%;width:70px;height:70px">JUMP</button><button data-mobile="fire" style="pointer-events:auto;border-radius:50%;width:70px;height:70px">FIRE</button></div>';
-    document.body.appendChild(root);
-    const joy=root.querySelector("#forgeJoy"),knob=root.querySelector("#forgeKnob");let active=false,cx=0,cy=0;
-    const move=e=>{if(!active)return;const r=joy.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),m=45,l=Math.min(m,Math.hypot(dx,dy)),a=Math.atan2(dy,dx);const x=Math.cos(a)*l/m,y=Math.sin(a)*l/m;knob.style.transform="translate("+Math.round(x*36)+"px,"+Math.round(y*36)+"px)";this.virtualMove={x:x,z:-y}};
-    const end=()=>{active=false;this.virtualMove={x:0,z:0};knob.style.transform=""};
-    joy.addEventListener("pointerdown",e=>{active=true;joy.setPointerCapture(e.pointerId);move(e)});joy.addEventListener("pointermove",move);joy.addEventListener("pointerup",end);joy.addEventListener("pointercancel",end);
-    for(const b of root.querySelectorAll("[data-mobile]")){const a=b.dataset.mobile;b.addEventListener("pointerdown",e=>{e.preventDefault();this.down.add(a)});b.addEventListener("pointerup",()=>this.down.delete(a));b.addEventListener("pointercancel",()=>this.down.delete(a));b.addEventListener("pointerleave",()=>this.down.delete(a))}
-    const show=()=>{root.style.display=(navigator.maxTouchPoints>0||matchMedia("(pointer:coarse)").matches)?"block":"none"};show();addEventListener("resize",show);
-  }
-}
+    let root=null;
+    const editorMode=!!document.getElementById("play");
+    const editorPlayActive=()=>document.body?.dataset?.forgeRuntimeActive==="1"||document.documentElement?.dataset?.forgeRuntimeActive==="1";
+    const isTouch=()=>navigator.maxTouchPoints>0||matchMedia("(pointer:coarse)").matches;
+
+    const destroy=()=>{
+      if(!root)return;
+      try{root.remove()}catch{}
+      root=null;
+      this.virtualMove={x:0,z:0};
+    };
+
+    const create=()=>{
+      if(root)return;
+      root=document.createElement("div");
+      root.id="forgeMobileControls";
+      Object.assign(root.style,{position:"fixed",inset:"0",zIndex:"110",pointerEvents:"none",display:"none"});
+      root.innerHTML='<div id="forgeJoy" style="position:absolute;left:22px;bottom:22px;width:120px;height:120px;border-radius:50%;border:1px solid #ffffff55;background:#07132166;pointer-events:auto"><div id="forgeKnob" style="position:absolute;left:38px;top:38px;width:44px;height:44px;border-radius:50%;background:#4dd7ffaa"></div></div><div style="position:absolute;right:22px;bottom:22px;display:flex;gap:12px"><button data-mobile="sprint" style="pointer-events:auto;border-radius:50%;width:58px;height:58px">RUN</button><button data-mobile="jump" style="pointer-events:auto;border-radius:50%;width:70px;height:70px">JUMP</button><button data-mobile="fire" style="pointer-events:auto;border-radius:50%;width:70px;height:70px">FIRE</button></div>';
+      document.body.appendChild(root);
+      const joy=root.querySelector("#forgeJoy"),knob=root.querySelector("#forgeKnob");let active=false;
+      const move=e=>{if(!active)return;const r=joy.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),m=45,l=Math.min(m,Math.hypot(dx,dy)),a=Math.atan2(dy,dx);const x=Math.cos(a)*l/m,y=Math.sin(a)*l/m;knob.style.transform="translate("+Math.round(x*36)+"px,"+Math.round(y*36)+"px)";this.virtualMove={x,z:-y}};
+      const end=()=>{active=false;this.virtualMove={x:0,z:0};knob.style.transform=""};
+      joy.addEventListener("pointerdown",e=>{active=true;joy.setPointerCapture(e.pointerId);move(e)});
+      joy.addEventListener("pointermove",move);joy.addEventListener("pointerup",end);joy.addEventListener("pointercancel",end);
+      for(const b of root.querySelectorAll("[data-mobile]")){const a=b.dataset.mobile;b.addEventListener("pointerdown",e=>{e.preventDefault();this.down.add(a)});b.addEventListener("pointerup",()=>this.down.delete(a));b.addEventListener("pointercancel",()=>this.down.delete(a));b.addEventListener("pointerleave",()=>this.down.delete(a))}
+    };
+
+    const show=()=>{
+      const standaloneRuntime=!editorMode;
+      const visible=(standaloneRuntime||editorPlayActive())&&isTouch();
+      if(visible){
+        create();
+        if(root)root.style.display="block";
+      }else if(editorMode){
+        destroy();
+      }else if(root){
+        root.style.display="none";
+      }
+    };
+
+    addEventListener("resize",show);
+    addEventListener("forge-runtime-visibility",show);
+    show();
+  }}
 
 class NavigationSystem{
   constructor(){this.cell=.75;this.width=80;this.height=80;this.blocked=new Uint8Array(this.width*this.height)}
