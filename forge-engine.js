@@ -432,8 +432,8 @@ export class ForgeEngine{
       if(ASSIMP_MODEL_EXTENSIONS.has(extension)){
         const converted=await this.convertLegacyModelToGLB(sourceFile,dependencies);
         const convertedResult=await this.importFile(converted,{internalConversion:true,sourceFile,sourceSha256,remoteSource:options.remoteSource,files:dependencies});
-        const record=convertedResult.record,internalEntry=this.assets.get(converted.name);
-        this.assets.delete(converted.name);
+        const record=convertedResult.record,internalEntry=this.assets.get(sourceFile.name)||this.assets.get(converted.name);
+        this.assets.delete(sourceFile.name);this.assets.delete(converted.name);
         record.name=sourceFile.name.replace(/\.[^.]+$/,"");
         record.entity.name=record.name;
         record.components.asset={
