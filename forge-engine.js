@@ -2,6 +2,12 @@ import * as pc from 'https://cdn.jsdelivr.net/npm/playcanvas@2.22.6/build/playca
 import RAPIER from 'https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.21.0/+esm';
 
 const V=(x=0,y=0,z=0)=>new pc.Vec3(x,y,z);
+const ASSIMP_MODEL_EXTENSIONS=new Set("3ds 3mf ac ac3d acc amj ase ask b3d bvh cob dae dxf enff fbx ifc iqm irr irrmesh lwo lws lxo m3d md2 md3 md5 mdc mdl mesh mesh.xml mot ms3d ndo nff obj off ogex ply pmx prj q3o q3s raw scn sib smd stp stl ter uc usd vta x x3d xgl zgl".split(" "));
+const MODEL_EXTENSIONS=new Set(["glb","gltf",...ASSIMP_MODEL_EXTENSIONS]);
+const IMAGE_EXTENSIONS=new Set(["png","jpg","jpeg","webp","avif","gif","bmp","svg","tif","tiff","tga","dds","ktx","ktx2","hdr","exr"]);
+const AUDIO_EXTENSIONS=new Set(["wav","mp3","ogg","m4a","aac","flac","webm"]);
+const SOURCE_EXTENSIONS=new Set(["ttf","ttc","otf","css","js","mjs","glsl","vert","frag","wgsl","wasm","json","forge.json"]);
+const extOf=name=>String(name||"").toLowerCase().includes(".")?String(name).toLowerCase().split(".").pop():"";
 function rayAabb(o,d,a){
   const mn=a.getMin(),mx=a.getMax();let lo=-Infinity,hi=Infinity;
   for(const k of ['x','y','z']){
@@ -124,6 +130,57 @@ export class ForgeEngine{
   evalAnimation(t){for(const[id,a]of this.keyframes){const r=this.entities.get(id);if(!r||!a.length)continue;let k=a[0];for(let i=0;i<a.length-1;i++)if(t>=a[i].time&&t<=a[i+1].time){const A=a[i],B=a[i+1],f=(t-A.time)/Math.max(.0001,B.time-A.time);k={p:A.p.map((v,j)=>v+(B.p[j]-v)*f),r:A.r.map((v,j)=>v+(B.r[j]-v)*f),s:A.s.map((v,j)=>v+(B.s[j]-v)*f)};break}r.entity.setLocalPosition(...k.p);r.entity.setLocalEulerAngles(...k.r);r.entity.setLocalScale(...k.s)}}
   attachScript(id,code){this.scripts.set(id,code)}
   runScripts(dt){for(const[id,code]of this.scripts){const r=this.entities.get(id);if(!r)continue;try{new Function('api',code)({entity:r.entity,time:this.timelineTime,dt,engine:this})}catch(e){this.log('Script error '+e.message,'error')}}}
+  assetImportCapabilities(){
+    return{
+      native3D:["glb","gltf"],
+      assimpWasm:[...ASSIMP_MODEL_EXTENSIONS].sort(),
+      images:[...IMAGE_EXTENSIONS].sort(),
+      audio:[...AUDIO_EXTENSIONS].sort(),
+      source:[...SOURCE_EXTENSIONS].sort(),
+      notes:{
+        native3D:"glTF/GLB is loaded directly in the PlayCanvas runtime.",
+        assimpWasm:"40+ legacy/industry formats are normalized to an internal GLB representation while the original source bytes remain preserved.",
+        images:"Raster/vector sources are kept as source assets; raster formats with browser decoders can be previewed directly.",
+        audio:"Browser-supported audio is registered as a real Forge Sound asset.",
+        source:"Non-renderable source files are preserved with type metadata for project pipelines."
+      }
+    }
+  }
+  async sha256File(file){
+    const bytes=await file.arrayBuffer();
+    if(globalThis.crypto?.subtle){
+      const hash=await crypto.subtle.digest("SHA-256",bytes);
+      return[...new Uint8Array(hash)].map(v=>v.toString(16).padStart(2,"0")).join("");
+    }
+    return null;
+  }
+  async fileToDataUri(file){
+    const bytes=new Uint8Array(await file.arrayBuffer());
+    let binary="";
+    for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,Math.min(i+0x8000,bytes.length)));
+    return"data:"+(file.type||"application/octet-stream")+";base64,"+btoa(binary);
+  }
+  async packageExternalGltf(file,bundle=[]){
+    const json=JSON.parse(await file.text());
+    const sources=[file,...(bundle||[])].filter(Boolean);
+    const pathOf=f=>String(f.webkitRelativePath||f.name||"").replaceAll("\\","/").replace(/^\.\//,"").toLowerCase();
+    const map=new Map(sources.map(f=>[pathOf(f),f]));
+    const byBase=new Map(sources.map(f=>[pathOf(f).split("/").at(-1),f]));
+    const resolve=uri=>{
+      const clean=decodeURIComponent(String(uri).split(/[?#]/)[0]).replaceAll("\\","/").replace(/^\.\//,"").toLowerCase();
+      return map.get(clean)||byBase.get(clean.split("/").at(-1));
+    };
+    const patch=async list=>{
+      for(const item of list||[]){
+        if(!item?.uri||String(item.uri).startsWith("data:"))continue;
+        const f=resolve(item.uri);
+        if(!f)throw new Error("Missing glTF dependency: "+item.uri);
+        item.uri=await this.fileToDataUri(f);
+      }
+    };
+    await patch(json.buffers);await patch(json.images);
+    return new File([JSON.stringify(json)],file.name,{type:"model/gltf+json"});
+  }
   importedModelBounds(root){
     const min=new pc.Vec3(Infinity,Infinity,Infinity),max=new pc.Vec3(-Infinity,-Infinity,-Infinity);
     root.syncHierarchy?.();
@@ -147,32 +204,36 @@ export class ForgeEngine{
     return{ok:true,scale,sourceSize:[b.size.x,b.size.y,b.size.z],targetSize};
   }
   prepareImportedModelPreview(root){
-    let textured=0,previewAdjusted=0,cullAdjusted=0;
+    let textured=0,previewAdjusted=0,cullAdjusted=0,pbrPreserved=0;
     root.forEach(n=>{
       for(const mi of n.render?.meshInstances||[]){
         const mat=mi.material;
         if(!mat)continue;
         const preview=mat.clone?.()||this.material([.62,.68,.76]);
         const hasMap=!!mat.diffuseMap;
+        const hadPbr=!!(mat.metalnessMap||mat.glossMap||mat.normalMap||mat.emissiveMap||mat.useMetalness);
         if(hasMap){
           textured++;
           preview.diffuse=new pc.Color(1,1,1);
           preview.diffuseMap=mat.diffuseMap;
-          preview.emissiveMap=mat.diffuseMap;
-          preview.emissive=new pc.Color(1,1,1);
-          preview.emissiveIntensity=.75;
-        }else{
+          if(!mat.emissiveMap){
+            preview.emissiveMap=mat.diffuseMap;
+            preview.emissive=new pc.Color(1,1,1);
+            preview.emissiveIntensity=Math.min(.18,Number(mat.emissiveIntensity||.18));
+          }
+        }else if(!preview.diffuse){
           preview.diffuse=new pc.Color(.62,.68,.76);
-          preview.emissive=new pc.Color(.10,.12,.16);
-          preview.emissiveIntensity=.35;
+          preview.emissive=new pc.Color(.06,.08,.11);
+          preview.emissiveIntensity=.08;
         }
-        preview.useLighting=false;
-        preview.useMetalness=false;
-        preview.useTonemap=false;
+        preview.useLighting=true;
+        preview.useMetalness=true;
+        preview.useTonemap=true;
+        if(hadPbr)pbrPreserved++;
         if("cull" in preview)preview.cull=pc.CULLFACE_NONE;
-        if("blendType" in preview)preview.blendType=pc.BLEND_NONE;
-        if("opacity" in preview)preview.opacity=1;
-        if("alphaTest" in preview)preview.alphaTest=0;
+        if("blendType" in preview)preview.blendType=Number(preview.opacity||1)<1?pc.BLEND_NORMAL:pc.BLEND_NONE;
+        if("opacity" in preview&&preview.opacity==null)preview.opacity=1;
+        preview.alphaTest=Number(preview.alphaTest||0);
         preview.update?.();
         mi.material=preview;
         previewAdjusted++;
@@ -180,7 +241,7 @@ export class ForgeEngine{
       }
     });
     const normalized=this.normalizeImportedModel(root,2.4);
-    root.__forgeViewportPreview={textured,previewAdjusted,cullAdjusted,normalized};
+    root.__forgeViewportPreview={textured,previewAdjusted,cullAdjusted,pbrPreserved,normalized};
     return root.__forgeViewportPreview;
   }
 
@@ -206,7 +267,7 @@ export class ForgeEngine{
     }
     const ajs=window.__ForgeAssimpJS;
     const list=new ajs.FileList();
-    for(const source of unique)list.AddFile(source.name.replaceAll("\\","/"),new Uint8Array(await source.arrayBuffer()));
+    for(const source of unique)list.AddFile(String(source.webkitRelativePath||source.name).replaceAll("\\","/"),new Uint8Array(await source.arrayBuffer()));
     const result=ajs.ConvertFileList(list,"glb2");
     if(!result?.IsSuccess?.()||!result?.FileCount?.())throw new Error("Legacy 3D conversion failed: "+String(result?.GetErrorCode?.()||"unknown AssimpJS error"));
     const out=result.GetFile(0);
@@ -278,7 +339,7 @@ export class ForgeEngine{
       const r=this.add('audio',file.name);
       r.entity.addComponent('sound',{positional:true,volume:1});
       r.entity.sound.addSlot('main',{asset:asset.id,autoPlay:false,loop:false,overlap:false,volume:1,pitch:1});
-      r.components.asset={type:'audio',name:file.name,analysis,derivedDirty:false};
+      r.components.asset={type:'audio',name:file.name,analysis,sourceBytes:file.size,sourceSha256:await this.sha256File(file),remoteSource:options.remoteSource||null,derivedDirty:false};
       this.assets.set(file.name,{type:'audio',file,url,resource:asset.resource,asset});
       this.select(r.id);
       window.dispatchEvent(new Event('forge-assets-changed'));
@@ -298,7 +359,7 @@ export class ForgeEngine{
       const h=2.6,w=Math.max(.25,h*(bmp.width/Math.max(1,bmp.height)));
       r.entity.setLocalEulerAngles(90,0,0);r.entity.setLocalScale(w,1,h);r.entity.setLocalPosition(0,h*.5,0);
       r.entity.render.material=mat;r.entity.render.frustumCulling=false;
-      r.components.asset={type:"image",name:file.name,width:bmp.width,height:bmp.height,analysis,sourceUnits:"pixels",presentation:"upright-2d-preview",pixelsPerWorldUnit:bmp.height/h,derivedDirty:false};
+      r.components.asset={type:"image",name:file.name,width:bmp.width,height:bmp.height,analysis,sourceBytes:file.size,sourceSha256:await this.sha256File(file),remoteSource:options.remoteSource||null,sourceUnits:"pixels",presentation:"upright-2d-preview",pixelsPerWorldUnit:bmp.height/h,derivedDirty:false};
       this.assets.set(file.name,{type:"image",file,url});this.select(r.id);this.setView("front");this.frame();
       window.dispatchEvent(new Event("forge-assets-changed"));window.ForgeRefreshUI?.();
       return{type:"image",record:r};
@@ -306,12 +367,12 @@ export class ForgeEngine{
     if(/\.(glb|gltf|fbx|obj|dae|3ds)$/i.test(file.name)){
       if(/\.(fbx|obj|dae|3ds)$/i.test(file.name)){
         const converted=await this.convertLegacyModelToGLB(file,options?.files||[file]);
-        const convertedResult=await this.importFile(converted,{internalConversion:true});
+        const convertedResult=await this.importFile(converted,{internalConversion:true,sourceFile:file,remoteSource:options.remoteSource,files:options.files});
         const record=convertedResult.record,internalEntry=this.assets.get(converted.name);
         this.assets.delete(converted.name);
         this.assets.set(file.name,{type:"model",file,url,resource:internalEntry?.resource,converted:true,convertedFrom:file.name});
         record.name=file.name.replace(/\.[^.]+$/,"");record.entity.name=record.name;
-        record.components.asset={type:"model",name:file.name,analysis:analysis||null,sourceUnits:"source-native",converted:true,convertedFrom:file.name,converter:"AssimpJS",sourcePreserved:true,derivedDirty:false,importScale:record.components.asset?.importScale||1,normalized:!!record.components.asset?.normalized,viewportPreview:record.components.asset?.viewportPreview||null};
+        record.components.asset={...record.components.asset,type:"model",name:file.name,analysis:analysis||null,sourceUnits:"source-native",sourceBytes:file.size,sourceSha256:await this.sha256File(file),remoteSource:options.remoteSource||null,converted:true,convertedFrom:file.name,converter:"AssimpJS",sourcePreserved:true,dependencyFiles:(options.files||[]).map(f=>f.name).filter(n=>n!==file.name),derivedDirty:false,importScale:record.components.asset?.importScale||1,normalized:!!record.components.asset?.normalized,viewportPreview:record.components.asset?.viewportPreview||null};
         this.select(record.id);window.dispatchEvent(new Event("forge-assets-changed"));window.ForgeRefreshUI?.();
         return{type:"model",record,converted:true};
       }
@@ -334,14 +395,14 @@ export class ForgeEngine{
               e.name=file.name.replace(/\.[^.]+$/,"");this.root.addChild(e);
               const preview=this.prepareImportedModelPreview(e),r=this.rec(e.name,"model",e);
               r.components.asset={
-                type:"model",name:file.name,analysis:analysis||null,sourceUnits:"source-native",
+                type:"model",name:file.name,analysis:analysis||null,sourceUnits:"source-native",sourceBytes:file.size,sourceSha256:await this.sha256File(file),remoteSource:options.remoteSource||null,dependencyFiles:(options.files||[]).map(f=>f.name).filter(n=>n!==file.name),
                 sourcePreserved:true,viewportSanitized:previewSource.sanitized===true,
                 sanitizedExtensions:previewSource.removedExtensions||[],
                 importScale:preview.normalized?.scale||1,normalized:!!preview.normalized?.ok,
                 derivedDirty:false,viewportPreview:preview
               };
               const clips=this.attachAnimations(e,asset.resource,analysis?.animationNames||[]);if(clips.length)r.components.animation={clips,playing:true};
-              this.assets.set(file.name,{type:"model",file,url,resource:asset.resource,asset,viewportFile:loadFile});
+              this.assets.set((sourceFile||file).name,{type:"model",file:sourceFile||file,url,resource:asset.resource,asset,viewportFile:loadFile,dependencies:options.files||[sourceFile||file]});
               URL.revokeObjectURL(loadUrl);
               window.dispatchEvent(new Event("forge-assets-changed"));window.ForgeRefreshUI?.();
               requestAnimationFrame(()=>requestAnimationFrame(()=>{this.select(r.id);window.ForgeSpatial?.inspect?.(r);resolve({type:"model",record:r})}));
@@ -351,7 +412,7 @@ export class ForgeEngine{
         }catch(err){reject(err)}
       });
     }
-    return{type:'asset',name:file.name,analysis}
+    return{type:'asset',name:file.name,analysis,sourceBytes:file.size,sourceSha256:await this.sha256File(file),extension,kind:SOURCE_EXTENSIONS.has(extension)?"source":"file"}
   }
   attachAnimations(entity,resource,names=[]){const tracks=resource?.animations||[];if(!tracks.length)return[];try{if(!entity.anim)entity.addComponent('anim',{activate:true,speed:1});const clips=[];for(let i=0;i<tracks.length;i++){const name=names[i]||tracks[i]?.name||('Clip_'+i);entity.anim.assignAnimation(name,tracks[i],undefined,1,true);clips.push(name)}entity.anim.playing=true;return clips}catch(e){this.log('Animation attach failed: '+e.message,'error');return[]}}
   setAnimationState(id,state){const r=this.entities.get(id);if(!r?.entity?.anim?.baseLayer)return false;try{r.entity.anim.baseLayer.play(state);return true}catch{return false}}
