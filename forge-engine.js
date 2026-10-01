@@ -3,7 +3,8 @@ import RAPIER from 'https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.21.
 
 const V=(x=0,y=0,z=0)=>new pc.Vec3(x,y,z);
 const ASSIMP_MODEL_EXTENSIONS=new Set("3ds 3mf ac ac3d acc amj ase ask b3d bvh cob dae dxf enff fbx ifc iqm irr irrmesh lwo lws lxo m3d md2 md3 md5 mdc mdl mesh mesh.xml mot ms3d ndo nff obj off ogex ply pmx prj q3o q3s raw scn sib smd stp stl ter uc usd vta x x3d xgl zgl".split(" "));
-const MODEL_EXTENSIONS=new Set(["glb","gltf",...ASSIMP_MODEL_EXTENSIONS]);
+const USD_EXTENSIONS=new Set(["usd","usda","usdc","usdz"]);
+const MODEL_EXTENSIONS=new Set(["glb","gltf",...ASSIMP_MODEL_EXTENSIONS,...USD_EXTENSIONS]);
 const IMAGE_EXTENSIONS=new Set(["png","jpg","jpeg","webp","avif","gif","bmp","svg","tif","tiff","tga","dds","ktx","ktx2","hdr","exr"]);
 const AUDIO_EXTENSIONS=new Set(["wav","mp3","ogg","m4a","aac","flac","webm"]);
 const SOURCE_EXTENSIONS=new Set(["ttf","ttc","otf","css","js","mjs","glsl","vert","frag","wgsl","wasm","json","forge.json"]);
@@ -137,6 +138,7 @@ export class ForgeEngine{
       images:[...IMAGE_EXTENSIONS].sort(),
       audio:[...AUDIO_EXTENSIONS].sort(),
       source:[...SOURCE_EXTENSIONS].sort(),
+      compatibilityBridge:["gltf","glb",...USD_EXTENSIONS],
       notes:{
         native3D:"glTF/GLB is loaded directly in the PlayCanvas runtime.",
         assimpWasm:"40+ legacy/industry formats are normalized to an internal GLB representation while the original source bytes remain preserved.",
@@ -145,6 +147,55 @@ export class ForgeEngine{
         source:"Non-renderable source files are preserved with type metadata for project pipelines."
       }
     }
+  }
+  async convertWithThreeBridge(file,kind="gltf"){
+    if(!window.__ForgeThreeBridgeLoading){
+      window.__ForgeThreeBridgeLoading=(async()=>{
+        const base="https://cdn.jsdelivr.net/npm/three@0.185.1";
+        const [THREE,{GLTFLoader},{DRACOLoader},{KTX2Loader},{USDLoader},{GLTFExporter},{MeshoptDecoder}]=await Promise.all([
+          import(base+"/build/three.module.js"),
+          import(base+"/examples/jsm/loaders/GLTFLoader.js"),
+          import(base+"/examples/jsm/loaders/DRACOLoader.js"),
+          import(base+"/examples/jsm/loaders/KTX2Loader.js"),
+          import(base+"/examples/jsm/loaders/USDLoader.js"),
+          import(base+"/examples/jsm/exporters/GLTFExporter.js"),
+          import(base+"/examples/jsm/libs/meshopt_decoder.module.js")
+        ]);
+        return{THREE,GLTFLoader,DRACOLoader,KTX2Loader,USDLoader,GLTFExporter,MeshoptDecoder};
+      })();
+    }
+    const bridge=await window.__ForgeThreeBridgeLoading;
+    const bytes=await file.arrayBuffer();
+    let root,animations=[];
+    if(kind==="usd"){
+      const loader=new bridge.USDLoader();
+      root=await new Promise((resolve,reject)=>loader.parse(bytes,"",resolve,reject));
+    }else{
+      const loader=new bridge.GLTFLoader();
+      try{
+        const draco=new bridge.DRACOLoader();
+        draco.setDecoderPath("https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/libs/draco/");
+        loader.setDRACOLoader(draco);
+      }catch{}
+      try{loader.setMeshoptDecoder(bridge.MeshoptDecoder)}catch{}
+      try{
+        const canvas=document.createElement("canvas");
+        const renderer=new bridge.THREE.WebGLRenderer({canvas,antialias:false,alpha:true});
+        const ktx2=new bridge.KTX2Loader();
+        ktx2.setTranscoderPath("https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/libs/basis/");
+        ktx2.detectSupport(renderer);
+        loader.setKTX2Loader(ktx2);
+        loader.__forgeRenderer=renderer;
+      }catch{}
+      const parsed=await new Promise((resolve,reject)=>loader.parse(bytes,"",resolve,reject));
+      root=parsed.scene;
+      animations=parsed.animations||[];
+    }
+    root.traverse?.(node=>{if(node.userData)node.userData.forgeSource=file.name});
+    const exporter=new bridge.GLTFExporter();
+    const result=await exporter.parseAsync(root,{binary:true,onlyVisible:false,trs:false,animations});
+    if(!(result instanceof ArrayBuffer))throw new Error("Three.js compatibility bridge did not return GLB bytes");
+    return new File([result],file.name.replace(/.[^.]+$/i,"")+".glb",{type:"model/gltf-binary"});
   }
   async sha256File(file){
     const bytes=await file.arrayBuffer();
@@ -369,6 +420,15 @@ export class ForgeEngine{
       const sourceFile=options?.sourceFile||file;
       const dependencies=options?.files?.length?options.files:[sourceFile];
       const sourceSha256=options?.sourceSha256||await this.sha256File(sourceFile);
+      if(USD_EXTENSIONS.has(extension)){
+        const converted=await this.convertWithThreeBridge(sourceFile,"usd");
+        const convertedResult=await this.importFile(converted,{internalConversion:true,sourceFile,sourceSha256,remoteSource:options.remoteSource,files:dependencies});
+        const record=convertedResult.record;
+        record.name=sourceFile.name.replace(/\.[^.]+$/,"");record.entity.name=record.name;
+        record.components.asset={...record.components.asset,name:sourceFile.name,sourceBytes:sourceFile.size,sourceSha256,remoteSource:options.remoteSource||null,converted:true,converter:"Three.js USD compatibility bridge",sourcePreserved:true,sourceFormat:extension};
+        this.select(record.id);
+        return convertedResult;
+      }
       if(ASSIMP_MODEL_EXTENSIONS.has(extension)){
         const converted=await this.convertLegacyModelToGLB(sourceFile,dependencies);
         const convertedResult=await this.importFile(converted,{internalConversion:true,sourceFile,sourceSha256,remoteSource:options.remoteSource,files:dependencies});
@@ -402,11 +462,11 @@ export class ForgeEngine{
       }catch(nativeError){
         if(options?.internalConversion||options?.disableAssimpFallback)throw nativeError;
         this.log("Native glTF preview rejected; retrying through AssimpJS compatibility path: "+nativeError.message,"warn");
-        const converted=await this.convertLegacyModelToGLB(sourceFile,dependencies);
+        const converted=await this.convertWithThreeBridge(loadInput,"gltf").catch(async()=>this.convertLegacyModelToGLB(sourceFile,dependencies));
         const convertedResult=await this.importFile(converted,{internalConversion:true,sourceFile,sourceSha256,remoteSource:options.remoteSource,files:dependencies});
         const record=convertedResult.record;
         record.name=sourceFile.name.replace(/\.[^.]+$/,"");record.entity.name=record.name;
-        record.components.asset={...record.components.asset,name:sourceFile.name,sourceBytes:sourceFile.size,sourceSha256,remoteSource:options.remoteSource||null,converted:true,converter:"AssimpJS compatibility fallback",sourcePreserved:true};
+        record.components.asset={...record.components.asset,name:sourceFile.name,sourceBytes:sourceFile.size,sourceSha256,remoteSource:options.remoteSource||null,converted:true,converter:converted===converted?((converted.name.startsWith(sourceFile.name.replace(/\.[^.]+$/,"")+"_")||converted.name.includes("glb"))?"Three.js GLTF compatibility bridge":"AssimpJS compatibility fallback"):"compatibility fallback",sourcePreserved:true};
         this.select(record.id);return convertedResult;
       }
 
