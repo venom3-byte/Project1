@@ -9,8 +9,13 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq xvfb xdotool ffmpeg pulseaudio pulseaudio-utils fonts-noto-core fonts-liberation >/dev/null
 
 echo "[2/4] تثبيت Chromium..."
-CHROME_BIN=$(npx --yes @puppeteer/browsers install chrome@stable 2>/dev/null | tail -1 | sed 's/^[^ ]* //')
-[ -x "$CHROME_BIN" ] || { echo "فشل تثبيت Chromium"; exit 1; }
+npx --yes @puppeteer/browsers install chrome@stable > .chrome-install.log 2>&1 || true
+CHROME_BIN=$(tail -1 .chrome-install.log | sed 's/^[^ ]* //')
+if [ ! -x "$CHROME_BIN" ]; then
+  # بديل: ابحث عن الملف مباشرة إن لم يُطبع المسار بالشكل المتوقع
+  CHROME_BIN=$(find "$HOME/.cache/puppeteer" . -path '*chrome-linux*' -name chrome -type f 2>/dev/null | head -1)
+fi
+[ -x "${CHROME_BIN:-/nonexistent}" ] || { echo "فشل تثبيت Chromium. سجل التثبيت:"; cat .chrome-install.log; exit 1; }
 echo "Chromium: $CHROME_BIN"
 
 echo "[3/4] تثبيت الحزم وإعداد المفتاح..."
