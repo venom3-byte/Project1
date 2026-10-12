@@ -1,0 +1,18 @@
+services:
+  browser:
+    build: .
+    image: cloud-browser:latest
+    env_file: .env
+    shm_size: "1gb"          # ضروري لاستقرار Chromium
+    restart: unless-stopped
+    mem_limit: 9g
+    expose:
+      - "8080"               # لا يُفتح أي منفذ على الإنترنت مباشرة
+
+  # نفق Cloudflare المجاني: يعطي رابط HTTPS بدون فتح منافذ على السيرفر
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate --url http://browser:8080
+    depends_on:
+      - browser
+    restart: unless-stopped

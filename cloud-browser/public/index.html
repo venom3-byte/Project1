@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0b1220">
+  <meta name="robots" content="noindex,nofollow">
+  <title>المتصفح السحابي</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <!-- شاشة الدخول بالمفتاح -->
+  <div id="login" class="overlay" hidden>
+    <div class="card">
+      <h1>المتصفح السحابي</h1>
+      <p>أدخل مفتاح الدخول الذي وضعته في ملف الإعدادات على السيرفر.</p>
+      <input id="keyInput" type="password" autocomplete="current-password" placeholder="مفتاح الدخول" dir="ltr">
+      <button id="loginBtn" class="primary">دخول</button>
+      <p id="loginMsg" class="muted"></p>
+    </div>
+  </div>
+
+  <header class="bar">
+    <div class="row">
+      <input id="url" type="url" dir="ltr" inputmode="url" enterkeyhint="go" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="ابحث أو اكتب رابطاً">
+      <button id="goBtn" class="primary" title="فتح">فتح</button>
+    </div>
+    <div class="row tools">
+      <button id="backBtn" title="رجوع" disabled>رجوع</button>
+      <button id="fwdBtn" title="تقدم" disabled>تقدم</button>
+      <button id="reloadBtn" title="تحديث">تحديث</button>
+      <button id="fullBtn" title="ملء الشاشة">ملء</button>
+      <button id="kbBtn" title="لوحة المفاتيح">كتابة</button>
+      <button id="settingsBtn" title="الإعدادات">⚙</button>
+    </div>
+  </header>
+
+  <main id="stage">
+    <video id="screen" playsinline autoplay></video>
+    <div id="touch" aria-label="شاشة التحكم"></div>
+    <div id="placeholder">
+      <button id="startBtn" class="primary big">▶ ابدأ البث</button>
+      <p id="statusText" class="muted">جارٍ الاتصال...</p>
+    </div>
+    <div id="toast" role="status" hidden></div>
+  </main>
+
+  <footer class="foot">
+    <div class="row between">
+      <span id="pageTitle" class="ellipsis"></span>
+      <span id="qualityLabel" class="muted"></span>
+    </div>
+    <div class="usage">
+      <div class="usage-text">
+        <span id="usageText">الاستهلاك خلال 60 دقيقة: 0.0 MB</span>
+      </div>
+      <div class="bar-bg"><div id="usageBar"></div></div>
+    </div>
+    <div class="row between">
+      <select id="qualitySel" aria-label="الجودة">
+        <option value="saver">توفير ⁦(≈27 MB/س)⁩</option>
+        <option value="balanced">متوازن ⁦(≈44 MB/س)⁩</option>
+        <option value="high">عالٍ ⁦(≈1 GB/س)⁩</option>
+      </select>
+      <button id="toggleBtn">ابدأ</button>
+    </div>
+  </footer>
+
+  <!-- لوحة الإعدادات -->
+  <div id="settings" class="overlay" hidden>
+    <div class="card">
+      <h2>الإعدادات</h2>
+      <label>حد الاستهلاك خلال 60 دقيقة (MB)
+        <input id="limitInput" type="number" min="1" max="1000" step="1" inputmode="numeric" dir="ltr">
+      </label>
+      <p class="muted small">الحد الأقصى المسموح به على السيرفر هو القيمة المضبوطة في LIMIT_MB_PER_HOUR. لا يمكن تجاوزها من الهاتف.</p>
+      <div class="row between">
+        <button id="settingsClose" class="primary">حفظ</button>
+        <button id="logoutBtn">تسجيل خروج</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- حقل مخفي لاستقبال الكتابة من لوحة مفاتيح الهاتف -->
+  <input id="kb" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-hidden="true" tabindex="-1">
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
