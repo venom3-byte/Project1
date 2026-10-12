@@ -14,6 +14,7 @@ import { ByteBudget } from './lib/budget.js';
 import { StreamProcess } from './lib/stream.js';
 import { InputController } from './lib/input.js';
 import { BrowserController } from './lib/browser.js';
+import { StreamStats } from './lib/stats.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -52,6 +53,9 @@ const input = new InputController({
   width: config.screenWidth, height: config.screenHeight,
 });
 const browser = new BrowserController(config);
+const stats = new StreamStats();
+let lastLoggedUrl = '';
+let lastLoggedError = '';
 
 let client = null; // جلسة الهاتف الوحيدة
 let session = null; // {ws, quality, audio, streaming, stream}
@@ -93,6 +97,8 @@ function startStream() {
     pulseSource: config.pulseSink, ffmpegBin: config.ffmpegBin,
   });
   session.stream = sp;
+  stats.streams++;
+  stats.log(`stream start profile=${profile.id} audio=${session.audio} fps=${profile.fps} video=${profile.videoKbps}kbps`);
 
   sp.on('data', (chunk) => {
     if (session?.stream !== sp) return;
@@ -103,12 +109,14 @@ function startStream() {
     }
     if (ws.bufferedAmount > config.maxBufferedBytes) {
       // الشبكة بطيئة: نعيد التهيئة بدل إرسال أجزاء ناقصة تُفسد الفيديو
-      console.warn('slow client, resyncing stream');
+      stats.restarts++;
+      stats.log('slow client: resyncing stream (bufferedAmount too high)');
       stopStream();
       setTimeout(() => { if (session && session.streaming) startStream(); }, 800);
       return;
     }
     budget.add(chunk.length);
+    stats.addBytes(chunk.length);
     ws.send(chunk, { binary: true });
   });
 
@@ -119,6 +127,8 @@ function startStream() {
 
   sp.on('exit', (info) => {
     if (session?.stream === sp) session.stream = null;
+    stats.log(`ffmpeg exit code=${info.code} signal=${info.signal} expected=${info.stopping} stderr=${JSON.stringify(info.stderr)}`);
+    if (!info.stopping) stats.errors++;
     if (!info.stopping && session?.streaming && client) {
       console.error('ffmpeg exited unexpectedly', info);
       send(ws, { type: 'error', message: 'توقف الترميز على السيرفر، سيُعاد التشغيل تلقائياً' });
@@ -133,6 +143,8 @@ function startStream() {
 let lastStateSent = 0;
 let pendingState = null;
 browser.on('state', (snap) => {
+  if (snap.url !== lastLoggedUrl) { lastLoggedUrl = snap.url; stats.log(`browser url=${snap.url}`); }
+  if (snap.error && snap.error !== lastLoggedError) { lastLoggedError = snap.error; stats.errors++; stats.log(`browser error=${snap.error}`); }
   pendingState = snap;
   const wait = Math.max(0, 200 - (Date.now() - lastStateSent));
   setTimeout(() => {
@@ -142,7 +154,9 @@ browser.on('state', (snap) => {
     pendingState = null;
   }, wait);
 });
-browser.on('crash', () => {
+browser.on('crash', (code) => {
+  stats.errors++;
+  stats.log(`browser crashed code=${code}`);
   if (session) send(session.ws, { type: 'error', message: 'توقف المتصفح على السيرفر، جارٍ إعادة تشغيله' });
   setTimeout(() => process.exit(1), 1000); // Docker سيعيد تشغيل الحاوية
 });
@@ -252,6 +266,7 @@ wss.on('connection', (ws, req) => {
       }
       authed = true;
       clearTimeout(authTimer);
+      stats.log(`phone authenticated ip=${ip}`);
       failures.delete(ip);
       if (client && client !== ws) {
         send(client, { type: 'replaced', message: 'تم فتح الجلسة من جهاز آخر' });
@@ -276,6 +291,7 @@ wss.on('connection', (ws, req) => {
 
   ws.on('close', () => {
     clearTimeout(authTimer);
+    if (client === ws) stats.log('phone disconnected');
     if (client === ws) {
       stopStream();
       client = null;
@@ -293,8 +309,19 @@ const heartbeat = setInterval(() => {
   }
 }, 20000);
 
+const statsTimer = setInterval(() => {
+  if (!client) return;
+  console.log(stats.line({
+    quality: session?.quality,
+    streaming: session?.streaming ? 1 : 0,
+    budgetUsedMb: (budget.used() / MB).toFixed(2),
+    limitMb: budget.limitBytes / MB,
+  }));
+}, 10000);
+
 // ---------- التشغيل ----------
 async function main() {
+  stats.log(`config capture=${config.captureMode} display=${config.display} chromium=${config.chromiumBin} ffmpeg=${config.ffmpegBin} limitMb=${config.limitMbPerHour}`);
   server.listen(config.port, '0.0.0.0', () => {
     console.log(`Cloud browser listening on :${config.port} (capture=${config.captureMode}, limit=${config.limitMbPerHour}MB/h)`);
   });
@@ -308,6 +335,7 @@ async function main() {
 
 async function shutdown() {
   clearInterval(heartbeat);
+  clearInterval(statsTimer);
   stopStream();
   await browser.close();
   server.close();

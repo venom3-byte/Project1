@@ -72,3 +72,14 @@ test('validateConfig: مفتاح الدخول إلزامي وطوله 12 حرف�
   assert.ok(validateConfig({ accessKey: 'short', limitMbPerHour: 50 }).length > 0);
   assert.deepEqual(validateConfig({ accessKey: 'a-very-long-key-123', limitMbPerHour: 50 }), []);
 });
+
+import { StreamStats } from '../lib/stats.js';
+test('StreamStats: معدل kbps ومعادلة MB/ساعة', () => {
+  const s = new StreamStats();
+  const now = 1_000_000;
+  s.addBytes(12500, now); // 12.5 KB خلال 10 ثوانٍ = 10 kbps
+  assert.equal(Math.round(s.kbps(10000, now)), 10);
+  assert.ok(Math.abs(StreamStats.mbPerHour(100) - 45) < 0.01); // 100 kbps ≈ 45 MB/س
+  assert.equal(s.kbps(10000, now + 20000), 0); // العينات القديمة تسقط
+  assert.match(s.line({ quality: 'balanced' }), /stats total=0\.013MB .* quality=balanced/);
+});
