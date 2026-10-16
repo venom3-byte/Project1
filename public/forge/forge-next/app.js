@@ -94,7 +94,7 @@ function refreshInspector(){
 function applyTransform(){
   const engine=state.engine,record=selectedRecord();if(!engine||!record)return;
   record.name=$("#objectName").value.trim()||record.name;record.entity.name=record.name;if(record.entity.__forge)record.entity.__forge.name=record.name;
-  engine.transform({x:Number($("#positionX").value),y:Number($("#positionY").value),z:Number($("#positionZ").value),rx:Number($("#rotationX").value),ry:Number($("#rotationY").value),rz:Number($("#rotationZ").value),sx:Number($("#scaleX").value),sy:Number($("#scaleY").value),sz:Number($("#scaleZ").value});
+  engine.transform({x:Number($("#positionX").value),y:Number($("#positionY").value),z:Number($("#positionZ").value),rx:Number($("#rotationX").value),ry:Number($("#rotationY").value),rz:Number($("#rotationZ").value),sx:Number($("#scaleX").value),sy:Number($("#scaleY").value),sz:Number($("#scaleZ").value)});
   refreshHierarchy();refreshInspector();status("Changes applied","dirty");
 }
 function applyMaterial(){
