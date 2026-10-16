@@ -43,6 +43,10 @@ jobs:
           node --check server/forge/forge-pipeline.mjs
           node --check server/forge/vision-control.mjs
           node --check server/forge/vision-controller.mjs
+          node --check mcp/worker.js
+          node --check mcp/forge-command-schema.mjs
+          node --check mcp/forge-port-smoke.mjs
+          node --check mcp/visual-agent-runner.mjs
       - name: Validate all imported Forge browser modules
         id: forge
         shell: bash
