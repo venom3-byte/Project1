@@ -336,7 +336,9 @@ try {
   const mobileTimelineCheck=await frame.evaluate(()=>({buttonVisible:(()=>{const e=document.querySelector("#mobileAnimation"),r=e?.getBoundingClientRect();return !!e&&!!r&&r.width>0&&r.height>0})(),timelineVisible:getComputedStyle(document.querySelector(".timeline-shell")).display!=="none",timelineOpen:document.querySelector(".timeline-shell")?.open===true}));
   await forgeFrameLocator.locator("#mobileScene").click();
   await frame.waitForFunction(()=>document.documentElement.dataset.editorWorkspace==="layout",null,{timeout:5000});
-  await forgeFrameLocator.locator("#viewport").click({position:{x:40,y:80},force:true});
+  const mobileViewportWidth = await frame.evaluate(() => document.querySelector("#viewport")?.clientWidth || innerWidth);
+  // Tap the exposed canvas to the right of the 330px mobile Scene drawer; the covered left edge cannot receive pointer events.
+  await forgeFrameLocator.locator("#viewport").click({position:{x:Math.max(0,mobileViewportWidth-16),y:80}});
   await sleep(120);
   if(!mobileTimelineCheck.buttonVisible||!mobileTimelineCheck.timelineVisible||!mobileTimelineCheck.timelineOpen){
     throw new Error("Mobile Animation control did not expose the timeline: "+JSON.stringify(mobileTimelineCheck));
