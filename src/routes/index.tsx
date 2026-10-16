@@ -9,7 +9,7 @@ function ForgeHost() {
     <main className="h-screen w-screen overflow-hidden bg-black">
       <iframe
         title="Forge Studio 3.7"
-        src="/forge/index.html"
+        src="forge/index.html"
         className="h-full w-full border-0"
         allow="fullscreen; clipboard-read; clipboard-write"
       />
