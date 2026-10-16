@@ -14,8 +14,12 @@ import { chromium } from "playwright-core";
 const Chromium = chromiumModule.default || chromiumModule;
 const EDITOR_URL = process.env.FORGE_EDITOR_URL || "https://claude-game-editor-copy.forgemail-agent.workers.dev/";
 const EDITOR_ORIGIN = new URL(EDITOR_URL).origin;
-if (EDITOR_ORIGIN !== "https://claude-game-editor-copy.forgemail-agent.workers.dev") {
-  throw new Error("FORGE_EDITOR_URL is restricted to the configured public editor origin.");
+const PUBLIC_EDITOR_ORIGIN = "https://claude-game-editor-copy.forgemail-agent.workers.dev";
+const ALLOWED_LOCAL_TEST_ORIGIN = "http://127.0.0.1:4173";
+const localTestEnabled = process.env.FORGE_LOCAL_TEST === "1";
+if (EDITOR_ORIGIN !== PUBLIC_EDITOR_ORIGIN &&
+    !(localTestEnabled && EDITOR_ORIGIN === ALLOWED_LOCAL_TEST_ORIGIN)) {
+  throw new Error("FORGE_EDITOR_URL must use the configured public editor origin; loopback is allowed only for isolated CI when FORGE_LOCAL_TEST=1.");
 }
 const profilePath = process.env.FORGE_VISUAL_PROFILE || path.join(os.homedir(), ".cache", "forge-visual-agent", "storage-state.json");
 const artifactDir = process.env.FORGE_VISUAL_ARTIFACTS || path.join(os.homedir(), ".cache", "forge-visual-agent", "artifacts");
