@@ -14,8 +14,12 @@ import { chromium } from "playwright-core";
 const Chromium = chromiumModule.default || chromiumModule;
 const EDITOR_URL = process.env.FORGE_EDITOR_URL || "https://claude-game-editor-copy.forgemail-agent.workers.dev/";
 const EDITOR_ORIGIN = new URL(EDITOR_URL).origin;
-if (EDITOR_ORIGIN !== "https://claude-game-editor-copy.forgemail-agent.workers.dev") {
-  throw new Error("FORGE_EDITOR_URL is restricted to the configured public editor origin.");
+const PUBLIC_EDITOR_ORIGIN = "https://claude-game-editor-copy.forgemail-agent.workers.dev";
+const ALLOWED_LOCAL_TEST_ORIGIN = "http://127.0.0.1:4173";
+const localTestEnabled = process.env.FORGE_LOCAL_TEST === "1";
+if (EDITOR_ORIGIN !== PUBLIC_EDITOR_ORIGIN &&
+    !(localTestEnabled && EDITOR_ORIGIN === ALLOWED_LOCAL_TEST_ORIGIN)) {
+  throw new Error("FORGE_EDITOR_URL must use the configured public editor origin; loopback is allowed only for isolated CI when FORGE_LOCAL_TEST=1.");
 }
 const profilePath = process.env.FORGE_VISUAL_PROFILE || path.join(os.homedir(), ".cache", "forge-visual-agent", "storage-state.json");
 const artifactDir = process.env.FORGE_VISUAL_ARTIFACTS || path.join(os.homedir(), ".cache", "forge-visual-agent", "artifacts");
@@ -53,6 +57,12 @@ async function main() {
     const response = await page.goto(EDITOR_URL, { waitUntil: "domcontentloaded", timeout: 60000 });
     responseStatus = response?.status() ?? null;
     await page.locator("canvas").first().waitFor({ state: "visible", timeout: 30000 });
+    if (localTestEnabled) {
+      await page.waitForFunction(
+        () => document.documentElement.dataset.forgeReady === "1" || !!window.ForgeBootError,
+        { timeout: 45000 },
+      ).catch(() => null);
+    }
     await sleep(1000);
 
     if (command === "click") {
@@ -193,16 +203,23 @@ async function main() {
       }
       action = { type:"sequence", steps:results };
     } else if (command === "checks") {
-      const canvasCount = await page.locator("canvas").count();
-      const play = page.getByRole("button", { name: "Play", exact: true }).first();
-      const playInitially = await play.isVisible().catch(() => false);
-      if (!playInitially) throw new Error("Play button is not visible.");
+      const canvasCount = await page.locator("#viewport").count();
+      const viewport = page.locator("#viewport").first();
+      await viewport.waitFor({ state: "visible", timeout: 10000 });
+      const play = page.locator("#play").first();
+      const playInitially = await play.isVisible().catch(() => false) && /play/i.test(await play.innerText().catch(() => ""));
+      if (!playInitially) throw new Error("Forge #play button is not visible in its initial Play state.");
       await play.click();
-      const stop = page.getByRole("button", { name: "Stop", exact: true }).first();
-      await stop.waitFor({ state: "visible", timeout: 5000 });
-      const stopAppeared = await stop.isVisible();
-      await stop.click();
-      const playReturned = await page.getByRole("button", { name: "Play", exact: true }).first().isVisible({ timeout: 5000 }).catch(() => false);
+      const stopAppeared = await page.waitForFunction(() => {
+        const button = document.querySelector("#play");
+        return !!button && /stop/i.test(button.textContent || "");
+      }, undefined, { timeout: 8000 }).then(() => true).catch(() => false);
+      if (!stopAppeared) throw new Error("Forge #play button did not enter the Stop state after clicking.");
+      await play.click();
+      const playReturned = await page.waitForFunction(() => {
+        const button = document.querySelector("#play");
+        return !!button && /play/i.test(button.textContent || "") && !/stop/i.test(button.textContent || "");
+      }, { timeout: 8000 }).then(() => true).catch(() => false);
       action = { type: "checks", canvasCount, playInitially, stopAppeared, playReturned, passed: canvasCount === 1 && playInitially && stopAppeared && playReturned };
     }
 
@@ -217,7 +234,11 @@ async function main() {
         title: document.title, url: location.href, bodyText: clean(document.body.innerText).slice(0, 7000),
         buttons: [...document.querySelectorAll("button,[role=button]")].filter(visible).slice(0,100).map(e=>({text:clean(e.innerText||e.getAttribute("aria-label")||e.title),disabled:!!e.disabled,rect:rect(e)})),
         fields: [...document.querySelectorAll("input,textarea,select,[contenteditable=true]")].filter(visible).slice(0,60).map(e=>({tag:e.tagName,type:e.type||null,value:clean(e.value||e.innerText),placeholder:e.placeholder||"",aria:e.getAttribute("aria-label")||"",rect:rect(e)})),
-        canvases: [...document.querySelectorAll("canvas")].map(e=>({width:e.width,height:e.height,rect:rect(e)})),
+        canvases: [...document.querySelectorAll("canvas")].map(e=>({id:e.id||null,width:e.width,height:e.height,visible:(()=>{const st=getComputedStyle(e),r=e.getBoundingClientRect();return r.width>0&&r.height>0&&st.display!=="none"&&st.visibility!=="hidden"})(),rect:rect(e)})),
+        forgeBootState: document.documentElement.dataset.forgeReady==="1" ? "ready" : (window.ForgeBootState || null),
+        forgeBootError: clean(window.ForgeBootError?.message || ""),
+        forgeEnginePresent: !!window.Forge,
+        forgeDiagnostics: (() => { try { return window.Forge?.diagnostics?.() ?? null; } catch (e) { return {error:clean(e?.message || e)}; } })(),
         project: project ? {name:project.name,objectCount:project.objects?.length||0,selectedId:project.selectedId||null,objects:(project.objects||[]).slice(0,80).map(o=>({id:o.id,name:o.name,shape:o.shape,position:o.position,rotation:o.rotation,scale:o.scale,color:o.color,behavior:o.behavior}))} : null
       };
     });
@@ -227,7 +248,9 @@ async function main() {
     await page.screenshot({ path: screenshotPath, type: "jpeg", quality: 72, fullPage: false });
     await context.storageState({ path: profilePath });
     const report = {
-      ok: responseStatus === 200 && pageErrors.length === 0 && !(command === "checks" && !action?.passed),
+      ok: responseStatus === 200 && pageErrors.length === 0 &&
+        !(command === "checks" && !action?.passed) &&
+        !(localTestEnabled && command === "inspect" && observation.forgeBootState !== "ready"),
       command, responseStatus, action, observation,
       verification: { pageErrors, consoleErrors: consoleErrors.slice(0, 15) },
       screenshotPath, profilePersisted: true

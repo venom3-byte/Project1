@@ -1,3 +1,4 @@
+import { normalizeForgeCommand, forgeCommandOperations } from "./forge-command-schema.mjs";
 /**
  * Read-only MCP server for the public Claude Game Editor copy.
  *
@@ -13,7 +14,7 @@ const API = "https://api.github.com";
 const RAW = "https://raw.githubusercontent.com/" + OWNER + "/" + REPO + "/" + BRANCH + "/";
 const AGENT_STATE_KEY = "editor-project:v1";
 const VISUAL_SESSION_KEY = "visual-agent-session:v1";
-const EDITOR_URL = "https://claude-game-editor-copy.forgemail-agent.workers.dev/";
+const EDITOR_URL = "https://claude-game-editor-copy.forgemail-agent.workers.dev/forge/index.html";
 let nextCdpId = 0;
 const VALID_SHAPES = ["box", "sphere", "cylinder", "cone", "torus", "plane", "light", "model", "image"];
 const VALID_BEHAVIORS = ["none", "player", "rotate", "bob", "collectible", "hazard", "goal", "patrol"];
@@ -128,6 +129,53 @@ const tools = [
         playing: { type: "boolean" }
       },
       required: ["action"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "forge_command",
+    description: "Operate the actual Forge Studio workbench with a provider-neutral, validated scene command. Supports inspection, entity creation/transforms, physics, gameplay templates, runtime/QA, terrain, animation metadata, project snapshots and save slots. No arbitrary JavaScript or shell commands are accepted.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        op: { type: "string", enum: forgeCommandOperations },
+        id: { type: "string", maxLength: 128 },
+        name: { type: "string", maxLength: 120 },
+        kind: { type: "string", maxLength: 40 },
+        x: { type: "number", minimum: -100000, maximum: 100000 },
+        y: { type: "number", minimum: -100000, maximum: 100000 },
+        z: { type: "number", minimum: -100000, maximum: 100000 },
+        rx: { type: "number", minimum: -100000, maximum: 100000 },
+        ry: { type: "number", minimum: -100000, maximum: 100000 },
+        rz: { type: "number", minimum: -100000, maximum: 100000 },
+        sx: { type: "number", exclusiveMinimum: 0, maximum: 100000 },
+        sy: { type: "number", exclusiveMinimum: 0, maximum: 100000 },
+        sz: { type: "number", exclusiveMinimum: 0, maximum: 100000 },
+        mode: { type: "string", maxLength: 24 },
+        shape: { type: "string", maxLength: 24 },
+        depth: { type: "number", minimum: 0, maximum: 1 },
+        planeY: { type: "number", minimum: -100000, maximum: 100000 },
+        seed: { type: "integer", minimum: -2147483647, maximum: 2147483647 },
+        count: { type: "integer", minimum: 1, maximum: 500 },
+        area: { type: "number", minimum: 1, maximum: 10000 },
+        start: { oneOf: [
+          { type: "array", minItems: 2, maxItems: 3, items: { type: "number" } },
+          { type: "object", properties: { x: { type: "number" }, y: { type: "number" }, z: { type: "number" } }, required: ["x","y"], additionalProperties: false }
+        ] },
+        goal: { oneOf: [
+          { type: "array", minItems: 2, maxItems: 3, items: { type: "number" } },
+          { type: "object", properties: { x: { type: "number" }, y: { type: "number" }, z: { type: "number" } }, required: ["x","y"], additionalProperties: false }
+        ] },
+        slot: { type: "string", maxLength: 80 },
+        data: { type: "object" },
+        preset: { type: "string", maxLength: 60 },
+        graphId: { type: "string", maxLength: 128 },
+        key: { type: "string", maxLength: 80 },
+        value: { oneOf: [{type:"string",maxLength:500},{type:"number"},{type:"boolean"}] },
+        rigId: { type: "string", maxLength: 128 },
+        options: { type: "object" }
+      },
+      required: ["op"],
       additionalProperties: false
     }
   },
@@ -564,15 +612,15 @@ async function visualTool(name,args,env) {
     } else if(name==="visual_run_checks"){
       const initial=await visualSummary(socket);
       const canvas=initial.canvases?.length||0;
-      const play=await visualEvaluate(socket,`(() => {const e=[...document.querySelectorAll("button")].find(e=>e.innerText.trim()==="Play"); return !!e && !e.disabled;})()`);
-      if(!play) throw new Error("Play button is not visible or enabled.");
-      await visualClickInternal(socket,{text:"Play"});
+      const play=await visualEvaluate(socket,`(() => {const e=document.querySelector("#play"),r=e?.getBoundingClientRect(),label=(e?.textContent||"").trim(); return !!e && !e.disabled && !!r && r.width>0 && r.height>0 && /play/i.test(label) && !/stop/i.test(label);})()`);
+      if(!play) throw new Error("Forge #play button is not visible or in its Play state.");
+      await visualClickInternal(socket,{selector:"#play"});
       await sleep(500);
-      const stop=await visualEvaluate(socket,`(() => [...document.querySelectorAll("button")].some(e=>e.innerText.trim()==="Stop" && e.getBoundingClientRect().width>0))()`);
-      if(!stop) throw new Error("Play did not expose the Stop button.");
-      await visualClickInternal(socket,{text:"Stop"});
+      const stop=await visualEvaluate(socket,`(() => {const e=document.querySelector("#play"),r=e?.getBoundingClientRect(); return !!e && !!r && r.width>0 && r.height>0 && /stop/i.test(e.textContent||"");})()`);
+      if(!stop) throw new Error("Play did not put Forge #play into its Stop state.");
+      await visualClickInternal(socket,{selector:"#play"});
       await sleep(350);
-      const playAgain=await visualEvaluate(socket,`(() => [...document.querySelectorAll("button")].some(e=>e.innerText.trim()==="Play" && e.getBoundingClientRect().width>0))()`);
+      const playAgain=await visualEvaluate(socket,`(() => {const e=document.querySelector("#play"),r=e?.getBoundingClientRect(),label=(e?.textContent||"").trim(); return !!e && !!r && r.width>0 && r.height>0 && /play/i.test(label) && !/stop/i.test(label);})()`);
       const final=await visualSummary(socket);
       const issues=[];
       if(canvas!==1) issues.push("Expected exactly one WebGL canvas; got "+canvas);
@@ -584,12 +632,59 @@ async function visualTool(name,args,env) {
   });
 }
 
+async function forgeCommandTool(args, env) {
+  const command = normalizeForgeCommand(args);
+  return await withVisualBrowser(env, async browser => {
+    const socket = browser.socket;
+    await cdpCommand(socket, "Page.navigate", { url: EDITOR_URL });
+    const boot = await visualEvaluate(socket, `new Promise((resolve, reject) => {
+      const deadline = Date.now() + 60000;
+      const poll = () => {
+        const state = window.ForgeBootState;
+        if (state === "ready" && window.Forge && window.ForgeAgent) {
+          resolve({ state, title: document.title });
+          return;
+        }
+        if (state === "error" || state === "ui-error") {
+          reject(new Error("Forge boot failed: " + (document.querySelector("#forgeBootText")?.textContent || state)));
+          return;
+        }
+        if (Date.now() > deadline) {
+          reject(new Error("Timed out waiting for Forge Studio; state=" + String(state)));
+          return;
+        }
+        setTimeout(poll, 100);
+      };
+      poll();
+    })`);
+    const before = await visualEvaluate(socket, `(() => ({
+      bootState: window.ForgeBootState,
+      diagnostics: window.Forge?.diagnostics?.() || null,
+      entityCount: window.Forge?.entities?.size ?? null,
+      selectedId: window.Forge?.selectedId ?? null
+    }))()`);
+    const result = await visualEvaluate(socket, `window.ForgeAgent.execute(${JSON.stringify(command)})`);
+    await sleep(180);
+    const after = await visualEvaluate(socket, `(() => ({
+      bootState: window.ForgeBootState,
+      diagnostics: window.Forge?.diagnostics?.() || null,
+      entityCount: window.Forge?.entities?.size ?? null,
+      selectedId: window.Forge?.selectedId ?? null
+    }))()`);
+    return {
+      structuredContent: { ok: true, operation: command.op, boot, before, result: result ?? null, after, observation: await visualSummary(socket) },
+      image: await visualScreenshot(socket)
+    };
+  });
+}
+
 async function callTool(name, args = {}, env) {
   if (name === "get_editor_state") {
     const snap = await readAgentSnapshot(env);
     const project = snap.project || starterProject();
     return { revision:snap.revision, stored:!!snap.project, updated_at:snap.updated_at, last_action:snap.last_action, ...projectSummary(project) };
   }
+  if (name === "forge_command") return forgeCommandTool(args, env);
   if (name === "control_editor") return executeEditorControl(args, env);
   if (name.startsWith("visual_")) return visualTool(name, args, env);
   if (name === "get_project_status") {
@@ -667,8 +762,8 @@ async function handleMcp(request, env) {
     return json(rpc(body.id, {
       protocolVersion: body.params?.protocolVersion || "2025-03-26",
       capabilities: { tools: { listChanged: false } },
-      serverInfo: { name: "claude-game-editor-mcp", version: "2.0.0" },
-      instructions: "This MCP includes a real remote visual browser agent. Use visual_open_editor to start/reuse remote Chrome, visual_inspect and visual_screenshot to observe it, visual_click/visual_type/visual_press_key/visual_scroll to operate the actual UI, and visual_run_checks to verify Play/Stop through real UI input. All visual_ and control_editor tools require an Authorization: Bearer AGENT_API_KEY header. control_editor changes only bounded scene properties. Browser navigation is restricted to the configured editor origin."
+      serverInfo: { name: "forge-studio-mcp", version: "3.0.0" },
+      instructions: "This MCP controls the Forge Studio 3.7 workbench served by this Worker. Use forge_command for provider-neutral, schema-validated scene/runtime operations; use visual_open_editor, visual_inspect, visual_screenshot, visual_click, visual_type, visual_press_key, visual_scroll, and visual_run_checks for the actual browser interface. forge_command/control_editor/visual_* require Authorization: Bearer AGENT_API_KEY. forge_command accepts only bounded JSON operations, never arbitrary JavaScript or shell commands. Browser navigation is pinned to the Forge workbench origin."
     }), 200, { "mcp-protocol-version": body.params?.protocolVersion || "2025-03-26" });
   }
   if (body.method === "ping") return json(rpc(body.id, {}));
@@ -677,7 +772,7 @@ async function handleMcp(request, env) {
     const name = body.params?.name;
     const args = body.params?.arguments || {};
     try {
-      if (name === "control_editor" || name.startsWith("visual_")) {
+      if (name === "control_editor" || name === "forge_command" || name.startsWith("visual_")) {
         const expected = env.AGENT_API_KEY;
         const supplied = request.headers.get("authorization") || "";
         if (!expected || supplied !== "Bearer " + expected) throw new Error("Unauthorized: " + name + " requires Authorization: Bearer AGENT_API_KEY.");

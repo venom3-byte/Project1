@@ -1,0 +1,121 @@
+name: Forge port build and browser QA
+on:
+  push:
+    branches:
+      - agent/forge-reverse-engineering-port
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: forge-port-visual-qa
+  cancel-in-progress: true
+jobs:
+  build-and-test-ported-forge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install project dependencies
+        run: npm ci
+      - name: Run application unit tests
+        run: npm test -- --reporter=dot
+      - name: Build static host and Macaly Forge workbench
+        env:
+          DEV_BUILD: "1"
+          STATIC_EXPORT: "1"
+          VITE_BASE_PATH: "/"
+        run: npm run build
+      - name: Validate F-16 source mesh and reference dimensions
+        run: node scripts/validate-f16-model.mjs
+      - name: Syntax-check imported Forge and Vision modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            node --check "$file"
+          done < <(find public/forge -type f -name '*.js' -print0)
+          node --check server/forge/forge-pipeline.mjs
+          node --check server/forge/vision-control.mjs
+          node --check server/forge/vision-controller.mjs
+          node --check mcp/worker.js
+          node --check mcp/forge-command-schema.mjs
+          node --check mcp/forge-port-smoke.mjs
+          node --check mcp/visual-agent-runner.mjs
+      - name: Validate all imported Forge browser modules
+        id: forge
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s dist/client/forge/index.html || test -s .output/public/forge/index.html || test -s dist/forge/index.html
+          forge_dir=""
+          for candidate in dist/client/forge dist/forge .output/public/forge; do
+            if [ -f "$candidate/index.html" ]; then forge_dir="$candidate"; break; fi
+          done
+          if [ -z "$forge_dir" ]; then
+            echo "Could not locate copied static Forge modules:"
+            find dist .output -maxdepth 4 -type f 2>/dev/null | head -150 || true
+            exit 1
+          fi
+          node --input-type=module - "$forge_dir" <<'NODE'
+          import fs from "node:fs";
+          import path from "node:path";
+          const root=process.argv[2];
+          const html=fs.readFileSync(path.join(root,"index.html"),"utf8");
+          const required=[
+            "forge-ui.js","forge-engine.js","forge-runtime.js","forge-spatial.js",
+            "forge-production.js","forge-project.js","forge-render.js","forge-vfx.js",
+            "forge-2d.js","forge-ai.js","forge-gameplay-data.js","forge-network.js",
+            "forge-replay.js","forge-session.js","forge-shader.js","forge-terrain.js",
+            "forge-qa.js","forge-animation.js","forge-gameplay.js","forge-gizmo.js",
+            "live-vision.js","forge.css"
+          ];
+          const missing=required.filter(name=>!fs.existsSync(path.join(root,name)));
+          const references=required.filter(name=>html.includes(name));
+          console.log(JSON.stringify({root,required:required.length,missing,htmlReferences:references,htmlBytes:html.length},null,2));
+          if(missing.length) process.exit(1);
+          NODE
+          site_root="$(dirname "$forge_dir")"
+          echo "path=$site_root" >> "$GITHUB_OUTPUT"
+      - name: Install the isolated Chromium visual test runner
+        run: npm install --prefix mcp --no-audit --no-fund
+      - name: Start static preview
+        shell: bash
+        env:
+          FORGE_SITE_DIR: ${{ steps.forge.outputs.path }}
+          DEV_BUILD: "1"
+          STATIC_EXPORT: "1"
+          VITE_BASE_PATH: "/"
+        run: |
+          set -euo pipefail
+          test -n "$FORGE_SITE_DIR"
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory "$FORGE_SITE_DIR" > /tmp/forge-preview.log 2>&1 &
+          echo $! > /tmp/forge-preview.pid
+          for i in $(seq 1 40); do
+            if curl --silent --fail --max-time 3 http://127.0.0.1:4173/ >/dev/null; then
+              echo "Static preview is responding."
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/forge-preview.log
+          exit 1
+      - name: Test Forge on desktop and mobile in real Chromium
+        env:
+          FORGE_PORT_URL: http://127.0.0.1:4173/
+          FORGE_PORT_ARTIFACTS: ${{ runner.temp }}/forge-port-qa
+        run: node mcp/forge-port-smoke.mjs
+      - name: Upload screenshots, diagnostics and browser logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-port-browser-qa
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/forge-port-qa/
+            /tmp/forge-preview.log

@@ -31,6 +31,23 @@ Example `control_editor` arguments for the F-16 reference mesh:
 }
 ```
 
+## Forge Studio structured control
+
+`forge_command` operates the PlayCanvas workbench itself, rather than the legacy Three.js scene snapshot. It accepts a bounded JSON operation schema and returns the command result, before/after engine diagnostics, DOM observation, and a real screenshot. It does not execute supplied code or shell commands.
+
+Examples:
+
+```json
+{ "op": "diagnostics" }
+{ "op": "create", "kind": "sphere", "name": "Collision Probe", "x": 0, "y": 3, "z": 0 }
+{ "op": "physics", "id": "ENTITY_ID_FROM_INSPECT", "mode": "dynamic", "shape": "ball" }
+{ "op": "template-racing" }
+{ "op": "qa" }
+{ "op": "screenshot" }
+```
+
+Use `forge_command` for stable scene/runtime operations and `visual_*` tools for screen-level actions and observing the rendered result. Both write-capable command tools and visual tools require the worker's Agent API key. That is a transport authorization credential, not an LLM provider key; Forge is not locked to a specific model provider.
+
 ## Visual browser tools
 
 These tools launch or reuse a remote Chromium session through Cloudflare Browser Run and return real page observations or screenshots:

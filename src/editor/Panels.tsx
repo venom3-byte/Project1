@@ -8,7 +8,18 @@ import {
   updateObject,
   useEditor,
 } from './store'
-import { BEHAVIORS, type Behavior, type SceneObject, type Shape, type Vec3 } from './types'
+import {
+  BEHAVIORS,
+  RULE_ACTIONS,
+  RULE_TRIGGERS,
+  type Behavior,
+  type Rule,
+  type RuleAction,
+  type RuleTrigger,
+  type SceneObject,
+  type Shape,
+  type Vec3,
+} from './types'
 
 const ICONS: Record<Shape, typeof Box> = {
   box: Box,
@@ -94,6 +105,146 @@ function VecRow({
           />
         ))}
       </div>
+    </div>
+  )
+}
+
+function Slider({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: number
+  onChange: (v: number) => void
+}) {
+  return (
+    <label className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
+      <span className="w-20 shrink-0">{label}</span>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.01}
+        value={value}
+        onPointerDown={pushHistory}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        className="min-w-0 flex-1"
+      />
+      <span className="w-8 text-right tabular-nums">{value.toFixed(2)}</span>
+    </label>
+  )
+}
+
+const SELECT = 'min-w-0 flex-1 rounded-md border border-input bg-background px-1.5 py-1 text-[11px] outline-none focus:border-ring'
+
+function RulesEditor({
+  rules,
+  others,
+  onChange,
+}: {
+  rules: Rule[]
+  others: SceneObject[]
+  onChange: (rules: Rule[], push: boolean) => void
+}) {
+  const update = (id: string, patch: Partial<Rule>, push = true) =>
+    onChange(
+      rules.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+      push,
+    )
+  return (
+    <div className="space-y-2 rounded-md border border-border p-2">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Rules</span>
+        <button
+          type="button"
+          onClick={() =>
+            onChange(
+              [
+                ...rules,
+                { id: `r${Date.now().toString(36)}${rules.length}`, on: 'touch', action: 'message', text: 'Hello!', once: true },
+              ],
+              true,
+            )
+          }
+          className="rounded-md border border-input px-2 py-0.5 text-[11px] hover:bg-accent"
+        >
+          + Add rule
+        </button>
+      </div>
+      {rules.length === 0 ? (
+        <p className="text-[11px] text-muted-foreground">
+          No rules yet. Example: when the player touches a button, hide a door.
+        </p>
+      ) : null}
+      {rules.map((r) => {
+        const def = RULE_ACTIONS.find((a) => a.value === r.action)
+        return (
+          <div key={r.id} className="space-y-1 rounded border border-border/60 p-1.5">
+            <div className="flex gap-1">
+              <select value={r.on} onChange={(e) => update(r.id, { on: e.target.value as RuleTrigger })} className={SELECT}>
+                {RULE_TRIGGERS.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                title="Remove rule"
+                onClick={() =>
+                  onChange(
+                    rules.filter((x) => x.id !== r.id),
+                    true,
+                  )
+                }
+                className="rounded-md p-1 hover:bg-destructive"
+              >
+                <Trash2 className="size-3" />
+              </button>
+            </div>
+            <select value={r.action} onChange={(e) => update(r.id, { action: e.target.value as RuleAction })} className={`${SELECT} w-full`}>
+              {RULE_ACTIONS.map((a) => (
+                <option key={a.value} value={a.value}>
+                  {a.label}
+                </option>
+              ))}
+            </select>
+            {def?.target ? (
+              <select
+                value={r.target ?? ''}
+                onChange={(e) => update(r.id, { target: e.target.value || undefined })}
+                className={`${SELECT} w-full`}
+              >
+                <option value="">Pick an object...</option>
+                {others.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+            {def?.text ? (
+              <input
+                value={r.text ?? ''}
+                placeholder="Message text"
+                onFocus={pushHistory}
+                onChange={(e) => update(r.id, { text: e.target.value }, false)}
+                className="w-full rounded-md border border-input bg-background px-1.5 py-1 text-[11px] outline-none focus:border-ring"
+              />
+            ) : null}
+            <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={r.once}
+                onChange={(e) => update(r.id, { once: e.target.checked })}
+                className="size-3.5 accent-current"
+              />
+              Only the first time
+            </label>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -206,6 +357,30 @@ export function Inspector() {
           />
         </div>
 
+        {obj.shape !== 'light' && obj.shape !== 'model' && obj.shape !== 'image' ? (
+          <div className="space-y-2 rounded-md border border-border p-2">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Material</div>
+            <Slider label="Roughness" value={obj.roughness ?? 0.6} onChange={(v) => set({ roughness: v })} />
+            <Slider label="Metalness" value={obj.metalness ?? 0.05} onChange={(v) => set({ metalness: v })} />
+            <Slider label="Opacity" value={obj.opacity ?? 1} onChange={(v) => set({ opacity: v })} />
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-medium text-muted-foreground">Glow color</span>
+              <input
+                type="color"
+                value={obj.emissive ?? '#000000'}
+                onPointerDown={pushHistory}
+                onChange={(e) => set({ emissive: e.target.value })}
+                className="h-7 w-14 cursor-pointer rounded border border-input bg-transparent"
+              />
+            </div>
+            <Slider
+              label="Glow strength"
+              value={obj.emissiveIntensity ?? 1}
+              onChange={(v) => set({ emissiveIntensity: v })}
+            />
+          </div>
+        ) : null}
+
         {obj.shape === 'light' ? (
           <div className="space-y-1">
             <div className="text-[11px] font-medium text-muted-foreground">Intensity</div>
@@ -245,6 +420,12 @@ export function Inspector() {
                 <NumField value={obj.speed} onChange={(v) => set({ speed: v })} />
               </div>
             ) : null}
+
+            <RulesEditor
+              rules={obj.rules ?? []}
+              others={s.objects.filter((o) => o.id !== obj.id)}
+              onChange={(rules, push) => updateObject(obj.id, { rules }, push)}
+            />
           </>
         )}
       </div>

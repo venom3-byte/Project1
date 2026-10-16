@@ -262,7 +262,21 @@ export function applyProps(obj: SceneObject, node: THREE.Object3D) {
     light.intensity = obj.intensity
     ;(marker.material as THREE.MeshBasicMaterial).color.set(obj.color)
   } else if (obj.shape !== 'model' && obj.shape !== 'image') {
-    ;((node as THREE.Mesh).material as THREE.MeshStandardMaterial).color.set(obj.color)
+    const m = (node as THREE.Mesh).material as THREE.MeshStandardMaterial
+    m.color.set(obj.color)
+    m.roughness = obj.roughness ?? 0.6
+    m.metalness = obj.metalness ?? 0.05
+    const opacity = obj.opacity ?? 1
+    m.opacity = opacity
+    const transparent = opacity < 1
+    if (m.transparent !== transparent) {
+      m.transparent = transparent
+      m.needsUpdate = true
+    }
+    if (m.emissive) {
+      m.emissive.set(obj.emissive ?? '#000000')
+      m.emissiveIntensity = obj.emissiveIntensity ?? 1
+    }
   }
 }
 
