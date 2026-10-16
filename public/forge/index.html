@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="stylesheet" href="./forge.css">
-<title>Forge Studio 3.9 — Claude Layout</title>
+<title>Forge Studio — Professional 3D Workspace</title>
 </head>
 <body>
 <div id="forgeBoot" class="forge-boot" role="status" aria-live="polite">
@@ -34,9 +34,21 @@
   <span class="app-spacer"></span>
   <button id="importAssets" data-import-assets class="app-button secondary-action"><span class="button-symbol" aria-hidden="true">＋</span><span>Import</span></button>
   <button id="productionTools" class="app-button secondary-action" aria-haspopup="dialog"><span class="button-symbol" aria-hidden="true">▦</span><span>Toolbox</span></button>
-  <button id="build" class="build-button" title="Build/export a playable project"><span aria-hidden="true">⇧</span><span>Build Web</span></button>
-  <button id="play" class="play-button" title="Run / stop the current scene"><span aria-hidden="true">▶</span><span>Play</span></button>
+  <button id="build" class="build-button" title="Build or export this project" aria-label="Build or export project"><span class="button-symbol" aria-hidden="true">⇧</span><span>Build</span></button>
+  <button id="play" class="preview-button" title="Enter or exit scene preview" aria-label="Preview scene" aria-pressed="false"><span class="preview-glyph" data-run-icon aria-hidden="true">▷</span><span data-run-label>Preview</span></button>
 </header>
+
+<nav class="workspace-strip" aria-label="Editor workspaces">
+  <div class="workspace-tabs" role="tablist" aria-label="Workflow">
+    <button class="workspace-tab is-active" type="button" role="tab" aria-selected="true" data-workspace-target="layout"><span class="workspace-tab-icon" aria-hidden="true">▦</span><span>Layout</span></button>
+    <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-target="modeling"><span class="workspace-tab-icon" aria-hidden="true">◇</span><span>Modeling</span></button>
+    <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-target="animation"><span class="workspace-tab-icon" aria-hidden="true">◷</span><span>Animation</span></button>
+    <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-target="assets"><span class="workspace-tab-icon" aria-hidden="true">▧</span><span>Assets</span></button>
+    <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-target="review"><span class="workspace-tab-icon" aria-hidden="true">✓</span><span>Review</span></button>
+  </div>
+  <div class="workspace-context" id="workspaceContext" aria-live="polite"><span class="context-led"></span><span>SCENE EDITING</span><i>·</i><span>Selection, transforms and hierarchy</span></div>
+  <div class="workspace-strip-meta"><kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>R</kbd><span>TOOLS</span></div>
+</nav>
 
 <main class="editor-shell">
   <aside class="side-panel left-panel" id="leftPanel">
