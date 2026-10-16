@@ -43,6 +43,7 @@ Run a visual verification loop:
 node mcp/visual-agent-runner.mjs checks
 node mcp/visual-agent-runner.mjs inspect
 node mcp/visual-agent-runner.mjs click '{"selector":"button[title=\"Add Sphere\"]}'
+node mcp/visual-agent-runner.mjs sequence '{"steps":[{"type":"click","text":"Sphere"},{"type":"key","key":"Delete"}]}'
 node mcp/visual-agent-runner.mjs type '{"selector":"input[aria-label=\"Project name\"]","text":"Visual QA Scene"}'
 ```
 
