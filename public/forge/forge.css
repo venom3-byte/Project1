@@ -170,3 +170,36 @@ dialog pre{min-height:220px;max-height:55vh;margin:0;padding:10px;background:#07
   .editor-shell{height:calc(100vh - 48px);display:block}
   .mobile-bar{grid-template-columns:1fr 1fr}
 }
+
+
+/* Mobile QA follow-up: preserve primary controls and keep production tools above navigation. */
+@media(max-width:430px){
+  .topbar.claude-layout{
+    gap:3px;
+    overflow-x:auto;
+    overflow-y:hidden;
+    flex-wrap:nowrap;
+    justify-content:flex-start;
+    scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;
+  }
+  .topbar.claude-layout::-webkit-scrollbar{display:none}
+  .topbar.claude-layout>*{flex-shrink:0}
+  .topbar.claude-layout .project-name{width:95px;min-width:95px;flex:0 0 95px;padding:0 3px;font-size:11px}
+  .topbar.claude-layout .top-divider,
+  .topbar.claude-layout .history,
+  .topbar.claude-layout #snapToggle,
+  .topbar.claude-layout #focus,
+  .topbar.claude-layout #importCar,
+  .topbar.claude-layout .create-inline,
+  .topbar.claude-layout #newProject,
+  .topbar.claude-layout #openProject,
+  .topbar.claude-layout .toolbar-spacer{display:none!important}
+  .topbar.claude-layout .transform-group{display:flex;flex:0 0 auto;gap:0}
+  .topbar.claude-layout .tool-icon{height:28px;min-width:27px;padding:0 5px;font-size:10px}
+  .topbar.claude-layout #importAssets{flex:0 0 28px;min-width:28px;width:28px;padding:0 3px;font-size:9px}
+  .topbar.claude-layout .file-actions{display:flex;flex:0 0 auto}
+  .topbar.claude-layout .file-actions #saveProject{height:28px;min-width:32px;padding:0 5px;font-size:9px}
+  .topbar.claude-layout #build{height:28px;flex:0 0 auto;padding:0 7px;font-size:10px}
+  .topbar.claude-layout #play{height:28px;flex:0 0 auto;padding:0 9px;font-size:10px}
+}
