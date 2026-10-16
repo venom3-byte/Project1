@@ -219,7 +219,7 @@ function isSceneObject(v: unknown): v is SceneObject {
 
 export function importJson(text: string): boolean {
   try {
-    const data = JSON.parse(text) as { name?: unknown; objects?: unknown }
+    const data = JSON.parse(text) as { name?: unknown; objects?: unknown; selectedId?: unknown }
     if (!Array.isArray(data.objects) || !data.objects.every(isSceneObject)) return false
     pushHistory()
     setState({
