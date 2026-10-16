@@ -15,8 +15,10 @@ const state = {root:null, refs:new Map(), activeSlot:'front', view:'perspective'
 function log(message, type='info') {
   try { F?.log?.('[Reference Studio] '+message, type); } catch {}
 }
+let dbPromise = null;
 function openDb() {
-  return new Promise((resolve,reject) => {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve,reject) => {
     if (!('indexedDB' in window)) return reject(new Error('IndexedDB unavailable'));
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
@@ -25,7 +27,8 @@ function openDb() {
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error || new Error('Could not open the local reference database'));
-  });
+  }).catch(error=>{dbPromise=null;throw error;});
+  return dbPromise;
 }
 function dbRequest(mode, operation) {
   return openDb().then(db => new Promise((resolve,reject) => {
@@ -297,7 +300,7 @@ async function selectSlot(slot) {
   setEditorView(SLOT_DEFS[slot].view);
   viewChanged(SLOT_DEFS[slot].view);
 }
-function applyCurrentFromUI() {
+function applyCurrentFromUI({save=true}={}) {
   const record = state.refs.get(state.activeSlot);
   if (!record) return;
   const d = state.dialog;
@@ -313,7 +316,7 @@ function applyCurrentFromUI() {
   posePlane(record);
   if (record.material) setOpacity(record.material,record.opacity);
   visibleForView(record);
-  persist(record).then(syncUI);
+  if (save) persist(record).then(syncUI);
   window.dispatchEvent(new CustomEvent('forge-reference-changed',{detail:{slot:record.slot,action:'updated',status:status()}}));
   syncUI();
 }
@@ -434,7 +437,8 @@ function open() {
     window.dispatchEvent(new CustomEvent('forge-reference-changed',{detail:{slot:state.activeSlot,action:'removed',status:status()}}));
   };
   d.querySelector('#refWidth').addEventListener('change',applyCurrentFromUI);
-  d.querySelector('#refOpacity').addEventListener('input',applyCurrentFromUI);
+  d.querySelector('#refOpacity').addEventListener('input',()=>applyCurrentFromUI({save:false}));
+  d.querySelector('#refOpacity').addEventListener('change',()=>applyCurrentFromUI());
   d.querySelector('#refOffset').addEventListener('change',applyCurrentFromUI);
   ['refX','refY','refZ'].forEach(id=>d.querySelector('#'+id).addEventListener('change',applyCurrentFromUI));
   d.querySelector('#refEnabled').addEventListener('change',applyCurrentFromUI);

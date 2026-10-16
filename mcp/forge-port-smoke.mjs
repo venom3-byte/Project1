@@ -121,8 +121,8 @@ try {
     throw new Error("Production Toolbox grouping is incomplete: "+JSON.stringify(toolboxCheck));
   }
   await forgeFrameLocator.locator(".forge-modal [data-x]").click();
-  await sleep(80);
-  const toolboxClosed = await frame.evaluate(() => !document.querySelector(".forge-modal"));
+  await forgeFrameLocator.locator(".forge-modal").waitFor({state:"detached",timeout:5000});
+  const toolboxClosed = await frame.evaluate(() => !document.querySelector(".forge-modal[open]"));
   if(!toolboxClosed) throw new Error("Production Toolbox did not close cleanly.");
 
   // Real image-reference regression: calibrate width, switch orthographic views,
