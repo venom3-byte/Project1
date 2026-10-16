@@ -118,6 +118,14 @@ function buildImageNode(o: SceneObject): THREE.Object3D {
   return group
 }
 
+/**
+ * Return the companion material library by file extension.
+ * OBJ materials silently fall back to white when the MTL is not selected.
+ */
+export function findMtlAssetName(assetFiles: Record<string, string> | undefined): string | undefined {
+  return Object.keys(assetFiles ?? {}).find((name) => /\.mtl$/i.test(name))
+}
+
 function loadThreeD(o: SceneObject, group: THREE.Group) {
   const manager = makeManager(o)
   const format = o.modelFormat ?? 'glb'
@@ -138,7 +146,7 @@ function loadThreeD(o: SceneObject, group: THREE.Group) {
       new FBXLoader(manager).load(source, done, undefined, fail)
       return
     case 'obj': {
-      const mtlName = Object.keys(o.assetFiles ?? {}).find((name) => /\\.mtl$/i.test(name))
+      const mtlName = findMtlAssetName(o.assetFiles)
       if (mtlName) {
         const mtl = new MTLLoader(manager)
         mtl.load(o.assetFiles?.[mtlName] ?? mtlName, (materials) => {
