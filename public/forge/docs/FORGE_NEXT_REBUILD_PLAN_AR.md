@@ -182,3 +182,26 @@
 ## 9. إقرار بالتقدم الحالي
 
 تم إنشاء الفرع المخصص لإعادة البناء كي لا نخاطر باستقرار النسخة الحية. الخطوة التنفيذية التالية هي بناء shell متوازٍ في `public/forge-next/` مع عقود وحدات واضحة، ثم اختباره وتطويره بعيداً عن واجهة الإنتاج الحالية حتى يثبت أنه أفضل في الشكل والسلوك والأداء.
+
+
+---
+
+## مرحلة متخصصة — التحريك والنمذجة بمراجع الصور (16 أكتوبر 2026)
+
+### التعديلات في Forge Next
+- إضافة مساحة **Image Model** مستقلة، تعرض صوراً مرجعية داخل المشهد ثلاثي الأبعاد نفسه، مع توجيه أمامي (XY) أو جانبي (YZ) أو علوي (XZ)، وقياس عرض معلوم بالمتر مع الحفاظ على نسبة الصورة، وضبط الشفافية، وقائمة مستقلة للمراجع مع إظهارها وإخفائها.
+- تطوير Timeline إلى مسارات مرئية للموقع (Location) والدوران (Rotation) والمقياس (Scale)، مع تحريك رأس التشغيل، وإعادة توقيت المفتاح بالسحب، وأنماط الاستيفاء Linear / Ease / Hold، وإدراج أو استبدال المفتاح، وAuto Key لتسجيل تغييرات التحويل.
+- توسيع اختبارات Chromium لاختبار المفاتيح والاستيفاء وAuto Key ومعايرة المرجع الأمامي والجانبي ووسائل إظهار المرجع وإخفائه وإمكانية فتح اللوحة على الهاتف.
+
+### مبدأ الدقة وحدود الصورة
+صورة واحدة لا تحدد العمق أو الأسطح المخفية؛ لا يمكن ضمان مجسم مطابق لكل جسم معقد من لقطة واحدة. للمركبات والطائرات والأجسام ذات الأشكال الدقيقة يلزم استخدام مراجع أمامية وجانبية وعلوية معايرة أو مخططات وأبعاد، ثم مطابقة الحدود والمقاطع ومقارنة النموذج من مناظير متعامدة ومنظورية. هذه المرحلة تبني سير عمل مضبوطاً للمراجع داخل المشهد، ولا تدّعي اكتمال مولّد AI يحوّل أي صورة آلياً إلى مجسم نهائي.
+
+### المراجع
+- Blender Manual 4.4 — Workspaces: https://docs.blender.org/manual/en/4.4/interface/window_system/workspaces.html
+- Blender Manual 4.4 — Areas / split / resize / maximize: https://docs.blender.org/manual/id/4.4/interface/window_system/areas.html
+- Blender Manual 4.4 — Import Images as Planes: https://docs.blender.org/manual/en/4.4/modeling/meshes/import_images_as_planes.html
+- Blender Manual 4.4 — Keyframes and interpolation: https://docs.blender.org/manual/th/4.4/animation/keyframes/introduction.html
+- Blender Manual 4.4 — Insert Keyframe / Auto Keying: https://docs.blender.org/manual/en/4.4/animation/keyframes/editing.html
+- Blender Guru — “Beginner Blender 4.0 Tutorial — Part 12: Animation”: https://www.youtube.com/watch?v=4-tCn4-GfM4. الفهرس الزمني المنشور يشير إلى Keyframes عند 00:00، وDope Sheet عند 06:39، وGraph Editor عند 07:32، وEasing عند 08:35، ومعدل الإطارات عند 13:51، ونهاية المدى عند 15:20.
+- Neil Blevins — “Creating Orthographic Reference Images”: https://artofsoulburn.com/art_lessons/orthographic_reference_images/orthographic_reference_images.htm. يشرح ضبط صور front/side/top على محاور ومقياس مشترك.
+- ملاحظة تحقق: لم يتوفر تشغيل الفيديو الكامل في بيئة الجلب هذه؛ لذا لا أسجّل مشاهدة إطاراً بإطار. استندت إلى فهرس الفصول الظاهر والمراجع الموثقة، ويجب إجراء مراجعة مرئية فعلية للفيديو في جلسة يمكنها تشغيله قبل الادعاء بإتمامها.
