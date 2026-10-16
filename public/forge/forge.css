@@ -246,3 +246,8 @@ html,body{background:var(--bg);color:var(--text)}button{transition:background-co
   .play-button{flex:0 0 auto;min-width:0;padding:0 6px;font-size:9px;margin-right:1px}
   .play-button span:last-child{font-size:9px}
 }
+
+/* Inspector transform fields must preserve X/Y/Z, RX/RY/RZ and SX/SY/SZ in narrow panels. */
+.vector-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;width:100%;min-width:0}
+.vector-grid label{min-width:0}
+.vector-grid input{width:100%;min-width:0;padding-left:3px;padding-right:3px;text-align:center}

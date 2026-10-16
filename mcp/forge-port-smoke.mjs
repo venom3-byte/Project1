@@ -145,6 +145,21 @@ try {
   await frame.waitForFunction(previous => window.Forge.entities.size === previous + 1, entityCountBefore, { timeout: 10000 });
   const entityCountAfterAdd = await frame.evaluate(() => window.Forge.entities.size);
   const uiSphereId = await frame.evaluate(() => window.Forge.selectedId);
+  const transformLayout = await frame.evaluate(() => ({
+    rows:[...document.querySelectorAll(".right-panel .vector-grid")].slice(0,3).map(row=>({
+      columnCount:getComputedStyle(row).gridTemplateColumns.split(" ").filter(Boolean).length,
+      columns:getComputedStyle(row).gridTemplateColumns,
+      inputs:[...row.querySelectorAll("input")].map(input=>{
+        const r=input.getBoundingClientRect(),panel=document.querySelector(".right-panel").getBoundingClientRect();
+        return {id:input.id,width:Math.round(r.width),visible:r.width>0&&r.height>0,left:Math.round(r.left),right:Math.round(r.right),insidePanel:r.left>=panel.left&&r.right<=panel.right+1};
+      })
+    }))
+  }));
+  if(transformLayout.rows.length!==3||transformLayout.rows.some(row=>row.columnCount!==3||row.inputs.length!==3||row.inputs.some(input=>!input.visible||input.width<45||!input.insidePanel))) {
+    throw new Error("Inspector must show all 9 transform fields in 3 aligned columns without clipping: "+JSON.stringify(transformLayout));
+  }
+  const axisContract=await frame.evaluate(()=>window.ForgeViewport.status());
+  if(!axisContract.axes?.y||axisContract.axisYColor!=="#35d982") throw new Error("The vertical world axis must use the green emissive axis material: "+JSON.stringify(axisContract));
 
   // Exercise the same provider-neutral structured command contract used by forge_command.
   const agentPhysicsBefore = await frame.evaluate(() => window.Forge.diagnostics().physics);
@@ -257,6 +272,8 @@ try {
     httpStatus: response.status(),
     initial,
     actionChecks: { entityCountBefore, entityCountAfterAdd, playState, stoppedState },
+    transformLayout,
+    axisContract,
     toolboxCheck,
     toolboxClosed,
     selectModeActive,

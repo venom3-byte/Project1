@@ -75,6 +75,22 @@ function createGridTexture() {
   texture.addressV=pc.ADDRESS_CLAMP_TO_EDGE;
   return texture;
 }
+function createSolidTexture(color) {
+  const surface=document.createElement("canvas");
+  surface.width=surface.height=32;
+  const ctx=surface.getContext("2d");
+  ctx.fillStyle=color;
+  ctx.fillRect(0,0,32,32);
+  const texture=new pc.Texture(F.app.graphicsDevice,{
+    width:32,height:32,format:pc.PIXELFORMAT_R8_G8_B8_A8,mipmaps:false
+  });
+  texture.setSource(surface);
+  texture.minFilter=pc.FILTER_LINEAR;
+  texture.magFilter=pc.FILTER_LINEAR;
+  texture.addressU=pc.ADDRESS_CLAMP_TO_EDGE;
+  texture.addressV=pc.ADDRESS_CLAMP_TO_EDGE;
+  return texture;
+}
 function createGridMaterials() {
   state.gridTexture=createGridTexture();
   state.gridMaterial=new pc.StandardMaterial();
@@ -121,11 +137,27 @@ function createWorldGrid() {
   // part of the user's scene registry or serialized project.
   const axis=new pc.Entity("World axis Y — helper");
   state.helperRoot.addChild(axis);
-  axis.addComponent("render",{type:"box"});
+  axis.addComponent("render",{type:"cylinder"});
   axis.setLocalPosition(0,2,0);
-  axis.setLocalScale(0.035,4,0.035);
+  axis.setLocalScale(0.045,4,0.045);
   axis.render.layers=[pc.LAYERID_WORLD];
-  axis.render.material=makeMaterial([0.24,0.88,0.47],{emissive:0.9});
+  const axisTexture=createSolidTexture("#35d982");
+  const axisMaterial=new pc.StandardMaterial();
+  axisMaterial.diffuse=new pc.Color(1,1,1);
+  axisMaterial.emissive=new pc.Color(1,1,1);
+  axisMaterial.diffuseMap=axisTexture;
+  axisMaterial.emissiveMap=axisTexture;
+  axisMaterial.useLighting=false;
+  axisMaterial.useMetalness=false;
+  axisMaterial.useTonemap=false;
+  axisMaterial.gloss=0;
+  axisMaterial.update();
+  axis.render.material=axisMaterial;
+  for(const instance of axis.render.meshInstances||[]){
+    instance.material=axisMaterial;
+    instance.castShadow=false;
+    instance.receiveShadow=false;
+  }
   axis.render.castShadows=false;
   axis.render.receiveShadows=false;
   axis.render.frustumCulling=false;
@@ -319,6 +351,7 @@ function status(){
     majorSubdivisionMeters:5,
     groundVisible:Boolean(state.ground?.entity?.render?.enabled&&state.ground.entity.render.layers.includes(pc.LAYERID_WORLD)),
     axes:{x:true,y:Boolean(state.axisY),z:true},
+    axisYColor:state.axisY?.render?.meshInstances?.[0]?.material?.emissiveMap?"#35d982":"unknown",
     navigation:{orbit:true,pan:true,zoom:true,touch:true,clickSelect:true},
     camera:camera&&position?{
       position:[position.x,position.y,position.z],
