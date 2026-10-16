@@ -111,7 +111,8 @@ async function main() {
       action = { type: "checks", canvasCount, playInitially, stopAppeared, playReturned, passed: canvasCount === 1 && playInitially && stopAppeared && playReturned };
     }
 
-    await sleep(300);
+    // Allow the editor's debounced local save to settle before persisting storage state.
+    await sleep(850);
     const observation = await page.evaluate(() => {
       const clean = s => String(s || "").replace(/\s+/g, " ").trim().slice(0, 180);
       const visible = e => { const r=e.getBoundingClientRect(),s=getComputedStyle(e); return r.width>0 && r.height>0 && s.display!=="none" && s.visibility!=="hidden"; };
