@@ -32,6 +32,25 @@ export type Behavior =
   | 'hazard'
   | 'goal'
   | 'patrol'
+  | 'physics'
+  | 'jumppad'
+  | 'checkpoint'
+
+export type RuleTrigger = 'touch' | 'start'
+
+export type RuleAction = 'message' | 'score' | 'hide' | 'show' | 'teleport' | 'win' | 'respawn' | 'launch'
+
+/** One visual-script rule: "when <trigger> on this object, do <action>". */
+export interface Rule {
+  id: string
+  on: RuleTrigger
+  action: RuleAction
+  /** id of another object (hide / show / teleport) */
+  target?: string
+  text?: string
+  /** fire only the first time */
+  once: boolean
+}
 
 export interface SceneObject {
   id: string
@@ -54,6 +73,14 @@ export interface SceneObject {
   modelFormat?: AssetFormat
   /** Optional companion files for GLTF/OBJ/FBX/etc. Indexed by original file name. */
   assetFiles?: Record<string, string>
+  /** Material tuning for primitive shapes. Defaults: roughness 0.6, metalness 0.05, opacity 1, no glow. */
+  roughness?: number
+  metalness?: number
+  opacity?: number
+  emissive?: string
+  emissiveIntensity?: number
+  /** Visual-script rules (events and actions). */
+  rules?: Rule[]
 }
 
 export type TransformMode = 'translate' | 'rotate' | 'scale'
@@ -88,4 +115,23 @@ export const BEHAVIORS: { value: Behavior; label: string; hint: string }[] = [
   { value: 'hazard', label: 'Hazard', hint: 'Sends the player back to the start on touch.' },
   { value: 'goal', label: 'Goal', hint: 'Touch it to win.' },
   { value: 'patrol', label: 'Enemy patrol', hint: 'Moves left and right and hurts on touch. Speed = pace.' },
+  { value: 'physics', label: 'Physics body', hint: 'Falls with gravity, bounces a little, can be pushed by the player and stacked.' },
+  { value: 'jumppad', label: 'Jump pad', hint: 'Launches the player high into the air on touch.' },
+  { value: 'checkpoint', label: 'Checkpoint', hint: 'Touch it to set the new respawn point.' },
+]
+
+export const RULE_TRIGGERS: { value: RuleTrigger; label: string }[] = [
+  { value: 'touch', label: 'When the player touches this' },
+  { value: 'start', label: 'When the game starts' },
+]
+
+export const RULE_ACTIONS: { value: RuleAction; label: string; target: boolean; text: boolean }[] = [
+  { value: 'message', label: 'Show a message', target: false, text: true },
+  { value: 'score', label: 'Add 1 to the score', target: false, text: true },
+  { value: 'hide', label: 'Hide / remove an object', target: true, text: false },
+  { value: 'show', label: 'Show an object', target: true, text: false },
+  { value: 'teleport', label: 'Teleport the player to an object', target: true, text: false },
+  { value: 'launch', label: 'Launch the player upward', target: false, text: false },
+  { value: 'respawn', label: 'Send the player back to the start', target: false, text: true },
+  { value: 'win', label: 'Win the game', target: false, text: true },
 ]
