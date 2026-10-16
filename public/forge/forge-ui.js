@@ -27,7 +27,14 @@ const loadForgeAgent=async()=>{
 };
 const forgeAgentProxy=new Proxy({},{
   get(_target,prop){
-    if(prop==="serverCapable")return()=>location.protocol!=="file:"&&!/github\\.io$/i.test(location.hostname);
+    if(prop==="serverCapable")return()=>{
+      const configured=window.ForgeServerBridge?.webSocketUrl;
+      if(typeof configured!=="string"||!configured.trim()||location.protocol==="file:"||typeof WebSocket==="undefined")return false;
+      try{
+        const target=new URL(configured.trim(),location.href);
+        return ["ws:","wss:"].includes(target.protocol)&&!(location.protocol==="https:"&&target.protocol!=="wss:");
+      }catch{return false}
+    };
     return async(...args)=>{
       const api=await loadForgeAgent();
       const fn=api?.[prop];
