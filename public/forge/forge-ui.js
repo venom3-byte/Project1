@@ -273,6 +273,7 @@ const editorWorkspaceCopy={
   assets:["ASSET WORKFLOW","Import, inspect and organize content"],
   review:["VALIDATION","Asset metrics, QA and diagnostics"]
 };
+let workspaceOpenedTimeline=false;
 function setEditorWorkspace(name){
   const key=editorWorkspaceCopy[name]?name:"layout";
   document.documentElement.dataset.editorWorkspace=key;
@@ -290,7 +291,8 @@ function setEditorWorkspace(name){
     if(detail)detail.textContent=description;
   }
   const timeline=document.querySelector(".timeline-shell");
-  if(key==="animation"&&timeline)timeline.open=true;
+  if(key==="animation"&&timeline){if(!timeline.open)workspaceOpenedTimeline=true;timeline.open=true}
+  else if(timeline&&workspaceOpenedTimeline){timeline.open=false;workspaceOpenedTimeline=false}
   if(key==="assets"){
     const panel=document.querySelector(".assets-section");
     if(panel){panel.open=true;panel.scrollIntoView({block:"nearest",behavior:"smooth"})}
