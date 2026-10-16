@@ -260,7 +260,7 @@ function validateAssetFiles(value) {
   if (entries.length > 12) throw new Error("At most 12 model companion files may be supplied.");
   const files = {};
   for (const [name, url] of entries) {
-    if (!/^[A-Za-z0-9_. -]{1,120}$/.test(name) || name === "." || name === ".." || name.includes("/") || name.includes("\\\\")) {
+    if (!/^[A-Za-z0-9_. -]{1,120}$/.test(name) || name === "." || name === ".." || name.includes("/") || name.includes("\\")) {
       throw new Error("Companion filenames must be simple basenames without path separators.");
     }
     files[name] = validatePublicAssetUrl(url);
