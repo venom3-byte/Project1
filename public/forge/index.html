@@ -223,9 +223,10 @@
   </aside>
 </main>
 
-<nav class="mobile-bar">
-  <button id="mobileScene">Scene</button>
-  <button id="mobileInspector">Inspector</button>
+<nav class="mobile-bar" aria-label="Mobile editor panels">
+  <button id="mobileScene" type="button">Scene</button>
+  <button id="mobileAnimation" type="button" aria-pressed="false">Animation</button>
+  <button id="mobileInspector" type="button">Inspector</button>
 </nav>
 
 <dialog id="visionDialog"><div class="dialog-head"><b>Forge Spatial Vision</b><button data-close="visionDialog">×</button></div><div class="vision-body"><div class="vision-toolbar"><button id="visionRefresh">Scan scene</button><button id="visionCenter">Frame selected</button><button id="visionMove">Move selected to center</button></div><pre id="visionReport">No scan yet.</pre></div><div class="dialog-actions"><button data-close="visionDialog">Close</button></div></dialog>
