@@ -27,7 +27,7 @@ function safeName(s) { return String(s || "step").toLowerCase().replace(/[^a-z0-
 async function main() {
   const command = process.argv[2] || "inspect";
   const args = process.argv[3] ? JSON.parse(process.argv[3]) : {};
-  const allowed = new Set(["open", "inspect", "screenshot", "click", "type", "key", "scroll", "checks"]);
+  const allowed = new Set(["open", "inspect", "screenshot", "click", "type", "key", "scroll", "sequence", "checks"]);
   if (!allowed.has(command)) throw new Error("Unsupported command. Use: " + [...allowed].join(", "));
   await ensureDir(path.dirname(profilePath));
   await ensureDir(artifactDir);
@@ -97,6 +97,54 @@ async function main() {
       await page.mouse.move(viewport.width * 0.72, viewport.height * 0.72);
       await page.mouse.wheel(dir === "left" ? -amount : dir === "right" ? amount : 0, dir === "up" ? -amount : dir === "down" ? amount : 0);
       action = { type: "scroll", direction: dir, amount };
+    } else if (command === "sequence") {
+      if (!Array.isArray(args.steps) || args.steps.length < 1 || args.steps.length > 20) {
+        throw new Error("sequence requires 1–20 bounded steps.");
+      }
+      const results = [];
+      for (const step of args.steps) {
+        if (!step || typeof step !== "object") throw new Error("Each sequence step must be an object.");
+        if (step.type === "click") {
+          const ways = Number(!!step.selector) + Number(!!step.text) + Number(Number.isFinite(step.x) && Number.isFinite(step.y));
+          if (ways !== 1) throw new Error("Each click step needs exactly one target: selector, text, or x/y.");
+          if (step.selector) {
+            if (typeof step.selector !== "string" || step.selector.length > 180) throw new Error("Selector too long.");
+            const target = page.locator(step.selector).first();
+            await target.waitFor({state:"visible",timeout:10000});
+            await target.click({timeout:10000});
+          } else if (step.text) {
+            const target = page.getByRole("button",{name:step.text,exact:true}).first();
+            await target.waitFor({state:"visible",timeout:10000});
+            await target.click({timeout:10000});
+          } else {
+            const x=Number(step.x), y=Number(step.y);
+            if(x<0||y<0||x>viewport.width||y>viewport.height) throw new Error("Coordinates out of viewport.");
+            await page.mouse.click(x,y);
+          }
+          results.push({type:"click",target:step.selector||step.text||[step.x,step.y]});
+        } else if (step.type === "type") {
+          if(typeof step.selector!=="string"||step.selector.length>180||typeof step.text!=="string"||step.text.length>4000) throw new Error("Invalid type step.");
+          const target=page.locator(step.selector).first();
+          await target.waitFor({state:"visible",timeout:10000});
+          await target.fill(step.text,{timeout:10000});
+          results.push({type:"type",selector:step.selector,characters:step.text.length});
+        } else if (step.type === "key") {
+          const allowedKeys=new Set(["Enter","Escape","Tab","Delete","Backspace","Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Home","End","F","W","E","R","Control+Z","Control+Y","Control+D"]);
+          if(!allowedKeys.has(step.key)) throw new Error("Unsupported key in sequence.");
+          await page.keyboard.press(step.key);
+          results.push({type:"key",key:step.key});
+        } else if (step.type === "scroll") {
+          if(!["up","down","left","right"].includes(step.direction)) throw new Error("Invalid scroll direction.");
+          const amount=Math.max(60,Math.min(1200,Number(step.amount)||480));
+          await page.mouse.move(viewport.width*0.72,viewport.height*0.72);
+          await page.mouse.wheel(step.direction==="left"?-amount:step.direction==="right"?amount:0,step.direction==="up"?-amount:step.direction==="down"?amount:0);
+          results.push({type:"scroll",direction:step.direction,amount});
+        } else {
+          throw new Error("Unsupported sequence step. Use click, type, key or scroll.");
+        }
+        await sleep(120);
+      }
+      action = { type:"sequence", steps:results };
     } else if (command === "checks") {
       const canvasCount = await page.locator("canvas").count();
       const play = page.getByRole("button", { name: "Play", exact: true }).first();
