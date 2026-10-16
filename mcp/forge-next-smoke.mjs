@@ -139,11 +139,11 @@ try {
     if(!base.canvas.visible||!base.bottomBar.visible||!base.previewVisible)throw new Error("Mobile viewport or primary controls are unusable at "+viewport.width+"px: "+JSON.stringify(base));
     await page.locator('[data-mobile-panel="scene"]').click();
     await page.waitForFunction(()=>document.querySelector("#leftDock").classList.contains("is-open"),null,{timeout:5000});
-    await page.locator("#drawerScrim").click({position:{x:innerWidth-3,y:innerHeight/2}});
+    await page.locator("#drawerScrim").click({position:{x:viewport.width-3,y:viewport.height/2}});
     await page.waitForFunction(()=>!document.querySelector("#leftDock").classList.contains("is-open"),null,{timeout:5000});
     await page.locator('[data-mobile-panel="properties"]').click();
     await page.waitForFunction(()=>document.querySelector("#rightDock").classList.contains("is-open"),null,{timeout:5000});
-    await page.locator("#drawerScrim").click({position:{x:3,y:innerHeight/2}});
+    await page.locator("#drawerScrim").click({position:{x:3,y:viewport.height/2}});
     await page.waitForFunction(()=>!document.querySelector("#rightDock").classList.contains("is-open"),null,{timeout:5000});
     await page.locator('[data-mobile-panel="timeline"]').click();
     await page.waitForFunction(()=>document.documentElement.dataset.forgeWorkspace==="animation"&&!document.querySelector("#timelinePanel").hidden,null,{timeout:5000});
