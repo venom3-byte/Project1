@@ -122,7 +122,10 @@ try {
   }
   await forgeFrameLocator.locator(".forge-modal [data-x]").click();
   await sleep(80);
-  const toolboxClosed = await frame.evaluate(() => !document.querySelector(".forge-modal"));
+  const toolboxClosed = await frame.evaluate(() => {
+    const dialog = document.querySelector(".forge-modal");
+    return !dialog || dialog.open === false;
+  });
   if(!toolboxClosed) throw new Error("Production Toolbox did not close cleanly.");
 
   // Verify the real reference-image workflow: import an intentionally wide image,
