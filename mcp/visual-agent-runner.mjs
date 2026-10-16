@@ -27,7 +27,7 @@ function safeName(s) { return String(s || "step").toLowerCase().replace(/[^a-z0-
 async function main() {
   const command = process.argv[2] || "inspect";
   const args = process.argv[3] ? JSON.parse(process.argv[3]) : {};
-  const allowed = new Set(["open", "inspect", "screenshot", "click", "type", "key", "scroll", "sequence", "checks"]);
+  const allowed = new Set(["open", "inspect", "screenshot", "click", "type", "key", "scroll", "drag", "sequence", "checks"]);
   if (!allowed.has(command)) throw new Error("Unsupported command. Use: " + [...allowed].join(", "));
   await ensureDir(path.dirname(profilePath));
   await ensureDir(artifactDir);
@@ -97,6 +97,30 @@ async function main() {
       await page.mouse.move(viewport.width * 0.72, viewport.height * 0.72);
       await page.mouse.wheel(dir === "left" ? -amount : dir === "right" ? amount : 0, dir === "up" ? -amount : dir === "down" ? amount : 0);
       action = { type: "scroll", direction: dir, amount };
+    } else if (command === "drag") {
+      const coords = [args.startX, args.startY, args.endX, args.endY].map(Number);
+      if (coords.some(value => !Number.isFinite(value))) {
+        throw new Error("drag requires finite startX, startY, endX and endY coordinates.");
+      }
+      const [startX, startY, endX, endY] = coords;
+      const button = args.button || "left";
+      if (!["left", "right"].includes(button)) throw new Error("drag button must be left or right.");
+      if (coords.some(value => value < 0) || startX > viewport.width || endX > viewport.width || startY > viewport.height || endY > viewport.height) {
+        throw new Error("Drag coordinates are outside the current viewport.");
+      }
+      if (Math.hypot(endX - startX, endY - startY) < 8) throw new Error("Drag distance must be at least 8 pixels.");
+      const segments = Math.max(4, Math.min(16, Math.ceil(Math.hypot(endX - startX, endY - startY) / 40)));
+      await page.mouse.move(startX, startY);
+      await page.mouse.down({ button });
+      for (let i = 1; i <= segments; i += 1) {
+        await page.mouse.move(
+          startX + (endX - startX) * i / segments,
+          startY + (endY - startY) * i / segments,
+        );
+      }
+      await page.mouse.up({ button });
+      await sleep(400);
+      action = { type: "drag", button, from: [startX, startY], to: [endX, endY], segments };
     } else if (command === "sequence") {
       if (!Array.isArray(args.steps) || args.steps.length < 1 || args.steps.length > 20) {
         throw new Error("sequence requires 1–20 bounded steps.");
@@ -139,8 +163,31 @@ async function main() {
           await page.mouse.move(viewport.width*0.72,viewport.height*0.72);
           await page.mouse.wheel(step.direction==="left"?-amount:step.direction==="right"?amount:0,step.direction==="up"?-amount:step.direction==="down"?amount:0);
           results.push({type:"scroll",direction:step.direction,amount});
+        } else if (step.type === "drag") {
+          const coords = [step.startX, step.startY, step.endX, step.endY].map(Number);
+          if (coords.some(value => !Number.isFinite(value))) {
+            throw new Error("drag steps require finite startX, startY, endX and endY coordinates.");
+          }
+          const [startX, startY, endX, endY] = coords;
+          const button = step.button || "left";
+          if (!["left", "right"].includes(button)) throw new Error("drag step button must be left or right.");
+          if (coords.some(value => value < 0) || startX > viewport.width || endX > viewport.width || startY > viewport.height || endY > viewport.height) {
+            throw new Error("Drag step coordinates are outside the viewport.");
+          }
+          if (Math.hypot(endX - startX, endY - startY) < 8) throw new Error("Drag step distance must be at least 8 pixels.");
+          const segments = Math.max(4, Math.min(16, Math.ceil(Math.hypot(endX - startX, endY - startY) / 40)));
+          await page.mouse.move(startX, startY);
+          await page.mouse.down({ button });
+          for (let i = 1; i <= segments; i += 1) {
+            await page.mouse.move(
+              startX + (endX - startX) * i / segments,
+              startY + (endY - startY) * i / segments,
+            );
+          }
+          await page.mouse.up({ button });
+          results.push({ type: "drag", button, from: [startX, startY], to: [endX, endY], segments });
         } else {
-          throw new Error("Unsupported sequence step. Use click, type, key or scroll.");
+          throw new Error("Unsupported sequence step. Use click, type, key, scroll or drag.");
         }
         await sleep(120);
       }
