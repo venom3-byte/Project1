@@ -20,6 +20,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Install application dependencies
+        run: npm ci
+      - name: Run unit tests, including the MTL filename regression test
+        run: npm test -- --reporter=dot
+      - name: Build the application bundle
+        run: npm run build
       - name: Validate the F-16 mesh structure and reference dimensions
         run: node scripts/validate-f16-model.mjs
       - name: Capture the current shared Agent Gateway scene
