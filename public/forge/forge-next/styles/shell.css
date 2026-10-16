@@ -143,3 +143,17 @@ html.timeline-manually-closed[data-forge-workspace="animation"] .work-area{grid-
 .forge-app.is-booting{visibility:hidden}
 .forge-app.is-ready{visibility:visible}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}
+
+
+/* Dock collapse, full-screen viewport, import feedback and keyboard-resizable panel states. */
+.editor-layout.left-collapsed{grid-template-columns:0 0 minmax(280px,1fr) 5px minmax(220px,var(--right-dock-width))}
+.editor-layout.left-collapsed>.left-dock,.editor-layout.left-collapsed>[data-splitter="left"]{display:none}
+.editor-layout.right-collapsed{grid-template-columns:minmax(190px,var(--left-dock-width)) 5px minmax(280px,1fr) 0 0}
+.editor-layout.right-collapsed>.inspector-dock,.editor-layout.right-collapsed>[data-splitter="right"]{display:none}
+.editor-layout.left-collapsed.right-collapsed{grid-template-columns:0 0 minmax(280px,1fr) 0 0}
+.viewport-stage.is-dragover:after{content:"Release to import";position:absolute;inset:20px;z-index:8;display:grid;place-items:center;border:1px dashed #79bfdc;border-radius:8px;background:#0a1b27dd;color:#d9f3ff;font-size:13px;font-weight:650;pointer-events:none}
+#viewportStage:fullscreen{width:100vw;height:100vh;background:#080d12}
+#viewportStage:fullscreen #viewport{width:100%;height:100%}
+@media(max-width:850px){
+  .editor-layout.left-collapsed,.editor-layout.right-collapsed,.editor-layout.left-collapsed.right-collapsed{display:block}
+}
