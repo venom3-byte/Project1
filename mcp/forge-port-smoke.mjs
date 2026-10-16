@@ -76,7 +76,8 @@ try {
       spatial: !!window.ForgeSpatial,
       agent: !!window.ForgeAgent,
       runtime: !!window.ForgeRuntime,
-      qa: !!window.ForgeQAPro
+      qa: !!window.ForgeQAPro,
+      referenceStudio: !!window.ForgeReferenceStudio?.status?.().ok
     },
     agentServer: {
       configured: typeof window.ForgeServerBridge?.webSocketUrl === "string" && !!window.ForgeServerBridge.webSocketUrl,
@@ -114,15 +115,79 @@ try {
     const content=(dialog?.innerText||"").toLowerCase();
     return {visible:Boolean(dialog?.open),cardCount:dialog?.querySelectorAll(".toolbox-card").length||0,
       groups:["assets & materials","animation & effects","world & gameplay","diagnostics"].filter(title=>content.includes(title)),
-      containsAssetLab:content.includes("asset lab"),containsVisualQA:content.includes("visual qa")};
+      containsAssetLab:content.includes("asset lab"),containsVisualQA:content.includes("visual qa"),containsReferenceStudio:content.includes("reference studio")};
   });
-  if(!toolboxCheck.visible||toolboxCheck.cardCount<10||toolboxCheck.groups.length!==4||!toolboxCheck.containsAssetLab||!toolboxCheck.containsVisualQA) {
+  if(!toolboxCheck.visible||toolboxCheck.cardCount<10||toolboxCheck.groups.length!==4||!toolboxCheck.containsAssetLab||!toolboxCheck.containsVisualQA||!toolboxCheck.containsReferenceStudio) {
     throw new Error("Production Toolbox grouping is incomplete: "+JSON.stringify(toolboxCheck));
   }
   await forgeFrameLocator.locator(".forge-modal [data-x]").click();
-  await sleep(80);
-  const toolboxClosed = await frame.evaluate(() => !document.querySelector(".forge-modal"));
+  await forgeFrameLocator.locator(".forge-modal").waitFor({state:"detached",timeout:5000});
+  const toolboxClosed = await frame.evaluate(() => !document.querySelector(".forge-modal[open]"));
   if(!toolboxClosed) throw new Error("Production Toolbox did not close cleanly.");
+
+  // Real image-reference regression: calibrate width, switch orthographic views,
+  // prove the image plane is isolated from scene entity count, then remove it.
+  await forgeFrameLocator.locator("#productionTools").click();
+  await forgeFrameLocator.locator('[data-production-tool="references"]').click();
+  const referenceDialog = forgeFrameLocator.locator(".forge-reference-modal");
+  await referenceDialog.waitFor({state:"visible",timeout:5000});
+  await referenceDialog.locator('[data-ref-slot="front"]').click();
+  await referenceDialog.locator("#refFile").setInputFiles({
+    // Tiny valid PNG fixture: exercise the same browser-decoded raster path users upload.
+    name:"qa-blueprint.png",mimeType:"image/png",
+    buffer:Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAKAAAABQCAIAAAARP+ljAAAA/klEQVR42u3dsQnCQBSA4RdxDAvBCRxEFJzAygGcIzPY2giKg7iChROIYOsCVnnGcN739Slyf14I5EKax/MV1ZjvzhFxbZf1nPIoEBiBERiBERiBEVhgBEZgBEZgBEZggREYgREYgREYgYloOm+bva9Xlu9nJseTCeaD8VBX1iBK3PievFOaYA9ZCIzACIzACIzAAiMwAiMwApPSzLaHbkdebvuIWEw3FrFXyXU2wf8+wckdHd4H9y25zibYQxYCIzACIzACI7DACIzACIzApPg+uAzeJvHtCS6RH2MhMAIjMAIjMAILjMAIjMAIjMAIjMACIzACIzACIzACV+oNY/sxIIl6NZ8AAAAASUVORK5CYII=","base64")
+  });
+  await frame.waitForFunction(() => window.ForgeReferenceStudio?.status?.().referenceCount === 1, null, {timeout:10000});
+  await referenceDialog.locator("#refWidth").fill("25");
+  await referenceDialog.locator("#refWidth").press("Tab");
+  await frame.waitForFunction(() => {
+    const s=window.ForgeReferenceStudio?.status?.();
+    return s?.slots?.[0]?.worldWidth===25 && s.slots[0].renderable && s.slots[0].visible;
+  },null,{timeout:10000});
+  const referenceBeforeViewSwitch = await frame.evaluate(() => ({
+    entityCount:window.Forge.entities.size,
+    guide:window.ForgeReferenceStudio.status().slots.find(x=>x.slot==="front")||null,
+    selectedId:window.Forge.selectedId
+  }));
+  if (!referenceBeforeViewSwitch.guide || referenceBeforeViewSwitch.guide.worldWidth!==25 ||
+      !referenceBeforeViewSwitch.guide.renderable || !referenceBeforeViewSwitch.guide.visible) {
+    throw new Error("Reference plane did not load or obey calibration: "+JSON.stringify(referenceBeforeViewSwitch));
+  }
+  // Close the modal before testing the Play toolbar; dialogs correctly block clicks behind them.
+  await referenceDialog.locator('[data-ref-close]').click();
+  await referenceDialog.waitFor({state:"detached",timeout:5000});
+  await forgeFrameLocator.locator("#play").click();
+  await frame.waitForFunction(() => window.Forge.running===true &&
+    window.ForgeReferenceStudio.status().slots.find(x=>x.slot==="front")?.visible===false,null,{timeout:5000});
+  await forgeFrameLocator.locator("#play").click();
+  await frame.waitForFunction(() => window.Forge.running===false &&
+    window.ForgeReferenceStudio.status().slots.find(x=>x.slot==="front")?.visible===true,null,{timeout:5000});
+  await forgeFrameLocator.locator("#productionTools").click();
+  await forgeFrameLocator.locator('[data-production-tool="references"]').click();
+  await referenceDialog.waitFor({state:"visible",timeout:5000});
+  await referenceDialog.locator('[data-ref-slot="top"]').click();
+  await frame.waitForFunction(() => window.ForgeReferenceStudio.status().view==="top" &&
+    window.ForgeReferenceStudio.status().slots.find(x=>x.slot==="front")?.visible===false,null,{timeout:5000});
+  await referenceDialog.locator('[data-ref-slot="front"]').click();
+  await frame.waitForFunction(() => window.ForgeReferenceStudio.status().view==="front" &&
+    window.ForgeReferenceStudio.status().slots.find(x=>x.slot==="front")?.visible===true,null,{timeout:5000});
+  await referenceDialog.locator("#refMatchView").uncheck();
+  await referenceDialog.locator('[data-ref-slot="side"]').click();
+  await frame.waitForFunction(() => window.ForgeReferenceStudio.status().slots.find(x=>x.slot==="front")?.visible===true,null,{timeout:5000});
+  // Select the populated slot again: Remove acts on the active reference slot.
+  await referenceDialog.locator('[data-ref-slot="front"]').click();
+  await frame.waitForFunction(() => window.ForgeReferenceStudio.status().view==="front" &&
+    window.ForgeReferenceStudio.status().slots.find(x=>x.slot==="front")?.visible===true,null,{timeout:5000});
+  await referenceDialog.locator("#refRemove").click();
+  await frame.waitForFunction(() => window.ForgeReferenceStudio.status().referenceCount===0,null,{timeout:5000});
+  const referenceCleanup = await frame.evaluate(() => ({
+    referenceCount:window.ForgeReferenceStudio.status().referenceCount,
+    entityCount:window.Forge.entities.size
+  }));
+  if(referenceCleanup.entityCount!==referenceBeforeViewSwitch.entityCount || referenceCleanup.referenceCount!==0) {
+    throw new Error("Reference guide contaminated the game scene or failed cleanup: "+JSON.stringify({referenceBeforeViewSwitch,referenceCleanup}));
+  }
+  await referenceDialog.locator('[data-ref-close]').click();
 
   await forgeFrameLocator.locator('[data-gizmo="select"]').click();
   await frame.waitForFunction(() => window.ForgeGizmo?.state?.mode === "select", null, {timeout:5000});
@@ -224,6 +289,14 @@ try {
     const r=document.querySelector("#viewport").getBoundingClientRect();
     return {x:r.x,y:r.y,width:r.width,height:r.height};
   });
+  // Reference QA leaves the editor in an orthographic view. Restore perspective
+  // before measuring wheel zoom against camera distance; ortho zoom changes orthoHeight.
+  await forgeFrameLocator.locator('[data-view="perspective"]').click();
+  await frame.waitForFunction(() => window.Forge.viewMode === "perspective", null, { timeout: 5000 });
+  const projectionBeforeNavigation = await frame.evaluate(() => window.ForgeViewport.status().camera.projection);
+  if (projectionBeforeNavigation !== "perspective") {
+    throw new Error("Camera navigation test must start in perspective projection: " + projectionBeforeNavigation);
+  }
   const cx=(frameBox?.x||0)+canvasRect.x+canvasRect.width*0.52;
   const cy=(frameBox?.y||0)+canvasRect.y+canvasRect.height*0.52;
   const cameraBeforeOrbit = await frame.evaluate(() => window.ForgeViewport.status().camera);
@@ -284,7 +357,8 @@ try {
     pageErrors,
     consoleErrors,
     failedRequests,
-    screenshots: ["forge-port-desktop.png", "forge-port-mobile.png"]
+    screenshots: ["forge-port-desktop.png", "forge-port-mobile.png"],
+    referenceStudio: {loaded:true, calibration:referenceBeforeViewSwitch.guide.worldWidth, orthographicVisibility:true, hiddenDuringPlay:true, sceneEntityIsolation:referenceCleanup.entityCount===referenceBeforeViewSwitch.entityCount, cleanup:referenceCleanup.referenceCount===0}
   };
   if (entityCountAfterAdd !== entityCountBefore + 1) throw new Error("Creating a sphere did not update scene state.");
   if (playState.running !== true || stoppedState.running !== false) throw new Error("Play/Stop did not change the real engine state.");

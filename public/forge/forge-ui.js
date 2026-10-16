@@ -111,7 +111,7 @@ const loadForgeRuntime=async()=>{
 };
 const engine=new ForgeEngine($("viewport"),write);
 try{bootMessage("Starting renderer and physics…");await engine.init();window.Forge=engine;bootMessage("Building the 3D workspace and camera controls…");await import("./forge-viewport.js");bootMessage("Loading spatial core and editor systems…");await import("./forge-spatial.js");for(const module of [
-  "./forge-production.js","./forge-project.js","./forge-render.js","./forge-ui-system.js","./forge-vfx.js",
+  "./forge-reference-studio.js","./forge-production.js","./forge-project.js","./forge-render.js","./forge-ui-system.js","./forge-vfx.js",
   "./forge-2d.js","./forge-ai.js","./forge-gameplay-data.js","./forge-network.js","./forge-replay.js",
   "./forge-session.js","./forge-shader.js","./forge-terrain.js","./forge-qa.js","./forge-animation.js","./forge-gameplay.js",
 ]){
@@ -252,7 +252,7 @@ document.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>{
 $("apply").onclick=apply;["px","py","pz","rx","ry","rz","sx","sy","sz","name"].forEach(id=>$(id).onchange=apply);
 $("duplicate").onclick=()=>{if(engine.duplicate()){refresh();inspect()}};$("undo")?.addEventListener("click",()=>{if(engine.undo()){refresh();inspect()}});$("redo")?.addEventListener("click",()=>{if(engine.redo()){refresh();inspect()}});
 $("delete").onclick=()=>{engine.delete();refresh();inspect()};$("focus")?.addEventListener("click",()=>engine.focus());$("focusViewport")?.addEventListener("click",()=>engine.focus());$("frame").onclick=()=>engine.frame();$("reset")?.addEventListener("click",()=>location.reload());
-$("play").onclick=()=>{engine.running=!engine.running;$("play").textContent=engine.running?"■ Stop":"▶ Play";engine.timelinePlaying=engine.running};$("timelinePlay").onclick=()=>$("play").click();
+$("play").onclick=()=>{engine.running=!engine.running;$("play").textContent=engine.running?"■ Stop":"▶ Play";engine.timelinePlaying=engine.running;window.dispatchEvent(new CustomEvent("forge-play-state",{detail:{running:engine.running}}))};$("timelinePlay").onclick=()=>$("play").click();
 $("rewind").onclick=()=>{engine.timelineTime=0;$("time").value=0;engine.evalAnimation(0);inspect()};$("time").oninput=e=>{engine.timelineTime=+e.target.value||0;engine.evalAnimation(engine.timelineTime);$("playhead").style.left=(engine.timelineTime*60)+"px";inspect()};$("key").onclick=()=>{engine.key();toast("Keyframe added")};
 $("projectName")?.addEventListener("change",()=>{const n=$("projectName").value.trim()||"Untitled Project";document.title=n+" — Forge Studio";localStorage.setItem("forge.projectName",n);$("projectName").value=n;});
 const storedProjectName=localStorage.getItem("forge.projectName");if(storedProjectName&&$("projectName"))$("projectName").value=storedProjectName;
