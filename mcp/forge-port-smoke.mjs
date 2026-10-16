@@ -289,6 +289,14 @@ try {
     const r=document.querySelector("#viewport").getBoundingClientRect();
     return {x:r.x,y:r.y,width:r.width,height:r.height};
   });
+  // Reference QA leaves the editor in an orthographic view. Restore perspective
+  // before measuring wheel zoom against camera distance; ortho zoom changes orthoHeight.
+  await forgeFrameLocator.locator('[data-view="perspective"]').click();
+  await frame.waitForFunction(() => window.Forge.viewMode === "perspective", null, { timeout: 5000 });
+  const projectionBeforeNavigation = await frame.evaluate(() => window.ForgeViewport.status().camera.projection);
+  if (projectionBeforeNavigation !== "perspective") {
+    throw new Error("Camera navigation test must start in perspective projection: " + projectionBeforeNavigation);
+  }
   const cx=(frameBox?.x||0)+canvasRect.x+canvasRect.width*0.52;
   const cy=(frameBox?.y||0)+canvasRect.y+canvasRect.height*0.52;
   const cameraBeforeOrbit = await frame.evaluate(() => window.ForgeViewport.status().camera);
