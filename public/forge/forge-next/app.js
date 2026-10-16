@@ -2,7 +2,7 @@ const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const PREFS_KEY = "forge.next.preferences.v1";
 const defaults = { left:264, right:302, timeline:178, leftCollapsed:false, rightCollapsed:false };
-const state = {engine:null,workspace:"layout",leftPanel:"scene",inspectorPanel:"properties",tool:"select",preview:false,timelinePlaying:false,autoKey:false,snap:false,grid:true,assets:[],statusTimer:0,prefs:{...defaults},lastError:null};
+const state = {engine:null,workspace:"layout",leftPanel:"scene",inspectorPanel:"properties",tool:"select",preview:false,timelinePlaying:false,autoKey:false,snap:false,grid:true,assets:[],trace:null,statusTimer:0,prefs:{...defaults},lastError:null};
 const commands = new Map();
 function registerCommand(name, execute){if(commands.has(name))throw new Error("Duplicate command: "+name);commands.set(name,execute)}
 function clamp(n,min,max,fallback){const v=Number(n);return Number.isFinite(v)?Math.max(min,Math.min(max,v)):fallback}
@@ -198,6 +198,63 @@ async function loadReferenceImages(files){
   }
   refreshReferences();refreshAll();if(added)status(added+" calibrated reference image"+(added===1?"":"s")+" added","dirty");
 }
+
+function traceDraw(){
+  const trace=state.trace,canvas=$("#traceCanvas");if(!trace||!canvas)return;
+  const ctx=canvas.getContext("2d"),w=canvas.width,h=canvas.height;
+  ctx.clearRect(0,0,w,h);ctx.fillStyle="#0b1118";ctx.fillRect(0,0,w,h);ctx.drawImage(trace.bitmap,0,0,w,h);
+  if(trace.points.length){
+    ctx.save();ctx.lineWidth=Math.max(2,Math.min(w,h)*.0035);ctx.strokeStyle="#54d6ff";ctx.fillStyle="#b0efff";ctx.lineJoin="round";ctx.lineCap="round";
+    ctx.beginPath();trace.points.forEach((p,i)=>{const x=p[0]*w,y=p[1]*h;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)});
+    if(trace.closed||trace.points.length>2)ctx.lineTo(trace.points[0][0]*w,trace.points[0][1]*h);ctx.stroke();
+    const r=Math.max(3,Math.min(w,h)*.006);
+    trace.points.forEach((p,i)=>{ctx.beginPath();ctx.arc(p[0]*w,p[1]*h,r,0,Math.PI*2);ctx.fillStyle=i===0?"#fff":"#79dcff";ctx.fill();ctx.strokeStyle="#092331";ctx.lineWidth=1.5;ctx.stroke()});
+    ctx.restore();
+  }
+  $("#tracePointCount").textContent=trace.points.length+" points"+(trace.closed?" · closed":"");
+}
+async function startSilhouetteTrace(){
+  const record=selectedRecord(),meta=record?.components?.reference,assetName=record?.components?.asset?.name,entry=assetName?state.engine.assets.get(assetName):null;
+  if(!meta||!entry?.file){notice("Trace image silhouette","Select a reference image imported in this session. Re-import it if the project was reopened without its original image file.");return}
+  try{
+    const bitmap=await createImageBitmap(entry.file),scale=Math.min(1000/bitmap.width,800/bitmap.height),width=Math.max(1,Math.round(bitmap.width*scale)),height=Math.max(1,Math.round(bitmap.height*scale));
+    const canvas=$("#traceCanvas");canvas.width=width;canvas.height=height;
+    state.trace={record,bitmap,points:[],closed:false,axis:meta.axis||"front",width:Number(meta.width)||3,height:Number(meta.height)||((Number(meta.width)||3)/(Number(meta.aspect)||1))};
+    $("#traceMessage").textContent="Tap around the object outline. Click near the first point to close the contour, or Build 3D mesh closes it automatically.";
+    $("#traceDialog").showModal();traceDraw();
+  }catch(error){reportError("Could not open silhouette tracing",error)}
+}
+function addTracePoint(event){
+  const trace=state.trace,canvas=$("#traceCanvas");if(!trace||trace.closed)return;
+  const rect=canvas.getBoundingClientRect();if(!rect.width||!rect.height)return;
+  const p=[clamp((event.clientX-rect.left)/rect.width,0,1,0),clamp((event.clientY-rect.top)/rect.height,0,1,0)];
+  if(trace.points.length>=3){
+    const first=trace.points[0],distance=Math.hypot((p[0]-first[0])*canvas.width,(p[1]-first[1])*canvas.height);
+    if(distance<Math.max(12,Math.min(canvas.width,canvas.height)*.025)){trace.closed=true;$("#traceMessage").textContent="Contour closed. Review the outline, then build the 3D mesh.";traceDraw();return}
+  }
+  if(trace.points.length){const last=trace.points[trace.points.length-1];if(Math.hypot((p[0]-last[0])*canvas.width,(p[1]-last[1])*canvas.height)<5)return}
+  if(trace.points.length>=256){$("#traceMessage").textContent="The outline reached 256 points. Build this contour or clear it and trace a simpler boundary.";return}
+  trace.points.push(p);$("#traceMessage").textContent="Point added. Continue around the silhouette in one direction.";traceDraw();
+}
+function closeTraceEditor(){
+  if(state.trace?.bitmap)state.trace.bitmap.close?.();state.trace=null;
+  if($("#traceDialog")?.open)$("#traceDialog").close();
+}
+function buildTraceMesh(){
+  const trace=state.trace;if(!trace)return;
+  if(trace.points.length<3){$("#traceMessage").textContent="Add at least three points before building a mesh.";return}
+  try{
+    const reference=trace.record.components.reference,depth=clamp($("#silhouetteDepth").value,.01,1000,.35);
+    const base=trace.record.name.replace(/\.[^.]+$/,"");
+    const record=state.engine.createExtrudedSilhouette({
+      name:base+" — 3D Silhouette",contour:trace.points,axis:reference.axis||trace.axis,
+      width:Number(reference.width)||trace.width,
+      height:Number(reference.height)||trace.height,depth,color:[.36,.57,.76]
+    });
+    state.engine.select(record.id);state.engine.frame();refreshAll();setWorkspace("modeling");closeTraceEditor();
+    status("3D silhouette mesh built · refine the geometry and compare other views","dirty");
+  }catch(error){$("#traceMessage").textContent=error?.message||String(error);status("Silhouette mesh could not be built","error")}
+}
 function refreshDiagnostics(){
   const engine=state.engine;if(!engine)return;const d=engine.diagnostics();$("#rendererStatus").textContent=d.renderer||"WebGL";$("#fpsStatus").textContent=(Number(d.fps)||0).toFixed(0)+" FPS · "+(Number(d.frameMs)||0).toFixed(1)+" ms";$("#entityStatus").textContent=d.entities+" entities";$("#unitLabel").textContent=String(d.unitSystem||"meters").toUpperCase();$("#unitSystem").value=d.unitSystem==="centimeters"?"centimeters":"meters";$("#snapEnabled").checked=engine.snapEnabled===true;$("#showGrid").checked=state.grid;$("#engineStatus").textContent=state.preview?"Scene preview active":"Engine ready";$("#diagnosticStatus").textContent=state.lastError?"1 error":"No errors";$("#diagnosticStatus").classList.toggle("diagnostic-error",!!state.lastError);if(state.timelinePlaying)refreshTimeline();
 }
@@ -267,6 +324,13 @@ function bindUI(){
   $("#sceneSearch").addEventListener("input",refreshHierarchy);$("#assetSearch").addEventListener("input",refreshAssetList);
   $("#assetInput").addEventListener("change",e=>{const files=[...e.target.files];if(files.length)void loadAssets(files);e.target.value=""});
   $("#addReferenceImages").addEventListener("click",()=>$("#referenceInput").click());
+  $("#traceSilhouette").addEventListener("click",()=>void startSilhouetteTrace());
+  $("#traceCanvas").addEventListener("pointerdown",event=>{event.preventDefault();addTracePoint(event)});
+  $("#traceUndo").addEventListener("click",()=>{if(state.trace){state.trace.points.pop();state.trace.closed=false;$("#traceMessage").textContent="Last point removed.";traceDraw()}});
+  $("#traceClear").addEventListener("click",()=>{if(state.trace){state.trace.points=[];state.trace.closed=false;$("#traceMessage").textContent="Outline cleared.";traceDraw()}});
+  $("#traceBuild").addEventListener("click",buildTraceMesh);
+  $("#traceClose").addEventListener("click",closeTraceEditor);
+  $("#traceDialog").addEventListener("cancel",event=>{event.preventDefault();closeTraceEditor()});
   $("#referenceInput").addEventListener("change",e=>{const files=[...e.target.files];if(files.length)void loadReferenceImages(files);e.target.value=""});
   $("#referenceOpacity").addEventListener("input",()=>$("#referenceOpacityValue").textContent=Math.round(Number($("#referenceOpacity").value)*100)+"%");
   $("#keyInterpolation").addEventListener("change",()=>{state.engine.keyInterpolation=$("#keyInterpolation").value;refreshTimeline()});
