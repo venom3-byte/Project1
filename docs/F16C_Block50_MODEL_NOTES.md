@@ -1,4 +1,4 @@
-# F-16C Block 50 — Forge reference-build v0.2
+# F-16C Block 50 — Forge reference-build v0.3
 
 ## Purpose and state
 
@@ -21,6 +21,7 @@ The public USAF F-16 fact sheet gives 14.8 m length and 9.8 m wingspan. The geom
 - Twin horizontal stabilators and single swept vertical tail.
 - Large-mouth intake and a layered F110-style exhaust/nozzle approximation for the Block 50 configuration.
 - Bubble canopy with transparent material, cockpit tub, seat/headrest, HUD glass, central/side instrument consoles, multiple displays, individual switches and control stick.
+- Cockpit refinement v0.3: raised bezel rails and individual pushbuttons around both MFDs, an integrated control panel with display and a 5×4 keypad, two round backup gauges with ticks/needles, and discrete ejection-seat harness straps, buckle and release tab.
 - Nose and main landing gear, tyres/hubs, doors, centerline tank, underwing pylons/stores, antennae, sensors, panel breaks and nav lamps.
 
 ## References used to establish proportions and layout
