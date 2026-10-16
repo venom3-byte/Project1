@@ -62,6 +62,9 @@ try {
       return e ? { width: e.width, height: e.height, visible: e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().height > 0 } : null;
     })(),
     diagnostics: window.Forge?.diagnostics?.() || null,
+    viewport3d: window.ForgeViewport?.status?.() || null,
+    editorOverlayGridCount: document.querySelectorAll(".editor-grid").length,
+    criticalDuplicateIds: ["importAssets","focus","focusViewport"].filter(id => document.querySelectorAll("#" + id).length > 1),
     entityCount: window.Forge?.entities?.size ?? null,
     modules: {
       production: !!window.ForgeProduction,
@@ -88,6 +91,11 @@ try {
   if (!initial.diagnostics || initial.entityCount < 1) {
     throw new Error("Forge did not create a valid engine scene: " + JSON.stringify(initial.diagnostics));
   }
+  if (!initial.viewport3d?.ok || !initial.viewport3d.groundVisible || initial.viewport3d.gridMeshes < 5) {
+    throw new Error("Forge true 3D workspace did not initialize its visible ground, world grid, axes and navigation: " + JSON.stringify(initial.viewport3d));
+  }
+  if (initial.editorOverlayGridCount !== 0) throw new Error("A flat CSS grid overlay is still masking the 3D workspace.");
+  if (initial.criticalDuplicateIds.length) throw new Error("Duplicate editor control IDs remain: " + initial.criticalDuplicateIds.join(", "));
   for (const [name, present] of Object.entries(initial.modules)) {
     if (!present) throw new Error("Expected Forge module did not load: " + name);
   }
@@ -159,6 +167,42 @@ try {
 
   await page.setViewportSize({ width: 390, height: 844 });
   await sleep(500);
+  const frameBox = await page.locator('iframe[title="Forge Studio 3.7"]').boundingBox();
+  const canvasRect = await frame.evaluate(() => {
+    const r=document.querySelector("#viewport").getBoundingClientRect();
+    return {x:r.x,y:r.y,width:r.width,height:r.height};
+  });
+  const cx=(frameBox?.x||0)+canvasRect.x+canvasRect.width*0.52;
+  const cy=(frameBox?.y||0)+canvasRect.y+canvasRect.height*0.52;
+  const cameraBeforeOrbit = await frame.evaluate(() => window.ForgeViewport.status().camera);
+  await page.mouse.move(cx,cy);
+  await page.mouse.down({button:"middle"});
+  await page.mouse.move(cx+64,cy+27,{steps:6});
+  await page.mouse.up({button:"middle"});
+  await sleep(120);
+  const cameraAfterOrbit = await frame.evaluate(() => window.ForgeViewport.status().camera);
+  const cameraBeforeZoom = cameraAfterOrbit.distance;
+  await page.mouse.move(cx,cy);
+  await page.mouse.wheel(0,-120);
+  await sleep(120);
+  const cameraAfterZoom = await frame.evaluate(() => window.ForgeViewport.status().camera);
+  const targetBeforePan = cameraAfterZoom.target;
+  await page.mouse.move(cx,cy);
+  await page.mouse.down({button:"right"});
+  await page.mouse.move(cx+35,cy+20,{steps:5});
+  await page.mouse.up({button:"right"});
+  await sleep(120);
+  const cameraAfterPan = await frame.evaluate(() => window.ForgeViewport.status().camera);
+  const viewportNavigation = {
+    orbitChanged: Math.hypot(...cameraAfterOrbit.position.map((v,i)=>v-cameraBeforeOrbit.position[i]))>0.05,
+    zoomChanged: Math.abs(cameraAfterZoom.distance-cameraBeforeZoom)>0.05,
+    panChanged: Math.hypot(...cameraAfterPan.target.map((v,i)=>v-targetBeforePan[i]))>0.005,
+    cameraBeforeOrbit,cameraAfterOrbit,cameraAfterZoom,cameraAfterPan
+  };
+  if (!viewportNavigation.orbitChanged || !viewportNavigation.zoomChanged || !viewportNavigation.panChanged) {
+    throw new Error("3D camera navigation regression: " + JSON.stringify(viewportNavigation));
+  }
+
   const mobile = await frame.evaluate(() => ({
     viewport: { width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth },
     canvas: (() => { const e=document.querySelector("#viewport"),r=e?.getBoundingClientRect(); return r?{width:Math.round(r.width),height:Math.round(r.height),visible:r.width>0&&r.height>0}:null; })(),
@@ -175,6 +219,7 @@ try {
     httpStatus: response.status(),
     initial,
     actionChecks: { entityCountBefore, entityCountAfterAdd, playState, stoppedState },
+    viewportNavigation,
     agentControl,
     mobile,
     pageErrors,
