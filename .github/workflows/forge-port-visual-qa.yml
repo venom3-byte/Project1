@@ -120,6 +120,27 @@ jobs:
           FORGE_NEXT_URL: http://127.0.0.1:4173/forge/forge-next/index.html
           FORGE_NEXT_ARTIFACTS: ${{ runner.temp }}/forge-next-qa
         run: node mcp/forge-next-smoke.mjs
+      - name: Verify the isolated public Forge Next preview route
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://forge-studio.forgemail-agent.workers.dev"
+          ok=0
+          for attempt in $(seq 1 8); do
+            if curl --fail --silent --show-error --max-time 20 "$base/forge-next/index.html" -o /tmp/forge-next-public.html; then
+              ok=1
+              break
+            fi
+            sleep 3
+          done
+          test "$ok" -eq 1
+          grep -q 'Forge Next' /tmp/forge-next-public.html
+          curl --fail --silent --show-error --max-time 20 "$base/forge-next/styles/shell.css" -o /tmp/forge-next-public.css
+          grep -q 'viewport-toolbar' /tmp/forge-next-public.css
+          curl --fail --silent --show-error --max-time 20 "$base/forge-next/app.js" -o /tmp/forge-next-public.js
+          grep -q 'function setWorkspace' /tmp/forge-next-public.js
+          grep -q 'function toggleTimeline' /tmp/forge-next-public.js
+          echo "Public Forge Next route verified: HTTP 200 for HTML, CSS and JavaScript, with workspace and independent timeline controller."
       - name: Upload screenshots, diagnostics and browser logs
         if: always()
         uses: actions/upload-artifact@v4
