@@ -157,3 +157,10 @@ html.timeline-manually-closed[data-forge-workspace="animation"] .work-area{grid-
 @media(max-width:850px){
   .editor-layout.left-collapsed,.editor-layout.right-collapsed,.editor-layout.left-collapsed.right-collapsed{display:block}
 }
+
+
+/* Compact viewports retain access to every viewport tool through horizontal overflow. */
+.viewport-toolbar{overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:#354c5d transparent;overscroll-behavior-x:contain}
+.viewport-toolbar::-webkit-scrollbar{height:4px}
+.viewport-toolbar::-webkit-scrollbar-thumb{background:#354c5d;border-radius:4px}
+.toolbar-flex{min-width:6px}
