@@ -282,6 +282,12 @@ function setEditorWorkspace(name){
     tab.classList.toggle("is-active",active);
     tab.setAttribute("aria-selected",String(active));
   });
+  const mobileAnimation=$("mobileAnimation");
+  if(mobileAnimation){
+    const active=key==="animation";
+    mobileAnimation.classList.toggle("active",active);
+    mobileAnimation.setAttribute("aria-pressed",String(active));
+  }
   const context=$("workspaceContext");
   if(context){
     const [heading,description]=editorWorkspaceCopy[key];
@@ -421,9 +427,13 @@ function openMobilePanel(which){
     right?.classList.add("mobile-open");
   }
 }
-$("mobileScene")?.addEventListener("click",()=>openMobilePanel("scene"));
+$("mobileScene")?.addEventListener("click",()=>{setEditorWorkspace("layout");openMobilePanel("scene")});
+$("mobileAnimation")?.addEventListener("click",()=>{
+  document.querySelectorAll(".mobile-open").forEach(panel=>panel.classList.remove("mobile-open"));
+  setEditorWorkspace("animation");
+});
 $("mobileAssets")?.addEventListener("click",()=>openMobilePanel("assets"));
-$("mobileInspector")?.addEventListener("click",()=>openMobilePanel("inspector"));
+$("mobileInspector")?.addEventListener("click",()=>{setEditorWorkspace("layout");openMobilePanel("inspector")});
 $("mobileAdd")?.addEventListener("click",()=>openMobilePanel("scene"));
 $("mobilePlay")?.addEventListener("click",()=>$("play")?.click());
 $("viewport")?.addEventListener("pointerdown",()=>{document.querySelectorAll(".mobile-open").forEach(x=>x.classList.remove("mobile-open"))});
