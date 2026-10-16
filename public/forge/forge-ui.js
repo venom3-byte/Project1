@@ -114,6 +114,7 @@ try{bootMessage("Starting renderer and physics…");await engine.init();window.F
   "./forge-production.js","./forge-project.js","./forge-render.js","./forge-ui-system.js","./forge-vfx.js",
   "./forge-2d.js","./forge-ai.js","./forge-gameplay-data.js","./forge-network.js","./forge-replay.js",
   "./forge-session.js","./forge-shader.js","./forge-terrain.js","./forge-qa.js","./forge-animation.js","./forge-gameplay.js",
+  "./forge-reference-studio.js",
 ]){
   bootMessage("Loading "+module+"…");
   const started=performance.now();
@@ -252,7 +253,7 @@ document.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>{
 $("apply").onclick=apply;["px","py","pz","rx","ry","rz","sx","sy","sz","name"].forEach(id=>$(id).onchange=apply);
 $("duplicate").onclick=()=>{if(engine.duplicate()){refresh();inspect()}};$("undo")?.addEventListener("click",()=>{if(engine.undo()){refresh();inspect()}});$("redo")?.addEventListener("click",()=>{if(engine.redo()){refresh();inspect()}});
 $("delete").onclick=()=>{engine.delete();refresh();inspect()};$("focus")?.addEventListener("click",()=>engine.focus());$("focusViewport")?.addEventListener("click",()=>engine.focus());$("frame").onclick=()=>engine.frame();$("reset")?.addEventListener("click",()=>location.reload());
-$("play").onclick=()=>{engine.running=!engine.running;$("play").textContent=engine.running?"■ Stop":"▶ Play";engine.timelinePlaying=engine.running};$("timelinePlay").onclick=()=>$("play").click();
+$("play").onclick=()=>{engine.running=!engine.running;$("play").textContent=engine.running?"■ Stop":"▶ Play";engine.timelinePlaying=engine.running;window.ForgeReferenceStudio?.setRunning(engine.running)};$("timelinePlay").onclick=()=>$("play").click();
 $("rewind").onclick=()=>{engine.timelineTime=0;$("time").value=0;engine.evalAnimation(0);inspect()};$("time").oninput=e=>{engine.timelineTime=+e.target.value||0;engine.evalAnimation(engine.timelineTime);$("playhead").style.left=(engine.timelineTime*60)+"px";inspect()};$("key").onclick=()=>{engine.key();toast("Keyframe added")};
 $("projectName")?.addEventListener("change",()=>{const n=$("projectName").value.trim()||"Untitled Project";document.title=n+" — Forge Studio";localStorage.setItem("forge.projectName",n);$("projectName").value=n;});
 const storedProjectName=localStorage.getItem("forge.projectName");if(storedProjectName&&$("projectName"))$("projectName").value=storedProjectName;
@@ -310,13 +311,13 @@ $("mExport")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.ex
 function smoke(){
   const d=engine.diagnostics(),v=window.AssetForgeLiveVision?.visualHealth?.()||null,viewport=window.ForgeViewport?.status?.()||null;
   const vision={camera:!!engine.camera(),objects:[...engine.entities.values()].filter(x=>x.entity.render?.meshInstances?.length).map(x=>({id:x.id,name:x.name,kind:x.kind}))};
-  const checks=[["renderer",d.renderer==="WebGPU"||d.renderer==="WebGL2"],["scene",d.entities>0],["camera",[...engine.entities.values()].some(x=>x.kind==="camera")],["ground",[...engine.entities.values()].some(x=>x.name==="Ground")],["physics",d.physics>0],["spatialCore",!!d.spatial],["renderLoop",d.fps>=0],["sceneVision",!!vision],["true3DViewport",viewport?.ok===true],["3DNavigation",viewport?.navigation?.orbit===true&&viewport?.navigation?.pan===true&&viewport?.navigation?.zoom===true]];
+  const checks=[["renderer",d.renderer==="WebGPU"||d.renderer==="WebGL2"],["scene",d.entities>0],["camera",[...engine.entities.values()].some(x=>x.kind==="camera")],["ground",[...engine.entities.values()].some(x=>x.name==="Ground")],["physics",d.physics>0],["spatialCore",!!d.spatial],["renderLoop",d.fps>=0],["sceneVision",!!vision],["true3DViewport",viewport?.ok===true],["3DNavigation",viewport?.navigation?.orbit===true&&viewport?.navigation?.pan===true&&viewport?.navigation?.zoom===true],["referenceStudio",window.ForgeReferenceStudio?.diagnostics?.().ok===true]];
   return{ok:checks.every(x=>x[1])&&(v?.ok!==false),checks,diagnostics:d,vision,visualHealth:v,viewport3d:viewport}
 }
 $("qa").onclick=()=>{$("qaReport").textContent=JSON.stringify(smoke(),null,2);$("qaDialog").showModal()};$("runQA").onclick=()=>{$("qaReport").textContent=JSON.stringify(smoke(),null,2)};$("grid")?.addEventListener("click",()=>{const on=window.ForgeViewport?.toggleGrid?.()??false;$("grid")?.classList.toggle("active",on);});
 $("script").onclick=()=>{const r=engine.selected();if(!r)return toast("Select an entity");$("scriptDialog").showModal();$("code").value=engine.scripts.get(r.id)||$("code").value};$("saveScript").onclick=()=>{const r=engine.selected();if(r){engine.attachScript(r.id,$("code").value);$("scriptDialog").close();toast("Script attached")}};
 document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>$(b.dataset.close).close());$("clear").onclick=()=>out.textContent="";
-document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-view]").forEach(x=>x.classList.remove("active"));b.classList.add("active");engine.setView(b.dataset.view);refresh();inspect()});
+document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-view]").forEach(x=>x.classList.remove("active"));b.classList.add("active");engine.setView(b.dataset.view);window.ForgeReferenceStudio?.setActiveView(b.dataset.view);refresh();inspect()});
 $("snapToggle")?.addEventListener("click",()=>{engine.snapEnabled=!engine.snapEnabled;$("snapToggle").classList.toggle("active",!!engine.snapEnabled);$("snapToggle").textContent=engine.snapEnabled?"Snap On":"Snap Off";window.ForgeSpatial?.setSnap(engine.snapSize);write("Snap: "+(engine.snapEnabled?"On":"Off"))});
 $("snapSize")?.addEventListener("change",e=>{engine.snapSize=Math.max(.001,+e.target.value||.25);window.ForgeSpatial?.setSnap(engine.snapSize)});
 $("boundsToggle")?.addEventListener("change",e=>{if(window.ForgeSpatial)window.ForgeSpatial.showBounds=e.target.checked});
@@ -379,6 +380,7 @@ function stats(){const d=engine.diagnostics();if($("renderer"))$("renderer").tex
 const waitForPublicAPIs=async()=>{
   const required={
     ForgeViewport:["status","toggleGrid","setGridVisible"],
+    ForgeReferenceStudio:["open","diagnostics"],
     ForgeGameplay:["createThirdPersonTemplate","createRacingTemplate","createShowcaseGame","status"],
     Forge2D:["createPlatformerTemplate","status"],
     ForgeProject:["serialize","load"],
