@@ -31,6 +31,18 @@ jobs:
           STATIC_EXPORT: "1"
           VITE_BASE_PATH: "/"
         run: npm run build
+      - name: Validate F-16 source mesh and reference dimensions
+        run: node scripts/validate-f16-model.mjs
+      - name: Syntax-check imported Forge and Vision modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            node --check "$file"
+          done < <(find public/forge -type f -name '*.js' -print0)
+          node --check server/forge/forge-pipeline.mjs
+          node --check server/forge/vision-control.mjs
+          node --check server/forge/vision-controller.mjs
       - name: Validate all imported Forge browser modules
         id: forge
         shell: bash
