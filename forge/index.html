@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0a0e14">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="stylesheet" href="./forge.css">
+<title>Forge Studio — Professional 3D Workspace</title>
+</head>
+<body>
+<div id="forgeBoot" class="forge-boot" role="status" aria-live="polite">
+  <div class="forge-boot-card">
+    <div class="forge-boot-mark">F</div>
+    <strong>Forge Studio</strong>
+    <span id="forgeBootText">Starting renderer and editor systems…</span>
+    <small>Real-time 3D workspace</small>
+  </div>
+</div>
+
+<header class="appbar" role="banner">
+  <div class="brand-lockup" aria-label="Forge Studio"><span class="brand-mark">F</span><span class="brand-name"><b>FORGE</b><small>3D WORKSPACE</small></span></div>
+  <span class="app-divider" aria-hidden="true"></span>
+  <label class="project-field"><small>PROJECT</small><input id="projectName" value="Untitled Project" aria-label="Project name" spellcheck="false" autocomplete="off"></label>
+  <div class="app-actions history-actions" aria-label="History"><button id="undo" class="app-button icon-only" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button><button id="redo" class="app-button icon-only" title="Redo (Ctrl+Y)" aria-label="Redo">↷</button></div>
+  <span class="app-divider file-divider" aria-hidden="true"></span>
+  <div class="app-actions file-actions" aria-label="Project files">
+    <button id="newProject" class="app-button"><span class="button-symbol" aria-hidden="true">＋</span><span>New</span></button>
+    <button id="openProject" class="app-button"><span class="button-symbol" aria-hidden="true">↥</span><span>Open</span></button>
+    <button id="saveProject" class="app-button"><span class="button-symbol" aria-hidden="true">↧</span><span>Save</span></button>
+  </div>
+  <span class="app-spacer"></span>
+  <button id="importAssets" data-import-assets class="app-button secondary-action"><span class="button-symbol" aria-hidden="true">＋</span><span>Import</span></button>
+  <button id="productionTools" class="app-button secondary-action" aria-haspopup="dialog"><span class="button-symbol" aria-hidden="true">▦</span><span>Toolbox</span></button>
+  <button id="build" class="build-button" title="Build or export this project" aria-label="Build or export project"><span class="button-symbol" aria-hidden="true">⇧</span><span>Build</span></button>
+  <button id="play" class="preview-button" title="Enter or exit scene preview" aria-label="Preview scene" aria-pressed="false"><span class="preview-glyph" data-run-icon aria-hidden="true">▷</span><span data-run-label>Preview</span></button>
+</header>
+
+<nav class="workspace-strip" aria-label="Editor workspaces">
+  <div class="workspace-tabs" role="tablist" aria-label="Workflow">
+    <button class="workspace-tab is-active" type="button" role="tab" aria-selected="true" data-workspace-target="layout"><span class="workspace-tab-icon" aria-hidden="true">▦</span><span>Layout</span></button>
+    <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-target="modeling"><span class="workspace-tab-icon" aria-hidden="true">◇</span><span>Modeling</span></button>
+    <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-target="animation"><span class="workspace-tab-icon" aria-hidden="true">◷</span><span>Animation</span></button>
+    <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-target="assets"><span class="workspace-tab-icon" aria-hidden="true">▧</span><span>Assets</span></button>
+    <button class="workspace-tab" type="button" role="tab" aria-selected="false" data-workspace-target="review"><span class="workspace-tab-icon" aria-hidden="true">✓</span><span>Review</span></button>
+  </div>
+  <div class="workspace-context" id="workspaceContext" aria-live="polite"><span class="context-led"></span><span>SCENE EDITING</span><i>·</i><span>Selection, transforms and hierarchy</span></div>
+  <div class="workspace-strip-meta"><kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>R</kbd><span>TOOLS</span></div>
+</nav>
+
+<main class="editor-shell">
+  <aside class="side-panel left-panel" id="leftPanel">
+    <section class="panel-section create-section">
+      <div class="section-head"><b>CREATE</b><span>SCENE</span></div>
+      <div class="create-grid">
+        <button data-add="box" title="Add Box"><strong>□</strong><span>Box</span></button>
+        <button data-add="sphere" title="Add Sphere"><strong>●</strong><span>Sphere</span></button>
+        <button data-add="cylinder" title="Add Cylinder"><strong>⬡</strong><span>Cylinder</span></button>
+        <button data-add="capsule" title="Add Capsule"><strong>◉</strong><span>Capsule</span></button>
+        <button data-add="plane" title="Add Plane"><strong>▱</strong><span>Plane</span></button>
+        <button data-add="camera" title="Add Camera"><strong>⌾</strong><span>Camera</span></button>
+        <button data-add="light" title="Add Light"><strong>☼</strong><span>Light</span></button>
+        <button data-add="empty" title="Add Empty"><strong>＋</strong><span>Empty</span></button>
+      </div>
+    </section>
+
+    <section class="panel-section scene-section">
+      <div class="section-head"><b>SCENE</b><span id="hierarchyCount">0</span></div>
+      <input id="treeFilter" class="panel-search" placeholder="Filter objects…" autocomplete="off">
+      <div id="tree" class="tree-list"></div>
+    </section>
+
+    <details class="panel-section assets-section">
+      <summary class="section-summary"><b>ASSETS</b><span>IMPORT</span></summary>
+      <div class="asset-import">
+        <input id="assetInput" type="file" multiple accept=".glb,.gltf,.fbx,.obj,.stl,.ply,.dae,.3ds,.usdz,.png,.jpg,.jpeg,.webp,.avif,.mp3,.wav,.ogg,.json,.forge.json">
+        <button id="importAssetsPanel" data-import-assets class="accent-btn">＋ Import files</button>
+        <div id="dropzone" class="dropzone">Drop 2D / 3D / project files</div>
+        <small>Imported files stay in the current scene session. GLB is preferred for self-contained 3D assets.</small>
+      </div>
+      <input id="assetSearch" class="panel-search" placeholder="Search imported assets…" autocomplete="off">
+      <div id="assetList" class="asset-list"></div>
+      <div id="assetMeta" class="asset-meta">Select an imported asset.</div>
+    </details>
+
+    <details class="panel-section asset-tools-section">
+      <summary class="section-summary"><b>ASSET TOOLS</b><span>QA</span></summary>
+      <div class="selected-asset-row"><span id="assetSelected">No asset selected</span><b id="assetType">Scene object</b></div>
+      <div class="asset-actions">
+        <button id="exportSource">Source</button>
+        <button id="exportGLB">GLB</button>
+        <button id="exportPreview">PNG</button>
+        <button id="exportManifest">Manifest</button>
+        <button id="validateAsset">Validate</button>
+        <button id="assetQA" class="accent-btn">Round-trip QA</button>
+      </div>
+      <div class="asset-status"><span id="assetBadge" class="qa-badge">READY</span></div>
+      <pre id="assetReport">No asset test yet.</pre>
+    </details>
+  </aside>
+
+  <section class="workspace">
+    <div class="viewport">
+      <canvas id="viewport"></canvas>
+
+      <div class="viewport-tools" role="toolbar" aria-label="3D viewport tools">
+        <div class="viewport-tool-group transform-tools" aria-label="Selection and transforms">
+          <button data-gizmo="select" class="view-tool active" title="Select (Q)" aria-label="Select"><span class="tool-glyph" aria-hidden="true">↖</span><span class="tool-label">Select</span><kbd>Q</kbd></button>
+          <button data-gizmo="translate" class="view-tool" title="Move (W)" aria-label="Move"><span class="tool-glyph" aria-hidden="true">↕</span><span class="tool-label">Move</span><kbd>W</kbd></button>
+          <button data-gizmo="rotate" class="view-tool" title="Rotate (E)" aria-label="Rotate"><span class="tool-glyph" aria-hidden="true">⟳</span><span class="tool-label">Rotate</span><kbd>E</kbd></button>
+          <button data-gizmo="scale" class="view-tool" title="Scale (R)" aria-label="Scale"><span class="tool-glyph" aria-hidden="true">⤢</span><span class="tool-label">Scale</span><kbd>R</kbd></button>
+        </div>
+        <span class="viewport-divider" aria-hidden="true"></span>
+        <div class="viewport-tool-group view-presets" aria-label="Camera views">
+          <button data-view="perspective" class="view-tool active">Perspective</button><button data-view="front" class="view-tool">Front</button><button data-view="right" class="view-tool">Side</button><button data-view="top" class="view-tool">Top</button>
+          <button id="focusViewport" class="view-tool" title="Focus selected object (F)">Focus</button><button id="frame" class="view-tool" title="Frame all scene objects">Frame All</button>
+        </div>
+        <span class="viewport-divider viewport-divider-last" aria-hidden="true"></span>
+        <div class="viewport-tool-group viewport-utilities" aria-label="Viewport options">
+          <button id="snapToggle" class="view-tool" title="Toggle transform snapping">Snap Off</button><button id="spaceToggle" class="view-tool" title="Switch world/local transform space">World</button><button id="grid" class="view-tool active" title="Toggle 3D grid">Grid</button><button id="qa" class="view-tool" title="Run viewport diagnostics">QA</button>
+        </div>
+      </div>
+      <div class="viewport-status" aria-live="polite"><span class="status-indicator"></span><span id="sceneCount">0 objects</span><span class="status-separator">·</span><span id="selected">No selection</span></div>
+      <div class="selection-hint"><span class="desktop-hint">MMB Orbit · RMB Pan · Wheel Zoom · F Focus</span><span class="mobile-hint">Drag to orbit · Pinch to zoom</span></div>
+      <div id="dropOverlay" class="drop-overlay hidden">Release to import</div>
+    </div>
+
+    <details class="timeline-shell">
+      <summary class="timeline-summary"><b>ANIMATION</b><span>Keyframes & simulation time</span></summary>
+      <section class="timeline">
+        <div class="timeline-head">
+          <div class="timeline-controls">
+            <button id="rewind" class="icon-btn small" title="Rewind">|◀</button>
+            <button id="timelinePlay" class="icon-btn small" title="Play timeline">▶</button>
+            <button id="key" class="tool-btn small" title="Add keyframe">◆ Key</button>
+            <label>Time <input id="time" value="0" type="number" step=".01"></label>
+          </div>
+        </div>
+        <div class="track" id="track"><div id="playhead"></div></div>
+      </section>
+    </details>
+  </section>
+
+  <aside class="side-panel right-panel" id="rightPanel">
+    <section class="inspector panel-section">
+      <div class="section-head"><b>INSPECTOR</b><span id="kind">—</span></div>
+      <div id="empty" class="empty-inspector">Select an entity in the scene.</div>
+      <div id="form" class="hidden">
+        <label class="field">Name<input id="name" autocomplete="off"></label>
+
+        <div class="subhead">TRANSFORM</div>
+        <div class="vector-grid">
+          <label>X<input id="px" type="number" step=".01"></label>
+          <label>Y<input id="py" type="number" step=".01"></label>
+          <label>Z<input id="pz" type="number" step=".01"></label>
+        </div>
+        <div class="vector-grid">
+          <label>RX<input id="rx" type="number" step=".5"></label>
+          <label>RY<input id="ry" type="number" step=".5"></label>
+          <label>RZ<input id="rz" type="number" step=".5"></label>
+        </div>
+        <div class="vector-grid">
+          <label>SX<input id="sx" type="number" step=".01"></label>
+          <label>SY<input id="sy" type="number" step=".01"></label>
+          <label>SZ<input id="sz" type="number" step=".01"></label>
+        </div>
+
+        <div class="subhead">PHYSICS</div>
+        <label class="field">Body<select id="body"><option value="none">None</option><option value="dynamic">Dynamic</option><option value="fixed">Fixed</option><option value="kinematic">Kinematic</option></select></label>
+        <label class="field">Shape<select id="shape"><option value="none">None</option><option value="box">Box</option><option value="ball">Sphere</option><option value="capsule">Capsule</option></select></label>
+
+        <div class="inspector-actions">
+          <button id="apply" class="accent-btn">Apply changes</button>
+          <button id="script">Script</button>
+          <button id="duplicate">Duplicate</button>
+          <button id="delete" class="danger-btn">Delete</button>
+        </div>
+      </div>
+    </section>
+
+    <details class="panel-section spatial-section" open>
+      <summary class="section-summary"><b>SPATIAL</b><span>METRICS</span></summary>
+      <div id="spatialEmpty" class="empty-inspector">Select a renderable object.</div>
+      <div id="spatialInfo" class="spatial-info hidden">
+        <div class="metric-head"><b>Source</b><span id="units">m</span></div>
+        <div class="metric"><span>Dimensions</span><b id="sourceDim">—</b></div>
+        <div class="metric"><span>World size</span><b id="worldDim">—</b></div>
+        <div class="metric"><span>World center</span><b id="worldCenter">—</b></div>
+        <div class="metric"><span>Vertices</span><b id="geoVertices">—</b></div>
+        <div class="metric"><span>Triangles</span><b id="geoTriangles">—</b></div>
+        <div class="metric"><span>UV channels</span><b id="geoUV">—</b></div>
+        <div class="metric"><span>Materials</span><b id="geoMaterials">—</b></div>
+        <div class="metric"><span>Animations</span><b id="geoAnimations">—</b></div>
+        <div class="metric"><span>LOD</span><b id="geoLOD">—</b></div>
+        <div class="metric"><span>Collision</span><b id="geoCollision">—</b></div>
+      </div>
+    </details>
+
+    <details class="panel-section settings-section">
+      <summary class="section-summary"><b>EDITOR</b><span>SETTINGS</span></summary>
+      <label class="toggle-row"><span>Snap</span><input id="snapSize" type="number" step=".01" min=".001" value=".25" title="Snap size"></label>
+      <label class="toggle-row"><span>Show bounds</span><input id="boundsToggle" type="checkbox" checked></label>
+      <div class="compact-stats">
+        <span>Physics <b id="physics">0</b></span>
+        <span>Renderer <b id="rendererSide">—</b></span>
+      </div>
+    </details>
+
+    <details class="panel-section vision-section">
+      <summary class="section-summary"><b>VISION / QA</b><span>ADVANCED</span></summary>
+      <button id="visionOpen" class="wide-btn">Spatial Vision</button>
+      <button id="liveVisionOpen" class="wide-btn">Live Vision — Server</button>
+      <small>Live Vision requires the Forge server bridge. The browser-only Macaly preview reports availability instead of pretending the bridge exists.</small>
+    </details>
+
+    <details class="panel-section console-section">
+      <summary class="section-summary"><b>CONSOLE</b><span>DIAGNOSTICS</span></summary>
+      <button id="clear" class="clear-btn">Clear console</button>
+      <pre id="log"></pre>
+    </details>
+  </aside>
+</main>
+
+<nav class="mobile-bar" aria-label="Mobile editor panels">
+  <button id="mobileScene" type="button">Scene</button>
+  <button id="mobileAnimation" type="button" aria-pressed="false">Animation</button>
+  <button id="mobileInspector" type="button">Inspector</button>
+</nav>
+
+<dialog id="visionDialog"><div class="dialog-head"><b>Forge Spatial Vision</b><button data-close="visionDialog">×</button></div><div class="vision-body"><div class="vision-toolbar"><button id="visionRefresh">Scan scene</button><button id="visionCenter">Frame selected</button><button id="visionMove">Move selected to center</button></div><pre id="visionReport">No scan yet.</pre></div><div class="dialog-actions"><button data-close="visionDialog">Close</button></div></dialog>
+
+<dialog id="qaDialog"><div class="dialog-head"><b>Forge Visual QA</b><button data-close="qaDialog">×</button></div><pre id="qaReport"></pre><div class="dialog-actions"><button data-close="qaDialog">Close</button><button id="runQA" class="primary">Run smoke</button></div></dialog>
+
+<dialog id="scriptDialog"><div class="dialog-head"><b>Entity Script</b><button data-close="scriptDialog">×</button></div><textarea id="code">// api.entity, api.time, api.dt
+api.entity.setEulerAngles(0, api.time * 30, 0);</textarea><div class="dialog-actions"><button data-close="scriptDialog">Cancel</button><button id="saveScript" class="primary">Attach</button></div></dialog>
+
+<input id="projectInput" hidden type="file" accept=".json,.forge.json">
+<script type="module" src="./forge-ui.js"></script>
+<script>if('serviceWorker' in navigator && location.protocol!=='file:') navigator.serviceWorker.register('./sw.js').catch(()=>{});</script>
+</body>
+</html>
