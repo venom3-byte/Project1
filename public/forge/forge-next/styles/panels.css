@@ -157,3 +157,8 @@
   .trace-toolbar .secondary-button,.trace-build-button{flex:1 1 calc(50% - 5px);font-size:9px}
   .trace-toolbar>span{flex:1 0 100%;margin:0 0 3px}
 }
+
+
+.trace-depth-field{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border:1px solid #2a3c49;border-radius:4px;background:#101a23;color:#a8bdcb;font-size:10px}
+.trace-depth-field input{width:132px;max-width:45%;height:30px;padding:0 8px;border:1px solid #354d5c;border-radius:4px;background:#080f15;color:#e2eef5;font:10px var(--font-mono)}
+.trace-depth-field input:focus{outline:none;border-color:#62a9cb}
