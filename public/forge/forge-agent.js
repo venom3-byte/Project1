@@ -37,7 +37,7 @@ const ForgeAgent={
     case 'select':{const r=c.id?F.select(c.id):[...F.entities.values()].find(x=>x.name===c.name);if(!r)throw new Error('Entity not found');return{id:r.id,name:r.name,kind:r.kind}}
     case 'create':{let r;if(c.kind==='camera')r=F.createCamera(c.name||'Camera',{x:c.x??6,y:c.y??4,z:c.z??8});else if(c.kind==='light')r=F.createLight(c.name||'Light');else r=F.primitive(c.kind||'box',c.name);if(c.x!=null||c.y!=null||c.z!=null)r.entity.setLocalPosition(c.x||0,c.y||0,c.z||0);F.select(r.id);return{id:r.id,name:r.name,kind:r.kind}}
     case 'transform':{if(c.id)F.select(c.id);F.transform(c);return F.spatial?.inspect?.(F.selected())||null}
-    case 'move-screen':{const r=F.selected();if(!r)throw new Error('No selected entity');return F.spatial?.moveToScreen?.(r.id,c.x,c.y,c.depth??.5,c.planeY??0)||false}
+    case 'move-screen':{if(c.id)F.select(c.id);const r=F.selected();if(!r)throw new Error('No selected entity');return F.spatial?.moveToScreen?.(r.id,c.x,c.y,c.depth??.5,c.planeY??0)||false}
     case 'physics':{if(c.id)F.select(c.id);const r=F.selected();if(!r)throw new Error('Select an entity first');if(c.mode==='none')F.removePhysics(r.id);else F.setPhysics(r.id,c.mode||'dynamic',c.shape||'box');return r.components.physics||null}
     case 'duplicate':{if(c.id)F.select(c.id);const r=F.duplicate();return r?{id:r.id,name:r.name,kind:r.kind}:null}
     case 'delete':{if(c.id)F.select(c.id);F.delete();return true}
