@@ -121,7 +121,7 @@ try {
   if(leftBefore===leftAfter)throw new Error("Left dock splitter did not change layout width.");
   const persisted=await page.evaluate(()=>!!localStorage.getItem("forge.next.preferences.v1"));
   if(!persisted)throw new Error("Editor layout preferences were not persisted.");
-  await page.locator('[data-command="reset-layout"]').click();
+  await page.locator('.workspace-bar [data-command="reset-layout"]').click();
 
   // Responsive pass: no horizontal page scroll, all core view tools stay inside the screen,
   // and the Scene / Assets / Inspector / Animation drawers remain reachable.
