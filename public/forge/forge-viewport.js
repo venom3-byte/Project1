@@ -2,132 +2,135 @@ import { pc } from "./forge-engine.js";
 
 const F = window.Forge;
 const canvas = document.getElementById("viewport");
-const gridExtent = 15;
-const minorStep = 1;
-const majorStep = 5;
+const GRID_METERS = 30;
+const GRID_TEXTURE_SIZE = 1024;
 const vec = (x=0,y=0,z=0) => new pc.Vec3(x,y,z);
 const state = {
-  gridVisible: true,
-  gridEntities: [],
-  helperRoot: null,
-  ground: null,
-  target: vec(0,1,0),
-  yaw: 0,
-  pitch: 0,
-  distance: 12,
-  gesture: null,
-  touches: new Map(),
-  lastPinch: null,
-  installed: false
+  gridVisible:true,
+  gridEntities:[],
+  helperRoot:null,
+  ground:null,
+  gridTexture:null,
+  gridMaterial:null,
+  plainMaterial:null,
+  axisY:null,
+  target:vec(0,1,0),
+  yaw:0,
+  pitch:0,
+  distance:12,
+  gesture:null,
+  touches:new Map(),
+  lastPinch:null,
+  installed:false
 };
 
-function makeMaterial(rgb, { lighting=false, emissive=0.18 }={}) {
-  const m = new pc.StandardMaterial();
-  m.diffuse = new pc.Color(rgb[0],rgb[1],rgb[2]);
-  m.emissive = new pc.Color(rgb[0],rgb[1],rgb[2]);
-  m.emissiveIntensity = emissive;
-  m.useLighting = lighting;
-  m.useMetalness = false;
-  m.metalness = 0;
-  m.gloss = 0.35;
-  m.specular = new pc.Color(0,0,0);
-  m.cull = pc.CULLFACE_NONE;
+function makeMaterial(rgb,{lighting=false,emissive=0.18}={}) {
+  const m=new pc.StandardMaterial();
+  m.diffuse=new pc.Color(rgb[0],rgb[1],rgb[2]);
+  m.emissive=new pc.Color(rgb[0],rgb[1],rgb[2]);
+  m.emissiveIntensity=emissive;
+  m.useLighting=lighting;
+  m.useMetalness=false;
+  m.metalness=0;
+  m.gloss=0.28;
+  m.specular=new pc.Color(0,0,0);
+  m.cull=pc.CULLFACE_NONE;
   m.update();
   return m;
 }
-function pushQuad(buffer, p0, p1, p2, p3) {
-  const start = buffer.positions.length/3;
-  for (const p of [p0,p1,p2,p3]) buffer.positions.push(p[0],p[1],p[2]);
-  buffer.indices.push(start,start+1,start+2,start,start+2,start+3);
-}
-function groundLine(buffer, along, fixed, extent, width, y) {
-  const h = width/2;
-  if (along === "x") {
-    pushQuad(buffer,[-extent,y,fixed-h],[extent,y,fixed-h],[extent,y,fixed+h],[-extent,y,fixed+h]);
-  } else {
-    pushQuad(buffer,[fixed-h,y,-extent],[fixed+h,y,-extent],[fixed+h,y,extent],[fixed-h,y,extent]);
+function createGridTexture() {
+  const size=GRID_TEXTURE_SIZE;
+  const surface=document.createElement("canvas");
+  surface.width=size;surface.height=size;
+  const ctx=surface.getContext("2d");
+  ctx.fillStyle="#0c131d";
+  ctx.fillRect(0,0,size,size);
+
+  // The ground plane is 30 x 30 world units: each subdivision represents 1 meter.
+  const spacing=size/GRID_METERS;
+  for(let i=0;i<=GRID_METERS;i++){
+    const major=i%5===0;
+    const p=Math.round(i*spacing)+0.5;
+    ctx.strokeStyle=major?"#51677d":"#2b3a4c";
+    ctx.lineWidth=major?2.5:1.35;
+    ctx.beginPath();ctx.moveTo(p,0);ctx.lineTo(p,size);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(0,p);ctx.lineTo(size,p);ctx.stroke();
   }
+
+  // World axes: X red, Z blue. The Y axis is a separate upright 3D primitive.
+  const center=Math.round(size/2)+0.5;
+  ctx.strokeStyle="#ed6872";ctx.lineWidth=4.5;
+  ctx.beginPath();ctx.moveTo(center,0);ctx.lineTo(center,size);ctx.stroke();
+  ctx.strokeStyle="#559cff";ctx.lineWidth=4.5;
+  ctx.beginPath();ctx.moveTo(0,center);ctx.lineTo(size,center);ctx.stroke();
+  ctx.fillStyle="#f3f7ff";ctx.beginPath();ctx.arc(center,center,5,0,Math.PI*2);ctx.fill();
+
+  const texture=new pc.Texture(F.app.graphicsDevice,{
+    width:size,height:size,format:pc.PIXELFORMAT_R8_G8_B8_A8,mipmaps:true
+  });
+  texture.setSource(surface);
+  texture.minFilter=pc.FILTER_LINEAR_MIPMAP_LINEAR;
+  texture.magFilter=pc.FILTER_LINEAR;
+  texture.addressU=pc.ADDRESS_CLAMP_TO_EDGE;
+  texture.addressV=pc.ADDRESS_CLAMP_TO_EDGE;
+  return texture;
 }
-function makeMesh(name, buffer, material) {
-  if (!buffer.positions.length) return null;
-  const mesh = new pc.Mesh(F.app.graphicsDevice);
-  mesh.setPositions(new Float32Array(buffer.positions));
-  mesh.setIndices(new Uint16Array(buffer.indices));
-  // StandardMaterial's lit and unlit shader variants both benefit from explicit normals.
-  // Compute them per quad so the ground grid and vertical Y axis render consistently.
-  const normals = new Float32Array(buffer.positions.length);
-  for (let i=0; i<buffer.positions.length; i+=12) {
-    const ax=buffer.positions[i], ay=buffer.positions[i+1], az=buffer.positions[i+2];
-    const bx=buffer.positions[i+3], by=buffer.positions[i+4], bz=buffer.positions[i+5];
-    const cx=buffer.positions[i+6], cy=buffer.positions[i+7], cz=buffer.positions[i+8];
-    const ux=bx-ax, uy=by-ay, uz=bz-az, vx=cx-ax, vy=cy-ay, vz=cz-az;
-    let nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
-    const length=Math.hypot(nx,ny,nz)||1;
-    nx/=length;ny/=length;nz/=length;
-    for (let j=0; j<4; j++) {
-      const k=i+j*3;
-      normals[k]=nx;normals[k+1]=ny;normals[k+2]=nz;
-    }
-  }
-  mesh.setNormals(normals);
-  mesh.update(pc.PRIMITIVE_TRIANGLES);
-  const entity = new pc.Entity(name);
-  state.helperRoot.addChild(entity);
-  const instance = new pc.MeshInstance(mesh,material,entity);
-  entity.addComponent("render",{meshInstances:[instance]});
-  entity.render.layers = [pc.LAYERID_WORLD];
-  entity.render.frustumCulling = false;
-  entity.render.castShadows = false;
-  entity.render.receiveShadows = false;
-  state.gridEntities.push(entity);
-  return entity;
+function createGridMaterials() {
+  state.gridTexture=createGridTexture();
+  state.gridMaterial=new pc.StandardMaterial();
+  state.gridMaterial.diffuse=new pc.Color(1,1,1);
+  state.gridMaterial.emissive=new pc.Color(1,1,1);
+  state.gridMaterial.emissiveIntensity=1.1;
+  state.gridMaterial.diffuseMap=state.gridTexture;
+  state.gridMaterial.emissiveMap=state.gridTexture;
+  state.gridMaterial.useLighting=false;
+  state.gridMaterial.useMetalness=false;
+  state.gridMaterial.metalness=0;
+  state.gridMaterial.useTonemap=false;
+  state.gridMaterial.gloss=0.25;
+  state.gridMaterial.specular=new pc.Color(0,0,0);
+  state.gridMaterial.update();
+
+  state.plainMaterial=new pc.StandardMaterial();
+  state.plainMaterial.diffuse=new pc.Color(0.045,0.057,0.075);
+  state.plainMaterial.emissive=new pc.Color(0.035,0.045,0.06);
+  state.plainMaterial.emissiveIntensity=0.35;
+  state.plainMaterial.useLighting=true;
+  state.plainMaterial.gloss=0.2;
+  state.plainMaterial.update();
 }
 function createWorldGrid() {
-  state.helperRoot = new pc.Entity("Forge Editor Grid — helper");
+  state.helperRoot=new pc.Entity("Forge Editor Helpers");
   F.root.addChild(state.helperRoot);
-  state.helperRoot.enabled = true;
 
-  state.ground = [...F.entities.values()].find(r => r.name === "Ground" && r.entity.render);
-  if (state.ground) {
-    const plane = state.ground.entity;
-    plane.render.layers = [pc.LAYERID_WORLD];
-    plane.render.enabled = true;
+  state.ground=[...F.entities.values()].find(r=>r.name==="Ground"&&r.entity.render);
+  createGridMaterials();
+  if(state.ground){
+    const plane=state.ground.entity;
+    plane.render.layers=[pc.LAYERID_WORLD];
+    plane.render.enabled=true;
+    plane.setLocalScale(GRID_METERS,1,GRID_METERS);
     plane.setLocalPosition(0,-0.025,0);
-    const material = makeMaterial([0.035,0.048,0.064],{lighting:true,emissive:0.02});
-    material.gloss = 0.2;
-    material.update();
-    plane.render.material = material;
-    plane.render.castShadows = false;
-    plane.render.receiveShadows = true;
+    plane.render.material=state.gridMaterial;
+    plane.render.castShadows=false;
+    plane.render.receiveShadows=true;
+    plane.render.frustumCulling=false;
   }
 
-  const minor = {positions:[],indices:[]};
-  const major = {positions:[],indices:[]};
-  const extent = gridExtent;
-  for (let v=-extent; v<=extent; v+=minorStep) {
-    if (v===0 || Math.abs(v%majorStep)<1e-6) continue;
-    groundLine(minor,"x",v,extent,0.012,0.002);
-    groundLine(minor,"z",v,extent,0.012,0.002);
-  }
-  for (let v=-extent; v<=extent; v+=majorStep) {
-    if (v===0) continue;
-    groundLine(major,"x",v,extent,0.024,0.006);
-    groundLine(major,"z",v,extent,0.024,0.006);
-  }
-  makeMesh("Forge Grid — 1m subdivisions",minor,makeMaterial([0.18,0.25,0.33],{emissive:0.72}));
-  makeMesh("Forge Grid — 5m major lines",major,makeMaterial([0.28,0.39,0.5],{emissive:0.82}));
-
-  const axisX={positions:[],indices:[]};
-  const axisZ={positions:[],indices:[]};
-  const axisY={positions:[],indices:[]};
-  groundLine(axisX,"x",0,extent,0.055,0.014);
-  groundLine(axisZ,"z",0,extent,0.055,0.016);
-  const w=0.035, z=0.018, top=4.5;
-  pushQuad(axisY.positions.length ? axisY : axisY,
-    [-w/2,0,z],[w/2,0,z],[w/2,top,z],[-w/2,top,z]);
-  makeMesh("World axis X",axisX,makeMaterial([0.93,0.22,0.28],{emissive:1}));
-  makeMesh("World axis Z",axisZ,makeMaterial([0.17,0.54,1],{emissive:1}));
-  makeMesh("World axis Y",axisY,makeMaterial([0.24,0.88,0.47],{emissive:1}));
+  // Real renderable geometry for the vertical world axis; it is intentionally not
+  // part of the user's scene registry or serialized project.
+  const axis=new pc.Entity("World axis Y — helper");
+  state.helperRoot.addChild(axis);
+  axis.addComponent("render",{type:"box"});
+  axis.setLocalPosition(0,2,0);
+  axis.setLocalScale(0.035,4,0.035);
+  axis.render.layers=[pc.LAYERID_WORLD];
+  axis.render.material=makeMaterial([0.24,0.88,0.47],{emissive:0.9});
+  axis.render.castShadows=false;
+  axis.render.receiveShadows=false;
+  axis.render.frustumCulling=false;
+  state.axisY=axis;
+  state.gridEntities.push(axis);
 }
 function activeCamera() { return F.camera(); }
 function readCamera(targetHint) {
@@ -296,22 +299,26 @@ F.setView=function(mode,...args){
 
 function setGridVisible(visible) {
   state.gridVisible=Boolean(visible);
-  for (const entity of state.gridEntities) entity.enabled=state.gridVisible;
+  if(state.ground?.entity?.render){
+    state.ground.entity.render.material=state.gridVisible?state.gridMaterial:state.plainMaterial;
+  }
+  if(state.axisY)state.axisY.enabled=state.gridVisible;
   return state.gridVisible;
 }
-function toggleGrid() { return setGridVisible(!state.gridVisible); }
-function status() {
+function toggleGrid(){return setGridVisible(!state.gridVisible)}
+function status(){
   const camera=activeCamera(),position=camera?.getPosition();
-  return {
-    ok:Boolean(F.app?.graphicsDevice&&camera?.camera&&state.helperRoot&&state.gridEntities.length===5&&state.ground?.entity?.render?.enabled),
+  return{
+    ok:Boolean(F.app?.graphicsDevice&&camera?.camera&&state.helperRoot&&state.ground?.entity?.render?.enabled&&state.gridTexture&&state.axisY),
     renderer:F.diagnostics?.().renderer||"unknown",
     gridVisible:state.gridVisible,
-    gridMeshes:state.gridEntities.length,
-    gridGeometry:state.gridEntities.map(entity=>{
-      const instance=entity.render?.meshInstances?.[0],mesh=instance?.mesh;
-      return {name:entity.name,enabled:entity.enabled,vertices:mesh?.vertexBuffer?.numVertices??null,indices:mesh?.primitive?.[0]?.count??null,hasNormals:Boolean(mesh?.vertexBuffer)};
-    }),
+    gridMeshes:1+state.gridEntities.length,
+    gridTexture:Boolean(state.gridTexture),
+    gridScaleMeters:GRID_METERS,
+    minorSubdivisionMeters:1,
+    majorSubdivisionMeters:5,
     groundVisible:Boolean(state.ground?.entity?.render?.enabled&&state.ground.entity.render.layers.includes(pc.LAYERID_WORLD)),
+    axes:{x:true,y:Boolean(state.axisY),z:true},
     navigation:{orbit:true,pan:true,zoom:true,touch:true,clickSelect:true},
     camera:camera&&position?{
       position:[position.x,position.y,position.z],

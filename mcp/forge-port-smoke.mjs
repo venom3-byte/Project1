@@ -91,7 +91,7 @@ try {
   if (!initial.diagnostics || initial.entityCount < 1) {
     throw new Error("Forge did not create a valid engine scene: " + JSON.stringify(initial.diagnostics));
   }
-  if (!initial.viewport3d?.ok || !initial.viewport3d.groundVisible || initial.viewport3d.gridMeshes < 5) {
+  if (!initial.viewport3d?.ok || !initial.viewport3d.groundVisible || !initial.viewport3d.gridTexture || initial.viewport3d.gridMeshes < 2 || initial.viewport3d.gridScaleMeters !== 30 || initial.viewport3d.minorSubdivisionMeters !== 1 || initial.viewport3d.majorSubdivisionMeters !== 5) {
     throw new Error("Forge true 3D workspace did not initialize its visible ground, world grid, axes and navigation: " + JSON.stringify(initial.viewport3d));
   }
   if (initial.editorOverlayGridCount !== 0) throw new Error("A flat CSS grid overlay is still masking the 3D workspace.");
