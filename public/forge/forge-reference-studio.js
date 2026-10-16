@@ -331,8 +331,10 @@ async function restoreSavedImages() {
 
 function bindControls() {
   const dialog = document.getElementById("referenceDialog");
-  document.getElementById("referenceStudio")?.addEventListener("click", () => {
+  const launchButton = document.getElementById("referenceStudio");
+  launchButton?.addEventListener("click", () => {
     if (dialog && !dialog.open) dialog.showModal();
+    launchButton.classList.toggle("active", Boolean(dialog?.open));
     for (const slot of Object.keys(SLOT_DEFS)) updateCard(slot);
   });
 
