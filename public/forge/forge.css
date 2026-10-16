@@ -221,3 +221,28 @@ html,body{background:var(--bg);color:var(--text)}button{transition:background-co
 @media(max-width:850px){.appbar{height:50px;padding:5px 7px;gap:4px}.brand-lockup{min-width:auto;gap:0}.brand-name,.file-divider,.history-actions,#newProject,#openProject{display:none!important}.brand-mark{height:27px;width:27px}.project-field{min-width:74px;flex:1 1 80px}.project-field>small{display:none}.project-field input{font-size:11px}.app-divider{display:none}.app-button{height:30px;padding:0 7px;font-size:10px}.app-button .button-symbol{font-size:13px}.build-button,.play-button{height:30px;padding:0 8px;font-size:10px;gap:4px}.editor-shell{height:calc(100vh - 50px);display:block;position:relative}.side-panel{position:absolute;top:0;bottom:0;width:min(88vw,330px);z-index:25;display:none;box-shadow:15px 0 45px #000b}.left-panel{left:0}.right-panel{right:0;box-shadow:-15px 0 45px #000b}.side-panel.mobile-open{display:block}.workspace{height:100%;display:grid;grid-template-rows:minmax(0,1fr) auto}.timeline-shell{display:none}.mobile-bar{position:fixed;left:7px;right:7px;bottom:7px;height:46px;z-index:40;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;padding:4px;border:1px solid #33414f;border-radius:11px;background:#111923ee;backdrop-filter:blur(16px);box-shadow:0 10px 38px #0009}.mobile-bar button{border-radius:7px;color:#bdc9d5;font-size:11px;font-weight:600;cursor:pointer}.mobile-bar button:hover,.mobile-bar button.active{background:#1d3d53;color:#fff}.viewport-tools{left:6px;right:6px;top:6px;gap:4px;padding:4px;border-radius:8px;min-height:38px}.view-tool{height:29px;padding:0 7px;font-size:10px}.viewport-divider{margin:0 1px}.viewport-status{left:7px;bottom:61px;font-size:9px}.selection-hint{right:7px;bottom:61px;max-width:62vw;font-size:8px;white-space:nowrap}.timeline-summary{height:31px}.create-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.asset-list{max-height:none}.fm-grid{grid-template-columns:1fr}}
 @media(max-width:520px){.appbar{gap:3px;padding:4px 6px}.brand-mark{height:24px;width:24px;font-size:15px}.project-field{flex:1 1 74px;min-width:64px}.project-field input{font-size:10px}.secondary-action{padding:0 5px;font-size:9px}#importAssets .button-symbol,#productionTools .button-symbol{display:none}#importAssets,#productionTools{padding:0 6px}.build-button{padding:0 6px;font-size:9px}.play-button{min-width:36px;padding:0 7px}.play-button span:last-child{font-size:9px}.editor-shell{height:calc(100vh - 50px)}.viewport-tools{justify-content:flex-start}.view-presets [data-view="front"],.view-presets [data-view="right"],.view-presets #frame{display:none}.viewport-tool-group{gap:1px}.transform-tools .tool-label,.transform-tools kbd{display:none}.view-tool{min-width:29px;padding:0 5px}.tool-glyph{font-size:16px}.viewport-divider-last{display:none}.viewport-utilities #snapToggle,.viewport-utilities #spaceToggle{display:none}.view-presets{margin-right:auto}.viewport-status{bottom:60px;max-width:55vw;overflow:hidden;white-space:nowrap}.selection-hint{max-width:48vw;overflow:hidden;text-overflow:ellipsis}.desktop-hint{display:none}.mobile-hint{display:inline}.mobile-bar{height:44px}.panel-section{padding:10px}.inspector-actions button{height:34px}}
 @media(prefers-reduced-motion:reduce){button{transition:none}}
+
+/* Final viewport overflow and compact-header corrections. */
+@media(min-width:851px){
+  .viewport-tools{justify-content:flex-start;flex-wrap:wrap;overflow:visible;row-gap:3px}
+  .viewport-tool-group{max-width:100%}
+  .viewport-utilities{margin-left:auto}
+  .viewport-tools .view-tool{padding-left:8px;padding-right:8px}
+}
+@media(max-width:850px){
+  .appbar{overflow:hidden}
+  .app-spacer{min-width:0}
+}
+@media(max-width:520px){
+  .appbar{gap:2px;padding:4px 5px;overflow:hidden}
+  .app-spacer{display:none;flex:0 0 0;min-width:0}
+  .brand-lockup{flex:0 0 24px;width:24px;min-width:24px}
+  .project-field{flex:0 1 78px;min-width:52px;max-width:78px}
+  .project-field input{min-width:0;width:100%;text-overflow:ellipsis}
+  .app-button{flex:0 0 auto;gap:3px}
+  #saveProject{padding:0 4px;min-width:0}
+  #importAssets,#productionTools{padding:0 5px;min-width:0}
+  .build-button{flex:0 0 auto;padding:0 5px;font-size:9px}
+  .play-button{flex:0 0 auto;min-width:0;padding:0 6px;font-size:9px;margin-right:1px}
+  .play-button span:last-child{font-size:9px}
+}
