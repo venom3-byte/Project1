@@ -64,6 +64,8 @@ try {
     diagnostics: window.Forge?.diagnostics?.() || null,
     viewport3d: window.ForgeViewport?.status?.() || null,
     editorOverlayGridCount: document.querySelectorAll(".editor-grid").length,
+    workspaceNavigation: (()=>{const e=document.querySelector(".workspace-strip"),r=e?.getBoundingClientRect();return {count:document.querySelectorAll("[data-workspace-target]").length,visible:!!e&&!!r&&r.height>=28&&getComputedStyle(e).display!=="none",active:document.querySelector("[data-workspace-target][aria-selected='true']")?.dataset.workspaceTarget||null}})(),
+    previewControl: (()=>{const e=document.querySelector("#play"),r=e?.getBoundingClientRect();return {visible:!!e&&!!r&&r.width>0&&r.height>0,label:e?.querySelector("[data-run-label]")?.textContent||"",ariaLabel:e?.getAttribute("aria-label")||"",pressed:e?.getAttribute("aria-pressed")||null}})(),
     criticalDuplicateIds: ["importAssets","productionTools","focus","focusViewport","snapToggle","spaceToggle","grid","qa","build","play"].filter(id => document.querySelectorAll("#" + id).length > 1),
     allDuplicateIds: [...document.querySelectorAll("[id]")].map(e=>e.id).filter((id,i,all)=>all.indexOf(id)!==i).filter((id,i,all)=>all.indexOf(id)===i),
     legacyFloatingDockCount: document.querySelectorAll(".forge-prod").length,
@@ -107,6 +109,38 @@ try {
   if (!initial.agentServer?.configured && initial.agentServer?.capable !== false) {
     throw new Error("Static Forge must not infer a live WebSocket endpoint when no server bridge is configured.");
   }
+  if(initial.workspaceNavigation.count!==5||!initial.workspaceNavigation.visible||initial.workspaceNavigation.active!=="layout"){
+    throw new Error("Forge workflow navigation did not initialize correctly: "+JSON.stringify(initial.workspaceNavigation));
+  }
+  if(!initial.previewControl.visible||initial.previewControl.label!=="Preview"||initial.previewControl.pressed!=="false"){
+    throw new Error("Scene Preview control should be available as a restrained Preview action: "+JSON.stringify(initial.previewControl));
+  }
+  const disclosureSelectors=[".assets-section",".asset-tools-section",".spatial-section",".vision-section",".console-section"];
+  const disclosureDefaults=await frame.evaluate(selectors=>selectors.map(selector=>({selector,open:document.querySelector(selector)?.open??false})),disclosureSelectors);
+  await forgeFrameLocator.locator('[data-workspace-target="animation"]').click();
+  await frame.waitForFunction(()=>document.documentElement.dataset.editorWorkspace==="animation"&&document.querySelector(".timeline-shell")?.open,null,{timeout:5000});
+  const animationWorkspace=await frame.evaluate(()=>({active:document.querySelector("[data-workspace-target][aria-selected='true']")?.dataset.workspaceTarget,timelineOpen:document.querySelector(".timeline-shell")?.open===true,context:document.querySelector("#workspaceContext")?.innerText||""}));
+  await forgeFrameLocator.locator('[data-workspace-target="assets"]').click();
+  await frame.waitForFunction(()=>document.documentElement.dataset.editorWorkspace==="assets"&&document.querySelector(".assets-section")?.open===true,null,{timeout:5000});
+  const assetsWorkspace=await frame.evaluate(()=>({active:document.querySelector("[data-workspace-target][aria-selected='true']")?.dataset.workspaceTarget,assetsOpen:document.querySelector(".assets-section")?.open===true}));
+  await forgeFrameLocator.locator('[data-workspace-target="review"]').click();
+  await frame.waitForFunction(()=>document.documentElement.dataset.editorWorkspace==="review"&&document.querySelector(".asset-tools-section")?.open===true,null,{timeout:5000});
+  const reviewWorkspace=await frame.evaluate(()=>({active:document.querySelector("[data-workspace-target][aria-selected='true']")?.dataset.workspaceTarget,assetToolsOpen:document.querySelector(".asset-tools-section")?.open===true,visionOpen:document.querySelector(".vision-section")?.open===true,spatialOpen:document.querySelector(".spatial-section")?.open===true}));
+  await forgeFrameLocator.locator('[data-workspace-target="layout"]').click();
+  await frame.waitForFunction(()=>document.documentElement.dataset.editorWorkspace==="layout"&&document.querySelector("[data-workspace-target='layout']")?.getAttribute("aria-selected")==="true",null,{timeout:5000});
+  const layoutRestored=await frame.evaluate(()=>({active:document.querySelector("[data-workspace-target][aria-selected='true']")?.dataset.workspaceTarget,timelineOpen:document.querySelector(".timeline-shell")?.open===true}));
+  await frame.evaluate(({selectors,defaults})=>{
+    for(const item of defaults){const e=document.querySelector(item.selector);if(e&&e.tagName==="DETAILS")e.open=item.open}
+    document.querySelector(".left-panel")?.scrollTo(0,0);document.querySelector(".right-panel")?.scrollTo(0,0);
+  },{selectors:disclosureSelectors,defaults:disclosureDefaults});
+  if(animationWorkspace.active!=="animation"||!animationWorkspace.timelineOpen||!animationWorkspace.context.includes("ANIMATION")){
+    throw new Error("Animation workspace did not expose the timeline: "+JSON.stringify(animationWorkspace));
+  }
+  if(assetsWorkspace.active!=="assets"||!assetsWorkspace.assetsOpen)throw new Error("Assets workspace did not expand the asset browser: "+JSON.stringify(assetsWorkspace));
+  if(reviewWorkspace.active!=="review"||!reviewWorkspace.assetToolsOpen||!reviewWorkspace.visionOpen||!reviewWorkspace.spatialOpen){
+    throw new Error("Review workspace did not expose QA and asset metrics: "+JSON.stringify(reviewWorkspace));
+  }
+  if(layoutRestored.active!=="layout"||layoutRestored.timelineOpen)throw new Error("Returning to Layout did not restore the previous timeline state: "+JSON.stringify(layoutRestored));
 
   await forgeFrameLocator.locator("#productionTools").click();
   await forgeFrameLocator.locator(".forge-modal").waitFor({state:"visible",timeout:5000});
@@ -284,6 +318,16 @@ try {
 
   await page.setViewportSize({ width: 390, height: 844 });
   await sleep(500);
+  await forgeFrameLocator.locator("#mobileAnimation").click();
+  await frame.waitForFunction(()=>document.documentElement.dataset.editorWorkspace==="animation"&&document.querySelector(".timeline-shell")?.open===true,null,{timeout:5000});
+  const mobileTimelineCheck=await frame.evaluate(()=>({buttonVisible:(()=>{const e=document.querySelector("#mobileAnimation"),r=e?.getBoundingClientRect();return !!e&&!!r&&r.width>0&&r.height>0})(),timelineVisible:getComputedStyle(document.querySelector(".timeline-shell")).display!=="none",timelineOpen:document.querySelector(".timeline-shell")?.open===true}));
+  await forgeFrameLocator.locator("#mobileScene").click();
+  await frame.waitForFunction(()=>document.documentElement.dataset.editorWorkspace==="layout",null,{timeout:5000});
+  await forgeFrameLocator.locator("#viewport").click({position:{x:40,y:80},force:true});
+  await sleep(120);
+  if(!mobileTimelineCheck.buttonVisible||!mobileTimelineCheck.timelineVisible||!mobileTimelineCheck.timelineOpen){
+    throw new Error("Mobile Animation control did not expose the timeline: "+JSON.stringify(mobileTimelineCheck));
+  }
   const frameBox = await page.locator('iframe[title="Forge Studio 3.7"]').boundingBox();
   const canvasRect = await frame.evaluate(() => {
     const r=document.querySelector("#viewport").getBoundingClientRect();
@@ -331,7 +375,7 @@ try {
   const mobile = await frame.evaluate(() => ({
     viewport: { width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth },
     canvas: (() => { const e=document.querySelector("#viewport"),r=e?.getBoundingClientRect(); return r?{width:Math.round(r.width),height:Math.round(r.height),visible:r.width>0&&r.height>0}:null; })(),
-    mobileControls: [...document.querySelectorAll("#mobileScene,#mobileInspector")].map(e=>({id:e.id,visible:e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0})),
+    mobileControls: [...document.querySelectorAll("#mobileScene,#mobileAnimation,#mobileInspector")].map(e=>({id:e.id,visible:e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0})),
     productionDockCount: document.querySelectorAll(".forge-prod").length,
     toolboxButton: (()=>{const e=document.querySelector("#productionTools"),r=e?.getBoundingClientRect();return {visible:!!e&&!!r&&r.width>0&&r.height>0,left:Math.round(r?.left||0),right:Math.round(r?.right||0)}})(),
     mobileNav: (() => { const e=document.querySelector(".mobile-bar"),r=e?.getBoundingClientRect(); return r?{top:Math.round(r.top),bottom:Math.round(r.bottom),height:Math.round(r.height)}:null; })(),
