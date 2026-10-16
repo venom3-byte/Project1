@@ -32,6 +32,7 @@ jobs:
           VITE_BASE_PATH: "/"
         run: npm run build
       - name: Validate all imported Forge browser modules
+        id: forge
         shell: bash
         run: |
           set -euo pipefail
@@ -63,13 +64,17 @@ jobs:
           console.log(JSON.stringify({root,required:required.length,missing,htmlReferences:references,htmlBytes:html.length},null,2));
           if(missing.length) process.exit(1);
           NODE
+          echo "path=$forge_dir" >> "$GITHUB_OUTPUT"
       - name: Install the isolated Chromium visual test runner
         run: npm install --prefix mcp --no-audit --no-fund
       - name: Start static preview
         shell: bash
+        env:
+          FORGE_SITE_DIR: ${{ steps.forge.outputs.path }}
         run: |
           set -euo pipefail
-          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/forge-preview.log 2>&1 &
+          test -n "$FORGE_SITE_DIR"
+          npm run preview -- --outDir "$FORGE_SITE_DIR" --host 127.0.0.1 --port 4173 > /tmp/forge-preview.log 2>&1 &
           echo $! > /tmp/forge-preview.pid
           for i in $(seq 1 40); do
             if curl --silent --fail http://127.0.0.1:4173/ >/dev/null; then
