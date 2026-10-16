@@ -57,6 +57,12 @@ async function main() {
     const response = await page.goto(EDITOR_URL, { waitUntil: "domcontentloaded", timeout: 60000 });
     responseStatus = response?.status() ?? null;
     await page.locator("canvas").first().waitFor({ state: "visible", timeout: 30000 });
+    if (localTestEnabled) {
+      await page.waitForFunction(
+        () => document.documentElement.dataset.forgeReady === "1" || !!window.ForgeBootError,
+        { timeout: 45000 },
+      ).catch(() => null);
+    }
     await sleep(1000);
 
     if (command === "click") {
@@ -235,7 +241,9 @@ async function main() {
     await page.screenshot({ path: screenshotPath, type: "jpeg", quality: 72, fullPage: false });
     await context.storageState({ path: profilePath });
     const report = {
-      ok: responseStatus === 200 && pageErrors.length === 0 && !(command === "checks" && !action?.passed),
+      ok: responseStatus === 200 && pageErrors.length === 0 &&
+        !(command === "checks" && !action?.passed) &&
+        !(localTestEnabled && command === "inspect" && observation.forgeBootState !== "ready"),
       command, responseStatus, action, observation,
       verification: { pageErrors, consoleErrors: consoleErrors.slice(0, 15) },
       screenshotPath, profilePersisted: true
