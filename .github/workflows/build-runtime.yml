@@ -1,0 +1,71 @@
+name: Build runnable Claude Game Editor copy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: claude-game-editor-runtime
+  cancel-in-progress: true
+jobs:
+  build-and-publish-runtime-files:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build static runtime
+        env:
+          DEV_BUILD: "1"
+          NITRO_PRESET: "static"
+          VITE_BASE_PATH: "/"
+        run: npm run build
+      - name: Find and validate static output
+        id: site
+        shell: bash
+        run: |
+          set -euo pipefail
+          site_dir=""
+          for candidate in .output/public dist/client dist; do
+            if [ -f "$candidate/index.html" ]; then
+              site_dir="$candidate"
+              break
+            fi
+          done
+          if [ -z "$site_dir" ]; then
+            echo "No generated index.html was found. Build output inventory:"
+            find .output dist -maxdepth 5 -type f 2>/dev/null | head -200 || true
+            exit 1
+          fi
+          test -s "$site_dir/index.html"
+          cp "$site_dir/index.html" "$site_dir/404.html"
+          touch "$site_dir/.nojekyll"
+          echo "path=$site_dir" >> "$GITHUB_OUTPUT"
+          echo "Static output: $site_dir"
+          echo "Files: $(find "$site_dir" -type f | wc -l)"
+          echo "Bytes: $(du -sb "$site_dir" | cut -f1)"
+      - name: Publish runnable files to runtime-site branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SITE_DIR: ${{ steps.site.outputs.path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/claude-game-editor-runtime
+          mkdir -p /tmp/claude-game-editor-runtime
+          cp -a "$SITE_DIR"/. /tmp/claude-game-editor-runtime/
+          cd /tmp/claude-game-editor-runtime
+          git init -b runtime-site
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Deploy static editor from ${GITHUB_SHA}"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force origin HEAD:runtime-site
