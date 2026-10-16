@@ -1,0 +1,121 @@
+# Neutral Have Glass inspired test-finish, not a production paint scheme
+newmtl Airframe
+Ka 0.10 0.11 0.12
+Kd 0.31 0.34 0.36
+Ks 0.22 0.23 0.24
+Ns 70
+illum 2
+
+newmtl PanelGrey
+Ka 0.08 0.09 0.10
+Kd 0.22 0.25 0.27
+Ks 0.28 0.29 0.30
+Ns 85
+illum 2
+
+newmtl PanelSeam
+Ka 0.02 0.02 0.02
+Kd 0.075 0.085 0.09
+Ks 0.12 0.12 0.12
+Ns 32
+illum 2
+
+newmtl ControlSurface
+Ka 0.06 0.07 0.08
+Kd 0.20 0.23 0.25
+Ks 0.22 0.23 0.24
+Ns 68
+illum 2
+
+newmtl CanopyGlass
+Ka 0.015 0.025 0.035
+Kd 0.09 0.16 0.21
+Ks 0.65 0.68 0.70
+Ns 180
+d 0.56
+illum 2
+
+newmtl CanopyFrame
+Ka 0.01 0.01 0.01
+Kd 0.035 0.045 0.05
+Ks 0.16 0.17 0.18
+Ns 55
+illum 2
+
+newmtl CockpitInterior
+Ka 0.01 0.015 0.015
+Kd 0.045 0.055 0.055
+Ks 0.10 0.11 0.11
+Ns 45
+illum 2
+
+newmtl SeatFabric
+Ka 0.025 0.03 0.025
+Kd 0.14 0.17 0.13
+Ks 0.10 0.12 0.10
+Ns 32
+illum 2
+
+newmtl DisplayGlass
+Ka 0.01 0.04 0.03
+Kd 0.025 0.16 0.12
+Ks 0.35 0.48 0.38
+Ns 125
+illum 2
+
+newmtl HUDGlass
+Ka 0.015 0.04 0.04
+Kd 0.08 0.20 0.19
+Ks 0.50 0.58 0.56
+Ns 150
+d 0.48
+illum 2
+
+newmtl SwitchMetal
+Ka 0.08 0.08 0.08
+Kd 0.30 0.32 0.31
+Ks 0.44 0.45 0.45
+Ns 90
+illum 2
+
+newmtl WarningAmber
+Ka 0.13 0.07 0.01
+Kd 0.85 0.36 0.04
+Ks 0.25 0.20 0.12
+Ns 65
+illum 2
+
+newmtl IntakeDark
+Ka 0.002 0.002 0.002
+Kd 0.006 0.007 0.008
+Ks 0.04 0.04 0.04
+Ns 20
+illum 2
+
+newmtl NozzleInterior
+Ka 0.004 0.004 0.004
+Kd 0.015 0.018 0.02
+Ks 0.25 0.26 0.27
+Ns 95
+illum 2
+
+newmtl EngineMetal
+Ka 0.10 0.10 0.11
+Kd 0.36 0.37 0.38
+Ks 0.72 0.74 0.76
+Ns 155
+illum 2
+
+newmtl ExternalStores
+Ka 0.06 0.07 0.08
+Kd 0.27 0.29 0.30
+Ks 0.20 0.21 0.21
+Ns 65
+illum 2
+
+newmtl Tyre
+Ka 0.004 0.004 0.004
+Kd 0.018 0.019 0.020
+Ks 0.12 0.12 0.12
+Ns 25
+illum 2
