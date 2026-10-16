@@ -87,11 +87,11 @@ try {
     if (!present) throw new Error("Expected Forge module did not load: " + name);
   }
 
-  await page.screenshot({ path: path.join(ARTIFACTS, "forge-port-desktop.png"), fullPage: true });
   const entityCountBefore = await frame.evaluate(() => window.Forge.entities.size);
   await forgeFrameLocator.locator('[data-add="sphere"]').first().click();
   await frame.waitForFunction(previous => window.Forge.entities.size === previous + 1, entityCountBefore, { timeout: 10000 });
   const entityCountAfterAdd = await frame.evaluate(() => window.Forge.entities.size);
+  await page.screenshot({ path: path.join(ARTIFACTS, "forge-port-desktop.png"), fullPage: true });
 
   const playButton = forgeFrameLocator.locator("#play");
   await playButton.click();
