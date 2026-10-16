@@ -1,0 +1,13 @@
+{
+  "name": "forge-visual-agent-runner",
+  "private": true,
+  "type": "module",
+  "description": "Headless Chromium + Playwright fallback runner for the Forge Claude Game Editor visual QA loop.",
+  "scripts": {
+    "visual": "node visual-agent-runner.mjs"
+  },
+  "dependencies": {
+    "@sparticuz/chromium": "153.0.0",
+    "playwright-core": "1.64.1"
+  }
+}
