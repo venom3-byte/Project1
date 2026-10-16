@@ -6,6 +6,7 @@ on:
       - agent/forge-reverse-engineering-port
       - agent/forge-true-3d-workspace
       - agent/forge-image-reference-studio
+      - agent/forge-next-rebuild-2026-10-16
   workflow_dispatch:
 permissions:
   contents: read
@@ -49,6 +50,7 @@ jobs:
           node --check mcp/worker.js
           node --check mcp/forge-command-schema.mjs
           node --check mcp/forge-port-smoke.mjs
+          node --check mcp/forge-next-smoke.mjs
           node --check mcp/visual-agent-runner.mjs
       - name: Validate all imported Forge browser modules
         id: forge
@@ -113,6 +115,11 @@ jobs:
           FORGE_PORT_URL: http://127.0.0.1:4173/
           FORGE_PORT_ARTIFACTS: ${{ runner.temp }}/forge-port-qa
         run: node mcp/forge-port-smoke.mjs
+      - name: Test Forge Next workspace on desktop and mobile in real Chromium
+        env:
+          FORGE_NEXT_URL: http://127.0.0.1:4173/forge/forge-next/index.html
+          FORGE_NEXT_ARTIFACTS: ${{ runner.temp }}/forge-next-qa
+        run: node mcp/forge-next-smoke.mjs
       - name: Upload screenshots, diagnostics and browser logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -121,4 +128,5 @@ jobs:
           if-no-files-found: warn
           path: |
             ${{ runner.temp }}/forge-port-qa/
+            ${{ runner.temp }}/forge-next-qa/
             /tmp/forge-preview.log
