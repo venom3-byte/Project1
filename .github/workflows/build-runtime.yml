@@ -27,7 +27,8 @@ jobs:
         env:
           DEV_BUILD: "1"
           STATIC_EXPORT: "1"
-          VITE_BASE_PATH: "/"
+          # This is a GitHub Project Page, so root assets must include the repository prefix.
+          VITE_BASE_PATH: "/Project1/"
         run: npm run build
       - name: Find and validate static output
         id: site
