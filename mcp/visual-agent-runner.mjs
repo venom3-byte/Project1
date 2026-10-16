@@ -213,7 +213,7 @@ async function main() {
       const stopAppeared = await page.waitForFunction(() => {
         const button = document.querySelector("#play");
         return !!button && /stop/i.test(button.textContent || "");
-      }, { timeout: 8000 }).then(() => true).catch(() => false);
+      }, undefined, { timeout: 8000 }).then(() => true).catch(() => false);
       if (!stopAppeared) throw new Error("Forge #play button did not enter the Stop state after clicking.");
       await play.click();
       const playReturned = await page.waitForFunction(() => {
@@ -234,7 +234,7 @@ async function main() {
         title: document.title, url: location.href, bodyText: clean(document.body.innerText).slice(0, 7000),
         buttons: [...document.querySelectorAll("button,[role=button]")].filter(visible).slice(0,100).map(e=>({text:clean(e.innerText||e.getAttribute("aria-label")||e.title),disabled:!!e.disabled,rect:rect(e)})),
         fields: [...document.querySelectorAll("input,textarea,select,[contenteditable=true]")].filter(visible).slice(0,60).map(e=>({tag:e.tagName,type:e.type||null,value:clean(e.value||e.innerText),placeholder:e.placeholder||"",aria:e.getAttribute("aria-label")||"",rect:rect(e)})),
-        canvases: [...document.querySelectorAll("canvas")].map(e=>({width:e.width,height:e.height,rect:rect(e)})),
+        canvases: [...document.querySelectorAll("canvas")].map(e=>({id:e.id||null,width:e.width,height:e.height,visible:(()=>{const st=getComputedStyle(e),r=e.getBoundingClientRect();return r.width>0&&r.height>0&&st.display!=="none"&&st.visibility!=="hidden"})(),rect:rect(e)})),
         forgeBootState: document.documentElement.dataset.forgeReady==="1" ? "ready" : (window.ForgeBootState || null),
         forgeBootError: clean(window.ForgeBootError?.message || ""),
         forgeEnginePresent: !!window.Forge,
