@@ -46,7 +46,7 @@ try {
     const frame = document.querySelector('iframe[title="Forge Studio 3.7"]');
     const state = frame?.contentWindow?.ForgeBootState;
     return state === "ready" || state === "error" || state === "ui-error";
-  }, { timeout: 60000 });
+  }, null, { timeout: 60000 });
   await sleep(800);
 
   const frame = page.frames().find(item => new URL(item.url()).pathname.endsWith("/forge/index.html"));
@@ -95,10 +95,10 @@ try {
 
   const playButton = forgeFrameLocator.locator("#play");
   await playButton.click();
-  await frame.waitForFunction(() => window.Forge.running === true, { timeout: 5000 });
+  await frame.waitForFunction(() => window.Forge.running === true, null, { timeout: 5000 });
   const playState = await frame.evaluate(() => ({ running: window.Forge.running, label: document.querySelector("#play")?.textContent?.trim() || "" }));
   await playButton.click();
-  await frame.waitForFunction(() => window.Forge.running === false, { timeout: 5000 });
+  await frame.waitForFunction(() => window.Forge.running === false, null, { timeout: 5000 });
   const stoppedState = await frame.evaluate(() => ({ running: window.Forge.running, label: document.querySelector("#play")?.textContent?.trim() || "" }));
 
   await page.setViewportSize({ width: 390, height: 844 });
