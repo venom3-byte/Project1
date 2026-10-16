@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { PlayStatus, SceneObject } from '../editor/types'
+import type { PlayStatus, Rule, SceneObject } from '../editor/types'
 
 export interface SimItem {
   id: string
@@ -15,6 +15,12 @@ interface Runtime {
   savedRot: THREE.Euler
   savedScale: THREE.Vector3
   savedVisible: boolean
+  /** vertical velocity (physics bodies) */
+  vy: number
+  /** player overlapped this object last frame (touch rules fire on entering) */
+  touching: boolean
+  /** ids of rules already fired (for "once" rules) */
+  fired: Set<string>
 }
 
 const GRAVITY = 25
@@ -74,6 +80,9 @@ export class GameSim {
       savedRot: item.node.rotation.clone(),
       savedScale: item.node.scale.clone(),
       savedVisible: item.node.visible,
+      vy: 0,
+      touching: false,
+      fired: new Set<string>(),
     }))
     this.player = this.rt.find((r) => r.item.obj.behavior === 'player') ?? null
     if (this.player) this.spawn.copy(this.player.item.node.position)
@@ -94,6 +103,7 @@ export class GameSim {
         ? 'Move: WASD / arrows / stick. Jump: Space / button'
         : 'No Player object: give one object the Player behavior to control it',
     )
+    for (const r of this.rt) if (r.item.obj.rules?.length) this.runRules(r, 'start')
   }
 
   stop() {
@@ -153,6 +163,107 @@ export class GameSim {
     }
   }
 
+  private runRules(r: Runtime, on: Rule['on']) {
+    for (const rule of r.item.obj.rules ?? []) {
+      if (rule.on !== on) continue
+      if (rule.once && r.fired.has(rule.id)) continue
+      r.fired.add(rule.id)
+      this.doAction(rule)
+    }
+  }
+
+  private doAction(rule: Rule) {
+    const target = rule.target ? this.rt.find((x) => x.item.id === rule.target) : undefined
+    const state: PlayStatus['state'] = this.won ? 'won' : 'playing'
+    switch (rule.action) {
+      case 'message':
+        this.emit(state, rule.text || '')
+        break
+      case 'score':
+        this.score += 1
+        this.emit(state, rule.text || `Score ${this.score}`)
+        break
+      case 'hide':
+      case 'show': {
+        if (!target) break
+        const on = rule.action === 'show'
+        target.active = on
+        target.item.node.visible = on
+        break
+      }
+      case 'teleport':
+        if (target && this.player) {
+          const t = target.item.node.position
+          this.player.item.node.position.set(t.x, t.y + 1.5, t.z)
+          this.vy = 0
+        }
+        break
+      case 'launch':
+        this.vy = JUMP_SPEED * 1.8
+        this.onGround = false
+        break
+      case 'respawn':
+        this.respawn(rule.text || 'Back to the start')
+        break
+      case 'win':
+        if (!this.won) {
+          this.won = true
+          this.emit('won', rule.text || 'You win!')
+        }
+        break
+      default:
+    }
+  }
+
+  private bodyBoxes(): THREE.Box3[] {
+    return this.rt
+      .filter((r) => r.active && r.item.obj.behavior === 'physics')
+      .map((r) => this.boxOf(r.item.node, 0, 0.02))
+  }
+
+  /** Gravity, landing, small bounce and stacking for 'physics' bodies. */
+  private stepBodies(dt: number, statics: THREE.Box3[]) {
+    const bodies = this.rt.filter((r) => r.active && r.item.obj.behavior === 'physics')
+    for (const r of bodies) {
+      const n = r.item.node
+      const floor = statics.concat(
+        bodies.filter((o) => o !== r).map((o) => this.boxOf(o.item.node, 0, 0.02)),
+      )
+      r.vy -= GRAVITY * dt
+      n.position.y += r.vy * dt
+      let b = this.boxOf(n, 0, 0.02)
+      for (const s of floor) {
+        if (!b.intersectsBox(s)) continue
+        if (r.vy <= 0) {
+          n.position.y += s.max.y - b.min.y
+          r.vy = r.vy < -6 ? -r.vy * 0.3 : 0
+        } else {
+          n.position.y -= b.max.y - s.min.y
+          r.vy = 0
+        }
+        b = this.boxOf(n, 0, 0.02)
+      }
+      if (n.position.y < KILL_Y) {
+        n.position.copy(r.base)
+        r.vy = 0
+      }
+    }
+  }
+
+  /** The player shoves overlapping physics bodies along the axis it just moved on. */
+  private pushBodies(player: THREE.Object3D, axis: 'x' | 'z', delta: number, statics: THREE.Box3[]) {
+    if (delta === 0) return
+    const pb = this.boxOf(player, 0.05)
+    for (const r of this.rt) {
+      if (!r.active || r.item.obj.behavior !== 'physics') continue
+      if (!pb.intersectsBox(this.boxOf(r.item.node))) continue
+      const n = r.item.node
+      n.position[axis] += delta * 0.9
+      const nb = this.boxOf(n, 0.05)
+      if (statics.some((s) => nb.intersectsBox(s))) n.position[axis] -= delta * 0.9
+    }
+  }
+
   update(rawDt: number) {
     if (!this.running) return
     const dt = Math.min(Math.max(rawDt, 0), 0.05)
@@ -186,12 +297,19 @@ export class GameSim {
     if (!player) return
     const node = player.item.node
 
-    const solids: THREE.Box3[] = []
+    const statics: THREE.Box3[] = []
     for (const r of this.rt) {
-      if (r !== player && r.active && r.item.obj.solid && r.item.obj.shape !== 'light') {
-        solids.push(this.boxOf(r.item.node))
+      if (
+        r !== player &&
+        r.active &&
+        r.item.obj.solid &&
+        r.item.obj.shape !== 'light' &&
+        r.item.obj.behavior !== 'physics'
+      ) {
+        statics.push(this.boxOf(r.item.node))
       }
     }
+    this.stepBodies(dt, statics)
 
     let dx = 0
     let dz = 0
@@ -216,9 +334,11 @@ export class GameSim {
     dz *= step
 
     node.position.x += dx
-    this.resolveHorizontal(node, solids, 'x', dx)
+    this.pushBodies(node, 'x', dx, statics)
+    this.resolveHorizontal(node, statics.concat(this.bodyBoxes()), 'x', dx)
     node.position.z += dz
-    this.resolveHorizontal(node, solids, 'z', dz)
+    this.pushBodies(node, 'z', dz, statics)
+    this.resolveHorizontal(node, statics.concat(this.bodyBoxes()), 'z', dz)
 
     if (wantJump && this.onGround) {
       this.vy = JUMP_SPEED
@@ -228,7 +348,7 @@ export class GameSim {
     node.position.y += this.vy * dt
     this.onGround = false
     let pb = this.boxOf(node, 0, 0.01)
-    for (const s of solids) {
+    for (const s of statics.concat(this.bodyBoxes())) {
       if (!pb.intersectsBox(s)) continue
       if (this.vy <= 0) {
         node.position.y += s.max.y - pb.min.y
@@ -248,7 +368,9 @@ export class GameSim {
     for (const r of this.rt) {
       if (r === player || !r.active) continue
       const b = r.item.obj.behavior
-      if (b !== 'collectible' && b !== 'hazard' && b !== 'goal' && b !== 'patrol') continue
+      if (b !== 'collectible' && b !== 'hazard' && b !== 'goal' && b !== 'patrol' && b !== 'jumppad' && b !== 'checkpoint') {
+        continue
+      }
       if (!touch.intersectsBox(this.boxOf(r.item.node))) continue
       if (b === 'collectible') {
         r.active = false
@@ -260,6 +382,15 @@ export class GameSim {
         } else {
           this.emit('playing', `Collected ${this.score}/${this.total}`)
         }
+      } else if (b === 'jumppad') {
+        this.vy = JUMP_SPEED * 1.8
+        this.onGround = false
+      } else if (b === 'checkpoint') {
+        const cp = r.item.node.position
+        if (this.spawn.x !== cp.x || this.spawn.z !== cp.z) {
+          this.spawn.set(cp.x, cp.y + 1.5, cp.z)
+          this.emit('playing', 'Checkpoint saved')
+        }
       } else if (b === 'goal') {
         if (!this.won) {
           this.won = true
@@ -268,6 +399,14 @@ export class GameSim {
       } else if (!this.won) {
         this.respawn('Ouch! Back to the start')
       }
+    }
+
+    // visual-script rules: touch triggers fire when the player enters the object
+    for (const r of this.rt) {
+      if (r === player || !r.active || !r.item.obj.rules?.length) continue
+      const hit = touch.intersectsBox(this.boxOf(r.item.node))
+      if (hit && !r.touching) this.runRules(r, 'touch')
+      r.touching = hit
     }
 
     // follow camera
