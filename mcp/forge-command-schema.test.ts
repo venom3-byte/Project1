@@ -21,7 +21,7 @@ describe("normalizeForgeCommand", () => {
   });
 
   it("requires stable target IDs for mutation commands", () => {
-    expect(() => normalizeForgeCommand({ op: "delete" })).toThrow(/stable id or name/);
+    expect(() => normalizeForgeCommand({ op: "delete" })).toThrow(/stable target id/);
     expect(() => normalizeForgeCommand({ op: "physics", id: "entity-1" })).toThrow(/requires mode/);
   });
 
