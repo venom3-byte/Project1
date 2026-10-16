@@ -8,7 +8,6 @@ permissions:
   contents: write
 jobs:
   import-source:
-    if: github.event.head_commit.message == 'chore: bootstrap Claude Game Editor import'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -22,6 +21,7 @@ jobs:
           set -euo pipefail
           archive_url='https://assets.macaly-user-data.dev/krejgsf8oalserz1lhd45fy0/r06pdypbhojqest3cylj93hy/uA7LnhEi56nuP85bvqgog/claude-game-editor-full-source-E5Pe_Wwu.zip'
           curl --fail --location --retry 3 --retry-delay 2 "$archive_url" -o /tmp/claude-game-editor.zip
+          unzip -tq /tmp/claude-game-editor.zip
           mkdir -p /tmp/claude-game-editor
           unzip -q /tmp/claude-game-editor.zip -d /tmp/claude-game-editor
           if [ -f /tmp/claude-game-editor/package.json ]; then
@@ -40,13 +40,16 @@ jobs:
           rm -f .github/workflows/import-claude-project.yml
           test -f package.json
           test -f src/editor/EditorView.tsx
-      - name: Commit the unmodified source tree
+      - name: Commit and push imported source
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --cached --quiet && { echo "No source changes found"; exit 1; } || true
+          if git diff --cached --quiet; then
+            echo "ERROR: No source changes were staged."
+            exit 1
+          fi
           git commit -m "chore: import Claude Game Editor source as-is"
           git push origin HEAD:main
