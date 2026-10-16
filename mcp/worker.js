@@ -349,7 +349,7 @@ async function callTool(name, args = {}, env) {
 async function handleMcp(request, env) {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   if (request.method === "GET") {
-    return json({ name: "claude-game-editor-mcp", version: "1.0.0", transport: "MCP Streamable HTTP", methods: ["POST"], tools: tools.length });
+    return json({ name: "claude-game-editor-mcp", version: "2.0.0", transport: "MCP Streamable HTTP", methods: ["POST"], tools: tools.length });
   }
   if (request.method !== "POST") return json({ error: "Method not allowed. Send MCP JSON-RPC POST." }, 405);
   let body;
