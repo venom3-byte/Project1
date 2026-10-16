@@ -84,6 +84,9 @@ jobs:
         shell: bash
         env:
           FORGE_SITE_DIR: ${{ steps.forge.outputs.path }}
+          DEV_BUILD: "1"
+          STATIC_EXPORT: "1"
+          VITE_BASE_PATH: "/"
         run: |
           set -euo pipefail
           test -n "$FORGE_SITE_DIR"
