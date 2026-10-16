@@ -220,6 +220,7 @@ async function startSilhouetteTrace(){
     const bitmap=await createImageBitmap(entry.file),scale=Math.min(1000/bitmap.width,800/bitmap.height),width=Math.max(1,Math.round(bitmap.width*scale)),height=Math.max(1,Math.round(bitmap.height*scale));
     const canvas=$("#traceCanvas");canvas.width=width;canvas.height=height;
     state.trace={record,bitmap,points:[],closed:false,axis:meta.axis||"front",width:Number(meta.width)||3,height:Number(meta.height)||((Number(meta.width)||3)/(Number(meta.aspect)||1))};
+    $("#traceDepth").value=$("#silhouetteDepth").value||"0.35";
     $("#traceMessage").textContent="Tap around the object outline. Click near the first point to close the contour, or Build 3D mesh closes it automatically.";
     $("#traceDialog").showModal();traceDraw();
   }catch(error){reportError("Could not open silhouette tracing",error)}
@@ -244,7 +245,7 @@ function buildTraceMesh(){
   const trace=state.trace;if(!trace)return;
   if(trace.points.length<3){$("#traceMessage").textContent="Add at least three points before building a mesh.";return}
   try{
-    const reference=trace.record.components.reference,depth=clamp($("#silhouetteDepth").value,.01,1000,.35);
+    const reference=trace.record.components.reference,depth=clamp($("#traceDepth").value,.01,1000,.35);$("#silhouetteDepth").value=String(depth);
     const base=trace.record.name.replace(/\.[^.]+$/,"");
     const record=state.engine.createExtrudedSilhouette({
       name:base+" — 3D Silhouette",contour:trace.points,axis:reference.axis||trace.axis,
