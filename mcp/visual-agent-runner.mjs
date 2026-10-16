@@ -203,16 +203,23 @@ async function main() {
       }
       action = { type:"sequence", steps:results };
     } else if (command === "checks") {
-      const canvasCount = await page.locator("canvas").count();
-      const play = page.getByRole("button", { name: "Play", exact: true }).first();
-      const playInitially = await play.isVisible().catch(() => false);
-      if (!playInitially) throw new Error("Play button is not visible.");
+      const canvasCount = await page.locator("#viewport").count();
+      const viewport = page.locator("#viewport").first();
+      await viewport.waitFor({ state: "visible", timeout: 10000 });
+      const play = page.locator("#play").first();
+      const playInitially = await play.isVisible().catch(() => false) && /play/i.test(await play.innerText().catch(() => ""));
+      if (!playInitially) throw new Error("Forge #play button is not visible in its initial Play state.");
       await play.click();
-      const stop = page.getByRole("button", { name: "Stop", exact: true }).first();
-      await stop.waitFor({ state: "visible", timeout: 5000 });
-      const stopAppeared = await stop.isVisible();
-      await stop.click();
-      const playReturned = await page.getByRole("button", { name: "Play", exact: true }).first().isVisible({ timeout: 5000 }).catch(() => false);
+      const stopAppeared = await page.waitForFunction(() => {
+        const button = document.querySelector("#play");
+        return !!button && /stop/i.test(button.textContent || "");
+      }, { timeout: 8000 }).then(() => true).catch(() => false);
+      if (!stopAppeared) throw new Error("Forge #play button did not enter the Stop state after clicking.");
+      await play.click();
+      const playReturned = await page.waitForFunction(() => {
+        const button = document.querySelector("#play");
+        return !!button && /play/i.test(button.textContent || "") && !/stop/i.test(button.textContent || "");
+      }, { timeout: 8000 }).then(() => true).catch(() => false);
       action = { type: "checks", canvasCount, playInitially, stopAppeared, playReturned, passed: canvasCount === 1 && playInitially && stopAppeared && playReturned };
     }
 
