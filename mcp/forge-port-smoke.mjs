@@ -315,6 +315,16 @@ try {
   await playButton.click();
   await frame.waitForFunction(() => window.Forge.running === false, null, { timeout: 5000 });
   const stoppedState = await frame.evaluate(() => ({ running: window.Forge.running, label: document.querySelector("#play")?.textContent?.trim() || "" }));
+  const timelineButton = forgeFrameLocator.locator("#timelinePlay");
+  await timelineButton.click();
+  await frame.waitForFunction(() => window.Forge.timelinePlaying === true, null, {timeout:5000});
+  const timelineStarted = await frame.evaluate(() => ({timelinePlaying:window.Forge.timelinePlaying,running:window.Forge.running,pressed:document.querySelector("#timelinePlay")?.getAttribute("aria-pressed")}));
+  await timelineButton.click();
+  await frame.waitForFunction(() => window.Forge.timelinePlaying === false, null, {timeout:5000});
+  const timelineStopped = await frame.evaluate(() => ({timelinePlaying:window.Forge.timelinePlaying,running:window.Forge.running,pressed:document.querySelector("#timelinePlay")?.getAttribute("aria-pressed")}));
+  if(timelineStarted.timelinePlaying!==true||timelineStarted.running!==false||timelineStarted.pressed!=="true"||timelineStopped.timelinePlaying!==false||timelineStopped.running!==false||timelineStopped.pressed!=="false"){
+    throw new Error("Animation timeline transport must be independent from scene preview: "+JSON.stringify({timelineStarted,timelineStopped}));
+  }
 
   await page.setViewportSize({ width: 390, height: 844 });
   await sleep(500);
