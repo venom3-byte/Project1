@@ -279,7 +279,7 @@ document.querySelectorAll("[data-gizmo]")?.forEach(b=>b.addEventListener("click"
 $("spaceToggle")?.addEventListener("click",()=>{
   const next=window.ForgeGizmo?.state?.space==="local"?"world":"local";
   window.ForgeGizmo?.setSpace(next);
-  $("spaceToggle").textContent=next==="local"?"Local":"World";
+  if($("spaceToggle"))$("spaceToggle").textContent=next==="local"?"Local":"World";
 });
 window.addEventListener("forge-gizmo-transform",()=>{refresh();inspect()});
 window.addEventListener("keydown",e=>{
@@ -333,7 +333,7 @@ $("mobileAdd")?.addEventListener("click",()=>openMobilePanel("scene"));
 $("mobilePlay")?.addEventListener("click",()=>$("play")?.click());
 $("viewport")?.addEventListener("pointerdown",()=>{document.querySelectorAll(".mobile-open").forEach(x=>x.classList.remove("mobile-open"))});
 
-$("standaloneMode").textContent=location.protocol==="file:"?"Local file":(/macaly\.dev$/i.test(location.hostname)?"Macaly Preview":(/github\.io$/i.test(location.hostname)?"Standalone PWA":"Forge Server"));
+if($("standaloneMode"))$("standaloneMode").textContent=location.protocol==="file:"?"Local file":(/macaly\.dev$/i.test(location.hostname)?"Macaly Preview":(/github\.io$/i.test(location.hostname)?"Standalone PWA":"Forge Server"));
 engine.canvas.addEventListener("pointerdown",()=>{
   requestAnimationFrame(()=>ensureForgeGizmo().then(g=>g?.init?.()));
   setTimeout(()=>{refresh();inspect()},0)
@@ -342,7 +342,7 @@ window.addEventListener("forge-selection",()=>{try{refresh()}catch(e){write("Sel
 window.addEventListener("forge-assets-changed",()=>{try{refresh()}catch(e){write("Asset event refresh failed: "+e.message,"error")}try{inspect()}catch(e){write("Asset event inspect failed: "+e.message,"error")}});
 window.ForgeRefreshUI=()=>{refresh();inspect();};
 window.ForgeVision={scan:()=>window.ForgeSpatial?.sceneVision?.()||{},inspect:id=>{const r=engine.entities.get(id);return r?window.ForgeSpatial?.inspect?.(r):null},selectAt:(x,y)=>engine.pick({clientX:x,clientY:y})};
-function stats(){const d=engine.diagnostics();$("renderer").textContent=d.renderer;if($("rendererSide"))$("rendererSide").textContent=d.renderer;$("fps").textContent=d.fps;$("physics").textContent=d.physics;requestAnimationFrame(stats)}
+function stats(){const d=engine.diagnostics();if($("renderer"))$("renderer").textContent=d.renderer;if($("rendererSide"))$("rendererSide").textContent=d.renderer;if($("fps"))$("fps").textContent=d.fps;if($("physics"))$("physics").textContent=d.physics;requestAnimationFrame(stats)}
 const waitForPublicAPIs=async()=>{
   const required={
     ForgeGameplay:["createThirdPersonTemplate","createRacingTemplate","createShowcaseGame","status"],
@@ -384,12 +384,12 @@ setTimeout(()=>{
       renderer:/webgpu/i.test(engine.app?.graphicsDevice?.constructor?.name||"")?"WebGPU":"WebGL2",
       physics:engine.physics?.size||0
     };
-    $("renderer").textContent=initialDiagnostics.renderer;
-    $("fps").textContent=String(engine.fps||0);
+    if($("renderer"))$("renderer").textContent=initialDiagnostics.renderer;
+    if($("fps"))$("fps").textContent=String(engine.fps||0);
     $("physics").textContent=String(initialDiagnostics.physics);
     $("sceneCount").textContent=engine.entities.size+" entities";
     $("selected").textContent=engine.selected()?.name||"None";
-    $("standaloneMode").textContent=location.protocol==="file:"?"Local file":(/github\\.io$/i.test(location.hostname)?"Standalone PWA":"Server + WebSocket");
+    if($("standaloneMode"))$("standaloneMode").textContent=location.protocol==="file:"?"Local file":(/github\\.io$/i.test(location.hostname)?"Standalone PWA":"Server + WebSocket");
     refresh();inspect();
     requestAnimationFrame(()=>{try{stats()}catch(e){write("Deferred stats failed: "+e.message,"error")}});
     setTimeout(()=>{try{window.dispatchEvent(new Event("forge-ready"))}catch(e){write("Deferred forge-ready dispatch failed: "+e.message,"error")}},0);
