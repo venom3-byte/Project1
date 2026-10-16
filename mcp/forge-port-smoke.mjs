@@ -315,6 +315,9 @@ try {
   await playButton.click();
   await frame.waitForFunction(() => window.Forge.running === false, null, { timeout: 5000 });
   const stoppedState = await frame.evaluate(() => ({ running: window.Forge.running, label: document.querySelector("#play")?.textContent?.trim() || "" }));
+  // The Timeline is contextually hidden until the Animation workspace is selected.
+  await forgeFrameLocator.locator('[data-workspace-target="animation"]').click();
+  await frame.waitForFunction(() => document.documentElement.dataset.editorWorkspace==="animation"&&document.querySelector(".timeline-shell")?.open===true,null,{timeout:5000});
   const timelineButton = forgeFrameLocator.locator("#timelinePlay");
   await timelineButton.click();
   await frame.waitForFunction(() => window.Forge.timelinePlaying === true, null, {timeout:5000});
