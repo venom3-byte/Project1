@@ -76,7 +76,7 @@ jobs:
           node mcp/visual-agent-runner.mjs inspect > f16-editor-inspect.json 2>&1
           inspect_code=$?
           echo "$inspect_code" > f16-editor-inspect.exitcode
-          node mcp/visual-agent-runner.mjs sequence '{"steps":[{"type":"scroll","direction":"up","amount":380},{"type":"drag","startX":720,"startY":455,"endX":900,"endY":505,"button":"left"}]}' > f16-editor-orbit.json 2>&1
+          node mcp/visual-agent-runner.mjs sequence '{"steps":[{"type":"scroll","direction":"up","amount":380},{"type":"drag","startX":320,"startY":120,"endX":510,"endY":170,"button":"left"}]}' > f16-editor-orbit.json 2>&1
           orbit_code=$?
           echo "$orbit_code" > f16-editor-orbit.exitcode
           node mcp/visual-agent-runner.mjs checks > f16-editor-checks.json 2>&1
