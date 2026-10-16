@@ -16,6 +16,33 @@ function rayTriangle(ro,rd,a,b,c){
   const v=q.cross(e1).dot(rd)*inv;if(v<0||u+v>1)return null;const t=e2.dot(q.cross(e1))*inv;return t>=0?t:null
 }
 
+
+function triangulateContour(points){
+  if(!Array.isArray(points)||points.length<3||points.length>256)throw new Error("A silhouette needs 3–256 contour points.");
+  const pts=points.map(p=>[Number(p[0]),Number(p[1])]);
+  if(pts.some(p=>!Number.isFinite(p[0])||!Number.isFinite(p[1])))throw new Error("Contour contains invalid points.");
+  let area=0;for(let i=0;i<pts.length;i++){const a=pts[i],b=pts[(i+1)%pts.length];area+=a[0]*b[1]-b[0]*a[1]}
+  if(Math.abs(area)<1e-6)throw new Error("Contour area is too small. Draw a wider outline.");
+  const ids=pts.map((_,i)=>i);if(area<0)ids.reverse();
+  const cross=(a,b,c)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
+  const inside=(p,a,b,c)=>{const x=cross(a,b,p),y=cross(b,c,p),z=cross(c,a,p);return x>=-1e-8&&y>=-1e-8&&z>=-1e-8};
+  const triangles=[];let guard=0;
+  while(ids.length>3&&guard++<points.length*points.length){
+    let clipped=false;
+    for(let i=0;i<ids.length;i++){
+      const ia=ids[(i+ids.length-1)%ids.length],ib=ids[i],ic=ids[(i+1)%ids.length],a=pts[ia],b=pts[ib],c=pts[ic];
+      if(cross(a,b,c)<=1e-8)continue;
+      let blocked=false;
+      for(const id of ids){if(id===ia||id===ib||id===ic)continue;if(inside(pts[id],a,b,c)){blocked=true;break}}
+      if(blocked)continue;
+      triangles.push([ia,ib,ic]);ids.splice(i,1);clipped=true;break;
+    }
+    if(!clipped)throw new Error("Cannot triangulate this outline. Remove crossing lines and duplicate points, then trace again.");
+  }
+  if(ids.length===3)triangles.push([ids[0],ids[1],ids[2]]);
+  return triangles;
+}
+
 export class ForgeEngine{
   constructor(canvas,log=()=>{}){
     this.canvas=canvas;this.log=log;this.app=null;this.root=null;this.entities=new Map();this.selectedId=null;this.assets=new Map();
@@ -139,6 +166,41 @@ export class ForgeEngine{
       r.entity.setLocalPosition(...value.p);r.entity.setLocalEulerAngles(...value.r);r.entity.setLocalScale(...value.s);
     }
   }
+
+  createExtrudedSilhouette({name="Image Silhouette",contour=[],axis="front",width=3,height=2,depth=.25,color=[.34,.55,.72],record=null}={}){
+    const pts=contour.map(p=>[Number(p[0]),Number(p[1])]);
+    const tris=triangulateContour(pts),w=Math.max(.01,Math.min(10000,Number(width)||3)),h=Math.max(.01,Math.min(10000,Number(height)||2)),d=Math.max(.005,Math.min(10000,Number(depth)||.25));
+    const orient=["front","side","top"].includes(axis)?axis:"front",positions=[],indices=[];
+    const pos=(p,side)=>{
+      const x=(p[0]-.5)*w,y=(.5-p[1])*h,z=(p[1]-.5)*h,n=side*d/2;
+      if(orient==="side")return[n,y,(p[0]-.5)*w];
+      if(orient==="top")return[x,n,z];
+      return[x,y,n];
+    };
+    const tri=(a,b,c)=>{const base=positions.length/3;positions.push(...a,...b,...c);indices.push(base,base+1,base+2)};
+    for(const t of tris){
+      tri(pos(pts[t[0]],1),pos(pts[t[2]],1),pos(pts[t[1]],1));
+      tri(pos(pts[t[0]],-1),pos(pts[t[1]],-1),pos(pts[t[2]],-1));
+    }
+    for(let i=0;i<pts.length;i++){
+      const j=(i+1)%pts.length,fa=pos(pts[i],1),fb=pos(pts[j],1),ba=pos(pts[i],-1),bb=pos(pts[j],-1);
+      tri(fa,ba,bb);tri(fa,bb,fb);
+    }
+    const mesh=new pc.Mesh(this.app.graphicsDevice);mesh.setPositions(positions);mesh.setIndices(indices);mesh.setNormals(pc.calculateNormals(positions,indices));mesh.update();
+    const mat=this.material(color);mat.cull=pc.CULLFACE_NONE;mat.update();
+    const meshInstance=new pc.MeshInstance(mesh,mat);
+    let out=record;
+    if(!out){const entity=new pc.Entity(name);this.root.addChild(entity);out=this.rec(name,"mesh",entity)}
+    out.name=name;out.kind="mesh";out.entity.name=name;
+    if(out.entity.render)out.entity.removeComponent("render");
+    out.entity.addComponent("render",{meshInstances:[meshInstance]});out.entity.render.layers=[pc.LAYERID_WORLD];out.entity.render.frustumCulling=false;
+    if(orient==="front")out.entity.setLocalPosition(0,h/2,.05+d/2);
+    else if(orient==="side")out.entity.setLocalPosition(.05+d/2,h/2,0);
+    else out.entity.setLocalPosition(0,.03+d/2,0);
+    out.components.geometry={kind:"extruded-silhouette",version:1,contour:pts,axis:orient,width:w,height:h,depth:d,color:[...color],sourceName:String(name)};
+    out.components.material={color:[...color],metalness:0.05,roughness:0.65,opacity:1};
+    return out;
+  }
   attachScript(id,code){this.scripts.set(id,code)}
   runScripts(dt){for(const[id,code]of this.scripts){const r=this.entities.get(id);if(!r)continue;try{new Function('api',code)({entity:r.entity,time:this.timelineTime,dt,engine:this})}catch(e){this.log('Script error '+e.message,'error')}}}
   async importFile(file){
@@ -175,6 +237,7 @@ export class ForgeEngine{
       if(d.kind==='camera')r.entity.addComponent('camera',{clearColor:new pc.Color(.02,.05,.09)});
       if(d.kind==='light')r.entity.addComponent('light',{type:'directional',intensity:2,castShadows:true});
       r.components=d.components||{};
+      if(d.components?.geometry?.kind==="extruded-silhouette")this.createExtrudedSilhouette({record:r,name:d.name,...d.components.geometry});
       if(d.components?.material){
         const previous=this.selectedId;
         this.selectedId=r.id; this.applyMaterial(d.components.material); this.selectedId=previous;
