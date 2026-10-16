@@ -129,7 +129,8 @@ try {
   await page.locator('[data-workspace="references"]').click();
   await page.waitForFunction(()=>document.documentElement.dataset.forgeWorkspace==="references"&&!document.querySelector('[data-inspector-panel="references"]').hidden,null,{timeout:5000});
   await page.locator("#referenceAxis").selectOption("front");await page.locator("#referenceWidth").fill("3.2");
-  const png=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC","base64");
+  const pngBase64=await page.evaluate(()=>{const canvas=document.createElement("canvas");canvas.width=2;canvas.height=2;const ctx=canvas.getContext("2d");ctx.fillStyle="#f0f0f0";ctx.fillRect(0,0,2,2);return canvas.toDataURL("image/png").split(",")[1]});
+  const png=Buffer.from(pngBase64,"base64");
   await page.locator("#referenceInput").setInputFiles({name:"qa-front-reference.png",mimeType:"image/png",buffer:png});
   await page.waitForFunction(()=>[...window.Forge.entities.values()].some(r=>r.components?.reference?.name==="qa-front-reference.png"),null,{timeout:10000});
   const reference=await page.evaluate(()=>{const r=[...window.Forge.entities.values()].find(o=>o.components?.reference?.name==="qa-front-reference.png"),rot=r.entity.getLocalEulerAngles(),scale=r.entity.getLocalScale();return{axis:r.components.reference.axis,width:r.components.reference.width,scale:[scale.x,scale.y,scale.z],rotation:[rot.x,rot.y,rot.z],panelCount:Number(document.querySelector("#referenceCount").textContent)}});
