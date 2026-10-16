@@ -1,4 +1,4 @@
-# F-16C Block 50 / reference-built exterior and cockpit study
+# F-16C Block 50 / reference-built exterior and cockpit study / v0.2
 # Hand-authored parametric mesh guided by multi-view references; not pixel-perfect CAD. Units: metres; Y is vertical.
 mtllib F16C_Block50.mtl
 
