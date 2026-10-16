@@ -174,6 +174,10 @@ try {
   await referenceDialog.locator("#refMatchView").uncheck();
   await referenceDialog.locator('[data-ref-slot="side"]').click();
   await frame.waitForFunction(() => window.ForgeReferenceStudio.status().slots.find(x=>x.slot==="front")?.visible===true,null,{timeout:5000});
+  // Select the populated slot again: Remove acts on the active reference slot.
+  await referenceDialog.locator('[data-ref-slot="front"]').click();
+  await frame.waitForFunction(() => window.ForgeReferenceStudio.status().view==="front" &&
+    window.ForgeReferenceStudio.status().slots.find(x=>x.slot==="front")?.visible===true,null,{timeout:5000});
   await referenceDialog.locator("#refRemove").click();
   await frame.waitForFunction(() => window.ForgeReferenceStudio.status().referenceCount===0,null,{timeout:5000});
   const referenceCleanup = await frame.evaluate(() => ({
