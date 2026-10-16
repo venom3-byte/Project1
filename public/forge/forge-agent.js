@@ -1,12 +1,22 @@
 const ForgeAgent={
   connected:false,ws:null,commands:new Map(),
-  serverCapable(){return location.protocol!=='file:'&&!/github\.io$/i.test(location.hostname)},
-  connect(){
-    if(!this.serverCapable()||typeof WebSocket==='undefined')return;
-    if(this.ws&&(this.ws.readyState===1||this.ws.readyState===0))return;
-    const proto=location.protocol==='https:'?'wss:':'ws:';
+  serverWebSocketUrl(){
+    const configured=window.ForgeServerBridge?.webSocketUrl;
+    if(typeof configured!=='string'||!configured.trim())return null;
     try{
-      const ws=new WebSocket(proto+'//'+location.host+'/live'); this.ws=ws;
+      const target=new URL(configured.trim(),location.href);
+      if(!['ws:','wss:'].includes(target.protocol))return null;
+      if(location.protocol==='https:'&&target.protocol!=='wss:')return null;
+      return target.href;
+    }catch{return null}
+  },
+  serverCapable(){return !!this.serverWebSocketUrl()&&typeof WebSocket!=='undefined'},
+  connect(){
+    const endpoint=this.serverWebSocketUrl();
+    if(!endpoint||typeof WebSocket==='undefined')return;
+    if(this.ws&&(this.ws.readyState===1||this.ws.readyState===0))return;
+    try{
+      const ws=new WebSocket(endpoint); this.ws=ws;
       ws.onopen=()=>{
         this.connected=true;
         ws.send(JSON.stringify({type:'hello',role:'forge-agent',protocol:3}));
