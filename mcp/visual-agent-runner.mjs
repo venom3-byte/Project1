@@ -222,6 +222,10 @@ async function main() {
         buttons: [...document.querySelectorAll("button,[role=button]")].filter(visible).slice(0,100).map(e=>({text:clean(e.innerText||e.getAttribute("aria-label")||e.title),disabled:!!e.disabled,rect:rect(e)})),
         fields: [...document.querySelectorAll("input,textarea,select,[contenteditable=true]")].filter(visible).slice(0,60).map(e=>({tag:e.tagName,type:e.type||null,value:clean(e.value||e.innerText),placeholder:e.placeholder||"",aria:e.getAttribute("aria-label")||"",rect:rect(e)})),
         canvases: [...document.querySelectorAll("canvas")].map(e=>({width:e.width,height:e.height,rect:rect(e)})),
+        forgeBootState: document.documentElement.dataset.forgeReady==="1" ? "ready" : (window.ForgeBootState || null),
+        forgeBootError: clean(window.ForgeBootError?.message || ""),
+        forgeEnginePresent: !!window.Forge,
+        forgeDiagnostics: (() => { try { return window.Forge?.diagnostics?.() ?? null; } catch (e) { return {error:clean(e?.message || e)}; } })(),
         project: project ? {name:project.name,objectCount:project.objects?.length||0,selectedId:project.selectedId||null,objects:(project.objects||[]).slice(0,80).map(o=>({id:o.id,name:o.name,shape:o.shape,position:o.position,rotation:o.rotation,scale:o.scale,color:o.color,behavior:o.behavior}))} : null
       };
     });
