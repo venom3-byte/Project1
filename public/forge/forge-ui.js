@@ -313,7 +313,29 @@ $("visionRefresh")?.addEventListener("click",()=>{$("visionReport").textContent=
 $("visionCenter")?.addEventListener("click",()=>{engine.frame();$("visionReport").textContent=JSON.stringify(window.ForgeSpatial?.sceneVision?.()||{},null,2)});
 $("visionMove")?.addEventListener("click",()=>{const r=engine.selected(),rect=$("viewport").getBoundingClientRect();if(!r||!window.ForgeSpatial)return;window.ForgeSpatial.moveToScreen(r.id,rect.left+rect.width/2,rect.top+rect.height/2,.5,0);refresh();inspect()});
 $("visionOpen")?.addEventListener("click",()=>{if(!window.ForgeSpatial)return;$("visionReport").textContent=JSON.stringify(window.ForgeSpatial.sceneVision(),null,2);$("visionDialog").showModal()});
-async function initLiveVision(){const b=$("liveVisionOpen");if(!b)return;try{const r=await fetch("./api/vision/status",{cache:"no-store"});const j=await r.json();if(!r.ok||j?.ok===false)throw new Error("vision bridge unavailable");b.disabled=false;b.onclick=()=>window.open("./vision.html","_blank","noopener");b.textContent="◉ Live Vision — Open";}catch{b.disabled=true;b.classList.remove("primary");b.title="Live Vision needs the Forge Server bridge; the Macaly preview is a static browser build.";b.textContent="◉ Live Vision — Server";}}
+async function initLiveVision(){
+  const b=$("liveVisionOpen");
+  if(!b)return;
+  const localHost=location.hostname==="localhost"||location.hostname==="127.0.0.1";
+  const githubPages=/\.github\.io$/i.test(location.hostname);
+  const statusUrl=window.ForgeServerBridge?.visionStatusUrl||(localHost||githubPages||location.protocol==="file:"?null:"./api/vision/status");
+  const unavailable=()=>{
+    b.disabled=true;
+    b.classList.remove("primary");
+    b.title="Live Vision needs a configured Forge server bridge; this static browser build is available without that service.";
+    b.textContent="◉ Live Vision — Server";
+  };
+  if(!statusUrl){unavailable();return;}
+  try{
+    const r=await fetch(statusUrl,{cache:"no-store"});
+    if(!r.ok)throw new Error("vision bridge unavailable");
+    const j=await r.json();
+    if(j?.ok===false)throw new Error("vision bridge unavailable");
+    b.disabled=false;
+    b.onclick=()=>window.open(window.ForgeServerBridge?.visionUrl||"./vision.html","_blank","noopener");
+    b.textContent="◉ Live Vision — Open";
+  }catch{unavailable()}
+}
 initLiveVision();
 
 function openMobilePanel(which){
