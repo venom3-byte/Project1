@@ -202,6 +202,11 @@
         <section class="dock-panel inspector-references" data-inspector-panel="references" hidden>
           <div class="panel-heading"><div><strong>Image Modeling</strong><span>CALIBRATE · ALIGN · TRACE</span></div></div>
           <button id="addReferenceImages" class="wide-secondary reference-add">＋ Add reference images</button>
+          <div class="silhouette-tools">
+            <label>Extrusion depth (m)<input id="silhouetteDepth" type="number" min="0.01" max="1000" step="0.05" value="0.35"></label>
+            <button id="traceSilhouette" class="wide-secondary">Trace outline → build 3D</button>
+            <p>For a clean cutout or measured orthographic view: trace the outer contour, then Forge builds and saves an editable 3D slab. This is a silhouette blockout, not full hidden-surface reconstruction.</p>
+          </div>
           <div class="reference-settings">
             <label>Reference plane<select id="referenceAxis"><option value="front">Front / X-Y</option><option value="side">Side / Y-Z</option><option value="top">Top / X-Z</option></select></label>
             <label>Known real-world width (m)<input id="referenceWidth" type="number" min="0.01" max="10000" step="0.01" value="3"></label>
@@ -242,6 +247,15 @@
 
   <input id="assetInput" type="file" hidden multiple accept=".glb,.gltf,.fbx,.obj,.stl,.ply,.dae,.3ds,.usdz,.png,.jpg,.jpeg,.webp,.avif,.mp3,.wav,.ogg,.json,.forge.json">
   <input id="referenceInput" type="file" hidden multiple accept="image/png,image/jpeg,image/webp,image/avif">
+  <dialog id="traceDialog" class="trace-dialog" aria-labelledby="traceDialogTitle">
+    <div class="trace-dialog-shell">
+      <div class="trace-dialog-head"><div><strong id="traceDialogTitle">Trace image silhouette</strong><span>OUTLINE · CLOSE · EXTRUDE</span></div><button id="traceClose" class="trace-close" aria-label="Close tracing editor">×</button></div>
+      <p class="trace-instructions">Tap or click around the outside edge of the object. Use at least three points; tracing should not cross itself. The 3D blockout uses the reference width and height set in the Images panel.</p>
+      <div class="trace-preview-frame"><canvas id="traceCanvas" aria-label="Image silhouette tracing canvas"></canvas></div>
+      <div class="trace-toolbar"><span id="tracePointCount" role="status">0 points</span><button id="traceUndo" class="secondary-button">Undo point</button><button id="traceClear" class="secondary-button">Clear outline</button><button id="traceBuild" class="trace-build-button">Build 3D mesh</button></div>
+      <p id="traceMessage" class="trace-message" role="status">Start at a recognizable corner and work around the silhouette.</p>
+    </div>
+  </dialog>
   <input id="projectInput" type="file" hidden accept=".json,.forge.json">
   <dialog id="noticeDialog" class="notice-dialog"><div class="dialog-heading"><b id="noticeTitle">Forge</b><button data-command="close-notice" aria-label="Close">×</button></div><p id="noticeBody"></p><div class="dialog-actions"><button class="primary-button" data-command="close-notice">OK</button></div></dialog>
   <script type="module" src="./app.js"></script>
