@@ -252,7 +252,67 @@ document.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>{
 $("apply").onclick=apply;["px","py","pz","rx","ry","rz","sx","sy","sz","name"].forEach(id=>$(id).onchange=apply);
 $("duplicate").onclick=()=>{if(engine.duplicate()){refresh();inspect()}};$("undo")?.addEventListener("click",()=>{if(engine.undo()){refresh();inspect()}});$("redo")?.addEventListener("click",()=>{if(engine.redo()){refresh();inspect()}});
 $("delete").onclick=()=>{engine.delete();refresh();inspect()};$("focus")?.addEventListener("click",()=>engine.focus());$("focusViewport")?.addEventListener("click",()=>engine.focus());$("frame").onclick=()=>engine.frame();$("reset")?.addEventListener("click",()=>location.reload());
-$("play").onclick=()=>{engine.running=!engine.running;$("play").textContent=engine.running?"■ Stop":"▶ Play";engine.timelinePlaying=engine.running;window.dispatchEvent(new CustomEvent("forge-play-state",{detail:{running:engine.running}}))};$("timelinePlay").onclick=()=>$("play").click();
+const previewButton=$("play"),previewGlyph=previewButton?.querySelector("[data-run-icon]"),previewLabel=previewButton?.querySelector("[data-run-label]");
+previewButton.onclick=()=>{
+  engine.running=!engine.running;
+  if(previewGlyph)previewGlyph.textContent=engine.running?"■":"▷";
+  if(previewLabel)previewLabel.textContent=engine.running?"Stop preview":"Preview";
+  previewButton.setAttribute("aria-pressed",String(engine.running));
+  previewButton.setAttribute("aria-label",engine.running?"Stop scene preview":"Preview scene");
+  previewButton.classList.toggle("is-running",engine.running);
+  engine.timelinePlaying=engine.running;
+  window.dispatchEvent(new CustomEvent("forge-play-state",{detail:{running:engine.running}}));
+};
+$("timelinePlay").title="Play or stop animation timeline";
+$("timelinePlay").onclick=()=>$("play").click();
+
+const editorWorkspaceCopy={
+  layout:["SCENE EDITING","Selection, transforms and hierarchy"],
+  modeling:["MODELING","Primitive creation and object transforms"],
+  animation:["ANIMATION","Timeline, keyframes and playback"],
+  assets:["ASSET WORKFLOW","Import, inspect and organize content"],
+  review:["VALIDATION","Asset metrics, QA and diagnostics"]
+};
+function setEditorWorkspace(name){
+  const key=editorWorkspaceCopy[name]?name:"layout";
+  document.documentElement.dataset.editorWorkspace=key;
+  document.querySelectorAll("[data-workspace-target]").forEach(tab=>{
+    const active=tab.dataset.workspaceTarget===key;
+    tab.classList.toggle("is-active",active);
+    tab.setAttribute("aria-selected",String(active));
+  });
+  const context=$("workspaceContext");
+  if(context){
+    const [heading,description]=editorWorkspaceCopy[key];
+    const spans=context.querySelectorAll("span");
+    if(spans[1])spans[1].textContent=heading;
+    const detail=spans[2];
+    if(detail)detail.textContent=description;
+  }
+  const timeline=document.querySelector(".timeline-shell");
+  if(key==="animation"&&timeline)timeline.open=true;
+  if(key==="assets"){
+    const panel=document.querySelector(".assets-section");
+    if(panel){panel.open=true;panel.scrollIntoView({block:"nearest",behavior:"smooth"})}
+    if(innerWidth<=850)openMobilePanel("assets");
+  }
+  if(key==="modeling"){
+    const scene=document.querySelector(".scene-section");
+    scene?.scrollIntoView({block:"nearest",behavior:"smooth"});
+    if(innerWidth<=850)openMobilePanel("scene");
+  }
+  if(key==="review"){
+    [".asset-tools-section",".spatial-section",".vision-section",".console-section"].forEach(selector=>{
+      const section=document.querySelector(selector);
+      if(section?.tagName==="DETAILS")section.open=true;
+    });
+    const tools=document.querySelector(".asset-tools-section");
+    tools?.scrollIntoView({block:"nearest",behavior:"smooth"});
+    if(innerWidth<=850)openMobilePanel("scene");
+  }
+}
+document.querySelectorAll("[data-workspace-target]").forEach(tab=>tab.addEventListener("click",()=>setEditorWorkspace(tab.dataset.workspaceTarget)));
+setEditorWorkspace("layout");
 $("rewind").onclick=()=>{engine.timelineTime=0;$("time").value=0;engine.evalAnimation(0);inspect()};$("time").oninput=e=>{engine.timelineTime=+e.target.value||0;engine.evalAnimation(engine.timelineTime);$("playhead").style.left=(engine.timelineTime*60)+"px";inspect()};$("key").onclick=()=>{engine.key();toast("Keyframe added")};
 $("projectName")?.addEventListener("change",()=>{const n=$("projectName").value.trim()||"Untitled Project";document.title=n+" — Forge Studio";localStorage.setItem("forge.projectName",n);$("projectName").value=n;});
 const storedProjectName=localStorage.getItem("forge.projectName");if(storedProjectName&&$("projectName"))$("projectName").value=storedProjectName;
