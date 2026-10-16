@@ -121,3 +121,30 @@
   .timeline-panel:not([hidden]){height:155px}
   .inspector-empty{min-height:120px}
 }
+
+
+/* Image references and animation lanes must remain usable on phone-sized screens. */
+@media(max-width:850px){
+  .mobile-panel-bar{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .mobile-panel-bar button{min-width:0;padding:2px}
+  .mobile-panel-bar button>b{font-size:8px}
+  .inspector-references{padding-bottom:14px}
+  .reference-settings{gap:10px}
+  .timeline-head{flex-wrap:nowrap}
+  .timeline-head .interpolation-field{display:none}
+  .timeline-title{min-width:62px}
+  .timeline-object-label{padding:0 6px}
+  .timeline-channel-label{padding:0 6px;font-size:7px}
+  .timeline-track-label{grid-template-rows:24px repeat(3,minmax(20px,1fr))}
+  .timeline-meta-row{flex-basis:24px}
+}
+@media(max-width:520px){
+  .mobile-panel-bar button>b{font-size:7px}
+  .reference-actions .secondary-button{font-size:8px}
+  .timeline-head{gap:3px;padding:0 4px}
+  .timeline-title{min-width:52px}
+  .timeline-transport .auto-key-button{min-width:32px;padding:0 3px;font-size:8px}
+  .timeline-track-label{width:77px;flex-basis:77px}
+  .timeline-ruler{padding-left:77px;padding-right:5px}
+  .timeline-object-label,.timeline-channel-label{padding:0 4px}
+}
