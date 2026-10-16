@@ -20,42 +20,22 @@
   </div>
 </div>
 
-<header class="topbar claude-layout">
-  <input id="projectName" class="project-name" value="Untitled Project" aria-label="Project name" spellcheck="false" autocomplete="off">
-  <div class="top-divider"></div>
-  <div class="toolbar-group history">
-    <button id="undo" class="icon-btn" title="Undo (Ctrl+Z)" aria-label="Undo">&lt;</button>
-    <button id="redo" class="icon-btn" title="Redo (Ctrl+Y)" aria-label="Redo">&gt;</button>
+<header class="appbar" role="banner">
+  <div class="brand-lockup" aria-label="Forge Studio"><span class="brand-mark">F</span><span class="brand-name"><b>FORGE</b><small>3D WORKSPACE</small></span></div>
+  <span class="app-divider" aria-hidden="true"></span>
+  <label class="project-field"><small>PROJECT</small><input id="projectName" value="Untitled Project" aria-label="Project name" spellcheck="false" autocomplete="off"></label>
+  <div class="app-actions history-actions" aria-label="History"><button id="undo" class="app-button icon-only" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button><button id="redo" class="app-button icon-only" title="Redo (Ctrl+Y)" aria-label="Redo">↷</button></div>
+  <span class="app-divider file-divider" aria-hidden="true"></span>
+  <div class="app-actions file-actions" aria-label="Project files">
+    <button id="newProject" class="app-button"><span class="button-symbol" aria-hidden="true">＋</span><span>New</span></button>
+    <button id="openProject" class="app-button"><span class="button-symbol" aria-hidden="true">↥</span><span>Open</span></button>
+    <button id="saveProject" class="app-button"><span class="button-symbol" aria-hidden="true">↧</span><span>Save</span></button>
   </div>
-  <div class="top-divider"></div>
-  <div class="toolbar-group transform-group" aria-label="Transform tools">
-    <button data-gizmo="translate" class="tool-icon active" title="Move (W)" aria-label="Move">M</button>
-    <button data-gizmo="rotate" class="tool-icon" title="Rotate (E)" aria-label="Rotate">R</button>
-    <button data-gizmo="scale" class="tool-icon" title="Scale (R)" aria-label="Scale">S</button>
-  </div>
-  <button id="snapToggle" class="tool-icon standalone" title="Snap to grid" aria-label="Snap">SN</button>
-  <button id="focus" class="tool-icon standalone" title="Focus selected (F)" aria-label="Focus">F</button>
-  <div class="top-divider"></div>
-  <div class="toolbar-group create-inline" aria-label="Create">
-    <button data-add="box" title="Add Cube">B</button>
-    <button data-add="sphere" title="Add Sphere">O</button>
-    <button data-add="cylinder" title="Add Cylinder">C</button>
-    <button data-add="cone" title="Add Cone">N</button>
-    <button data-add="torus" title="Add Torus">T</button>
-    <button data-add="plane" title="Add Plane">P</button>
-    <button data-add="light" title="Add Light">L</button>
-  </div>
-  <button id="importAssets" data-import-assets class="tool-icon standalone" title="Import 2D/3D assets" aria-label="Import">IN</button>
-  <button id="importCar" class="tool-icon standalone" title="Insert Car Concept test asset" aria-label="Car">CAR</button>
-  <div class="top-divider"></div>
-  <div class="toolbar-group file-actions">
-    <button id="newProject" class="icon-btn" title="New project" aria-label="New">NEW</button>
-    <button id="saveProject" class="icon-btn" title="Save project" aria-label="Save">SAVE</button>
-    <button id="openProject" class="icon-btn" title="Open project" aria-label="Open">OPEN</button>
-  </div>
-  <div class="toolbar-spacer"></div>
-  <button id="build" class="export-btn" title="Export project / build">Export</button>
-  <button id="play" class="play-btn" title="Play / Stop">Play</button>
+  <span class="app-spacer"></span>
+  <button id="importAssets" data-import-assets class="app-button secondary-action"><span class="button-symbol" aria-hidden="true">＋</span><span>Import</span></button>
+  <button id="productionTools" class="app-button secondary-action" aria-haspopup="dialog"><span class="button-symbol" aria-hidden="true">▦</span><span>Toolbox</span></button>
+  <button id="build" class="build-button" title="Build/export a playable project"><span aria-hidden="true">⇧</span><span>Build Web</span></button>
+  <button id="play" class="play-button" title="Run / stop the current scene"><span aria-hidden="true">▶</span><span>Play</span></button>
 </header>
 
 <main class="editor-shell">
@@ -84,7 +64,7 @@
       <summary class="section-summary"><b>ASSETS</b><span>IMPORT</span></summary>
       <div class="asset-import">
         <input id="assetInput" type="file" multiple accept=".glb,.gltf,.fbx,.obj,.stl,.ply,.dae,.3ds,.usdz,.png,.jpg,.jpeg,.webp,.avif,.mp3,.wav,.ogg,.json,.forge.json">
-        <button id="importAssetsPanel" data-import-assets class="accent-btn">＋ Import asset</button>
+        <button id="importAssetsPanel" data-import-assets class="accent-btn">＋ Import files</button>
         <div id="dropzone" class="dropzone">Drop 2D / 3D / project files</div>
         <small>Imported files stay in the current scene session. GLB is preferred for self-contained 3D assets.</small>
       </div>
@@ -113,24 +93,25 @@
     <div class="viewport">
       <canvas id="viewport"></canvas>
 
-      <div class="viewport-top">
-        <div class="hud-chip"><span id="sceneCount">0 entities</span><span class="hud-divider">·</span><span id="selected">None</span></div>
-        <div class="hud-actions">
-          <button id="grid" class="hud-btn active" title="Toggle editor grid">Grid</button>
-          <button id="qa" class="hud-btn" title="Open visual QA">QA</button>
+      <div class="viewport-tools" role="toolbar" aria-label="3D viewport tools">
+        <div class="viewport-tool-group transform-tools" aria-label="Selection and transforms">
+          <button data-gizmo="select" class="view-tool active" title="Select (Q)" aria-label="Select"><span class="tool-glyph" aria-hidden="true">↖</span><span class="tool-label">Select</span><kbd>Q</kbd></button>
+          <button data-gizmo="translate" class="view-tool" title="Move (W)" aria-label="Move"><span class="tool-glyph" aria-hidden="true">↕</span><span class="tool-label">Move</span><kbd>W</kbd></button>
+          <button data-gizmo="rotate" class="view-tool" title="Rotate (E)" aria-label="Rotate"><span class="tool-glyph" aria-hidden="true">⟳</span><span class="tool-label">Rotate</span><kbd>E</kbd></button>
+          <button data-gizmo="scale" class="view-tool" title="Scale (R)" aria-label="Scale"><span class="tool-glyph" aria-hidden="true">⤢</span><span class="tool-label">Scale</span><kbd>R</kbd></button>
+        </div>
+        <span class="viewport-divider" aria-hidden="true"></span>
+        <div class="viewport-tool-group view-presets" aria-label="Camera views">
+          <button data-view="perspective" class="view-tool active">Perspective</button><button data-view="front" class="view-tool">Front</button><button data-view="right" class="view-tool">Side</button><button data-view="top" class="view-tool">Top</button>
+          <button id="focusViewport" class="view-tool" title="Focus selected object (F)">Focus</button><button id="frame" class="view-tool" title="Frame all scene objects">Frame All</button>
+        </div>
+        <span class="viewport-divider viewport-divider-last" aria-hidden="true"></span>
+        <div class="viewport-tool-group viewport-utilities" aria-label="Viewport options">
+          <button id="snapToggle" class="view-tool" title="Toggle transform snapping">Snap Off</button><button id="spaceToggle" class="view-tool" title="Switch world/local transform space">World</button><button id="grid" class="view-tool active" title="Toggle 3D grid">Grid</button><button id="qa" class="view-tool" title="Run viewport diagnostics">QA</button>
         </div>
       </div>
-
-      <div class="viewport-tools">
-        <button data-view="perspective" class="view-btn active">Perspective</button>
-        <button data-view="front" class="view-btn">Front</button>
-        <button data-view="right" class="view-btn">Right</button>
-        <button data-view="top" class="view-btn">Top</button>
-        <button id="focusViewport" class="view-btn" title="Focus selected object (F)">Focus</button>
-        <button id="frame" class="view-btn">Frame</button>
-      </div>
-
-      <div class="selection-hint">MMB Orbit · RMB Pan · Wheel Zoom · Click Select · F Focus</div>
+      <div class="viewport-status" aria-live="polite"><span class="status-indicator"></span><span id="sceneCount">0 objects</span><span class="status-separator">·</span><span id="selected">No selection</span></div>
+      <div class="selection-hint"><span class="desktop-hint">MMB Orbit · RMB Pan · Wheel Zoom · F Focus</span><span class="mobile-hint">Drag to orbit · Pinch to zoom</span></div>
       <div id="dropOverlay" class="drop-overlay hidden">Release to import</div>
     </div>
 

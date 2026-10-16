@@ -129,7 +129,8 @@ let forgeGizmoLoad=null;
 function ensureForgeGizmo(){
   if(window.ForgeGizmo?.nativeReady) return Promise.resolve(window.ForgeGizmo);
   if(forgeGizmoLoad) return forgeGizmoLoad;
-  forgeGizmoLoad=import("./forge-gizmo.js").then(()=>window.ForgeGizmo).catch(error=>{
+  const fallbackState=window.ForgeGizmo?.state||{};
+  forgeGizmoLoad=import("./forge-gizmo.js").then(()=>{const api=window.ForgeGizmo;if(api?.state){api.state.mode=["select","translate","rotate","scale"].includes(fallbackState.mode)?fallbackState.mode:"select";api.setSpace?.(fallbackState.space==="local"?"local":"world");api.sync?.()}return api}).catch(error=>{
     forgeGizmoLoad=null;
     write("Native gizmo load failed: "+error.message,"error");
     return window.ForgeGizmo;
@@ -137,10 +138,10 @@ function ensureForgeGizmo(){
   return forgeGizmoLoad;
 }
 if(!window.ForgeGizmo){
-  const state={mode:"translate",space:"world",layer:null,gizmos:{},ready:true,nativeReady:false,initializing:false};
+  const state={mode:"select",space:"world",layer:null,gizmos:{},ready:true,nativeReady:false,initializing:false};
   window.ForgeGizmo={
     state,
-    setMode(mode){if(!["translate","rotate","scale"].includes(mode))return false;state.mode=mode;return true},
+    setMode(mode){if(!["select","translate","rotate","scale"].includes(mode))return false;state.mode=mode;return true},
     setSpace(space){state.space=space==="local"?"local":"world";return state.space},
     init(){return ensureForgeGizmo().then(g=>g?.init?.().then?.(()=>g)??g)}
   };
@@ -294,9 +295,12 @@ window.addEventListener("keydown",e=>{
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){e.preventDefault();if(engine.undo()){refresh();inspect()}return}
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="y"){e.preventDefault();if(engine.redo()){refresh();inspect()}return}
 
-  if(e.key==="1")document.querySelector('[data-gizmo="translate"]')?.click();
-  else if(e.key==="2")document.querySelector('[data-gizmo="rotate"]')?.click();
-  else if(e.key==="3")document.querySelector('[data-gizmo="scale"]')?.click();
+  const key=e.key.toLowerCase();
+  if(key==="f"){engine.focus();return}
+  if(key==="q"||key==="1")document.querySelector('[data-gizmo="select"]')?.click();
+  else if(key==="w"||key==="2")document.querySelector('[data-gizmo="translate"]')?.click();
+  else if(key==="e"||key==="3")document.querySelector('[data-gizmo="rotate"]')?.click();
+  else if(key==="r"||key==="4")document.querySelector('[data-gizmo="scale"]')?.click();
 });
 $("mImport")?.addEventListener("click",()=>$("assetInput")?.click());
 $("mUndo")?.addEventListener("click",()=>{if(engine.undo()){refresh();inspect()}});
@@ -313,7 +317,7 @@ $("qa").onclick=()=>{$("qaReport").textContent=JSON.stringify(smoke(),null,2);$(
 $("script").onclick=()=>{const r=engine.selected();if(!r)return toast("Select an entity");$("scriptDialog").showModal();$("code").value=engine.scripts.get(r.id)||$("code").value};$("saveScript").onclick=()=>{const r=engine.selected();if(r){engine.attachScript(r.id,$("code").value);$("scriptDialog").close();toast("Script attached")}};
 document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>$(b.dataset.close).close());$("clear").onclick=()=>out.textContent="";
 document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-view]").forEach(x=>x.classList.remove("active"));b.classList.add("active");engine.setView(b.dataset.view);refresh();inspect()});
-$("snapToggle")?.addEventListener("click",()=>{engine.snapEnabled=!engine.snapEnabled;$("snapToggle").classList.toggle("active",!!engine.snapEnabled);window.ForgeSpatial?.setSnap(engine.snapSize);write("Snap: "+(engine.snapEnabled?"On":"Off"))});
+$("snapToggle")?.addEventListener("click",()=>{engine.snapEnabled=!engine.snapEnabled;$("snapToggle").classList.toggle("active",!!engine.snapEnabled);$("snapToggle").textContent=engine.snapEnabled?"Snap On":"Snap Off";window.ForgeSpatial?.setSnap(engine.snapSize);write("Snap: "+(engine.snapEnabled?"On":"Off"))});
 $("snapSize")?.addEventListener("change",e=>{engine.snapSize=Math.max(.001,+e.target.value||.25);window.ForgeSpatial?.setSnap(engine.snapSize)});
 $("boundsToggle")?.addEventListener("change",e=>{if(window.ForgeSpatial)window.ForgeSpatial.showBounds=e.target.checked});
 $("visionRefresh")?.addEventListener("click",()=>{$("visionReport").textContent=JSON.stringify(window.ForgeSpatial?.sceneVision?.()||{},null,2)});

@@ -64,7 +64,10 @@ try {
     diagnostics: window.Forge?.diagnostics?.() || null,
     viewport3d: window.ForgeViewport?.status?.() || null,
     editorOverlayGridCount: document.querySelectorAll(".editor-grid").length,
-    criticalDuplicateIds: ["importAssets","focus","focusViewport"].filter(id => document.querySelectorAll("#" + id).length > 1),
+    criticalDuplicateIds: ["importAssets","productionTools","focus","focusViewport","snapToggle","spaceToggle","grid","qa","build","play"].filter(id => document.querySelectorAll("#" + id).length > 1),
+    allDuplicateIds: [...document.querySelectorAll("[id]")].map(e=>e.id).filter((id,i,all)=>all.indexOf(id)!==i).filter((id,i,all)=>all.indexOf(id)===i),
+    legacyFloatingDockCount: document.querySelectorAll(".forge-prod").length,
+    toolboxLauncher: (()=>{const e=document.querySelector("#productionTools"),r=e?.getBoundingClientRect();return !!e&&!!r&&r.width>0&&r.height>0})(),
     entityCount: window.Forge?.entities?.size ?? null,
     modules: {
       production: !!window.ForgeProduction,
@@ -95,13 +98,31 @@ try {
     throw new Error("Forge true 3D workspace did not initialize its visible ground, world grid, axes and navigation: " + JSON.stringify(initial.viewport3d));
   }
   if (initial.editorOverlayGridCount !== 0) throw new Error("A flat CSS grid overlay is still masking the 3D workspace.");
-  if (initial.criticalDuplicateIds.length) throw new Error("Duplicate editor control IDs remain: " + initial.criticalDuplicateIds.join(", "));
+  if (initial.criticalDuplicateIds.length || initial.allDuplicateIds.length) throw new Error("Duplicate editor control IDs remain: " + JSON.stringify({critical:initial.criticalDuplicateIds,all:initial.allDuplicateIds}));
+  if (initial.legacyFloatingDockCount !== 0 || !initial.toolboxLauncher) throw new Error("The floating production ribbon remains or the Toolbox launcher is unavailable.");
   for (const [name, present] of Object.entries(initial.modules)) {
     if (!present) throw new Error("Expected Forge module did not load: " + name);
   }
   if (!initial.agentServer?.configured && initial.agentServer?.capable !== false) {
     throw new Error("Static Forge must not infer a live WebSocket endpoint when no server bridge is configured.");
   }
+
+  await forgeFrameLocator.locator("#productionTools").click();
+  await forgeFrameLocator.locator(".forge-modal").waitFor({state:"visible",timeout:5000});
+  const toolboxCheck = await frame.evaluate(() => {
+    const dialog=document.querySelector(".forge-modal");
+    const content=dialog?.innerText||"";
+    return {visible:Boolean(dialog?.open),cardCount:dialog?.querySelectorAll(".toolbox-card").length||0,
+      groups:["Assets & Materials","Animation & Effects","World & Gameplay","Diagnostics"].filter(title=>content.includes(title)),
+      containsAssetLab:content.includes("Asset Lab"),containsVisualQA:content.includes("Visual QA")};
+  });
+  if(!toolboxCheck.visible||toolboxCheck.cardCount<10||toolboxCheck.groups.length!==4||!toolboxCheck.containsAssetLab||!toolboxCheck.containsVisualQA) {
+    throw new Error("Production Toolbox grouping is incomplete: "+JSON.stringify(toolboxCheck));
+  }
+  await forgeFrameLocator.locator(".forge-modal [data-x]").click();
+  await sleep(80);
+  const toolboxClosed = await frame.evaluate(() => !document.querySelector(".forge-modal"));
+  if(!toolboxClosed) throw new Error("Production Toolbox did not close cleanly.");
 
   const entityCountBefore = await frame.evaluate(() => window.Forge.entities.size);
   await forgeFrameLocator.locator('[data-add="sphere"]').first().click();
@@ -207,7 +228,8 @@ try {
     viewport: { width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth },
     canvas: (() => { const e=document.querySelector("#viewport"),r=e?.getBoundingClientRect(); return r?{width:Math.round(r.width),height:Math.round(r.height),visible:r.width>0&&r.height>0}:null; })(),
     mobileControls: [...document.querySelectorAll("#mobileScene,#mobileInspector")].map(e=>({id:e.id,visible:e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0})),
-    featureDock: (() => { const e=document.querySelector(".forge-prod"),r=e?.getBoundingClientRect(),st=e?getComputedStyle(e):null; return e&&r?{visible:r.width>0&&r.height>0,top:Math.round(r.top),bottom:Math.round(r.bottom),height:Math.round(r.height),clientWidth:e.clientWidth,scrollWidth:e.scrollWidth,flexWrap:st.flexWrap}:null; })(),
+    productionDockCount: document.querySelectorAll(".forge-prod").length,
+    toolboxButton: (()=>{const e=document.querySelector("#productionTools"),r=e?.getBoundingClientRect();return {visible:!!e&&!!r&&r.width>0&&r.height>0,left:Math.round(r?.left||0),right:Math.round(r?.right||0)}})(),
     mobileNav: (() => { const e=document.querySelector(".mobile-bar"),r=e?.getBoundingClientRect(); return r?{top:Math.round(r.top),bottom:Math.round(r.bottom),height:Math.round(r.height)}:null; })(),
     primaryToolbar: Object.fromEntries(["projectName","importAssets","saveProject","build","play"].map(id=>{const e=document.getElementById(id),r=e?.getBoundingClientRect();return[id,!!e&&!!r&&r.width>0&&r.height>0&&r.left>=-1&&r.right<=innerWidth+1]}))
   }));
@@ -219,6 +241,8 @@ try {
     httpStatus: response.status(),
     initial,
     actionChecks: { entityCountBefore, entityCountAfterAdd, playState, stoppedState },
+    toolboxCheck,
+    toolboxClosed,
     viewportNavigation,
     agentControl,
     mobile,
@@ -232,8 +256,8 @@ try {
   if (!agentControl.inspectReturnedData || agentControl.physicsAfter !== agentControl.physicsBefore + 1 || agentControl.deleteRestoredEntityCount !== entityCountAfterAdd) throw new Error("Provider-neutral ForgeAgent command sequence failed.");
   if (mobile.viewport.scrollWidth > mobile.viewport.clientWidth + 2) throw new Error("Forge overflows horizontally at 390px: " + JSON.stringify(mobile.viewport));
   if (!mobile.canvas?.visible || mobile.canvas.width < 300 || mobile.canvas.height < 200) throw new Error("Mobile viewport canvas is unusable: " + JSON.stringify(mobile.canvas));
-  if (!mobile.featureDock?.visible || mobile.featureDock.flexWrap !== "nowrap" || mobile.featureDock.height > 56) throw new Error("Mobile production feature dock must stay on one compact row: " + JSON.stringify(mobile.featureDock));
-  if (!mobile.mobileNav || mobile.featureDock.bottom > mobile.mobileNav.top - 3) throw new Error("Mobile feature dock overlaps the Scene/Inspector navigation: " + JSON.stringify({dock:mobile.featureDock,nav:mobile.mobileNav}));
+  if (mobile.productionDockCount !== 0 || !mobile.toolboxButton?.visible) throw new Error("Mobile must use the Toolbox button instead of a floating production ribbon: " + JSON.stringify(mobile));
+  if (!mobile.mobileNav) throw new Error("Mobile Scene/Inspector navigation is missing.");
   for (const id of ["projectName","importAssets","saveProject","build","play"]) {
     if (!mobile.primaryToolbar?.[id]) throw new Error("Primary mobile toolbar control is clipped or hidden: " + id + " " + JSON.stringify(mobile.primaryToolbar));
   }
