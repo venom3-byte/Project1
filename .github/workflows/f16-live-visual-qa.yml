@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - agent/f16-live-visual-qa
+      - agent/f16-orbit-visual-qa
   workflow_dispatch:
 permissions:
   contents: read
@@ -75,16 +76,22 @@ jobs:
           node mcp/visual-agent-runner.mjs inspect > f16-editor-inspect.json 2>&1
           inspect_code=$?
           echo "$inspect_code" > f16-editor-inspect.exitcode
+          node mcp/visual-agent-runner.mjs sequence '{"steps":[{"type":"scroll","direction":"up","amount":380},{"type":"drag","startX":720,"startY":455,"endX":900,"endY":505,"button":"left"}]}' > f16-editor-orbit.json 2>&1
+          orbit_code=$?
+          echo "$orbit_code" > f16-editor-orbit.exitcode
           node mcp/visual-agent-runner.mjs checks > f16-editor-checks.json 2>&1
           checks_code=$?
           echo "$checks_code" > f16-editor-checks.exitcode
           echo "inspect_exit_code=$inspect_code"
+          echo "orbit_exit_code=$orbit_code"
           echo "checks_exit_code=$checks_code"
           echo "=== INSPECT REPORT ==="
           cat f16-editor-inspect.json
+          echo "=== ZOOM AND CAMERA-ORBIT REPORT ==="
+          cat f16-editor-orbit.json
           echo "=== PLAY/STOP CHECK REPORT ==="
           cat f16-editor-checks.json
-          if [ "$inspect_code" -ne 0 ] || [ "$checks_code" -ne 0 ]; then
+          if [ "$inspect_code" -ne 0 ] || [ "$orbit_code" -ne 0 ] || [ "$checks_code" -ne 0 ]; then
             exit 1
           fi
       - name: Upload reports and real browser screenshots
@@ -97,6 +104,8 @@ jobs:
             f16-shared-scene-summary.json
             f16-editor-inspect.json
             f16-editor-inspect.exitcode
+            f16-editor-orbit.json
+            f16-editor-orbit.exitcode
             f16-editor-checks.json
             f16-editor-checks.exitcode
             ${{ runner.temp }}/forge-visual-agent/artifacts/
