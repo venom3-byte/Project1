@@ -1,0 +1,96 @@
+name: F-16 live editor visual QA
+on:
+  push:
+    branches:
+      - agent/f16-live-visual-qa
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: f16-live-visual-qa
+  cancel-in-progress: true
+jobs:
+  visual-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the current repository revision
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate the F-16 mesh structure and reference dimensions
+        run: node scripts/validate-f16-model.mjs
+      - name: Capture the current shared Agent Gateway scene
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 3 --retry-delay 2 \
+            https://claude-game-editor-copy.forgemail-agent.workers.dev/agent/project \
+            --output /tmp/f16-shared-scene.json
+          node --input-type=module <<'NODE'
+          import { readFile, writeFile } from "node:fs/promises";
+          const raw = JSON.parse(await readFile("/tmp/f16-shared-scene.json", "utf8"));
+          const project = raw.project ?? raw;
+          const objects = Array.isArray(project.objects) ? project.objects : [];
+          const rows = objects.map(o => ({
+            id: o.id ?? null,
+            name: o.name ?? null,
+            shape: o.shape ?? null,
+            position: o.position ?? null,
+            rotation: o.rotation ?? null,
+            scale: o.scale ?? null,
+            modelFormat: o.modelFormat ?? o.model_format ?? null,
+            hasModelData: Boolean(o.modelData ?? o.model_data)
+          }));
+          const summary = {
+            capturedAt: new Date().toISOString(),
+            topLevelKeys: Object.keys(raw),
+            projectName: project.name ?? null,
+            objectCount: rows.length,
+            selectedId: project.selectedId ?? project.selected_id ?? null,
+            f16NamedObjects: rows.filter(o => /f.?16|falcon|block.?50|aircraft/i.test(o.name ?? "")),
+            objects: rows
+          };
+          await writeFile("f16-shared-scene-summary.json", JSON.stringify(summary, null, 2));
+          console.log(JSON.stringify(summary, null, 2));
+          NODE
+      - name: Install the isolated visual browser runner
+        run: npm install --prefix mcp --no-audit --no-fund
+      - name: Inspect the actual deployed Forge editor
+        shell: bash
+        env:
+          FORGE_EDITOR_URL: https://claude-game-editor-copy.forgemail-agent.workers.dev/
+          FORGE_VISUAL_PROFILE: ${{ runner.temp }}/forge-visual-agent/storage-state.json
+          FORGE_VISUAL_ARTIFACTS: ${{ runner.temp }}/forge-visual-agent/artifacts
+        run: |
+          set +e
+          node mcp/visual-agent-runner.mjs inspect > f16-editor-inspect.json 2>&1
+          inspect_code=$?
+          echo "$inspect_code" > f16-editor-inspect.exitcode
+          node mcp/visual-agent-runner.mjs checks > f16-editor-checks.json 2>&1
+          checks_code=$?
+          echo "$checks_code" > f16-editor-checks.exitcode
+          echo "inspect_exit_code=$inspect_code"
+          echo "checks_exit_code=$checks_code"
+          echo "=== INSPECT REPORT ==="
+          cat f16-editor-inspect.json
+          echo "=== PLAY/STOP CHECK REPORT ==="
+          cat f16-editor-checks.json
+          if [ "$inspect_code" -ne 0 ] || [ "$checks_code" -ne 0 ]; then
+            exit 1
+          fi
+      - name: Upload reports and real browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f16-live-editor-visual-qa
+          if-no-files-found: warn
+          path: |
+            f16-shared-scene-summary.json
+            f16-editor-inspect.json
+            f16-editor-inspect.exitcode
+            f16-editor-checks.json
+            f16-editor-checks.exitcode
+            ${{ runner.temp }}/forge-visual-agent/artifacts/
