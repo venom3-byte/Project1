@@ -11,9 +11,25 @@ A remote MCP Streamable HTTP endpoint for the public Forge / Claude Game Editor 
 ## Scene tools
 
 - `get_editor_state` — inspect scene objects, transforms, selection and editor mode.
-- `control_editor` — add primitive objects; update position, rotation, scale, color, collision and behavior; duplicate/delete objects; rename or clear a scene; reset the starter scene; set transform mode, grid snapping and play state.
+- `control_editor` — add primitives; import public OBJ/GLB/GLTF models by URL with optional companion files (for example an MTL); update transforms/material-adjacent scene properties; duplicate/delete objects; rename or clear a scene; reset the starter scene; and set transform mode, grid snapping and play state.
 
-Writes are validated scene operations, not arbitrary source evaluation. Imported binary assets are not uploaded through `control_editor`.
+Model imports require HTTPS URLs from `raw.githubusercontent.com`, `cdn.jsdelivr.net` or `assets.macaly-user-data.dev`. OBJ companion filenames are basenames only, and no more than 12 companion files can be attached. Writes remain validated scene operations, not arbitrary source evaluation.
+
+Example `control_editor` arguments for the F-16 reference mesh:
+
+```json
+{
+  "action": "import_model",
+  "name": "F-16C Block 50 — reference mesh",
+  "model_format": "obj",
+  "model_url": "https://raw.githubusercontent.com/venom3-byte/Project1/main/assets/F16C_Block50.obj",
+  "asset_files": {
+    "F16C_Block50.mtl": "https://raw.githubusercontent.com/venom3-byte/Project1/main/assets/F16C_Block50.mtl"
+  },
+  "position": [0, 1.32, 0],
+  "scale": [1, 1, 1]
+}
+```
 
 ## Visual browser tools
 
