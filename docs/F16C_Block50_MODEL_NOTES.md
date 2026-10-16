@@ -6,8 +6,9 @@ This is a new mesh built from parametric surfaces and polygon panels, not a down
 
 ## Dimension anchors
 
-- Overall target length: **14.8 m**.
+- Overall target length: **14.8 m** (mesh bounds are approximately 14.75 m, within reference rounding).
 - Wingtip-to-wingtip span: **9.8 m**.
+- Overall height target: **4.8 m**; the vertical fin is scaled to bring the mesh bounds into agreement with this published general dimension.
 - The primary fuselage loft spans roughly x = -7.34 to +7.20 m; the tip of the pitot probe marks the 14.8 m forward extent when measured to the nozzle end.
 - Coordinate convention: X = nose-to-tail, Y = vertical, Z = port/starboard.
 
@@ -31,7 +32,7 @@ The public USAF F-16 fact sheet gives 14.8 m length and 9.8 m wingspan. The geom
 
 ## Known limitations / next visual-QA loop
 
-- This is a hand-built polygonal interpretation of the references, not an orthographic pixel-perfect retopology; photographs, line drawings and the 3D mesh have not yet been overlaid in a calibrated multi-view fitting pass.
+- This is a hand-built polygonal interpretation informed by orthographic drawings and cockpit references, not a pixel-perfect traced retopology. Photographs and line drawings have not yet been overlaid in a calibrated multi-view fitting pass.
 - Fine rivets, maintenance stencils, accurate Block 50/GE F110 panel topology, exact wheel-bay internals and an aircraft-specific avionics label map still need photographic matching.
 - Cockpit layout is arrangement-inspired and should be compared in front/top/side orthographic views against additional cockpit photographs before calling it a replica.
 - OBJ has no UV texture maps; color and gloss come from the accompanying MTL. Transparency depends on OBJ/MTL loader and browser render settings.
