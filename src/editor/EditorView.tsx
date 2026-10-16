@@ -124,6 +124,12 @@ export function EditorView() {
   // load saved project once on the client
   useEffect(() => {
     loadFromStorage()
+    try {
+      const lastRemote = Number(window.localStorage.getItem('game-editor:agent-remote-revision:v1') || 0)
+      remoteRevisionRef.current = Number.isFinite(lastRemote) && lastRemote >= 0 ? lastRemote : 0
+    } catch {
+      remoteRevisionRef.current = 0
+    }
   }, [])
 
   // Poll the paired Agent Gateway project snapshot. The gateway only sends
@@ -144,6 +150,11 @@ export function EditorView() {
         const accepted = importJson(JSON.stringify(project))
         if (!accepted) return
         remoteRevisionRef.current = revision
+        try {
+          window.localStorage.setItem('game-editor:agent-remote-revision:v1', String(revision))
+        } catch {
+          // The live session still works when persistent storage is disabled.
+        }
         if (project.editor?.mode === 'translate' || project.editor?.mode === 'rotate' || project.editor?.mode === 'scale') {
           setMode(project.editor.mode)
         }
