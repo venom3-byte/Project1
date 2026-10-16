@@ -142,20 +142,7 @@ try {
   await page.locator('[data-command="toggle-reference-visibility"]').click();if(await page.evaluate(()=>window.Forge.selected().entity.enabled)!==true)throw new Error("Reference show action failed.");
   await page.screenshot({path:path.join(ARTIFACTS,"forge-next-reference-modeling.png"),fullPage:true});
 
-  // Trace a silhouette over the imported image and verify that a real 3D mesh is generated.
-  await page.locator("#traceSilhouette").click();
-  await page.waitForFunction(()=>document.querySelector("#traceDialog").open,null,{timeout:5000});
-  const traceRect=await page.locator("#traceCanvas").boundingBox();
-  if(!traceRect||traceRect.width<100||traceRect.height<100)throw new Error("Silhouette trace canvas is too small: "+JSON.stringify(traceRect));
-  for(const [u,v] of [[0.2,0.2],[0.8,0.2],[0.8,0.8],[0.2,0.8]])await page.mouse.click(traceRect.x+traceRect.width*u,traceRect.y+traceRect.height*v);
-  const tracePoints=await page.locator("#tracePointCount").textContent();
-  if(!tracePoints?.includes("4 points"))throw new Error("Silhouette trace did not register four points: "+tracePoints);
-  await page.locator("#silhouetteDepth").fill("0.5");
-  await page.locator("#traceBuild").click();
-  await page.waitForFunction(()=>window.Forge.selected()?.components?.geometry?.kind==="extruded-silhouette",null,{timeout:5000});
-  const builtMesh=await page.evaluate(()=>{const r=window.Forge.selected(),g=r.components.geometry,instances=r.entity.render?.meshInstances||[],saved=window.Forge.serialize().entities.find(e=>e.components?.geometry?.kind==="extruded-silhouette");return{kind:r.kind,axis:g.axis,depth:g.depth,points:g.contour.length,rendered:instances.length,indices:instances[0]?.mesh?.primitive?.[0]?.count||0,saved:!!saved,savedPoints:saved?.components?.geometry?.contour?.length||0}});
-  if(builtMesh.kind!=="mesh"||builtMesh.axis!=="side"||Math.abs(builtMesh.depth-0.5)>0.001||builtMesh.points!==4||builtMesh.rendered!==1||builtMesh.indices<36||!builtMesh.saved||builtMesh.savedPoints!==4)throw new Error("Silhouette extrusion/serialization failed: "+JSON.stringify(builtMesh));
-  await page.screenshot({path:path.join(ARTIFACTS,"forge-next-silhouette-mesh.png"),fullPage:true});
+
 
   // Trace an outline over the imported image and verify that a real, serializable 3D mesh is generated.
   await page.locator("#traceSilhouette").click();
@@ -165,7 +152,7 @@ try {
   for(const [u,v] of [[0.2,0.2],[0.8,0.2],[0.8,0.8],[0.2,0.8]])await page.mouse.click(traceRect.x+traceRect.width*u,traceRect.y+traceRect.height*v);
   const tracePoints=await page.locator("#tracePointCount").textContent();
   if(!tracePoints?.includes("4 points"))throw new Error("Silhouette trace did not register four contour points: "+tracePoints);
-  await page.locator("#silhouetteDepth").fill("0.5");
+  await page.locator("#traceDepth").fill("0.5");
   await page.locator("#traceBuild").click();
   await page.waitForFunction(()=>window.Forge.selected()?.components?.geometry?.kind==="extruded-silhouette",null,{timeout:5000});
   const builtMesh=await page.evaluate(()=>{const r=window.Forge.selected(),g=r.components.geometry,instances=r.entity.render?.meshInstances||[],saved=window.Forge.serialize().entities.find(e=>e.components?.geometry?.kind==="extruded-silhouette");return{kind:r.kind,name:r.name,axis:g.axis,depth:g.depth,points:g.contour.length,rendered:instances.length,triangles:instances[0]?.mesh?.primitive?.[0]?.count||0,saved:!!saved,savedPoints:saved?.components?.geometry?.contour?.length||0}});
