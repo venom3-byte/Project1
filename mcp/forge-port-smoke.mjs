@@ -76,7 +76,8 @@ try {
       spatial: !!window.ForgeSpatial,
       agent: !!window.ForgeAgent,
       runtime: !!window.ForgeRuntime,
-      qa: !!window.ForgeQAPro
+      qa: !!window.ForgeQAPro,
+      referenceStudio: !!window.ForgeReferenceStudio
     },
     agentServer: {
       configured: typeof window.ForgeServerBridge?.webSocketUrl === "string" && !!window.ForgeServerBridge.webSocketUrl,
@@ -123,6 +124,97 @@ try {
   await sleep(80);
   const toolboxClosed = await frame.evaluate(() => !document.querySelector(".forge-modal"));
   if(!toolboxClosed) throw new Error("Production Toolbox did not close cleanly.");
+
+  // Verify the real reference-image workflow: import an intentionally wide image,
+  // preserve its aspect ratio, keep guide planes out of the editable scene, and
+  // switch visibility with orthographic views.
+  const referenceButton = forgeFrameLocator.locator("#referenceStudio");
+  await referenceButton.waitFor({state:"visible",timeout:5000});
+  await referenceButton.click();
+  await forgeFrameLocator.locator("#referenceDialog").waitFor({state:"visible",timeout:5000});
+  const referenceDialog = await frame.evaluate(() => ({
+    visible: Boolean(document.querySelector("#referenceDialog")?.open),
+    slots: [...document.querySelectorAll("[data-reference-slot]")].map(e=>e.dataset.referenceSlot),
+    diagnostics: window.ForgeReferenceStudio?.diagnostics?.() || null
+  }));
+  if (!referenceDialog.visible || referenceDialog.slots.join(",") !== "front,side,top" ||
+      !referenceDialog.diagnostics?.ok || !referenceDialog.diagnostics?.rendererReady) {
+    throw new Error("Reference Studio did not initialize its three-view workspace: "+JSON.stringify(referenceDialog));
+  }
+
+  const refPngDataUrl = await frame.evaluate(() => {
+    const canvas=document.createElement("canvas");
+    canvas.width=160;canvas.height=80;
+    const ctx=canvas.getContext("2d");
+    ctx.fillStyle="#f5f7fa";ctx.fillRect(0,0,160,80);
+    ctx.fillStyle="#2f75f2";ctx.fillRect(12,12,136,56);
+    return canvas.toDataURL("image/png");
+  });
+  const refPngBuffer = Buffer.from(refPngDataUrl.split(",")[1],"base64");
+  const referenceSceneCountBefore = await frame.evaluate(() => window.Forge.entities.size);
+  await forgeFrameLocator.locator('[data-reference-slot="front"] [data-ref-file]').setInputFiles({
+    name:"front-reference-test.png",
+    mimeType:"image/png",
+    buffer:refPngBuffer
+  });
+  await forgeFrameLocator.locator('[data-reference-slot="front"] [data-ref-info]').filter({hasText:"160 × 80 px"}).waitFor({state:"visible",timeout:10000});
+  const referenceImport = await frame.evaluate(() => {
+    const guides=window.Forge.app.root.children.find(e=>e.name==="Forge Reference Guides");
+    const front=guides?.children?.find(e=>e.name==="Reference - Front");
+    const scale=front?.getLocalScale?.();
+    return {
+      diagnostics:window.ForgeReferenceStudio.diagnostics(),
+      sceneEntities:window.Forge.entities.size,
+      guideRootFound:Boolean(guides),
+      frontGuideFound:Boolean(front),
+      guideEnabled:front?.enabled ?? null,
+      scale:scale?{x:scale.x,y:scale.y,z:scale.z}:null,
+      info:document.querySelector('[data-reference-slot="front"] [data-ref-info]')?.textContent || null
+    };
+  });
+  if(referenceImport.diagnostics.loadedImages!==1 || !referenceImport.guideRootFound || !referenceImport.frontGuideFound ||
+     referenceImport.sceneEntities!==referenceSceneCountBefore || Math.abs((referenceImport.scale?.x ?? 0)-10)>0.01 ||
+     Math.abs((referenceImport.scale?.z ?? 0)-5)>0.01 || !referenceImport.info?.includes("aspect 2.000")) {
+    throw new Error("Reference image import failed aspect-ratio or non-destructive scene checks: "+JSON.stringify({referenceSceneCountBefore,referenceImport}));
+  }
+  await forgeFrameLocator.locator('[data-view="front"]').click();
+  const frontVisible = await frame.evaluate(() => ({
+    activeView:window.ForgeReferenceStudio.diagnostics().activeView,
+    enabled:window.Forge.app.root.children.find(e=>e.name==="Forge Reference Guides")?.children?.find(e=>e.name==="Reference - Front")?.enabled
+  }));
+  await forgeFrameLocator.locator('[data-view="right"]').click();
+  const sideHidesFront = await frame.evaluate(() => ({
+    activeView:window.ForgeReferenceStudio.diagnostics().activeView,
+    enabled:window.Forge.app.root.children.find(e=>e.name==="Forge Reference Guides")?.children?.find(e=>e.name==="Reference - Front")?.enabled
+  }));
+  await forgeFrameLocator.locator('[data-view="perspective"]').click();
+  const perspectiveShowsFront = await frame.evaluate(() => ({
+    activeView:window.ForgeReferenceStudio.diagnostics().activeView,
+    enabled:window.Forge.app.root.children.find(e=>e.name==="Forge Reference Guides")?.children?.find(e=>e.name==="Reference - Front")?.enabled
+  }));
+  if(frontVisible.activeView!=="front"||frontVisible.enabled!==true||sideHidesFront.activeView!=="right"||
+     sideHidesFront.enabled!==false||perspectiveShowsFront.activeView!=="perspective"||perspectiveShowsFront.enabled!==true) {
+    throw new Error("Reference image visibility did not follow the current camera view: "+JSON.stringify({frontVisible,sideHidesFront,perspectiveShowsFront}));
+  }
+  await forgeFrameLocator.locator('[data-reference-slot="front"] [data-ref-opacity]').evaluate(e=>{e.value="0.7";e.dispatchEvent(new Event("input",{bubbles:true}))});
+  const opacityApplied = await frame.evaluate(() => {
+    const guides=window.Forge.app.root.children.find(e=>e.name==="Forge Reference Guides");
+    const front=guides?.children?.find(e=>e.name==="Reference - Front");
+    return front?.render?.material?.opacity ?? null;
+  });
+  if(Math.abs((opacityApplied ?? 0)-0.7)>0.01) throw new Error("Reference image opacity slider did not update the live material: "+opacityApplied);
+  await forgeFrameLocator.locator('[data-reference-slot="front"] [data-ref-remove]').click();
+  const referenceRemoved = await frame.evaluate(() => ({
+    diagnostics:window.ForgeReferenceStudio.diagnostics(),
+    sceneEntities:window.Forge.entities.size,
+    guideCount:window.Forge.app.root.children.find(e=>e.name==="Forge Reference Guides")?.children?.length ?? 0
+  }));
+  if(referenceRemoved.diagnostics.loadedImages!==0 || referenceRemoved.sceneEntities!==referenceSceneCountBefore || referenceRemoved.guideCount!==0) {
+    throw new Error("Removing the reference left an entity, changed editable scene state, or leaked a guide plane: "+JSON.stringify(referenceRemoved));
+  }
+  await forgeFrameLocator.locator("#referenceDialog [data-close='referenceDialog']").click();
+  const referenceStudioClosed = await frame.evaluate(() => !document.querySelector("#referenceDialog")?.open);
+  if(!referenceStudioClosed) throw new Error("Reference Studio dialog did not close cleanly.");
 
   await forgeFrameLocator.locator('[data-gizmo="select"]').click();
   await frame.waitForFunction(() => window.ForgeGizmo?.state?.mode === "select", null, {timeout:5000});
@@ -276,6 +368,12 @@ try {
     axisContract,
     toolboxCheck,
     toolboxClosed,
+    referenceDialog,
+    referenceImport,
+    referenceViewChecks: {frontVisible,sideHidesFront,perspectiveShowsFront},
+    opacityApplied,
+    referenceRemoved,
+    referenceStudioClosed,
     selectModeActive,
     moveModeActive,
     viewportNavigation,
