@@ -263,8 +263,17 @@ previewButton.onclick=()=>{
   engine.timelinePlaying=engine.running;
   window.dispatchEvent(new CustomEvent("forge-play-state",{detail:{running:engine.running}}));
 };
-$("timelinePlay").title="Play or stop animation timeline";
-$("timelinePlay").onclick=()=>$("play").click();
+$("timelinePlay").title="Play animation timeline";
+$("timelinePlay").setAttribute("aria-label","Play animation timeline");
+$("timelinePlay").setAttribute("aria-pressed","false");
+$("timelinePlay").onclick=()=>{
+  engine.timelinePlaying=!engine.timelinePlaying;
+  const playing=engine.timelinePlaying===true;
+  $("timelinePlay").textContent=playing?"Ⅱ":"▶";
+  $("timelinePlay").title=playing?"Pause animation timeline":"Play animation timeline";
+  $("timelinePlay").setAttribute("aria-label",playing?"Pause animation timeline":"Play animation timeline");
+  $("timelinePlay").setAttribute("aria-pressed",String(playing));
+};
 
 const editorWorkspaceCopy={
   layout:["SCENE EDITING","Selection, transforms and hierarchy"],
