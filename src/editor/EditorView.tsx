@@ -111,6 +111,7 @@ function download(name: string, text: string) {
 export function EditorView() {
   const s = useEditor()
   const hostRef = useRef<HTMLDivElement>(null)
+  const remoteRevisionRef = useRef(0)
   const glbRef = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLInputElement>(null)
   const jsonRef = useRef<HTMLInputElement>(null)
@@ -123,6 +124,44 @@ export function EditorView() {
   // load saved project once on the client
   useEffect(() => {
     loadFromStorage()
+  }, [])
+
+  // Poll the paired Agent Gateway project snapshot. The gateway only sends
+  // bounded scene JSON; no remote JavaScript or shell commands are executed.
+  useEffect(() => {
+    let stopped = false
+    const pullAgentProject = async () => {
+      try {
+        const response = await fetch('/agent/project', { cache: 'no-store' })
+        if (!response.ok) return
+        const snapshot = (await response.json()) as {
+          revision?: number
+          project?: { name?: unknown; objects?: unknown; selectedId?: unknown; editor?: { mode?: unknown; snap?: unknown; playing?: unknown } }
+        }
+        const revision = Number(snapshot.revision || 0)
+        if (stopped || !snapshot.project || !Array.isArray(snapshot.project.objects) || revision <= remoteRevisionRef.current) return
+        const project = snapshot.project
+        const accepted = importJson(JSON.stringify(project))
+        if (!accepted) return
+        remoteRevisionRef.current = revision
+        if (project.editor?.mode === 'translate' || project.editor?.mode === 'rotate' || project.editor?.mode === 'scale') {
+          setMode(project.editor.mode)
+        }
+        if (typeof project.editor?.snap === 'boolean' && project.editor.snap !== getState().snap) toggleSnap()
+        if (typeof project.editor?.playing === 'boolean' && project.editor.playing !== getState().playing) {
+          setPlaying(project.editor.playing)
+        }
+        setToast(`Agent synced scene r${revision}`)
+      } catch {
+        // The editor remains usable offline; a later poll retries the sync.
+      }
+    }
+    void pullAgentProject()
+    const timer = window.setInterval(() => void pullAgentProject(), 1000)
+    return () => {
+      stopped = true
+      window.clearInterval(timer)
+    }
   }, [])
 
   // autosave
