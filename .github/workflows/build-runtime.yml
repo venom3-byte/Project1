@@ -24,7 +24,7 @@ jobs:
       - name: Build static runtime
         env:
           DEV_BUILD: "1"
-          NITRO_PRESET: "static"
+          STATIC_EXPORT: "1"
           VITE_BASE_PATH: "/"
         run: npm run build
       - name: Find and validate static output
