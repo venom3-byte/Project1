@@ -92,7 +92,7 @@ jobs:
           if (inspect.observation?.forgeBootState !== "ready") errors.push("Forge failed to report its ready boot state");
           if (!inspect.observation?.forgeEnginePresent) errors.push("window.Forge engine is not present");
           if (!inspect.observation?.forgeDiagnostics || inspect.observation?.forgeDiagnostics?.error) errors.push("Forge diagnostics were missing or errored");
-          if ((inspect.observation?.canvases || []).length !== 1) errors.push("expected exactly one main Forge canvas");
+          if (!(inspect.observation?.canvases || []).some(canvas => canvas.id === "viewport" && canvas.visible)) errors.push("expected the main #viewport canvas to be visible");
           if ((inspect.verification?.pageErrors || []).length) errors.push("browser page errors were detected");
           if (!checks.ok || !checks.action?.passed) errors.push("actual Play → Stop → Play UI checks failed");
           if ((checks.verification?.pageErrors || []).length) errors.push("browser page errors appeared during Play/Stop checks");
