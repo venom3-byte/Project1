@@ -72,3 +72,26 @@ jobs:
           git commit -m "Deploy static editor from ${GITHUB_SHA}"
           git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push --force origin HEAD:runtime-site
+      - name: Verify live Forge delivery route
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://forge-studio.forgemail-agent.workers.dev"
+          ok=0
+          for attempt in $(seq 1 8); do
+            if curl --fail --silent --show-error --max-time 20 "$base/" -o /tmp/forge-live-index.html; then
+              ok=1
+              break
+            fi
+            sleep 3
+          done
+          test "$ok" -eq 1
+          grep -q 'data-workspace-target="animation"' /tmp/forge-live-index.html
+          curl --fail --silent --show-error --max-time 20 "$base/forge.css" -o /tmp/forge-live.css
+          grep -q '\.workspace-strip' /tmp/forge-live.css
+          curl --fail --silent --show-error --max-time 20 "$base/forge-ui.js" -o /tmp/forge-live-ui.js
+          grep -q 'function setEditorWorkspace' /tmp/forge-live-ui.js
+          grep -q 'Stop preview' /tmp/forge-live-ui.js
+          curl --fail --silent --show-error --max-time 20 "$base/sw.js" -o /tmp/forge-live-sw.js
+          grep -q 'forge-static-v6' /tmp/forge-live-sw.js
+          echo "Live Forge route verified: HTTP 200; workspace tabs, editor styles, independent preview UI and fresh service-worker cache are present."
