@@ -1,7 +1,8 @@
-name: Forge port build and browser QA
+name: Forge workspace build and browser QA
 on:
   push:
     branches:
+      - main
       - agent/forge-reverse-engineering-port
       - agent/forge-true-3d-workspace
       - agent/forge-image-reference-studio
