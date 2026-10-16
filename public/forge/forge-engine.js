@@ -43,6 +43,15 @@ function triangulateContour(points){
   return triangles;
 }
 
+function pointInContour(point,contour){
+  const x=point[0],y=point[1];let inside=false;
+  for(let i=0,j=contour.length-1;i<contour.length;j=i++){
+    const a=contour[i],b=contour[j];
+    if(((a[1]>y)!==(b[1]>y))&&(x<(b[0]-a[0])*(y-a[1])/(b[1]-a[1]+1e-15)+a[0]))inside=!inside;
+  }
+  return inside;
+}
+
 export class ForgeEngine{
   constructor(canvas,log=()=>{}){
     this.canvas=canvas;this.log=log;this.app=null;this.root=null;this.entities=new Map();this.selectedId=null;this.assets=new Map();
@@ -201,6 +210,56 @@ export class ForgeEngine{
     out.components.material={color:[...color],metalness:0.05,roughness:0.65,opacity:1};
     return out;
   }
+  createSilhouetteVisualHull({name="Two-view Silhouette Hull",frontContour=[],sideContour=[],width=3,height=2,depth=3,resolution=32,color=[.3,.62,.78],record=null}={}){
+    const front=frontContour.map(p=>[Number(p[0]),Number(p[1])]),side=sideContour.map(p=>[Number(p[0]),Number(p[1])]);
+    triangulateContour(front);triangulateContour(side);
+    const w=Math.max(.01,Math.min(10000,Number(width)||3)),h=Math.max(.01,Math.min(10000,Number(height)||2)),d=Math.max(.01,Math.min(10000,Number(depth)||3));
+    const r=Math.max(12,Math.min(48,Math.round(Number(resolution)||32))),slice=r*r;
+    const frontMask=new Uint8Array(slice),sideMask=new Uint8Array(slice),occupied=new Uint8Array(slice*r);
+    for(let j=0;j<r;j++){
+      const v=(j+.5)/r;
+      for(let i=0;i<r;i++){
+        const u=(i+.5)/r;
+        frontMask[j*r+i]=pointInContour([u,v],front)?1:0;
+        sideMask[j*r+i]=pointInContour([u,v],side)?1:0;
+      }
+    }
+    let filled=0;
+    for(let k=0;k<r;k++)for(let j=0;j<r;j++)for(let i=0;i<r;i++){
+      const at=i+r*(j+r*k);
+      if(frontMask[j*r+i]&&sideMask[j*r+k]){occupied[at]=1;filled++}
+    }
+    if(!filled)throw new Error("The front and side silhouettes do not intersect. Check view alignment and shared height.");
+    if(filled>slice*r*.92)throw new Error("The silhouettes fill nearly the entire volume. Check that both outlines closely follow the object.");
+    const positions=[],normals=[],indices=[];
+    const quad=(verts,n)=>{
+      const base=positions.length/3;
+      for(const v of verts){positions.push(v[0],v[1],v[2]);normals.push(n[0],n[1],n[2])}
+      indices.push(base,base+1,base+2,base,base+2,base+3);
+    };
+    const has=(i,j,k)=>i>=0&&j>=0&&k>=0&&i<r&&j<r&&k<r&&occupied[i+r*(j+r*k)]===1;
+    const dx=w/r,dy=h/r,dz=d/r;
+    for(let k=0;k<r;k++)for(let j=0;j<r;j++)for(let i=0;i<r;i++){
+      if(!has(i,j,k))continue;
+      const x0=-w/2+i*dx,x1=x0+dx,y0=h/2-j*dy,y1=y0-dy,z0=-d/2+k*dz,z1=z0+dz;
+      if(!has(i-1,j,k))quad([[x0,y0,z0],[x0,y0,z1],[x0,y1,z1],[x0,y1,z0]],[-1,0,0]);
+      if(!has(i+1,j,k))quad([[x1,y0,z1],[x1,y0,z0],[x1,y1,z0],[x1,y1,z1]],[1,0,0]);
+      if(!has(i,j-1,k))quad([[x0,y0,z1],[x0,y0,z0],[x1,y0,z0],[x1,y0,z1]],[0,1,0]);
+      if(!has(i,j+1,k))quad([[x0,y1,z0],[x0,y1,z1],[x1,y1,z1],[x1,y1,z0]],[0,-1,0]);
+      if(!has(i,j,k-1))quad([[x1,y0,z0],[x0,y0,z0],[x0,y1,z0],[x1,y1,z0]],[0,0,-1]);
+      if(!has(i,j,k+1))quad([[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]],[0,0,1]);
+    }
+    const mesh=new pc.Mesh(this.app.graphicsDevice);mesh.setPositions(positions);mesh.setNormals(normals);mesh.setIndices(indices);mesh.update();
+    const mat=this.material(color);mat.cull=pc.CULLFACE_NONE;mat.update();const meshInstance=new pc.MeshInstance(mesh,mat);
+    let out=record;if(!out){const entity=new pc.Entity(name);this.root.addChild(entity);out=this.rec(name,"mesh",entity)}
+    out.name=name;out.kind="mesh";out.entity.name=name;if(out.entity.render)out.entity.removeComponent("render");
+    out.entity.addComponent("render",{meshInstances:[meshInstance]});out.entity.render.layers=[pc.LAYERID_WORLD];out.entity.render.frustumCulling=false;
+    out.entity.setLocalPosition(0,h/2,0);out.entity.setLocalEulerAngles(0,0,0);out.entity.setLocalScale(1,1,1);
+    out.components.geometry={kind:"silhouette-visual-hull",version:1,frontContour:front,sideContour:side,width:w,height:h,depth:d,resolution:r,color:[...color],sourceName:String(name)};
+    out.components.material={color:[...color],metalness:.05,roughness:.68,opacity:1};
+    out.components.diagnostics={method:"two-view silhouette intersection",occupiedVoxels:filled,resolution:r};
+    return out;
+  }
   attachScript(id,code){this.scripts.set(id,code)}
   runScripts(dt){for(const[id,code]of this.scripts){const r=this.entities.get(id);if(!r)continue;try{new Function('api',code)({entity:r.entity,time:this.timelineTime,dt,engine:this})}catch(e){this.log('Script error '+e.message,'error')}}}
   async importFile(file){
@@ -238,6 +297,7 @@ export class ForgeEngine{
       if(d.kind==='light')r.entity.addComponent('light',{type:'directional',intensity:2,castShadows:true});
       r.components=d.components||{};
       if(d.components?.geometry?.kind==="extruded-silhouette")this.createExtrudedSilhouette({record:r,name:d.name,...d.components.geometry});
+      else if(d.components?.geometry?.kind==="silhouette-visual-hull")this.createSilhouetteVisualHull({record:r,name:d.name,...d.components.geometry});
       if(d.components?.material){
         const previous=this.selectedId;
         this.selectedId=r.id; this.applyMaterial(d.components.material); this.selectedId=previous;
