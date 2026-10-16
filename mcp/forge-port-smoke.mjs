@@ -106,7 +106,10 @@ try {
   const mobile = await frame.evaluate(() => ({
     viewport: { width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth },
     canvas: (() => { const e=document.querySelector("#viewport"),r=e?.getBoundingClientRect(); return r?{width:Math.round(r.width),height:Math.round(r.height),visible:r.width>0&&r.height>0}:null; })(),
-    mobileControls: [...document.querySelectorAll("#mobileScene,#mobileInspector")].map(e=>({id:e.id,visible:e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0}))
+    mobileControls: [...document.querySelectorAll("#mobileScene,#mobileInspector")].map(e=>({id:e.id,visible:e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0})),
+    featureDock: (() => { const e=document.querySelector(".forge-prod"),r=e?.getBoundingClientRect(),st=e?getComputedStyle(e):null; return e&&r?{visible:r.width>0&&r.height>0,top:Math.round(r.top),bottom:Math.round(r.bottom),height:Math.round(r.height),clientWidth:e.clientWidth,scrollWidth:e.scrollWidth,flexWrap:st.flexWrap}:null; })(),
+    mobileNav: (() => { const e=document.querySelector(".mobile-bar"),r=e?.getBoundingClientRect(); return r?{top:Math.round(r.top),bottom:Math.round(r.bottom),height:Math.round(r.height)}:null; })(),
+    primaryToolbar: Object.fromEntries(["projectName","importAssets","saveProject","build","play"].map(id=>{const e=document.getElementById(id),r=e?.getBoundingClientRect();return[id,!!e&&!!r&&r.width>0&&r.height>0&&r.left>=-1&&r.right<=innerWidth+1]}))
   }));
   await page.screenshot({ path: path.join(ARTIFACTS, "forge-port-mobile.png"), fullPage: true });
 
@@ -126,6 +129,11 @@ try {
   if (playState.running !== true || stoppedState.running !== false) throw new Error("Play/Stop did not change the real engine state.");
   if (mobile.viewport.scrollWidth > mobile.viewport.clientWidth + 2) throw new Error("Forge overflows horizontally at 390px: " + JSON.stringify(mobile.viewport));
   if (!mobile.canvas?.visible || mobile.canvas.width < 300 || mobile.canvas.height < 200) throw new Error("Mobile viewport canvas is unusable: " + JSON.stringify(mobile.canvas));
+  if (!mobile.featureDock?.visible || mobile.featureDock.flexWrap !== "nowrap" || mobile.featureDock.height > 56) throw new Error("Mobile production feature dock must stay on one compact row: " + JSON.stringify(mobile.featureDock));
+  if (!mobile.mobileNav || mobile.featureDock.bottom > mobile.mobileNav.top - 3) throw new Error("Mobile feature dock overlaps the Scene/Inspector navigation: " + JSON.stringify({dock:mobile.featureDock,nav:mobile.mobileNav}));
+  for (const id of ["projectName","importAssets","saveProject","build","play"]) {
+    if (!mobile.primaryToolbar?.[id]) throw new Error("Primary mobile toolbar control is clipped or hidden: " + id + " " + JSON.stringify(mobile.primaryToolbar));
+  }
   if (pageErrors.length) throw new Error("Uncaught page errors: " + pageErrors.join("\n"));
   if (consoleErrors.length) throw new Error("Console errors: " + consoleErrors.join("\n"));
 } catch (error) {
