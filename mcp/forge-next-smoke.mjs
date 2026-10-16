@@ -105,7 +105,7 @@ try {
   const downloadPromise=page.waitForEvent("download",{timeout:10000});
   await page.locator('[data-command="save"]').click();
   const download=await downloadPromise;
-  if(!/\\.forge\\.json$/.test(download.suggestedFilename()))throw new Error("Save did not produce a Forge project file: "+download.suggestedFilename());
+  if(!/\.forge\.json$/.test(download.suggestedFilename()))throw new Error("Save did not produce a Forge project file: "+download.suggestedFilename());
   await page.screenshot({path:path.join(ARTIFACTS,"forge-next-desktop.png"),fullPage:true});
 
   // Resizing docks must persist layout dimensions without pushing the main page horizontally.
@@ -154,8 +154,8 @@ try {
   }
   await page.evaluate(()=>{window.Forge.timelinePlaying=false;window.Forge.running=false});
   report={ok:true,url:URL_TO_TEST,httpStatus:response.status(),initial,created,transformed,front,moveTool,material,timelineOnly,previewOnly,saveDownload:download.suggestedFilename(),dockResize:{leftBefore,leftAfter,persisted},mobileReports,pageErrors,consoleErrors,failedRequests};
-  if(pageErrors.length)throw new Error("Uncaught browser errors: "+pageErrors.join("\\n"));
-  if(consoleErrors.length)throw new Error("Browser console errors: "+consoleErrors.join("\\n"));
+  if(pageErrors.length)throw new Error("Uncaught browser errors: "+pageErrors.join("\n"));
+  if(consoleErrors.length)throw new Error("Browser console errors: "+consoleErrors.join("\n"));
 } catch(error) {
   report={ok:false,url:URL_TO_TEST,error:String(error?.stack||error),pageErrors,consoleErrors,failedRequests};
   try{await page.screenshot({path:path.join(ARTIFACTS,"forge-next-failure.png"),fullPage:true})}catch{}
