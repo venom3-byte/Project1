@@ -111,10 +111,10 @@ try {
   await forgeFrameLocator.locator(".forge-modal").waitFor({state:"visible",timeout:5000});
   const toolboxCheck = await frame.evaluate(() => {
     const dialog=document.querySelector(".forge-modal");
-    const content=dialog?.innerText||"";
+    const content=(dialog?.innerText||"").toLowerCase();
     return {visible:Boolean(dialog?.open),cardCount:dialog?.querySelectorAll(".toolbox-card").length||0,
-      groups:["Assets & Materials","Animation & Effects","World & Gameplay","Diagnostics"].filter(title=>content.includes(title)),
-      containsAssetLab:content.includes("Asset Lab"),containsVisualQA:content.includes("Visual QA")};
+      groups:["assets & materials","animation & effects","world & gameplay","diagnostics"].filter(title=>content.includes(title)),
+      containsAssetLab:content.includes("asset lab"),containsVisualQA:content.includes("visual qa")};
   });
   if(!toolboxCheck.visible||toolboxCheck.cardCount<10||toolboxCheck.groups.length!==4||!toolboxCheck.containsAssetLab||!toolboxCheck.containsVisualQA) {
     throw new Error("Production Toolbox grouping is incomplete: "+JSON.stringify(toolboxCheck));
@@ -123,6 +123,22 @@ try {
   await sleep(80);
   const toolboxClosed = await frame.evaluate(() => !document.querySelector(".forge-modal"));
   if(!toolboxClosed) throw new Error("Production Toolbox did not close cleanly.");
+
+  await forgeFrameLocator.locator('[data-gizmo="select"]').click();
+  await frame.waitForFunction(() => window.ForgeGizmo?.state?.mode === "select", null, {timeout:5000});
+  const selectModeActive = await frame.evaluate(() => ({
+    mode:window.ForgeGizmo?.state?.mode,
+    active:document.querySelector('[data-gizmo="select"]')?.classList.contains("active")
+  }));
+  await forgeFrameLocator.locator('[data-gizmo="translate"]').click();
+  await frame.waitForFunction(() => window.ForgeGizmo?.state?.mode === "translate", null, {timeout:5000});
+  const moveModeActive = await frame.evaluate(() => ({
+    mode:window.ForgeGizmo?.state?.mode,
+    active:document.querySelector('[data-gizmo="translate"]')?.classList.contains("active")
+  }));
+  if(selectModeActive.mode!=="select"||!selectModeActive.active||moveModeActive.mode!=="translate"||!moveModeActive.active) {
+    throw new Error("Selection/Move tool state did not follow the active viewport control: "+JSON.stringify({selectModeActive,moveModeActive}));
+  }
 
   const entityCountBefore = await frame.evaluate(() => window.Forge.entities.size);
   await forgeFrameLocator.locator('[data-add="sphere"]').first().click();
@@ -243,6 +259,8 @@ try {
     actionChecks: { entityCountBefore, entityCountAfterAdd, playState, stoppedState },
     toolboxCheck,
     toolboxClosed,
+    selectModeActive,
+    moveModeActive,
     viewportNavigation,
     agentControl,
     mobile,
