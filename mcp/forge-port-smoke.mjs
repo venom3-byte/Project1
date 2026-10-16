@@ -69,6 +69,8 @@ try {
       animation: !!window.ForgeAnimation,
       spatial: !!window.ForgeSpatial,
       agent: !!window.ForgeAgent,
+      agentServerBridgeConfigured: typeof window.ForgeServerBridge?.webSocketUrl === "string" && !!window.ForgeServerBridge.webSocketUrl,
+      agentServerCapable: window.ForgeAgent?.serverCapable?.() ?? null,
       runtime: !!window.ForgeRuntime,
       qa: !!window.ForgeQAPro
     },
@@ -86,6 +88,9 @@ try {
   }
   for (const [name, present] of Object.entries(initial.modules)) {
     if (!present) throw new Error("Expected Forge module did not load: " + name);
+  }
+  if (!initial.modules.agentServerBridgeConfigured && initial.modules.agentServerCapable !== false) {
+    throw new Error("Static Forge must not infer a live WebSocket endpoint when no server bridge is configured.");
   }
 
   const entityCountBefore = await frame.evaluate(() => window.Forge.entities.size);
