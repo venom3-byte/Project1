@@ -361,6 +361,7 @@ function addBar(){
   const groups=[
     {title:"Assets & Materials",items:[
       ["asset","Asset Lab","Import, inspect and prepare 2D/3D assets",openAssets],
+      ["references","Reference Studio","Calibrated front, side, top and rear image guides",()=>window.ForgeReferenceStudio?.open?.()],
       ["material","Material Lab","PBR color, roughness and metalness",openMaterial],
       ["shader","Shader Lab","Shader presets and material graphs",openShader],
       ["render","Render Settings","Render quality and output profiles",openRender]
@@ -384,7 +385,7 @@ function addBar(){
     ]}
   ];
   launcher.addEventListener("click",()=>{
-    const icons={asset:"▧",material:"◒",shader:"◇",render:"◉",animation:"⌁","anim-graph":"⌘",sequencer:"▤",vfx:"✳","two-d":"▦",world:"⌗",logic:"⑂",runtime:"▷",build:"⇧",profiler:"▥",vision:"◎"};
+    const icons={asset:"▧",references:"⊞",material:"◒",shader:"◇",render:"◉",animation:"⌁","anim-graph":"⌘",sequencer:"▤",vfx:"✳","two-d":"▦",world:"⌗",logic:"⑂",runtime:"▷",build:"⇧",profiler:"▥",vision:"◎"};
     const body=groups.map(group=>'<section class="toolbox-section"><h3>'+group.title+'</h3><div class="toolbox-grid">'+group.items.map(([id,title,desc])=>'<button class="toolbox-card" data-production-tool="'+id+'"><span class="toolbox-card-mark" aria-hidden="true">'+(icons[id]||"•")+'</span><span class="toolbox-card-copy"><b>'+title+'</b><small>'+desc+'</small></span><span class="toolbox-arrow" aria-hidden="true">↗</span></button>').join("")+'</div></section>').join("");
     const d=modal("Forge Production Toolbox",'<p class="toolbox-intro">Choose a focused workspace tool. The 3D viewport stays clear while each tool opens only when needed.</p><div class="toolbox-sections">'+body+'</div>');
     d.querySelectorAll("[data-production-tool]").forEach(button=>button.addEventListener("click",()=>{

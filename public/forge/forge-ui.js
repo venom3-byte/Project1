@@ -111,7 +111,7 @@ const loadForgeRuntime=async()=>{
 };
 const engine=new ForgeEngine($("viewport"),write);
 try{bootMessage("Starting renderer and physics…");await engine.init();window.Forge=engine;bootMessage("Building the 3D workspace and camera controls…");await import("./forge-viewport.js");bootMessage("Loading spatial core and editor systems…");await import("./forge-spatial.js");for(const module of [
-  "./forge-production.js","./forge-project.js","./forge-render.js","./forge-ui-system.js","./forge-vfx.js",
+  "./forge-reference-studio.js","./forge-production.js","./forge-project.js","./forge-render.js","./forge-ui-system.js","./forge-vfx.js",
   "./forge-2d.js","./forge-ai.js","./forge-gameplay-data.js","./forge-network.js","./forge-replay.js",
   "./forge-session.js","./forge-shader.js","./forge-terrain.js","./forge-qa.js","./forge-animation.js","./forge-gameplay.js",
 ]){
