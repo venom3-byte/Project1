@@ -41,11 +41,12 @@
     <nav class="workspace-bar" aria-label="Workspaces" role="tablist">
       <button class="workspace-tab is-active" data-workspace="layout" role="tab" aria-selected="true"><span>01</span>Layout</button>
       <button class="workspace-tab" data-workspace="modeling" role="tab" aria-selected="false"><span>02</span>Modeling</button>
-      <button class="workspace-tab" data-workspace="materials" role="tab" aria-selected="false"><span>03</span>Materials</button>
-      <button class="workspace-tab" data-workspace="animation" role="tab" aria-selected="false"><span>04</span>Animation</button>
-      <button class="workspace-tab" data-workspace="assets" role="tab" aria-selected="false"><span>05</span>Assets</button>
-      <button class="workspace-tab" data-workspace="world" role="tab" aria-selected="false"><span>06</span>World</button>
-      <button class="workspace-tab" data-workspace="review" role="tab" aria-selected="false"><span>07</span>Review</button>
+      <button class="workspace-tab" data-workspace="references" role="tab" aria-selected="false"><span>03</span>Image Model</button>
+      <button class="workspace-tab" data-workspace="materials" role="tab" aria-selected="false"><span>04</span>Materials</button>
+      <button class="workspace-tab" data-workspace="animation" role="tab" aria-selected="false"><span>05</span>Animation</button>
+      <button class="workspace-tab" data-workspace="assets" role="tab" aria-selected="false"><span>06</span>Assets</button>
+      <button class="workspace-tab" data-workspace="world" role="tab" aria-selected="false"><span>07</span>World</button>
+      <button class="workspace-tab" data-workspace="review" role="tab" aria-selected="false"><span>08</span>Review</button>
       <div class="workspace-bar-spacer"></div>
       <button class="icon-button layout-reset" data-command="reset-layout" title="Reset editor layout" aria-label="Reset editor layout">↺</button>
     </nav>
@@ -131,14 +132,30 @@
               <button class="transport-button" data-command="timeline-start" title="Go to start">|◀</button>
               <button id="timelinePlay" class="transport-button primary-transport" data-command="timeline-play" aria-pressed="false" title="Play timeline">▶</button>
               <button class="transport-button" data-command="timeline-end" title="Go to end">▶|</button>
-              <button class="transport-button key-button" data-command="keyframe" title="Insert keyframe for selected object">◆ Key</button>
+              <button class="transport-button key-button" data-command="keyframe" title="Insert or replace a transform key at this frame">◆ Key</button>
+              <button id="autoKeyButton" class="transport-button auto-key-button" data-command="toggle-auto-key" aria-pressed="false" title="Automatically insert or replace transform keys when transforms change">● Auto</button>
             </div>
-            <label class="frame-field">FRAME <input id="currentFrame" type="number" value="0" min="0" max="100000" step="1"></label>
+            <label class="interpolation-field">INTERPOLATION
+              <select id="keyInterpolation" aria-label="Keyframe interpolation"><option value="ease" selected>Ease</option><option value="linear">Linear</option><option value="constant">Hold</option></select>
+            </label>
+            <label class="frame-field">FRAME <input id="currentFrame" type="number" value="0" min="0" max="240" step="1"></label>
             <button class="icon-button" data-command="close-timeline" aria-label="Close timeline" title="Close timeline">×</button>
           </div>
           <div class="timeline-ruler"><span>00</span><span>24</span><span>48</span><span>72</span><span>96</span><span>120</span><span>144</span><span>168</span><span>192</span><span>216</span><span>240</span></div>
-          <div class="timeline-track-area"><div class="timeline-track-label"><span id="timelineTrackName">Selected Object</span><span id="keyCount">0 keys</span></div><div id="timelineTrack" class="timeline-track"><div id="timelineKeyMarkers"></div><div id="timelinePlayhead" class="timeline-playhead"></div></div></div>
-          <div class="timeline-status"><span id="timelineStatus">24 FPS</span><span>Timeline playback is independent from scene preview</span></div>
+          <div class="timeline-track-area">
+            <div class="timeline-track-label">
+              <div class="timeline-object-label"><span id="timelineTrackName">Selected Object</span><span id="keyCount">0 keys</span></div>
+              <div class="timeline-channel-label">Location</div><div class="timeline-channel-label">Rotation</div><div class="timeline-channel-label">Scale</div>
+            </div>
+            <div id="timelineTrack" class="timeline-track" role="slider" tabindex="0" aria-label="Animation timeline; click to scrub and drag a key to retime it">
+              <div class="timeline-channel-row timeline-meta-row" aria-hidden="true"></div>
+              <div class="timeline-channel-row"><div id="timelineKeyMarkers" class="timeline-key-markers" aria-label="Location keys"></div></div>
+              <div class="timeline-channel-row"><div id="timelineRotationMarkers" class="timeline-key-markers" aria-label="Rotation keys"></div></div>
+              <div class="timeline-channel-row"><div id="timelineScaleMarkers" class="timeline-key-markers" aria-label="Scale keys"></div></div>
+              <div id="timelinePlayhead" class="timeline-playhead"></div>
+            </div>
+          </div>
+          <div class="timeline-status"><span id="timelineStatus">24 FPS</span><span>Key = transform at a frame · interpolation creates motion between keys</span></div>
         </section>
       </section>
 
@@ -149,6 +166,7 @@
           <div class="dock-tabs" role="tablist" aria-label="Inspector tabs">
             <button class="dock-tab is-active" data-inspector-tab="properties" role="tab" aria-selected="true">Properties</button>
             <button class="dock-tab" data-inspector-tab="scene" role="tab" aria-selected="false">Scene</button>
+            <button class="dock-tab" data-inspector-tab="references" role="tab" aria-selected="false">Images</button>
           </div>
           <button class="icon-button" data-command="collapse-right" title="Collapse inspector" aria-label="Collapse inspector">›</button>
         </div>
@@ -181,6 +199,27 @@
           <div class="settings-group"><label>Unit system<select id="unitSystem"><option value="meters">Meters</option><option value="centimeters">Centimeters</option></select></label><label>Grid size<select id="gridSize"><option value="1">1 m</option><option value="0.5">0.5 m</option><option value="0.25">0.25 m</option></select></label><label class="check-property"><input id="showGrid" type="checkbox" checked><span>Show world grid</span></label><label class="check-property"><input id="snapEnabled" type="checkbox"><span>Enable transform snapping</span></label></div>
           <button class="wide-secondary" data-command="reset-layout">Reset editor layout</button>
         </section>
+        <section class="dock-panel inspector-references" data-inspector-panel="references" hidden>
+          <div class="panel-heading"><div><strong>Image Modeling</strong><span>CALIBRATE · ALIGN · TRACE</span></div></div>
+          <button id="addReferenceImages" class="wide-secondary reference-add">＋ Add reference images</button>
+          <div class="reference-settings">
+            <label>Reference plane<select id="referenceAxis"><option value="front">Front / X-Y</option><option value="side">Side / Y-Z</option><option value="top">Top / X-Z</option></select></label>
+            <label>Known real-world width (m)<input id="referenceWidth" type="number" min="0.01" max="10000" step="0.01" value="3"></label>
+            <label class="range-property"><span>Image opacity <output id="referenceOpacityValue">45%</output></span><input id="referenceOpacity" type="range" min="0.1" max="1" step="0.05" value="0.45"></label>
+          </div>
+          <div class="reference-actions">
+            <button class="secondary-button" data-command="apply-reference-setup">Apply alignment</button>
+            <button class="secondary-button" data-command="focus-reference-view">Align view</button>
+            <button class="secondary-button" data-command="toggle-reference-visibility">Show / hide selected</button>
+          </div>
+          <div class="reference-list-heading"><b>Scene reference planes</b><span id="referenceCount">0</span></div>
+          <div id="referenceList" class="reference-list"></div>
+          <div class="reference-guide">
+            <b>Recommended reconstruction workflow</b>
+            <p>Use front, side and top views with a shared known measurement. Match the silhouette first, then refine cross-sections and details. Lower opacity to compare the mesh against the reference.</p>
+            <p class="reference-caveat">A single photo does not reveal hidden surfaces or true depth. This workspace calibrates and aligns reference images; it does not claim automatic, exact AI reconstruction of arbitrary objects.</p>
+          </div>
+        </section>
         <div class="inspector-footer"><span id="selectedCount">0 selected</span><span id="unitLabel">METERS</span></div>
       </aside>
 
@@ -190,6 +229,7 @@
     <nav class="mobile-panel-bar" aria-label="Mobile panels">
       <button data-mobile-panel="scene"><span aria-hidden="true">☷</span><b>Scene</b></button>
       <button data-mobile-panel="assets"><span aria-hidden="true">▧</span><b>Assets</b></button>
+      <button data-mobile-panel="references"><span aria-hidden="true">▧</span><b>Images</b></button>
       <button data-mobile-panel="timeline"><span aria-hidden="true">◷</span><b>Animation</b></button>
       <button data-mobile-panel="properties"><span aria-hidden="true">◇</span><b>Inspect</b></button>
     </nav>
@@ -201,6 +241,7 @@
   </div>
 
   <input id="assetInput" type="file" hidden multiple accept=".glb,.gltf,.fbx,.obj,.stl,.ply,.dae,.3ds,.usdz,.png,.jpg,.jpeg,.webp,.avif,.mp3,.wav,.ogg,.json,.forge.json">
+  <input id="referenceInput" type="file" hidden multiple accept="image/png,image/jpeg,image/webp,image/avif">
   <input id="projectInput" type="file" hidden accept=".json,.forge.json">
   <dialog id="noticeDialog" class="notice-dialog"><div class="dialog-heading"><b id="noticeTitle">Forge</b><button data-command="close-notice" aria-label="Close">×</button></div><p id="noticeBody"></p><div class="dialog-actions"><button class="primary-button" data-command="close-notice">OK</button></div></dialog>
   <script type="module" src="./app.js"></script>
