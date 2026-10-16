@@ -53,6 +53,23 @@ function makeMesh(name, buffer, material) {
   const mesh = new pc.Mesh(F.app.graphicsDevice);
   mesh.setPositions(new Float32Array(buffer.positions));
   mesh.setIndices(new Uint16Array(buffer.indices));
+  // StandardMaterial's lit and unlit shader variants both benefit from explicit normals.
+  // Compute them per quad so the ground grid and vertical Y axis render consistently.
+  const normals = new Float32Array(buffer.positions.length);
+  for (let i=0; i<buffer.positions.length; i+=12) {
+    const ax=buffer.positions[i], ay=buffer.positions[i+1], az=buffer.positions[i+2];
+    const bx=buffer.positions[i+3], by=buffer.positions[i+4], bz=buffer.positions[i+5];
+    const cx=buffer.positions[i+6], cy=buffer.positions[i+7], cz=buffer.positions[i+8];
+    const ux=bx-ax, uy=by-ay, uz=bz-az, vx=cx-ax, vy=cy-ay, vz=cz-az;
+    let nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+    const length=Math.hypot(nx,ny,nz)||1;
+    nx/=length;ny/=length;nz/=length;
+    for (let j=0; j<4; j++) {
+      const k=i+j*3;
+      normals[k]=nx;normals[k+1]=ny;normals[k+2]=nz;
+    }
+  }
+  mesh.setNormals(normals);
   mesh.update(pc.PRIMITIVE_TRIANGLES);
   const entity = new pc.Entity(name);
   state.helperRoot.addChild(entity);
@@ -97,8 +114,8 @@ function createWorldGrid() {
     groundLine(major,"x",v,extent,0.024,0.006);
     groundLine(major,"z",v,extent,0.024,0.006);
   }
-  makeMesh("Forge Grid — 1m subdivisions",minor,makeMaterial([0.15,0.205,0.265],{emissive:0.28}));
-  makeMesh("Forge Grid — 5m major lines",major,makeMaterial([0.235,0.315,0.39],{emissive:0.32}));
+  makeMesh("Forge Grid — 1m subdivisions",minor,makeMaterial([0.18,0.25,0.33],{emissive:0.72}));
+  makeMesh("Forge Grid — 5m major lines",major,makeMaterial([0.28,0.39,0.5],{emissive:0.82}));
 
   const axisX={positions:[],indices:[]};
   const axisZ={positions:[],indices:[]};
@@ -108,9 +125,9 @@ function createWorldGrid() {
   const w=0.035, z=0.018, top=4.5;
   pushQuad(axisY.positions.length ? axisY : axisY,
     [-w/2,0,z],[w/2,0,z],[w/2,top,z],[-w/2,top,z]);
-  makeMesh("World axis X",axisX,makeMaterial([0.93,0.22,0.28],{emissive:0.72}));
-  makeMesh("World axis Z",axisZ,makeMaterial([0.17,0.54,1],{emissive:0.72}));
-  makeMesh("World axis Y",axisY,makeMaterial([0.24,0.88,0.47],{emissive:0.72}));
+  makeMesh("World axis X",axisX,makeMaterial([0.93,0.22,0.28],{emissive:1}));
+  makeMesh("World axis Z",axisZ,makeMaterial([0.17,0.54,1],{emissive:1}));
+  makeMesh("World axis Y",axisY,makeMaterial([0.24,0.88,0.47],{emissive:1}));
 }
 function activeCamera() { return F.camera(); }
 function readCamera(targetHint) {
@@ -290,6 +307,10 @@ function status() {
     renderer:F.diagnostics?.().renderer||"unknown",
     gridVisible:state.gridVisible,
     gridMeshes:state.gridEntities.length,
+    gridGeometry:state.gridEntities.map(entity=>{
+      const instance=entity.render?.meshInstances?.[0],mesh=instance?.mesh;
+      return {name:entity.name,enabled:entity.enabled,vertices:mesh?.vertexBuffer?.numVertices??null,indices:mesh?.primitive?.[0]?.count??null,hasNormals:Boolean(mesh?.vertexBuffer)};
+    }),
     groundVisible:Boolean(state.ground?.entity?.render?.enabled&&state.ground.entity.render.layers.includes(pc.LAYERID_WORLD)),
     navigation:{orbit:true,pan:true,zoom:true,touch:true,clickSelect:true},
     camera:camera&&position?{
