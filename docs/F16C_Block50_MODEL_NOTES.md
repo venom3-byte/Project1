@@ -31,6 +31,15 @@ The public USAF F-16 fact sheet gives 14.8 m length and 9.8 m wingspan. The geom
 3. F-16C Block 50/52 cockpit arrangement schematic: https://learning.falcon-lounge.com/course/view.php?id=3
 4. Block 50 exterior photo reference: https://files.digitalcombatsimulator.com/upload/userfiles/1a5/5mboamc0yuym617oaf2ihb1g3o499rbd/Screen_240227_205652.jpg
 
+## Additional image references used for cockpit refinement v0.3
+
+5. Annotated F-16C UFC/ICP photograph, with labeled mode buttons, numeric keys, RCL/ENTR, and display: https://cypher1778.github.io/DCS_Wiki/f-16c/cockpit/ufc/
+6. F-16C Block 50 cockpit panel layout drawing (MFDs, backup instruments, side consoles and seat area): https://www.quebecairforce.com/Commun/Sim_BMS/Ref/Cockpit_Panel/F-16C-Block50
+7. Cockpit panel layout image used to compare the main panel's relative zones: https://www.quebecairforce.com/img/sim_bms/ref/cockpit_panels/qaf_cockpit_f-16cm-52.webp
+8. Reference cockpit image with both MFDs and central instrument stack visible: https://defencehub.live/attachments/f-16c-jpg.598/
+
+These images guide relative placement and grouping only. The current v0.3 geometry does not yet reproduce every legible stencil, exact switch label, wiring path, or instrument face marking.
+
 ## Known limitations / next visual-QA loop
 
 - This is a hand-built polygonal interpretation informed by orthographic drawings and cockpit references, not a pixel-perfect traced retopology. Photographs and line drawings have not yet been overlaid in a calibrated multi-view fitting pass.
