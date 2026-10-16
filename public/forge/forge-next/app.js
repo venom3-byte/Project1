@@ -2,7 +2,7 @@ const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const PREFS_KEY = "forge.next.preferences.v1";
 const defaults = { left:264, right:302, timeline:178, leftCollapsed:false, rightCollapsed:false };
-const state = {engine:null,workspace:"layout",leftPanel:"scene",inspectorPanel:"properties",tool:"select",preview:false,timelinePlaying:false,snap:false,grid:true,assets:[],statusTimer:0,prefs:{...defaults},lastError:null};
+const state = {engine:null,workspace:"layout",leftPanel:"scene",inspectorPanel:"properties",tool:"select",preview:false,timelinePlaying:false,autoKey:false,snap:false,grid:true,assets:[],statusTimer:0,prefs:{...defaults},lastError:null};
 const commands = new Map();
 function registerCommand(name, execute){if(commands.has(name))throw new Error("Duplicate command: "+name);commands.set(name,execute)}
 function clamp(n,min,max,fallback){const v=Number(n);return Number.isFinite(v)?Math.max(min,Math.min(max,v)):fallback}
@@ -36,17 +36,18 @@ function loadPrefs(){
   }catch{state.prefs={...defaults}}
 }
 function setWorkspace(name,{save=true}={}){
-  const allowed=["layout","modeling","materials","animation","assets","world","review"];if(!allowed.includes(name))return;
+  const allowed=["layout","modeling","references","materials","animation","assets","world","review"];if(!allowed.includes(name))return;
   state.workspace=name;document.documentElement.dataset.forgeWorkspace=name;document.documentElement.classList.remove("timeline-manually-closed");
   $$(".workspace-tab").forEach(tab=>{const active=tab.dataset.workspace===name;tab.classList.toggle("is-active",active);tab.setAttribute("aria-selected",String(active))});
-  const contexts={layout:["SCENE / LAYOUT","Orbit: drag · Pan: right-drag · Zoom: wheel"],modeling:["MODELING","Select · Move W · Rotate E · Scale R · Focus F"],materials:["MATERIALS","Surface appearance · Base color, metalness and roughness"],animation:["ANIMATION","Timeline controls are independent from scene preview"],assets:["ASSET WORKFLOW","Import and inspect 2D/3D content"],world:["WORLD SETTINGS","Grid and unit settings"],review:["REVIEW / QA","Scene diagnostics and engine status"]};
+  const contexts={layout:["SCENE / LAYOUT","Orbit: drag · Pan: right-drag · Zoom: wheel"],modeling:["MODELING","Select · Move W · Rotate E · Scale R · Focus F"],references:["IMAGE MODELING","Calibrate front, side and top reference planes before tracing geometry"],materials:["MATERIALS","Surface appearance · Base color, metalness and roughness"],animation:["ANIMATION","Keyframes store transforms; interpolation fills motion between them"],assets:["ASSET WORKFLOW","Import and inspect 2D/3D content"],world:["WORLD SETTINGS","Grid and unit settings"],review:["REVIEW / QA","Scene diagnostics and engine status"]};
   $("#workspaceContext").textContent=contexts[name][0];$("#viewportHelp").textContent=contexts[name][1];$("#timelinePanel").hidden=name!=="animation";
   if(name==="assets")setLeftPanel("assets",{save:false});
-  if(["layout","modeling","review"].includes(name))setLeftPanel("scene",{save:false});
+  if(["layout","modeling","references","review"].includes(name))setLeftPanel("scene",{save:false});
+  if(name==="references")setInspectorPanel("references",{save:false});
   if(name==="materials"){setInspectorPanel("properties",{save:false});$("#materialSection").classList.add("is-open")}
   if(name==="world")setInspectorPanel("scene",{save:false});
   if(name==="animation")refreshTimeline();
-  if(innerWidth<=850&&["assets","materials","world","review"].includes(name))openMobilePanel(name==="assets"?"assets":"properties");
+  if(innerWidth<=850&&["assets","materials","world","review","references"].includes(name))openMobilePanel(name==="assets"?"assets":name==="references"?"references":"properties");
   if(save)persistPrefs();
 }
 function setLeftPanel(name,{save=true}={}){
@@ -55,7 +56,7 @@ function setLeftPanel(name,{save=true}={}){
   $$("[data-left-panel]").forEach(p=>p.hidden=p.dataset.leftPanel!==name);if(save)persistPrefs();
 }
 function setInspectorPanel(name,{save=true}={}){
-  if(!["properties","scene"].includes(name))return;state.inspectorPanel=name;
+  if(!["properties","scene","references"].includes(name))return;state.inspectorPanel=name;
   $$("[data-inspector-tab]").forEach(t=>{const active=t.dataset.inspectorTab===name;t.classList.toggle("is-active",active);t.setAttribute("aria-selected",String(active))});
   $$("[data-inspector-panel]").forEach(p=>p.hidden=p.dataset.inspectorPanel!==name);if(save)persistPrefs();
 }
@@ -63,9 +64,9 @@ function closeMobileDrawers(){$("#leftDock").classList.remove("is-open");$("#rig
 function openMobilePanel(name){
   closeMobileDrawers();
   if(name==="scene"||name==="assets"){setLeftPanel(name);$("#leftDock").classList.add("is-open");const b=$('[data-mobile-panel="'+name+'"]');b?.classList.add("is-active")}
-  else if(name==="properties"){setInspectorPanel("properties");$("#rightDock").classList.add("is-open");$('[data-mobile-panel="properties"]')?.classList.add("is-active")}
+  else if(name==="properties"||name==="references"){setInspectorPanel(name==="references"?"references":"properties");$("#rightDock").classList.add("is-open");$('[data-mobile-panel="'+name+'"]')?.classList.add("is-active")}
   else if(name==="timeline"){setWorkspace("animation");$('[data-mobile-panel="timeline"]')?.classList.add("is-active")}
-  $("#drawerScrim").hidden=!["scene","assets","properties"].includes(name);
+  $("#drawerScrim").hidden=!["scene","assets","properties","references"].includes(name);
 }
 function iconForKind(kind){return ({box:"□",sphere:"◉",cylinder:"⬡",capsule:"◌",plane:"▱",camera:"▣",light:"☼",model:"◇",mesh:"◇"})[String(kind).toLowerCase()]||"◇"}
 function selectedRecord(){return state.engine?.selected?.()||null}
@@ -95,7 +96,7 @@ function applyTransform(){
   const engine=state.engine,record=selectedRecord();if(!engine||!record)return;
   record.name=$("#objectName").value.trim()||record.name;record.entity.name=record.name;if(record.entity.__forge)record.entity.__forge.name=record.name;
   engine.transform({x:Number($("#positionX").value),y:Number($("#positionY").value),z:Number($("#positionZ").value),rx:Number($("#rotationX").value),ry:Number($("#rotationY").value),rz:Number($("#rotationZ").value),sx:Number($("#scaleX").value),sy:Number($("#scaleY").value),sz:Number($("#scaleZ").value)});
-  refreshHierarchy();refreshInspector();status("Changes applied","dirty");
+  refreshHierarchy();refreshInspector();refreshTimeline();status(state.autoKey?"Transform changed · auto-key recorded":"Changes applied","dirty");
 }
 function applyMaterial(){
   const engine=state.engine;if(!engine||!selectedRecord())return;const hex=$("#materialColor").value,color=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255);
@@ -109,20 +110,104 @@ function refreshAssetList(){
   $("#assetCount").textContent=assets.length+" imported";$("#assetEmpty").hidden=assets.length!==0;
 }
 function refreshTimeline(){
-  const engine=state.engine;if(!engine)return;const frame=Math.round((engine.timelineTime||0)*24);$("#currentFrame").value=String(frame);$("#timelinePlay").setAttribute("aria-pressed",String(engine.timelinePlaying===true));$("#timelinePlay").textContent=engine.timelinePlaying?"Ⅱ":"▶";$("#timelineStatus").textContent="24 FPS · "+frame+" F";
-  const record=selectedRecord(),keys=record?(engine.keyframes.get(record.id)||[]):[];$("#keyCount").textContent=keys.length+(keys.length===1?" key":" keys");const markers=$("#timelineKeyMarkers");markers.replaceChildren();
-  for(const key of keys){const marker=document.createElement("span");marker.className="timeline-key-marker";marker.style.left=(clamp(key.time/10,0,1,0)*100)+"%";marker.title="Frame "+Math.round(key.time*24);markers.append(marker)}
+  const engine=state.engine;if(!engine)return;
+  const frame=Math.round((engine.timelineTime||0)*24);
+  $("#currentFrame").value=String(frame);
+  $("#timelinePlay").setAttribute("aria-pressed",String(engine.timelinePlaying===true));
+  $("#timelinePlay").textContent=engine.timelinePlaying?"Ⅱ":"▶";
+  $("#timelineStatus").textContent="24 FPS · "+frame+" F";
+  $("#autoKeyButton").setAttribute("aria-pressed",String(state.autoKey));
+  $("#autoKeyButton").classList.toggle("is-active",state.autoKey);
+  $("#keyInterpolation").value=engine.keyInterpolation||"ease";
+  const record=selectedRecord(),keys=record?(engine.keyframes.get(record.id)||[]):[];
+  $("#keyCount").textContent=keys.length+(keys.length===1?" key":" keys");
+  $("#timelineTrackName").textContent=record?.name||"No object selected";
+  const renderLane=(selector,channel)=>{
+    const lane=$(selector);if(!lane)return;lane.replaceChildren();
+    keys.forEach((key,index)=>{
+      const marker=document.createElement("button");marker.type="button";marker.className="timeline-key-marker marker-"+channel;
+      marker.dataset.keyIndex=String(index);marker.style.left=(clamp(key.time/10,0,1,0)*100)+"%";
+      const keyFrame=Math.round(key.time*24);marker.title=channel+" · frame "+keyFrame;marker.setAttribute("aria-label",channel+" key at frame "+keyFrame);
+      marker.addEventListener("click",event=>{event.preventDefault();event.stopPropagation();setTimelineFrame(Math.round(key.time*24))});
+      marker.addEventListener("pointerdown",event=>{
+        if(event.button!==0)return;
+        event.preventDefault();event.stopPropagation();
+        const track=$("#timelineTrack"),rect=track.getBoundingClientRect(),keyRef=key;let dragged=false;
+        const move=moveEvent=>{
+          const frameNow=Math.round(clamp((moveEvent.clientX-rect.left)/Math.max(1,rect.width),0,1,0)*240);
+          keyRef.time=frameNow/24;dragged=true;
+          const left=(frameNow/240*100)+"%";$$(".timeline-key-marker[data-key-index='"+index+"']").forEach(item=>item.style.left=left);
+          $("#currentFrame").value=String(frameNow);$("#timelinePlayhead").style.left=left;
+        };
+        const finish=()=>{
+          document.removeEventListener("pointermove",move);document.removeEventListener("pointerup",finish);document.removeEventListener("pointercancel",finish);
+          if(dragged){keys.sort((a,b)=>a.time-b.time);setTimelineFrame(Math.round(keyRef.time*24));refreshTimeline();status("Keyframe moved","dirty")}
+        };
+        document.addEventListener("pointermove",move);document.addEventListener("pointerup",finish,{once:true});document.addEventListener("pointercancel",finish,{once:true});
+      });
+      lane.append(marker);
+    });
+  };
+  renderLane("#timelineKeyMarkers","location");renderLane("#timelineRotationMarkers","rotation");renderLane("#timelineScaleMarkers","scale");
   $("#timelinePlayhead").style.left=(clamp(engine.timelineTime/10,0,1,0)*100)+"%";
+}
+function toggleAutoKey(){state.autoKey=!state.autoKey;state.engine.autoKey=state.autoKey;state.engine.keyInterpolation=$("#keyInterpolation").value;refreshTimeline();status(state.autoKey?"Auto-key enabled for transforms":"Auto-key disabled")}
+function applyReferenceMaterial(record,opacity){
+  const pc=window.ForgePC,blend=pc?.BLEND_NORMAL??2,none=pc?.BLEND_NONE??0;
+  const walk=entity=>{for(const instance of(entity.render?.meshInstances||[])){
+    const material=instance.material?.clone?.();if(!material)continue;
+    material.opacity=opacity;material.blendType=opacity<0.999?blend:none;material.depthWrite=opacity>=0.999;material.cull=pc?.CULLFACE_NONE??0;material.update();instance.material=material;
+  }for(const child of entity.children||[])walk(child)};
+  walk(record.entity);
+}
+function applyReferenceSetup(record=selectedRecord()){
+  if(!record?.components?.reference){notice("Image Modeling","Select a reference image plane first, then set its view, width and opacity.");return false}
+  const data=record.components.reference,axis=$("#referenceAxis").value,width=clamp($("#referenceWidth").value,0.01,10000,Number(data.width)||3);
+  const opacity=clamp($("#referenceOpacity").value,0.1,1,Number(data.opacity)||0.45),aspect=clamp(data.aspect,0.001,1000,1),height=width/aspect,entity=record.entity;
+  if(axis==="front"){entity.setLocalEulerAngles(90,0,0);entity.setLocalPosition(0,height/2,0.05)}
+  else if(axis==="side"){entity.setLocalEulerAngles(90,90,0);entity.setLocalPosition(0.05,height/2,0)}
+  else{entity.setLocalEulerAngles(0,0,0);entity.setLocalPosition(0,0.03,0)}
+  entity.setLocalScale(width,1,height);Object.assign(data,{axis,width,height,opacity,visible:entity.enabled!==false,locked:false});
+  applyReferenceMaterial(record,opacity);refreshReferences();refreshHierarchy();refreshInspector();status("Reference calibrated · "+axis+" view · "+width.toFixed(2)+" m","dirty");return true;
+}
+function refreshReferences(){
+  const list=$("#referenceList");if(!list||!state.engine)return;const all=[...state.engine.entities.values()].filter(record=>record.components?.reference);
+  $("#referenceCount").textContent=String(all.length);list.replaceChildren();
+  for(const record of all){
+    const meta=record.components.reference,row=document.createElement("div");row.className="reference-row";
+    const select=document.createElement("button");select.type="button";select.className="reference-row-main"+(record.id===state.engine.selectedId?" is-selected":"");
+    const name=document.createElement("b");name.textContent=record.name;name.title=record.name;const details=document.createElement("small");details.textContent=String(meta.axis||"front").toUpperCase()+" · "+Number(meta.width||0).toFixed(2)+" m";
+    select.append(name,details);select.addEventListener("click",()=>{state.engine.select(record.id);$("#referenceAxis").value=meta.axis||"front";$("#referenceWidth").value=String(meta.width||3);$("#referenceOpacity").value=String(meta.opacity??0.45);$("#referenceOpacityValue").textContent=Math.round((meta.opacity??0.45)*100)+"%";chooseView(meta.axis==="side"?"right":meta.axis||"front")});row.append(select);
+    const visibility=document.createElement("button");visibility.type="button";visibility.className="reference-visibility";visibility.textContent=record.entity.enabled===false?"Show":"Hide";
+    visibility.addEventListener("click",()=>{record.entity.enabled=record.entity.enabled===false;meta.visible=record.entity.enabled;refreshReferences();status(record.entity.enabled?"Reference shown":"Reference hidden","dirty")});row.append(visibility);list.append(row);
+  }
+  const chosen=selectedRecord();if(chosen?.components?.reference){const d=chosen.components.reference;$("#referenceAxis").value=d.axis||"front";$("#referenceWidth").value=String(d.width||3);$("#referenceOpacity").value=String(d.opacity??0.45);$("#referenceOpacityValue").textContent=Math.round((d.opacity??0.45)*100)+"%"}
+}
+function focusReferenceView(){const ref=selectedRecord()?.components?.reference;if(!ref){notice("Image Modeling","Select a calibrated reference plane first.");return}chooseView(ref.axis==="side"?"right":ref.axis||"front");state.engine.frame();status("Reference aligned in "+ref.axis+" view")}
+async function loadReferenceImages(files){
+  let added=0;const axis=$("#referenceAxis").value,width=clamp($("#referenceWidth").value,0.01,10000,3),opacity=clamp($("#referenceOpacity").value,0.1,1,0.45);
+  for(const file of files){
+    if(!file.type.startsWith("image/")){reportError("Reference import rejected",new Error(file.name+" is not an image"));continue}
+    try{
+      status("Calibrating reference "+file.name+"…");const result=await state.engine.importFile(file),record=result?.record;
+      if(!record||result.type!=="image")throw new Error("Image importer did not create a reference plane.");
+      const asset=record.components.asset||{},aspect=Number(asset.width)>0&&Number(asset.height)>0?Number(asset.width)/Number(asset.height):1;
+      record.components.reference={name:file.name,axis,width,height:width/aspect,aspect,opacity,visible:true,locked:false};
+      applyReferenceSetup(record);state.engine.select(record.id);added++;
+    }catch(error){reportError("Reference import failed: "+file.name,error)}
+  }
+  refreshReferences();refreshAll();if(added)status(added+" calibrated reference image"+(added===1?"":"s")+" added","dirty");
 }
 function refreshDiagnostics(){
   const engine=state.engine;if(!engine)return;const d=engine.diagnostics();$("#rendererStatus").textContent=d.renderer||"WebGL";$("#fpsStatus").textContent=(Number(d.fps)||0).toFixed(0)+" FPS · "+(Number(d.frameMs)||0).toFixed(1)+" ms";$("#entityStatus").textContent=d.entities+" entities";$("#unitLabel").textContent=String(d.unitSystem||"meters").toUpperCase();$("#unitSystem").value=d.unitSystem==="centimeters"?"centimeters":"meters";$("#snapEnabled").checked=engine.snapEnabled===true;$("#showGrid").checked=state.grid;$("#engineStatus").textContent=state.preview?"Scene preview active":"Engine ready";$("#diagnosticStatus").textContent=state.lastError?"1 error":"No errors";$("#diagnosticStatus").classList.toggle("diagnostic-error",!!state.lastError);if(state.timelinePlaying)refreshTimeline();
 }
-function refreshAll(){refreshHierarchy();refreshInspector();refreshDiagnostics()}
+function refreshAll(){refreshHierarchy();refreshInspector();refreshDiagnostics();refreshReferences()}
 function changed(){refreshAll();status("Scene changed · unsaved","dirty")}
 async function saveProject(){if(!window.ForgeProject)throw new Error("Project serializer did not load");window.ForgeProject.download(fileBaseName(projectLabel())+".forge.json");document.title=projectLabel()+" — Forge Next";status("Project exported")}
 function openProject(){ $("#projectInput").click() }
 function importAssets(){ $("#assetInput").click() }
 async function loadAssets(files){
+  if(state.workspace==="references"){const images=files.filter(file=>file.type.startsWith("image/")),other=files.filter(file=>!file.type.startsWith("image/"));if(images.length)await loadReferenceImages(images);files=other}
   for(const file of files){try{status("Importing "+file.name+"…");const result=await state.engine.importFile(file);state.assets.push({name:file.name,size:file.size,type:file.type});console.info("[Forge Next] Imported",file.name,result?.type||"asset")}catch(error){reportError("Import failed: "+file.name,error)}}
   changed();refreshAssetList()
 }
@@ -145,7 +230,7 @@ function chooseView(mode){
 function frameSelection(){if(selectedRecord())state.engine.frame();else window.ForgeViewport?.frame?.()}
 function togglePreview(force){const next=typeof force==="boolean"?force:!state.preview;state.preview=next;state.engine.running=next;const b=$("#previewScene");b.setAttribute("aria-pressed",String(next));b.querySelector(".preview-symbol").textContent=next?"■":"▷";b.querySelector("[data-preview-label]").textContent=next?"Stop":"Preview";b.title=next?"Stop scene preview":"Run or stop scene preview";status(next?"Scene preview active":"Engine ready");window.dispatchEvent(new CustomEvent("forge-play-state",{detail:{running:next}}))}
 function toggleTimeline(){state.engine.timelinePlaying=!state.engine.timelinePlaying;state.timelinePlaying=state.engine.timelinePlaying;refreshTimeline()}
-function setTimelineFrame(value){const frame=clamp(value,0,100000,0);state.engine.timelineTime=frame/24;state.engine.evalAnimation(state.engine.timelineTime);refreshInspector();refreshTimeline()}
+function setTimelineFrame(value){const frame=clamp(Math.round(Number(value)||0),0,240,0);state.engine.timelineTime=frame/24;state.engine.evalAnimation(state.engine.timelineTime);refreshInspector();refreshTimeline()}
 function setSplitter(handle,event){
   event.preventDefault();const side=handle.dataset.splitter,key=side==="left"?"--left-dock-width":"--right-dock-width",root=document.documentElement,start=event.clientX,old=parseInt(getComputedStyle(root).getPropertyValue(key),10)||(side==="left"?defaults.left:defaults.right);
   handle.classList.add("is-dragging");handle.setPointerCapture(event.pointerId);
@@ -166,7 +251,7 @@ function registerCommands(){
   registerCommand("collapse-left",()=>toggleCollapsed("left"));registerCommand("collapse-right",()=>toggleCollapsed("right"));registerCommand("scene-menu",sceneSummary);registerCommand("inspector-menu",()=>{refreshInspector();status("Inspector refreshed")});
   registerCommand("grid",()=>toggleGrid());registerCommand("snap",()=>toggleSnap());registerCommand("frame-selected",frameSelection);registerCommand("frame-all",()=>{state.engine.frame();status("Framed scene")});registerCommand("fullscreen",fullscreenViewport);
   registerCommand("duplicate",()=>{if(state.engine.duplicate())changed()});registerCommand("delete",()=>{const r=selectedRecord();if(r&&confirm("Delete "+r.name+"?")){state.engine.delete();changed()}});
-  registerCommand("timeline-play",toggleTimeline);registerCommand("timeline-start",()=>setTimelineFrame(0));registerCommand("timeline-end",()=>setTimelineFrame(240));registerCommand("keyframe",()=>{state.engine.key();refreshTimeline();status("Keyframe inserted","dirty")});registerCommand("close-timeline",()=>{document.documentElement.classList.add("timeline-manually-closed");status("Timeline hidden")});registerCommand("close-notice",()=>$("#noticeDialog").close());
+  registerCommand("timeline-play",toggleTimeline);registerCommand("timeline-start",()=>setTimelineFrame(0));registerCommand("timeline-end",()=>setTimelineFrame(240));registerCommand("toggle-auto-key",toggleAutoKey);registerCommand("keyframe",()=>{state.engine.keyInterpolation=$("#keyInterpolation").value;const result=state.engine.key({interpolation:$("#keyInterpolation").value});refreshTimeline();status(result?.updated?"Keyframe replaced":"Keyframe inserted","dirty")});registerCommand("apply-reference-setup",()=>applyReferenceSetup());registerCommand("focus-reference-view",focusReferenceView);registerCommand("toggle-reference-visibility",()=>{const record=selectedRecord();if(!record?.components?.reference){notice("Image Modeling","Select a reference image plane first.");return}record.entity.enabled=record.entity.enabled===false;record.components.reference.visible=record.entity.enabled;refreshReferences();status(record.entity.enabled?"Reference shown":"Reference hidden","dirty")});registerCommand("close-timeline",()=>{document.documentElement.classList.add("timeline-manually-closed");status("Timeline hidden")});registerCommand("close-notice",()=>$("#noticeDialog").close());
 }
 function bindUI(){
   registerCommands();
@@ -181,6 +266,12 @@ function bindUI(){
   $("#drawerScrim").addEventListener("click",closeMobileDrawers);
   $("#sceneSearch").addEventListener("input",refreshHierarchy);$("#assetSearch").addEventListener("input",refreshAssetList);
   $("#assetInput").addEventListener("change",e=>{const files=[...e.target.files];if(files.length)void loadAssets(files);e.target.value=""});
+  $("#addReferenceImages").addEventListener("click",()=>$("#referenceInput").click());
+  $("#referenceInput").addEventListener("change",e=>{const files=[...e.target.files];if(files.length)void loadReferenceImages(files);e.target.value=""});
+  $("#referenceOpacity").addEventListener("input",()=>$("#referenceOpacityValue").textContent=Math.round(Number($("#referenceOpacity").value)*100)+"%");
+  $("#keyInterpolation").addEventListener("change",()=>{state.engine.keyInterpolation=$("#keyInterpolation").value;refreshTimeline()});
+  $("#timelineTrack").addEventListener("click",event=>{if(event.target.closest(".timeline-key-marker"))return;const rect=$("#timelineTrack").getBoundingClientRect();setTimelineFrame(Math.round(clamp((event.clientX-rect.left)/Math.max(1,rect.width),0,1,0)*240))});
+  $("#timelineTrack").addEventListener("keydown",event=>{if(event.key==="ArrowLeft"||event.key==="ArrowRight"){event.preventDefault();setTimelineFrame(Number($("#currentFrame").value)+(event.key==="ArrowRight"?1:-1))}});
   $("#projectInput").addEventListener("change",async e=>{const file=e.target.files?.[0];e.target.value="";if(!file)return;try{const data=JSON.parse(await file.text());await window.ForgeProject.load(data);$("#projectName").value=data.meta?.name||file.name.replace(/\.forge\.json$|\.json$/i,"");refreshAll();status("Project loaded")}catch(error){reportError("Project could not be opened",error)}});
   $("#viewportStage").addEventListener("dragover",e=>{e.preventDefault();$("#viewportStage").classList.add("is-dragover")});
   $("#viewportStage").addEventListener("dragleave",e=>{if(!$("#viewportStage").contains(e.relatedTarget))$("#viewportStage").classList.remove("is-dragover")});
@@ -203,13 +294,14 @@ function bindUI(){
     if(e.key==="Escape"){closeMobileDrawers();if(state.preview)togglePreview(false)}
     if(e.key==="Delete"||e.key==="Backspace"){if(selectedRecord())safeRun("Delete",()=>commands.get("delete")())}
   });
-  window.addEventListener("forge-selection",()=>{refreshHierarchy();refreshInspector()});window.addEventListener("forge-assets-changed",()=>{refreshHierarchy();refreshAssetList();refreshInspector()});window.addEventListener("resize",()=>state.engine?.app?.resizeCanvas?.());
+  window.addEventListener("forge-selection",()=>{refreshHierarchy();refreshInspector();refreshReferences()});window.addEventListener("forge-assets-changed",()=>{refreshHierarchy();refreshAssetList();refreshInspector();refreshReferences()});window.addEventListener("resize",()=>state.engine?.app?.resizeCanvas?.());
   const ro=new ResizeObserver(()=>requestAnimationFrame(()=>state.engine?.app?.resizeCanvas?.()));ro.observe($("#viewportStage"));
 }
 function bootFailed(error){state.lastError=error?.message||String(error);$("#bootMessage").textContent="Startup failed: "+state.lastError;$("#bootScreen").querySelector(".boot-meter").hidden=true;console.error("[Forge Next] Startup failed",error)}
 async function boot(){
   loadPrefs();status("Loading engine…");
-  const {ForgeEngine}=await import("../forge-engine.js");
+  const {ForgeEngine,pc}=await import("../forge-engine.js");
+  window.ForgePC=pc;
   const engine=new ForgeEngine($("#viewport"),message=>console.info("[Forge Engine]",message));state.engine=engine;await engine.init();window.Forge=engine;
   status("Installing viewport…");await import("../forge-viewport.js");
   try{await import("../forge-spatial.js")}catch(error){console.warn("Spatial overlay unavailable",error)}
