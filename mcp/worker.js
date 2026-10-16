@@ -12,6 +12,9 @@ const BRANCH = "main";
 const API = "https://api.github.com";
 const RAW = "https://raw.githubusercontent.com/" + OWNER + "/" + REPO + "/" + BRANCH + "/";
 const AGENT_STATE_KEY = "editor-project:v1";
+const VISUAL_SESSION_KEY = "visual-agent-session:v1";
+const EDITOR_URL = "https://claude-game-editor-copy.forgemail-agent.workers.dev/";
+let nextCdpId = 0;
 const VALID_SHAPES = ["box", "sphere", "cylinder", "cone", "torus", "plane", "light", "model", "image"];
 const VALID_BEHAVIORS = ["none", "player", "rotate", "bob", "collectible", "hazard", "goal", "patrol"];
 const VALID_MODES = ["translate", "rotate", "scale"];
@@ -124,6 +127,78 @@ const tools = [
       required: ["action"],
       additionalProperties: false
     }
+  },
+  {
+    name: "visual_open_editor",
+    description: "Launch or reuse a remote Cloudflare headless Chrome session and open the live Forge/Claude editor. Returns live DOM observations and an actual screenshot.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false }
+  },
+  {
+    name: "visual_screenshot",
+    description: "Capture a fresh screenshot of the current remote editor tab; returns an actual image as MCP image content.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false }
+  },
+  {
+    name: "visual_inspect",
+    description: "Read visible page text, buttons, form fields, canvas count, and element geometry from the current remote browser, plus a screenshot.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false }
+  },
+  {
+    name: "visual_click",
+    description: "Perform an actual mouse click in the remote browser using a CSS selector, exact visible text, or viewport coordinates. Only the fixed editor origin is navigated.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        selector: { type: "string", maxLength: 180 },
+        text: { type: "string", maxLength: 120 },
+        x: { type: "number", minimum: 0, maximum: 5000 },
+        y: { type: "number", minimum: 0, maximum: 5000 }
+      },
+      additionalProperties: false
+    }
+  },
+  {
+    name: "visual_type",
+    description: "Type text through the remote browser into a visible input, textarea or contenteditable control identified by CSS selector.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        selector: { type: "string", minLength: 1, maxLength: 180 },
+        text: { type: "string", maxLength: 4000 }
+      },
+      required: ["selector", "text"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "visual_press_key",
+    description: "Send a real key press to the remote browser for editor shortcuts. Supported keys: Enter, Escape, Tab, Delete, Backspace, Space, arrows, Home, End, F, W, E, R, and Ctrl+Z/Ctrl+Y/Ctrl+D.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        key: { type: "string", enum: ["Enter","Escape","Tab","Delete","Backspace","Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Home","End","F","W","E","R","Ctrl+Z","Ctrl+Y","Ctrl+D"] }
+      },
+      required: ["key"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "visual_scroll",
+    description: "Scroll the remote editor browser viewport or panel using real wheel input.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        direction: { type: "string", enum: ["up","down","left","right"] },
+        amount: { type: "integer", minimum: 60, maximum: 1200 }
+      },
+      required: ["direction"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "visual_run_checks",
+    description: "Run a UI-level verification loop against the live editor: inspect the canvas and scene panel, click Play, verify Stop appears, click Stop, verify Play returns; returns console/runtime observations and screenshot.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false }
   }
 ];
 
@@ -280,6 +355,191 @@ async function executeEditorControl(args, env) {
   return { ok:true, action:args.action, revision:saved.revision, updated_at:saved.updated_at, selected_object:selected ? {id:selected.id,name:selected.name,shape:selected.shape,position:selected.position,rotation:selected.rotation,scale:selected.scale} : null, project:projectSummary(project) };
 }
 
+function cdpCommand(socket, method, params = {}) {
+  return new Promise((resolve, reject) => {
+    const id = ++nextCdpId;
+    const timer = setTimeout(() => { cleanup(); reject(new Error("CDP command timed out: " + method)); }, 15000);
+    const cleanup = () => {
+      clearTimeout(timer);
+      socket.removeEventListener("message", onMessage);
+      socket.removeEventListener("close", onClose);
+    };
+    const onClose = () => { cleanup(); reject(new Error("Remote browser socket closed.")); };
+    const onMessage = event => {
+      let message;
+      try { message = JSON.parse(event.data); } catch { return; }
+      if (message.id !== id) return;
+      cleanup();
+      if (message.error) reject(new Error(message.error.message || method + " failed"));
+      else resolve(message.result || {});
+    };
+    socket.addEventListener("message", onMessage);
+    socket.addEventListener("close", onClose);
+    try { socket.send(JSON.stringify({id, method, params})); }
+    catch (e) { cleanup(); reject(e); }
+  });
+}
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+async function connectVisualBrowser(env) {
+  if (!env.BROWSER) throw new Error("Cloudflare Browser Run binding is missing on this Worker.");
+  let saved = null;
+  try { saved = JSON.parse((await env.AGENT_STORE.get(VISUAL_SESSION_KEY)) || "null"); } catch {}
+  if (saved?.sessionId && saved?.targetId) {
+    try {
+      const conn = await env.BROWSER.connectSession(saved.sessionId, {targetId: saved.targetId});
+      const response = await conn.webSocket.fetch("https://browser-binding.invalid", {headers:{Upgrade:"websocket"}});
+      if (!response.webSocket) throw new Error("Browser Run did not return a WebSocket.");
+      response.webSocket.accept();
+      return {socket:response.webSocket, sessionId:saved.sessionId, targetId:saved.targetId, reused:true};
+    } catch {
+      try { await env.BROWSER.closeSession(saved.sessionId); } catch {}
+      saved = null;
+    }
+  }
+  const session = await env.BROWSER.acquire({targets:true, keepAlive:600000});
+  let targets = session.targets || [];
+  if (!targets.length) {
+    try { targets = await env.BROWSER.devtools.listTargets(session.sessionId); } catch {}
+  }
+  let target = targets.find(t => t.type === "page");
+  if (!target) target = await env.BROWSER.devtools.newTarget(session.sessionId, "about:blank");
+  const conn = await env.BROWSER.connectSession(session.sessionId, {targetId:target.id});
+  const response = await conn.webSocket.fetch("https://browser-binding.invalid", {headers:{Upgrade:"websocket"}});
+  if (!response.webSocket) throw new Error("Browser Run did not return a WebSocket.");
+  response.webSocket.accept();
+  await env.AGENT_STORE.put(VISUAL_SESSION_KEY, JSON.stringify({sessionId:session.sessionId,targetId:target.id,createdAt:new Date().toISOString()}), {expirationTtl:1200});
+  return {socket:response.webSocket,sessionId:session.sessionId,targetId:target.id,reused:false};
+}
+async function withVisualBrowser(env, fn) {
+  const browser = await connectVisualBrowser(env);
+  try {
+    await cdpCommand(browser.socket, "Page.enable");
+    await cdpCommand(browser.socket, "Runtime.enable");
+    return await fn(browser);
+  } finally {
+    try { browser.socket.close(); } catch {}
+  }
+}
+async function visualEvaluate(socket, expression) {
+  const result = await cdpCommand(socket, "Runtime.evaluate", {expression, returnByValue:true, awaitPromise:true});
+  if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text || "Browser evaluation failed.");
+  return result.result?.value;
+}
+async function visualSummary(socket) {
+  return await visualEvaluate(socket, `(() => {
+    const clean = s => (s || "").replace(/\\s+/g," ").trim().slice(0,180);
+    const rect = e => { const r=e.getBoundingClientRect(); return {x:Math.round(r.x),y:Math.round(r.y),width:Math.round(r.width),height:Math.round(r.height)}; };
+    const visible = e => { const r=e.getBoundingClientRect(), s=getComputedStyle(e); return r.width>0 && r.height>0 && s.visibility!=="hidden" && s.display!=="none"; };
+    const buttons=[...document.querySelectorAll("button,[role=button]")].filter(visible).slice(0,100).map(e=>({text:clean(e.innerText||e.getAttribute("aria-label")||e.title),disabled:!!e.disabled,rect:rect(e)}));
+    const fields=[...document.querySelectorAll("input,textarea,select,[contenteditable=true]")].filter(visible).slice(0,60).map(e=>({tag:e.tagName,type:e.type||null,value:clean(e.value||e.innerText),placeholder:e.placeholder||"",aria:e.getAttribute("aria-label")||"",rect:rect(e)}));
+    const canvases=[...document.querySelectorAll("canvas")].map(e=>({width:e.width,height:e.height,rect:rect(e)}));
+    return {url:location.href,title:document.title,bodyText:clean(document.body.innerText).slice(0,7000),buttons,fields,canvases};
+  })()`);
+}
+async function visualScreenshot(socket) {
+  const result = await cdpCommand(socket, "Page.captureScreenshot", {format:"jpeg",quality:68,fromSurface:true,captureBeyondViewport:false});
+  return result.data;
+}
+async function visualClickInternal(socket, args) {
+  if (typeof args.x === "number" && typeof args.y === "number") {
+    const x=Math.round(args.x), y=Math.round(args.y);
+    await cdpCommand(socket,"Input.dispatchMouseEvent",{type:"mouseMoved",x,y});
+    await cdpCommand(socket,"Input.dispatchMouseEvent",{type:"mousePressed",x,y,button:"left",clickCount:1});
+    await cdpCommand(socket,"Input.dispatchMouseEvent",{type:"mouseReleased",x,y,button:"left",clickCount:1});
+    return {clicked:{x,y},method:"coordinates"};
+  }
+  let lookup;
+  if (typeof args.selector === "string" && args.selector.trim()) {
+    if (args.selector.length>180) throw new Error("Selector is too long.");
+    lookup = `document.querySelector(${JSON.stringify(args.selector)})`;
+  } else if (typeof args.text === "string" && args.text.trim()) {
+    if (args.text.length>120) throw new Error("Text query is too long.");
+    lookup = `[...document.querySelectorAll("button,[role=button],label,[role=tab],input[type=button],input[type=submit]")].find(e=>(e.innerText||e.getAttribute("aria-label")||e.value||e.title||"").trim()===${JSON.stringify(args.text.trim())})`;
+  } else throw new Error("Provide selector, text, or both x and y coordinates.");
+  const found=await visualEvaluate(socket,`(() => { const e=${lookup}; if(!e) return {error:"Element not found"}; const r=e.getBoundingClientRect(),s=getComputedStyle(e); if(e.disabled || r.width<=0 || r.height<=0 || s.visibility==="hidden" || s.display==="none") return {error:"Element is not visible or is disabled"}; return {x:r.x+r.width/2,y:r.y+r.height/2,tag:e.tagName,text:(e.innerText||e.value||e.getAttribute("aria-label")||"").trim().slice(0,120)}; })()`);
+  if(found?.error) throw new Error(found.error);
+  const x=Math.round(found.x), y=Math.round(found.y);
+  await cdpCommand(socket,"Input.dispatchMouseEvent",{type:"mouseMoved",x,y});
+  await cdpCommand(socket,"Input.dispatchMouseEvent",{type:"mousePressed",x,y,button:"left",clickCount:1});
+  await cdpCommand(socket,"Input.dispatchMouseEvent",{type:"mouseReleased",x,y,button:"left",clickCount:1});
+  await sleep(200);
+  return {clicked:found,method:"element-center"};
+}
+async function visualKeyInternal(socket, key) {
+  const combos={"Ctrl+Z":{key:"z",code:"KeyZ",vk:90,mod:2},"Ctrl+Y":{key:"y",code:"KeyY",vk:89,mod:2},"Ctrl+D":{key:"d",code:"KeyD",vk:68,mod:2}};
+  const named={Enter:{key:"Enter",code:"Enter",vk:13},"Escape":{key:"Escape",code:"Escape",vk:27},Tab:{key:"Tab",code:"Tab",vk:9},Delete:{key:"Delete",code:"Delete",vk:46},Backspace:{key:"Backspace",code:"Backspace",vk:8},Space:{key:" ",code:"Space",vk:32},ArrowUp:{key:"ArrowUp",code:"ArrowUp",vk:38},ArrowDown:{key:"ArrowDown",code:"ArrowDown",vk:40},ArrowLeft:{key:"ArrowLeft",code:"ArrowLeft",vk:37},ArrowRight:{key:"ArrowRight",code:"ArrowRight",vk:39},Home:{key:"Home",code:"Home",vk:36},End:{key:"End",code:"End",vk:35},F:{key:"f",code:"KeyF",vk:70},W:{key:"w",code:"KeyW",vk:87},E:{key:"e",code:"KeyE",vk:69},R:{key:"r",code:"KeyR",vk:82}};
+  if(combos[key]){
+    const k=combos[key];
+    await cdpCommand(socket,"Input.dispatchKeyEvent",{type:"keyDown",key:"Control",code:"ControlLeft",windowsVirtualKeyCode:17});
+    await cdpCommand(socket,"Input.dispatchKeyEvent",{type:"keyDown",key:k.key,code:k.code,windowsVirtualKeyCode:k.vk,modifiers:k.mod});
+    await cdpCommand(socket,"Input.dispatchKeyEvent",{type:"keyUp",key:k.key,code:k.code,windowsVirtualKeyCode:k.vk,modifiers:k.mod});
+    await cdpCommand(socket,"Input.dispatchKeyEvent",{type:"keyUp",key:"Control",code:"ControlLeft",windowsVirtualKeyCode:17});
+  } else {
+    const k=named[key]; if(!k) throw new Error("Unsupported key.");
+    await cdpCommand(socket,"Input.dispatchKeyEvent",{type:"keyDown",key:k.key,code:k.code,windowsVirtualKeyCode:k.vk});
+    await cdpCommand(socket,"Input.dispatchKeyEvent",{type:"keyUp",key:k.key,code:k.code,windowsVirtualKeyCode:k.vk});
+  }
+  return {sent:key};
+}
+async function visualTypeInternal(socket, selector, text) {
+  if(typeof selector!=="string"||!selector.trim()||selector.length>180) throw new Error("Invalid field selector.");
+  if(typeof text!=="string"||text.length>4000) throw new Error("Text is too long.");
+  const found=await visualEvaluate(socket,`(() => {const e=document.querySelector(${JSON.stringify(selector)}); if(!e) return {error:"Field not found"}; const r=e.getBoundingClientRect(),s=getComputedStyle(e); if(r.width<=0||r.height<=0||s.display==="none"||s.visibility==="hidden") return {error:"Field is not visible"}; if(!(e instanceof HTMLInputElement||e instanceof HTMLTextAreaElement||e.isContentEditable)) return {error:"Target is not a text-editable field"}; e.focus(); if("select" in e) e.select(); return {tag:e.tagName,type:e.type||null,x:r.x+r.width/2,y:r.y+r.height/2};})()`);
+  if(found?.error) throw new Error(found.error);
+  await cdpCommand(socket,"Input.dispatchMouseEvent",{type:"mouseMoved",x:Math.round(found.x),y:Math.round(found.y)});
+  await cdpCommand(socket,"Input.dispatchMouseEvent",{type:"mousePressed",x:Math.round(found.x),y:Math.round(found.y),button:"left",clickCount:1});
+  await cdpCommand(socket,"Input.dispatchMouseEvent",{type:"mouseReleased",x:Math.round(found.x),y:Math.round(found.y),button:"left",clickCount:1});
+  await cdpCommand(socket,"Input.insertText",{text});
+  return {typed:text.length,selector,tag:found.tag,type:found.type};
+}
+async function visualTool(name,args,env) {
+  return await withVisualBrowser(env, async browser => {
+    const socket=browser.socket;
+    if(name==="visual_open_editor"){
+      await cdpCommand(socket,"Page.navigate",{url:EDITOR_URL});
+      await sleep(3500);
+    } else if(name==="visual_click"){
+      const action=await visualClickInternal(socket,args);
+      await sleep(350);
+      return {structuredContent:{ok:true,action,observation:await visualSummary(socket)},image:await visualScreenshot(socket)};
+    } else if(name==="visual_type"){
+      const action=await visualTypeInternal(socket,args.selector,args.text);
+      await sleep(250);
+      return {structuredContent:{ok:true,action,observation:await visualSummary(socket)},image:await visualScreenshot(socket)};
+    } else if(name==="visual_press_key"){
+      const action=await visualKeyInternal(socket,args.key);
+      await sleep(250);
+      return {structuredContent:{ok:true,action,observation:await visualSummary(socket)},image:await visualScreenshot(socket)};
+    } else if(name==="visual_scroll"){
+      const direction=args.direction;
+      const delta= Math.max(60,Math.min(1200,Number(args.amount)||480));
+      await cdpCommand(socket,"Input.dispatchMouseEvent",{type:"mouseWheel",x:720,y:450,deltaX:direction==="left"?-delta:direction==="right"?delta:0,deltaY:direction==="up"?-delta:direction==="down"?delta:0});
+      await sleep(250);
+      return {structuredContent:{ok:true,direction,amount:delta,observation:await visualSummary(socket)},image:await visualScreenshot(socket)};
+    } else if(name==="visual_run_checks"){
+      const initial=await visualSummary(socket);
+      const canvas=initial.canvases?.length||0;
+      const play=await visualEvaluate(socket,`(() => {const e=[...document.querySelectorAll("button")].find(e=>e.innerText.trim()==="Play"); return !!e && !e.disabled;})()`);
+      if(!play) throw new Error("Play button is not visible or enabled.");
+      await visualClickInternal(socket,{text:"Play"});
+      await sleep(500);
+      const stop=await visualEvaluate(socket,`(() => [...document.querySelectorAll("button")].some(e=>e.innerText.trim()==="Stop" && e.getBoundingClientRect().width>0))()`);
+      if(!stop) throw new Error("Play did not expose the Stop button.");
+      await visualClickInternal(socket,{text:"Stop"});
+      await sleep(350);
+      const playAgain=await visualEvaluate(socket,`(() => [...document.querySelectorAll("button")].some(e=>e.innerText.trim()==="Play" && e.getBoundingClientRect().width>0))()`);
+      const final=await visualSummary(socket);
+      const issues=[];
+      if(canvas!==1) issues.push("Expected exactly one WebGL canvas; got "+canvas);
+      if(!stop) issues.push("Stop button did not appear while playing");
+      if(!playAgain) issues.push("Play button did not return after Stop");
+      return {structuredContent:{ok:issues.length===0,checks:{httpAndPage:true,canvasCount:canvas,playInitially:play,stopAppeared:stop,playReturned:playAgain},issues,observation:final,sessionReused:browser.reused},image:await visualScreenshot(socket)};
+    }
+    return {structuredContent:{ok:true,sessionId:browser.sessionId,targetId:browser.targetId,reused:browser.reused,observation:await visualSummary(socket)},image:await visualScreenshot(socket)};
+  });
+}
+
 async function callTool(name, args = {}, env) {
   if (name === "get_editor_state") {
     const snap = await readAgentSnapshot(env);
@@ -287,6 +547,7 @@ async function callTool(name, args = {}, env) {
     return { revision:snap.revision, stored:!!snap.project, updated_at:snap.updated_at, last_action:snap.last_action, ...projectSummary(project) };
   }
   if (name === "control_editor") return executeEditorControl(args, env);
+  if (name.startsWith("visual_")) return visualTool(name, args, env);
   if (name === "get_project_status") {
     const [repo, runs] = await Promise.all([
       gh("/repos/" + OWNER + "/" + REPO),
@@ -363,7 +624,7 @@ async function handleMcp(request, env) {
       protocolVersion: body.params?.protocolVersion || "2025-03-26",
       capabilities: { tools: { listChanged: false } },
       serverInfo: { name: "claude-game-editor-mcp", version: "2.0.0" },
-      instructions: "Project metadata/source tools are read-only. The get_editor_state tool reads the shared scene. The control_editor tool edits only bounded scene properties and requires an Authorization: Bearer AGENT_API_KEY header."
+      instructions: "This MCP includes a real remote visual browser agent. Use visual_open_editor to start/reuse remote Chrome, visual_inspect and visual_screenshot to observe it, visual_click/visual_type/visual_press_key/visual_scroll to operate the actual UI, and visual_run_checks to verify Play/Stop through real UI input. All visual_ and control_editor tools require an Authorization: Bearer AGENT_API_KEY header. control_editor changes only bounded scene properties. Browser navigation is restricted to the configured editor origin."
     }), 200, { "mcp-protocol-version": body.params?.protocolVersion || "2025-03-26" });
   }
   if (body.method === "ping") return json(rpc(body.id, {}));
@@ -372,12 +633,18 @@ async function handleMcp(request, env) {
     const name = body.params?.name;
     const args = body.params?.arguments || {};
     try {
-      if (name === "control_editor") {
+      if (name === "control_editor" || name.startsWith("visual_")) {
         const expected = env.AGENT_API_KEY;
         const supplied = request.headers.get("authorization") || "";
-        if (!expected || supplied !== "Bearer " + expected) throw new Error("Unauthorized: control_editor requires Authorization: Bearer AGENT_API_KEY.");
+        if (!expected || supplied !== "Bearer " + expected) throw new Error("Unauthorized: " + name + " requires Authorization: Bearer AGENT_API_KEY.");
       }
       const result = await callTool(name, args, env);
+      if (result && typeof result === "object" && result.image && result.structuredContent) {
+        return json(rpc(body.id, { content: [
+          { type: "text", text: JSON.stringify(result.structuredContent, null, 2) },
+          { type: "image", data: result.image, mimeType: "image/jpeg" }
+        ], structuredContent: result.structuredContent, isError: false }));
+      }
       return json(rpc(body.id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], structuredContent: result, isError: false }));
     } catch (e) {
       return json(rpc(body.id, { content: [{ type: "text", text: String(e?.message || e) }], isError: true }));
