@@ -104,11 +104,11 @@ const tools = [
   },
   {
     name: "control_editor",
-    description: "Execute a bounded edit in the live 3D editor scene. Requires Authorization: Bearer AGENT_API_KEY. Changes are stored in the Agent Gateway and live editor tabs pick them up automatically. Actions: add_object, update_object, duplicate_object, delete_object, rename_project, clear_scene, reset_starter, set_mode, set_snap, set_playing.",
+    description: "Execute a bounded edit in the live 3D editor scene. Supports primitive edits and importing approved public OBJ/GLB/GLTF assets by URL. Changes are stored in the Agent Gateway and live editor tabs pick them up automatically. Actions: add_object, import_model, update_object, duplicate_object, delete_object, rename_project, clear_scene, reset_starter, set_mode, set_snap, set_playing.",
     inputSchema: {
       type: "object",
       properties: {
-        action: { type: "string", enum: ["add_object", "update_object", "duplicate_object", "delete_object", "rename_project", "clear_scene", "reset_starter", "set_mode", "set_snap", "set_playing"] },
+        action: { type: "string", enum: ["add_object", "import_model", "update_object", "duplicate_object", "delete_object", "rename_project", "clear_scene", "reset_starter", "set_mode", "set_snap", "set_playing"] },
         id: { type: "string", maxLength: 120 },
         shape: { type: "string", enum: ["box", "sphere", "cylinder", "cone", "torus", "plane", "light"] },
         name: { type: "string", maxLength: 80 },
@@ -120,6 +120,9 @@ const tools = [
         behavior: { type: "string", enum: ["none", "player", "rotate", "bob", "collectible", "hazard", "goal", "patrol"] },
         speed: { type: "number", minimum: 0, maximum: 100 },
         intensity: { type: "number", minimum: 0, maximum: 10000 },
+        model_url: { type: "string", maxLength: 800 },
+        model_format: { type: "string", enum: ["obj", "glb", "gltf"] },
+        asset_files: { type: "object", additionalProperties: { type: "string", maxLength: 800 } },
         mode: { type: "string", enum: ["translate", "rotate", "scale"] },
         snap: { type: "boolean" },
         playing: { type: "boolean" }
@@ -240,6 +243,30 @@ function starterProject() {
 function validVector(v, scale = false) {
   return Array.isArray(v) && v.length === 3 && v.every(n => typeof n === "number" && Number.isFinite(n) && Math.abs(n) <= 10000 && (!scale || Math.abs(n) <= 1000));
 }
+function validatePublicAssetUrl(value) {
+  if (typeof value !== "string" || !value.trim() || value.length > 800) throw new Error("Model asset URL must be a non-empty HTTPS URL up to 800 characters.");
+  let url;
+  try { url = new URL(value); } catch { throw new Error("Model asset URL is invalid."); }
+  const allowedHosts = new Set(["raw.githubusercontent.com", "cdn.jsdelivr.net", "assets.macaly-user-data.dev"]);
+  if (url.protocol !== "https:" || !allowedHosts.has(url.hostname) || url.username || url.password) {
+    throw new Error("Model assets must use HTTPS from raw.githubusercontent.com, cdn.jsdelivr.net, or assets.macaly-user-data.dev.");
+  }
+  return url.toString();
+}
+function validateAssetFiles(value) {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("asset_files must map companion filenames to public HTTPS URLs.");
+  const entries = Object.entries(value);
+  if (entries.length > 12) throw new Error("At most 12 model companion files may be supplied.");
+  const files = {};
+  for (const [name, url] of entries) {
+    if (!/^[A-Za-z0-9_. -]{1,120}$/.test(name) || name === "." || name === ".." || name.includes("/") || name.includes("\\\\")) {
+      throw new Error("Companion filenames must be simple basenames without path separators.");
+    }
+    files[name] = validatePublicAssetUrl(url);
+  }
+  return files;
+}
 function validateObjectPatch(patch) {
   if (!patch || typeof patch !== "object" || Array.isArray(patch)) throw new Error("patch must be an object.");
   const allowed = ["name", "position", "rotation", "scale", "color", "solid", "behavior", "speed", "intensity"];
@@ -291,7 +318,24 @@ async function executeEditorControl(args, env) {
   const project = snap.project || starterProject();
   project.editor = project.editor || {mode:"translate",snap:false,playing:false};
   let targetId = args.id || project.selectedId || null;
-  if (args.action === "add_object") {
+  if (args.action === "import_model") {
+    if (!["obj", "glb", "gltf"].includes(args.model_format)) throw new Error("model_format must be obj, glb, or gltf.");
+    const modelUrl = validatePublicAssetUrl(args.model_url);
+    const assetFiles = validateAssetFiles(args.asset_files);
+    const base = {};
+    for (const k of ["name", "position", "rotation", "scale", "color", "solid", "behavior", "speed", "intensity"]) {
+      if (args[k] !== undefined) base[k] = args[k];
+    }
+    if (base.name === undefined) base.name = "Imported " + args.model_format.toUpperCase() + " model";
+    validateObjectPatch(base);
+    const id = "agent-" + crypto.randomUUID();
+    const fields = {...base, modelData:modelUrl, modelFormat:args.model_format};
+    if (assetFiles && Object.keys(assetFiles).length) fields.assetFiles = assetFiles;
+    const object = createObject(id, "model", fields);
+    project.objects.push(object);
+    project.selectedId = id;
+    targetId = id;
+  } else if (args.action === "add_object") {
     if (!args.shape || !VALID_SHAPES.includes(args.shape) || args.shape === "model" || args.shape === "image") throw new Error("Choose a primitive shape: box, sphere, cylinder, cone, torus, plane, or light.");
     const id = "agent-" + crypto.randomUUID();
     const base = {};
@@ -352,7 +396,7 @@ async function executeEditorControl(args, env) {
   }
   const saved = await saveAgentProject(env, snap, project, args.action);
   const selected = project.selectedId ? project.objects.find(o => o.id === project.selectedId) : null;
-  return { ok:true, action:args.action, revision:saved.revision, updated_at:saved.updated_at, selected_object:selected ? {id:selected.id,name:selected.name,shape:selected.shape,position:selected.position,rotation:selected.rotation,scale:selected.scale} : null, project:projectSummary(project) };
+  return { ok:true, action:args.action, revision:saved.revision, updated_at:saved.updated_at, selected_object:selected ? {id:selected.id,name:selected.name,shape:selected.shape,position:selected.position,rotation:selected.rotation,scale:selected.scale,modelFormat:selected.modelFormat||null,hasAsset:!!selected.modelData} : null, project:projectSummary(project) };
 }
 
 function cdpCommand(socket, method, params = {}) {
