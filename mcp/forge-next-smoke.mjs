@@ -44,7 +44,7 @@ try {
   if(initial.unexpectedLegacyControls!==0)throw new Error("Legacy floating/play controls leaked into the new editor.");
   if(initial.rootOverflow>1)throw new Error("Desktop page has horizontal overflow: "+initial.rootOverflow);
   for(const [name,present] of Object.entries(initial.modules))if(!present)throw new Error("Missing vNext engine integration: "+name);
-  if(initial.workspaces.length!==7)throw new Error("Expected seven functional workspace destinations.");
+  if(initial.workspaces.length!==8)throw new Error("Expected eight task workspaces including Image Model.");
 
   // Create/select a real engine object and verify the tree follows engine state.
   const beforeCreate=await page.evaluate(()=>window.Forge.entities.size);
@@ -85,9 +85,20 @@ try {
   if(!material||Math.abs(material.color[1]-(119/255))>0.02)throw new Error("Material editor did not write to the real engine material: "+JSON.stringify(material));
   await page.locator('[data-workspace="animation"]').click();
   await page.waitForFunction(()=>document.documentElement.dataset.forgeWorkspace==="animation"&&!document.querySelector("#timelinePanel").hidden,null,{timeout:5000});
+  await page.locator("#keyInterpolation").selectOption("ease");
+  await page.locator("#currentFrame").fill("0");await page.locator("#currentFrame").press("Tab");
   await page.locator('[data-command="keyframe"]').click();
-  const keyCount=await page.evaluate(()=>window.Forge.keyframes.get(window.Forge.selectedId)?.length||0);
-  if(keyCount!==1)throw new Error("Animation workspace did not record a keyframe.");
+  const firstKey=await page.evaluate(()=>({keys:window.Forge.keyframes.get(window.Forge.selectedId)?.length||0,mode:window.Forge.keyframes.get(window.Forge.selectedId)?.[0]?.interpolation}));
+  if(firstKey.keys!==1||firstKey.mode!=="ease")throw new Error("Animation workspace did not record a key with selected interpolation: "+JSON.stringify(firstKey));
+  await page.locator("#currentFrame").fill("24");await page.locator("#currentFrame").press("Tab");
+  await page.locator("#positionX").fill("4.5");await page.locator("#positionX").press("Tab");
+  await page.locator('[data-command="keyframe"]').click();
+  const twoKeys=await page.evaluate(()=>({keys:window.Forge.keyframes.get(window.Forge.selectedId)?.length||0,markers:document.querySelectorAll(".timeline-key-marker").length}));
+  if(twoKeys.keys!==2||twoKeys.markers!==6)throw new Error("Two animation keys were not rendered across the three transform lanes: "+JSON.stringify(twoKeys));
+  await page.locator("#currentFrame").fill("12");await page.locator("#currentFrame").press("Tab");
+  await page.waitForFunction(()=>Math.abs(window.Forge.selected().entity.getLocalPosition().x-3.5)<0.05,null,{timeout:5000});
+  const interpolated=await page.evaluate(()=>({frame:Number(document.querySelector("#currentFrame").value),x:window.Forge.selected().entity.getLocalPosition().x,keys:window.Forge.keyframes.get(window.Forge.selectedId).length}));
+  if(interpolated.frame!==12||Math.abs(interpolated.x-3.5)>0.05)throw new Error("Timeline scrubbing or Ease interpolation failed: "+JSON.stringify(interpolated));
   await page.locator('[data-command="timeline-play"]').click();
   await page.waitForFunction(()=>window.Forge.timelinePlaying===true,null,{timeout:5000});
   const timelineOnly=await page.evaluate(()=>({timeline:window.Forge.timelinePlaying,preview:window.Forge.running,pressed:document.querySelector("#timelinePlay").getAttribute("aria-pressed")}));
@@ -100,6 +111,12 @@ try {
   if(!previewOnly.preview||previewOnly.timeline||previewOnly.pressed!=="true")throw new Error("Preview did not remain independent from timeline: "+JSON.stringify(previewOnly));
   await page.locator("#previewScene").click();
   await page.waitForFunction(()=>window.Forge.running===false,null,{timeout:5000});
+  await page.locator('[data-command="toggle-auto-key"]').click();
+  await page.locator("#currentFrame").fill("36");await page.locator("#currentFrame").press("Tab");
+  await page.locator("#positionY").fill("3.25");await page.locator("#positionY").press("Tab");
+  const autoKeyResult=await page.evaluate(()=>({enabled:document.querySelector("#autoKeyButton").getAttribute("aria-pressed"),keys:window.Forge.keyframes.get(window.Forge.selectedId)?.length||0,has36:window.Forge.keyframes.get(window.Forge.selectedId)?.some(k=>Math.round(k.time*24)===36)}));
+  if(autoKeyResult.enabled!=="true"||!autoKeyResult.has36)throw new Error("Auto-key did not record the edited transform: "+JSON.stringify(autoKeyResult));
+  await page.locator('[data-command="toggle-auto-key"]').click();
 
   // A project download is an observable action, not a simulated success toast.
   const downloadPromise=page.waitForEvent("download",{timeout:10000});
@@ -107,6 +124,22 @@ try {
   const download=await downloadPromise;
   if(!/\.forge\.json$/.test(download.suggestedFilename()))throw new Error("Save did not produce a Forge project file: "+download.suggestedFilename());
   await page.screenshot({path:path.join(ARTIFACTS,"forge-next-desktop.png"),fullPage:true});
+
+  // Reference images become calibrated entities in the 3D scene, not DOM-only mock data.
+  await page.locator('[data-workspace="references"]').click();
+  await page.waitForFunction(()=>document.documentElement.dataset.forgeWorkspace==="references"&&!document.querySelector('[data-inspector-panel="references"]').hidden,null,{timeout:5000});
+  await page.locator("#referenceAxis").selectOption("front");await page.locator("#referenceWidth").fill("3.2");
+  const png=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC","base64");
+  await page.locator("#referenceInput").setInputFiles({name:"qa-front-reference.png",mimeType:"image/png",buffer:png});
+  await page.waitForFunction(()=>[...window.Forge.entities.values()].some(r=>r.components?.reference?.name==="qa-front-reference.png"),null,{timeout:10000});
+  const reference=await page.evaluate(()=>{const r=[...window.Forge.entities.values()].find(o=>o.components?.reference?.name==="qa-front-reference.png"),rot=r.entity.getLocalEulerAngles(),scale=r.entity.getLocalScale();return{axis:r.components.reference.axis,width:r.components.reference.width,scale:[scale.x,scale.y,scale.z],rotation:[rot.x,rot.y,rot.z],panelCount:Number(document.querySelector("#referenceCount").textContent)}});
+  if(reference.axis!=="front"||Math.abs(reference.width-3.2)>0.001||Math.abs(reference.scale[0]-3.2)>0.001||Math.abs(reference.rotation[0]-90)>0.01||reference.panelCount!==1)throw new Error("Front reference calibration failed: "+JSON.stringify(reference));
+  await page.locator("#referenceAxis").selectOption("side");await page.locator("#referenceWidth").fill("4.5");await page.locator('[data-command="apply-reference-setup"]').click();
+  const sideReference=await page.evaluate(()=>{const r=window.Forge.selected(),rot=r.entity.getLocalEulerAngles(),scale=r.entity.getLocalScale();return{axis:r.components.reference.axis,width:r.components.reference.width,rotY:rot.y,scaleX:scale.x}});
+  if(sideReference.axis!=="side"||Math.abs(sideReference.width-4.5)>0.001||Math.abs(sideReference.rotY-90)>0.01||Math.abs(sideReference.scaleX-4.5)>0.001)throw new Error("Side reference calibration failed: "+JSON.stringify(sideReference));
+  await page.locator('[data-command="toggle-reference-visibility"]').click();if(await page.evaluate(()=>window.Forge.selected().entity.enabled)!==false)throw new Error("Reference hide action failed.");
+  await page.locator('[data-command="toggle-reference-visibility"]').click();if(await page.evaluate(()=>window.Forge.selected().entity.enabled)!==true)throw new Error("Reference show action failed.");
+  await page.screenshot({path:path.join(ARTIFACTS,"forge-next-reference-modeling.png"),fullPage:true});
 
   // Resizing docks must persist layout dimensions without pushing the main page horizontally.
   const leftBefore=await page.evaluate(()=>parseInt(getComputedStyle(document.documentElement).getPropertyValue("--left-dock-width"),10));
@@ -144,6 +177,10 @@ try {
     await page.locator('[data-mobile-panel="properties"]').click();
     await page.waitForFunction(()=>document.querySelector("#rightDock").classList.contains("is-open"),null,{timeout:5000});
     await page.locator("#drawerScrim").click({position:{x:3,y:viewport.height/2}});
+    await page.waitForFunction(()=>!document.querySelector("#rightDock").classList.contains("is-open"),null,{timeout:5000});
+    await page.locator('[data-mobile-panel="references"]').click();
+    await page.waitForFunction(()=>document.querySelector("#rightDock").classList.contains("is-open")&&!document.querySelector('[data-inspector-panel="references"]').hidden,null,{timeout:5000});
+    await page.locator("#drawerScrim").click({position:{x:viewport.width-3,y:viewport.height/2}});
     await page.waitForFunction(()=>!document.querySelector("#rightDock").classList.contains("is-open"),null,{timeout:5000});
     await page.locator('[data-mobile-panel="timeline"]').click();
     await page.waitForFunction(()=>document.documentElement.dataset.forgeWorkspace==="animation"&&!document.querySelector("#timelinePanel").hidden,null,{timeout:5000});
