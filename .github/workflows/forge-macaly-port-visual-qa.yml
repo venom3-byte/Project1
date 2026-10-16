@@ -1,0 +1,124 @@
+name: Forge Macaly port visual QA
+on:
+  push:
+    branches:
+      - agent/forge-reverse-engineering-port
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: forge-macaly-port-visual-qa
+  cancel-in-progress: true
+jobs:
+  verify-macaly-port:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out the port branch
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install app dependencies
+        run: npm ci
+      - name: Unit tests
+        run: npm test -- --reporter=dot
+      - name: Production build
+        env:
+          DEV_BUILD: "1"
+          STATIC_EXPORT: "1"
+          VITE_BASE_PATH: "/"
+        run: npm run build
+      - name: Validate F-16 source mesh
+        run: node scripts/validate-f16-model.mjs
+      - name: Syntax-check the copied browser modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            node --check "$file"
+          done < <(find public/forge -type f -name '*.js' -print0)
+          node --check public/forge/forge-pipeline.mjs
+          node --check public/forge/vision-control.mjs
+          node --check public/forge/vision-controller.mjs
+          echo "All copied browser and reference server modules passed Node syntax checks."
+      - name: Install isolated browser runner
+        run: npm install --prefix mcp --no-audit --no-fund
+      - name: Run the actual copied Forge UI in Chromium
+        shell: bash
+        env:
+          FORGE_LOCAL_TEST: "1"
+          FORGE_EDITOR_URL: http://127.0.0.1:4173/forge/index.html
+          FORGE_VISUAL_PROFILE: ${{ runner.temp }}/forge-port-qa/storage-state.json
+          FORGE_VISUAL_ARTIFACTS: ${{ runner.temp }}/forge-port-qa/artifacts
+        run: |
+          set -euo pipefail
+          npm run dev -- --host 127.0.0.1 --port 4173 > "$RUNNER_TEMP/forge-port-vite.log" 2>&1 &
+          server_pid=$!
+          cleanup() {
+            kill "$server_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:4173/forge/index.html -o /tmp/forge-port-index.html; then
+              break
+            fi
+            sleep 1
+          done
+          test -s /tmp/forge-port-index.html || { cat "$RUNNER_TEMP/forge-port-vite.log"; exit 1; }
+          grep -q 'Forge Studio 3.9' /tmp/forge-port-index.html
+          set +e
+          node mcp/visual-agent-runner.mjs inspect > forge-port-inspect.json 2>&1
+          inspect_code=$?
+          node mcp/visual-agent-runner.mjs checks > forge-port-checks.json 2>&1
+          checks_code=$?
+          set -e
+          echo "inspect_exit_code=$inspect_code"
+          echo "checks_exit_code=$checks_code"
+          echo "=== COPIED FORGE BOOT / SCENE REPORT ==="
+          cat forge-port-inspect.json
+          echo "=== COPIED FORGE PLAY / STOP REPORT ==="
+          cat forge-port-checks.json
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const inspect = JSON.parse(fs.readFileSync("forge-port-inspect.json", "utf8"));
+          const checks = JSON.parse(fs.readFileSync("forge-port-checks.json", "utf8"));
+          const errors = [];
+          if (!inspect.ok) errors.push("visual-agent inspect did not pass");
+          if (inspect.responseStatus !== 200) errors.push("Forge page did not return HTTP 200");
+          if (inspect.observation?.title !== "Forge Studio 3.9 — Claude Layout") errors.push("the copied Macaly Forge HTML title was not served");
+          if (inspect.observation?.forgeBootState !== "ready") errors.push("Forge failed to report its ready boot state");
+          if (!inspect.observation?.forgeEnginePresent) errors.push("window.Forge engine is not present");
+          if (!inspect.observation?.forgeDiagnostics || inspect.observation?.forgeDiagnostics?.error) errors.push("Forge diagnostics were missing or errored");
+          if ((inspect.observation?.canvases || []).length !== 1) errors.push("expected exactly one main Forge canvas");
+          if ((inspect.verification?.pageErrors || []).length) errors.push("browser page errors were detected");
+          if (!checks.ok || !checks.action?.passed) errors.push("actual Play → Stop → Play UI checks failed");
+          if ((checks.verification?.pageErrors || []).length) errors.push("browser page errors appeared during Play/Stop checks");
+          if (errors.length) {
+            console.error(JSON.stringify({ ok: false, errors, forge: inspect.observation?.forgeDiagnostics }, null, 2));
+            process.exit(1);
+          }
+          console.log(JSON.stringify({
+            ok: true,
+            title: inspect.observation.title,
+            forgeBootState: inspect.observation.forgeBootState,
+            forgeDiagnostics: inspect.observation.forgeDiagnostics,
+            canvasCount: inspect.observation.canvases.length,
+            playStopPlay: checks.action
+          }, null, 2));
+          NODE
+          test "$inspect_code" -eq 0
+          test "$checks_code" -eq 0
+      - name: Upload reports and real browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-macaly-port-visual-qa
+          if-no-files-found: warn
+          path: |
+            forge-port-inspect.json
+            forge-port-checks.json
+            ${{ runner.temp }}/forge-port-qa/artifacts/
+            ${{ runner.temp }}/forge-port-vite.log
