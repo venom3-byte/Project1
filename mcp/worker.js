@@ -612,15 +612,15 @@ async function visualTool(name,args,env) {
     } else if(name==="visual_run_checks"){
       const initial=await visualSummary(socket);
       const canvas=initial.canvases?.length||0;
-      const play=await visualEvaluate(socket,`(() => {const e=[...document.querySelectorAll("button")].find(e=>e.innerText.trim()==="Play"); return !!e && !e.disabled;})()`);
-      if(!play) throw new Error("Play button is not visible or enabled.");
-      await visualClickInternal(socket,{text:"Play"});
+      const play=await visualEvaluate(socket,`(() => {const e=document.querySelector("#play"),r=e?.getBoundingClientRect(),label=(e?.textContent||"").trim(); return !!e && !e.disabled && !!r && r.width>0 && r.height>0 && /play/i.test(label) && !/stop/i.test(label);})()`);
+      if(!play) throw new Error("Forge #play button is not visible or in its Play state.");
+      await visualClickInternal(socket,{selector:"#play"});
       await sleep(500);
-      const stop=await visualEvaluate(socket,`(() => [...document.querySelectorAll("button")].some(e=>e.innerText.trim()==="Stop" && e.getBoundingClientRect().width>0))()`);
-      if(!stop) throw new Error("Play did not expose the Stop button.");
-      await visualClickInternal(socket,{text:"Stop"});
+      const stop=await visualEvaluate(socket,`(() => {const e=document.querySelector("#play"),r=e?.getBoundingClientRect(); return !!e && !!r && r.width>0 && r.height>0 && /stop/i.test(e.textContent||"");})()`);
+      if(!stop) throw new Error("Play did not put Forge #play into its Stop state.");
+      await visualClickInternal(socket,{selector:"#play"});
       await sleep(350);
-      const playAgain=await visualEvaluate(socket,`(() => [...document.querySelectorAll("button")].some(e=>e.innerText.trim()==="Play" && e.getBoundingClientRect().width>0))()`);
+      const playAgain=await visualEvaluate(socket,`(() => {const e=document.querySelector("#play"),r=e?.getBoundingClientRect(),label=(e?.textContent||"").trim(); return !!e && !!r && r.width>0 && r.height>0 && /play/i.test(label) && !/stop/i.test(label);})()`);
       const final=await visualSummary(socket);
       const issues=[];
       if(canvas!==1) issues.push("Expected exactly one WebGL canvas; got "+canvas);
