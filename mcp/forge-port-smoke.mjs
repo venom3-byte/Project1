@@ -133,8 +133,9 @@ try {
   await referenceDialog.waitFor({state:"visible",timeout:5000});
   await referenceDialog.locator('[data-ref-slot="front"]').click();
   await referenceDialog.locator("#refFile").setInputFiles({
-    name:"qa-blueprint.svg",mimeType:"image/svg+xml",
-    buffer:Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="160" height="80" viewBox="0 0 160 80"><rect width="160" height="80" fill="#f2f4f7"/><path d="M8 40H152M80 8V72" stroke="#2367a8" stroke-width="2"/><rect x="20" y="24" width="120" height="32" fill="none" stroke="#d64747" stroke-width="2"/></svg>')
+    // Tiny valid PNG fixture: exercise the same browser-decoded raster path users upload.
+    name:"qa-blueprint.png",mimeType:"image/png",
+    buffer:Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC","base64")
   });
   await frame.waitForFunction(() => window.ForgeReferenceStudio?.status?.().referenceCount === 1, null, {timeout:10000});
   await referenceDialog.locator("#refWidth").fill("25");
