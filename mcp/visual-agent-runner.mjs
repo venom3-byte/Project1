@@ -1,0 +1,150 @@
+#!/usr/bin/env node
+/**
+ * Visual-agent fallback runner for the public Forge / Claude Game Editor copy.
+ * Each invocation opens Chromium, performs a bounded UI action or check,
+ * captures a screenshot, persists browser storage, and closes cleanly.
+ */
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import chromiumModule from "@sparticuz/chromium";
+import { chromium } from "playwright-core";
+
+const Chromium = chromiumModule.default || chromiumModule;
+const EDITOR_URL = process.env.FORGE_EDITOR_URL || "https://claude-game-editor-copy.forgemail-agent.workers.dev/";
+const EDITOR_ORIGIN = new URL(EDITOR_URL).origin;
+if (EDITOR_ORIGIN !== "https://claude-game-editor-copy.forgemail-agent.workers.dev") {
+  throw new Error("FORGE_EDITOR_URL is restricted to the configured public editor origin.");
+}
+const profilePath = process.env.FORGE_VISUAL_PROFILE || path.join(os.homedir(), ".cache", "forge-visual-agent", "storage-state.json");
+const artifactDir = process.env.FORGE_VISUAL_ARTIFACTS || path.join(os.homedir(), ".cache", "forge-visual-agent", "artifacts");
+const viewport = { width: 1440, height: 900 };
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+async function ensureDir(p) { await fs.mkdir(p, { recursive: true }); }
+function safeName(s) { return String(s || "step").toLowerCase().replace(/[^a-z0-9_-]+/g, "-").slice(0, 60) || "step"; }
+
+async function main() {
+  const command = process.argv[2] || "inspect";
+  const args = process.argv[3] ? JSON.parse(process.argv[3]) : {};
+  const allowed = new Set(["open", "inspect", "screenshot", "click", "type", "key", "scroll", "checks"]);
+  if (!allowed.has(command)) throw new Error("Unsupported command. Use: " + [...allowed].join(", "));
+  await ensureDir(path.dirname(profilePath));
+  await ensureDir(artifactDir);
+
+  let storageState;
+  try { storageState = JSON.parse(await fs.readFile(profilePath, "utf8")); } catch { storageState = undefined; }
+  const browser = await chromium.launch({
+    headless: true,
+    executablePath: await Chromium.executablePath(),
+    args: Chromium.args,
+    timeout: 60000
+  });
+  const context = await browser.newContext({ viewport, deviceScaleFactor: 1, storageState, ignoreHTTPSErrors: false });
+  const page = await context.newPage();
+  const pageErrors = [];
+  const consoleErrors = [];
+  page.on("pageerror", e => pageErrors.push(String(e?.message || e)));
+  page.on("console", msg => { if (msg.type() === "error") consoleErrors.push(msg.text().slice(0, 500)); });
+
+  let responseStatus = null;
+  let action = null;
+  try {
+    const response = await page.goto(EDITOR_URL, { waitUntil: "domcontentloaded", timeout: 60000 });
+    responseStatus = response?.status() ?? null;
+    await page.locator("canvas").first().waitFor({ state: "visible", timeout: 30000 });
+    await sleep(1000);
+
+    if (command === "click") {
+      const ways = Number(!!args.selector) + Number(!!args.text) + Number(Number.isFinite(args.x) && Number.isFinite(args.y));
+      if (ways !== 1) throw new Error("Provide exactly one of selector, text, or x/y coordinates.");
+      if (args.selector) {
+        if (typeof args.selector !== "string" || args.selector.length > 180) throw new Error("Selector must be at most 180 characters.");
+        const target = page.locator(args.selector).first();
+        await target.waitFor({ state: "visible", timeout: 10000 });
+        await target.click({ timeout: 10000 });
+        action = { type: "click", selector: args.selector };
+      } else if (args.text) {
+        if (typeof args.text !== "string" || args.text.length > 120) throw new Error("Text target must be at most 120 characters.");
+        const target = page.getByRole("button", { name: args.text, exact: true }).first();
+        await target.waitFor({ state: "visible", timeout: 10000 });
+        await target.click({ timeout: 10000 });
+        action = { type: "click", text: args.text };
+      } else {
+        const x = Number(args.x), y = Number(args.y);
+        if (x < 0 || y < 0 || x > viewport.width || y > viewport.height) throw new Error("Coordinates are outside the current viewport.");
+        await page.mouse.click(x, y);
+        action = { type: "click", x, y };
+      }
+    } else if (command === "type") {
+      if (typeof args.selector !== "string" || args.selector.length > 180) throw new Error("A valid field selector is required.");
+      if (typeof args.text !== "string" || args.text.length > 4000) throw new Error("Text is limited to 4000 characters.");
+      const target = page.locator(args.selector).first();
+      await target.waitFor({ state: "visible", timeout: 10000 });
+      const tag = await target.evaluate(e => ({ tag: e.tagName, editable: e.isContentEditable || e instanceof HTMLInputElement || e instanceof HTMLTextAreaElement }));
+      if (!tag.editable) throw new Error("The selector does not target an editable field.");
+      await target.fill(args.text, { timeout: 10000 });
+      action = { type: "type", selector: args.selector, characters: args.text.length };
+    } else if (command === "key") {
+      const allowedKeys = new Set(["Enter", "Escape", "Tab", "Delete", "Backspace", "Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "F", "W", "E", "R", "Control+Z", "Control+Y", "Control+D"]);
+      if (!allowedKeys.has(args.key)) throw new Error("Unsupported keyboard input.");
+      await page.keyboard.press(args.key);
+      action = { type: "key", key: args.key };
+    } else if (command === "scroll") {
+      const dir = args.direction;
+      if (!["up", "down", "left", "right"].includes(dir)) throw new Error("direction must be up/down/left/right.");
+      const amount = Math.max(60, Math.min(1200, Number(args.amount) || 480));
+      await page.mouse.move(viewport.width * 0.72, viewport.height * 0.72);
+      await page.mouse.wheel(dir === "left" ? -amount : dir === "right" ? amount : 0, dir === "up" ? -amount : dir === "down" ? amount : 0);
+      action = { type: "scroll", direction: dir, amount };
+    } else if (command === "checks") {
+      const canvasCount = await page.locator("canvas").count();
+      const play = page.getByRole("button", { name: "Play", exact: true }).first();
+      const playInitially = await play.isVisible().catch(() => false);
+      if (!playInitially) throw new Error("Play button is not visible.");
+      await play.click();
+      const stop = page.getByRole("button", { name: "Stop", exact: true }).first();
+      await stop.waitFor({ state: "visible", timeout: 5000 });
+      const stopAppeared = await stop.isVisible();
+      await stop.click();
+      const playReturned = await page.getByRole("button", { name: "Play", exact: true }).first().isVisible({ timeout: 5000 }).catch(() => false);
+      action = { type: "checks", canvasCount, playInitially, stopAppeared, playReturned, passed: canvasCount === 1 && playInitially && stopAppeared && playReturned };
+    }
+
+    await sleep(300);
+    const observation = await page.evaluate(() => {
+      const clean = s => String(s || "").replace(/\s+/g, " ").trim().slice(0, 180);
+      const visible = e => { const r=e.getBoundingClientRect(),s=getComputedStyle(e); return r.width>0 && r.height>0 && s.display!=="none" && s.visibility!=="hidden"; };
+      const rect = e => { const r=e.getBoundingClientRect(); return {x:Math.round(r.x),y:Math.round(r.y),width:Math.round(r.width),height:Math.round(r.height)}; };
+      const project = (() => { try { return JSON.parse(localStorage.getItem("game-editor:project:v1") || "null"); } catch { return null; } })();
+      return {
+        title: document.title, url: location.href, bodyText: clean(document.body.innerText).slice(0, 7000),
+        buttons: [...document.querySelectorAll("button,[role=button]")].filter(visible).slice(0,100).map(e=>({text:clean(e.innerText||e.getAttribute("aria-label")||e.title),disabled:!!e.disabled,rect:rect(e)})),
+        fields: [...document.querySelectorAll("input,textarea,select,[contenteditable=true]")].filter(visible).slice(0,60).map(e=>({tag:e.tagName,type:e.type||null,value:clean(e.value||e.innerText),placeholder:e.placeholder||"",aria:e.getAttribute("aria-label")||"",rect:rect(e)})),
+        canvases: [...document.querySelectorAll("canvas")].map(e=>({width:e.width,height:e.height,rect:rect(e)})),
+        project: project ? {name:project.name,objectCount:project.objects?.length||0,selectedId:project.selectedId||null,objects:(project.objects||[]).slice(0,80).map(o=>({id:o.id,name:o.name,shape:o.shape,position:o.position,rotation:o.rotation,scale:o.scale,color:o.color,behavior:o.behavior}))} : null
+      };
+    });
+
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const screenshotPath = path.join(artifactDir, stamp + "-" + safeName(command) + ".jpg");
+    await page.screenshot({ path: screenshotPath, type: "jpeg", quality: 72, fullPage: false });
+    await context.storageState({ path: profilePath });
+    const report = {
+      ok: responseStatus === 200 && pageErrors.length === 0 && !(command === "checks" && !action?.passed),
+      command, responseStatus, action, observation,
+      verification: { pageErrors, consoleErrors: consoleErrors.slice(0, 15) },
+      screenshotPath, profilePersisted: true
+    };
+    console.log(JSON.stringify(report, null, 2));
+    if (!report.ok) process.exitCode = 2;
+  } finally {
+    try { await context.storageState({ path: profilePath }); } catch {}
+    await context.close();
+    await browser.close();
+  }
+}
+main().catch(error => {
+  console.error(JSON.stringify({ ok: false, error: String(error?.message || error) }));
+  process.exit(1);
+});
