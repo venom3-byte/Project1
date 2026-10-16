@@ -164,16 +164,23 @@ export function normalizeForgeCommand(input) {
       result[key] = requireString(value, key);
     }
   }
-  if (["inspect", "select", "physics", "duplicate", "delete", "transform", "animation-state"].includes(op) && !result.id && !result.name) {
+  if (["inspect", "select"].includes(op) && !result.id && !result.name) {
     throw new Error(op + " requires a stable id or name.");
+  }
+  if (["transform", "physics", "duplicate", "delete", "move-screen"].includes(op) && !result.id) {
+    throw new Error(op + " requires a stable target id.");
   }
   if (op === "create" && !result.kind) result.kind = "box";
   if (op === "transform" && !["x","y","z","rx","ry","rz","sx","sy","sz"].some(key => key in result)) {
     throw new Error("transform requires at least one transform field.");
   }
   if (op === "physics" && !result.mode) throw new Error("physics requires mode.");
+  if (op === "move-screen" && (!("x" in result) || !("y" in result))) {
+    throw new Error("move-screen requires screen coordinates x and y.");
+  }
   if (op === "nav-path" && (!result.start || !result.goal)) throw new Error("nav-path requires both start and goal.");
   if (op === "animation-graph-param" && !("value" in result)) throw new Error("animation-graph-param requires value.");
+  if (op === "rig-validate" && !result.rigId) throw new Error("rig-validate requires rigId.");
   if (op === "terrain-generate") boundedJson(result.options || {}, 12000);
   boundedJson(result, 55000);
   return result;
