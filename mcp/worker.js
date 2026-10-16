@@ -668,10 +668,20 @@ export default {
     let path = decodeURIComponent(url.pathname || "/");
     if (path === "/" || path.endsWith("/")) path += "index.html";
     if (path.split("/").some(part => part === "..")) return new Response("Bad path", { status: 400 });
-    const source = RAW.replace("/main/", "/runtime-site/") + path;
-    let upstream = await fetch(source, { cf: { cacheTtl: 0, cacheEverything: false } });
-    if (!upstream.ok && !/\.[^/]+$/.test(path)) {
-      upstream = await fetch(RAW.replace("/main/", "/runtime-site/") + "index.html");
+    // raw.githubusercontent.com may cache the mutable runtime-site branch
+    // name across deployments. A minute-bucket query forces a fresh origin key
+    // while immutable hashed assets still remain cacheable by browsers.
+    const runtimeBase = RAW.replace("/main/", "/runtime-site/");
+    const sourceVersion = "?forge_runtime=" + Math.floor(Date.now() / 60000);
+    let upstream = await fetch(runtimeBase + path + sourceVersion, {
+      cf: { cacheTtl: 0, cacheEverything: false },
+      headers: { "cache-control": "no-cache", "pragma": "no-cache" }
+    });
+    if (!upstream.ok && !/\\.[^/]+$/.test(path)) {
+      upstream = await fetch(runtimeBase + "index.html" + sourceVersion, {
+        cf: { cacheTtl: 0, cacheEverything: false },
+        headers: { "cache-control": "no-cache", "pragma": "no-cache" }
+      });
       path = "/index.html";
     }
     if (!upstream.ok) return new Response("The app build is not published yet. Check the GitHub Actions build.", { status: 503, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" } });
