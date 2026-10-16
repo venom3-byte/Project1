@@ -40,9 +40,9 @@ jobs:
           while IFS= read -r -d '' file; do
             node --check "$file"
           done < <(find public/forge -type f -name '*.js' -print0)
-          node --check public/forge/forge-pipeline.mjs
-          node --check public/forge/vision-control.mjs
-          node --check public/forge/vision-controller.mjs
+          node --check server/forge/forge-pipeline.mjs
+          node --check server/forge/vision-control.mjs
+          node --check server/forge/vision-controller.mjs
           echo "All copied browser and reference server modules passed Node syntax checks."
       - name: Install isolated browser runner
         run: npm install --prefix mcp --no-audit --no-fund
