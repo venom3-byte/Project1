@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import chromiumModule from "@sparticuz/chromium";
 import { chromium } from "playwright-core";
+import { normalizeForgeCommand } from "./forge-command-schema.mjs";
 
 const Chromium = chromiumModule.default || chromiumModule;
 const URL_TO_TEST = process.env.FORGE_PORT_URL || "http://127.0.0.1:4173/";
@@ -91,6 +92,54 @@ try {
   await forgeFrameLocator.locator('[data-add="sphere"]').first().click();
   await frame.waitForFunction(previous => window.Forge.entities.size === previous + 1, entityCountBefore, { timeout: 10000 });
   const entityCountAfterAdd = await frame.evaluate(() => window.Forge.entities.size);
+  const uiSphereId = await frame.evaluate(() => window.Forge.selectedId);
+
+  // Exercise the same provider-neutral structured command contract used by forge_command.
+  const agentPhysicsBefore = await frame.evaluate(() => window.Forge.diagnostics().physics);
+  const agentCreateResult = await frame.evaluate(
+    command => window.ForgeAgent.execute(command),
+    normalizeForgeCommand({ op: "create", kind: "sphere", name: "MCP Probe", x: 0, y: 2, z: 0 }),
+  );
+  if (!agentCreateResult?.id) throw new Error("ForgeAgent.create did not return a stable entity ID.");
+  const agentInspectResult = await frame.evaluate(
+    command => window.ForgeAgent.execute(command),
+    normalizeForgeCommand({ op: "inspect", id: agentCreateResult.id }),
+  );
+  if (!agentInspectResult) throw new Error("ForgeAgent.inspect did not return scene inspection data.");
+  await frame.evaluate(
+    command => window.ForgeAgent.execute(command),
+    normalizeForgeCommand({ op: "transform", id: agentCreateResult.id, x: 2, y: 1, z: -1 }),
+  );
+  const agentTransform = await frame.evaluate(id => {
+    const entity = window.Forge.entities.get(id);
+    if (!entity) return null;
+    const p = entity.entity.getLocalPosition();
+    return { x: p.x, y: p.y, z: p.z };
+  }, agentCreateResult.id);
+  if (!agentTransform || Math.abs(agentTransform.x - 2) > 1e-5 || Math.abs(agentTransform.y - 1) > 1e-5 || Math.abs(agentTransform.z + 1) > 1e-5) {
+    throw new Error("ForgeAgent.transform did not update real engine state: " + JSON.stringify(agentTransform));
+  }
+  await frame.evaluate(
+    command => window.ForgeAgent.execute(command),
+    normalizeForgeCommand({ op: "physics", id: agentCreateResult.id, mode: "fixed", shape: "ball" }),
+  );
+  const agentPhysicsAfter = await frame.evaluate(() => window.Forge.diagnostics().physics);
+  if (agentPhysicsAfter !== agentPhysicsBefore + 1) throw new Error("ForgeAgent.physics did not add a real physics body.");
+  await frame.evaluate(
+    command => window.ForgeAgent.execute(command),
+    normalizeForgeCommand({ op: "delete", id: agentCreateResult.id }),
+  );
+  const entityCountAfterAgentDelete = await frame.evaluate(() => window.Forge.entities.size);
+  if (entityCountAfterAgentDelete !== entityCountAfterAdd) throw new Error("ForgeAgent.delete did not restore the pre-agent scene count.");
+  await frame.evaluate(id => { window.Forge.select(id); window.Forge.focus(); }, uiSphereId);
+  const agentControl = {
+    create: agentCreateResult,
+    inspectReturnedData: !!agentInspectResult,
+    transform: agentTransform,
+    physicsBefore: agentPhysicsBefore,
+    physicsAfter: agentPhysicsAfter,
+    deleteRestoredEntityCount: entityCountAfterAgentDelete
+  };
   await page.screenshot({ path: path.join(ARTIFACTS, "forge-port-desktop.png"), fullPage: true });
 
   const playButton = forgeFrameLocator.locator("#play");
@@ -119,6 +168,7 @@ try {
     httpStatus: response.status(),
     initial,
     actionChecks: { entityCountBefore, entityCountAfterAdd, playState, stoppedState },
+    agentControl,
     mobile,
     pageErrors,
     consoleErrors,
@@ -127,6 +177,7 @@ try {
   };
   if (entityCountAfterAdd !== entityCountBefore + 1) throw new Error("Creating a sphere did not update scene state.");
   if (playState.running !== true || stoppedState.running !== false) throw new Error("Play/Stop did not change the real engine state.");
+  if (!agentControl.inspectReturnedData || agentControl.physicsAfter !== agentControl.physicsBefore + 1 || agentControl.deleteRestoredEntityCount !== entityCountAfterAdd) throw new Error("Provider-neutral ForgeAgent command sequence failed.");
   if (mobile.viewport.scrollWidth > mobile.viewport.clientWidth + 2) throw new Error("Forge overflows horizontally at 390px: " + JSON.stringify(mobile.viewport));
   if (!mobile.canvas?.visible || mobile.canvas.width < 300 || mobile.canvas.height < 200) throw new Error("Mobile viewport canvas is unusable: " + JSON.stringify(mobile.canvas));
   if (!mobile.featureDock?.visible || mobile.featureDock.flexWrap !== "nowrap" || mobile.featureDock.height > 56) throw new Error("Mobile production feature dock must stay on one compact row: " + JSON.stringify(mobile.featureDock));
