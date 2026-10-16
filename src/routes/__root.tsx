@@ -29,8 +29,8 @@ export const Route = createRootRoute({
       { name: 'description', content: rootMeta.description },
     ],
     links: [
-      { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
-      { rel: 'manifest', href: '/manifest.json' },
+      { rel: 'icon', type: 'image/svg+xml', href: `${import.meta.env.BASE_URL}favicon.svg` },
+      { rel: 'manifest', href: `${import.meta.env.BASE_URL}manifest.json` },
     ],
   }),
   shellComponent: RootDocument,
