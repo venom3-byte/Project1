@@ -153,12 +153,18 @@ try {
       !referenceBeforeViewSwitch.guide.renderable || !referenceBeforeViewSwitch.guide.visible) {
     throw new Error("Reference plane did not load or obey calibration: "+JSON.stringify(referenceBeforeViewSwitch));
   }
+  // Close the modal before testing the Play toolbar; dialogs correctly block clicks behind them.
+  await referenceDialog.locator('[data-ref-close]').click();
+  await referenceDialog.waitFor({state:"detached",timeout:5000});
   await forgeFrameLocator.locator("#play").click();
   await frame.waitForFunction(() => window.Forge.running===true &&
     window.ForgeReferenceStudio.status().slots.find(x=>x.slot==="front")?.visible===false,null,{timeout:5000});
   await forgeFrameLocator.locator("#play").click();
   await frame.waitForFunction(() => window.Forge.running===false &&
     window.ForgeReferenceStudio.status().slots.find(x=>x.slot==="front")?.visible===true,null,{timeout:5000});
+  await forgeFrameLocator.locator("#productionTools").click();
+  await forgeFrameLocator.locator('[data-production-tool="references"]').click();
+  await referenceDialog.waitFor({state:"visible",timeout:5000});
   await referenceDialog.locator('[data-ref-slot="top"]').click();
   await frame.waitForFunction(() => window.ForgeReferenceStudio.status().view==="top" &&
     window.ForgeReferenceStudio.status().slots.find(x=>x.slot==="front")?.visible===false,null,{timeout:5000});
