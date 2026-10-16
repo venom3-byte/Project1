@@ -135,7 +135,7 @@ try {
   await referenceDialog.locator("#refFile").setInputFiles({
     // Tiny valid PNG fixture: exercise the same browser-decoded raster path users upload.
     name:"qa-blueprint.png",mimeType:"image/png",
-    buffer:Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC","base64")
+    buffer:Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAKAAAABQCAIAAAARP+ljAAAA/klEQVR42u3dsQnCQBSA4RdxDAvBCRxEFJzAygGcIzPY2giKg7iChROIYOsCVnnGcN739Slyf14I5EKax/MV1ZjvzhFxbZf1nPIoEBiBERiBERiBEVhgBEZgBEZgBEZggREYgREYgREYgYloOm+bva9Xlu9nJseTCeaD8VBX1iBK3PievFOaYA9ZCIzACIzACIzAAiMwAiMwApPSzLaHbkdebvuIWEw3FrFXyXU2wf8+wckdHd4H9y25zibYQxYCIzACIzACI7DACIzACIzApPg+uAzeJvHtCS6RH2MhMAIjMAIjMAILjMAIjMAIjMAIjMACIzACIzACIzACV+oNY/sxIIl6NZ8AAAAASUVORK5CYII=","base64")
   });
   await frame.waitForFunction(() => window.ForgeReferenceStudio?.status?.().referenceCount === 1, null, {timeout:10000});
   await referenceDialog.locator("#refWidth").fill("25");
