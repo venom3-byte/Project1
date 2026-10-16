@@ -134,14 +134,14 @@ function posePlane(record) {
   entity.setLocalScale(width,1,height);
   if (record.slot === 'front') {
     entity.setLocalEulerAngles(-90,0,0);
-    entity.setLocalPosition(Number(c.x)||0,Number(c.y)||0,(Number(c.z)||0)-o);
+    entity.setLocalPosition(Number(c.x)||0,Number(c.y)||0,(Number(c.z)||0)+o);
   } else if (record.slot === 'back') {
     entity.setLocalEulerAngles(-90,0,0);
     entity.setLocalPosition(Number(c.x)||0,Number(c.y)||0,(Number(c.z)||0)+o);
   } else if (record.slot === 'side') {
     // Map the built-in XZ plane onto world Z (image horizontal) and Y (image vertical).
     entity.setLocalRotation(new pc.Quat(-0.5,-0.5,-0.5,0.5));
-    entity.setLocalPosition((Number(c.x)||0)-o,Number(c.y)||0,Number(c.z)||0);
+    entity.setLocalPosition((Number(c.x)||0)+o,Number(c.y)||0,Number(c.z)||0);
   } else {
     // The top guide lies just below the object origin, above the editor floor grid.
     entity.setLocalEulerAngles(0,0,0);
@@ -150,7 +150,7 @@ function posePlane(record) {
 }
 function visibleForView(record) {
   if (!record.entity?.render) return;
-  record.entity.render.enabled = !!record.enabled && (!state.matchViewOnly || state.view === SLOT_DEFS[record.slot].view);
+  record.entity.render.enabled = !!record.enabled && !F.running && (!state.matchViewOnly || state.view === SLOT_DEFS[record.slot].view);
 }
 function updateVisibility() {
   for (const record of state.refs.values()) visibleForView(record);
@@ -472,6 +472,7 @@ async function init() {
     log('Persistent local reference storage unavailable: '+error.message,'warn');
   }
   document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>viewChanged(button.dataset.view)));
+  window.addEventListener('forge-play-state',updateVisibility);
   state.initialized = true;
   window.ForgeReferenceStudio = {open,init:()=>init(),status,viewChanged,serialize:()=>status(),setViewOnly(value){state.matchViewOnly=!!value;updateVisibility();syncUI();},remove:async slot=>{const r=state.refs.get(slot);if(!r)return false;disposePlane(r);state.refs.delete(slot);await removeStored(slot);syncUI();return true;}};
   log('Reference Studio ready; '+state.refs.size+' guide(s) restored.');

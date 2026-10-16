@@ -153,6 +153,12 @@ try {
       !referenceBeforeViewSwitch.guide.renderable || !referenceBeforeViewSwitch.guide.visible) {
     throw new Error("Reference plane did not load or obey calibration: "+JSON.stringify(referenceBeforeViewSwitch));
   }
+  await forgeFrameLocator.locator("#play").click();
+  await frame.waitForFunction(() => window.Forge.running===true &&
+    window.ForgeReferenceStudio.status().slots.find(x=>x.slot==="front")?.visible===false,null,{timeout:5000});
+  await forgeFrameLocator.locator("#play").click();
+  await frame.waitForFunction(() => window.Forge.running===false &&
+    window.ForgeReferenceStudio.status().slots.find(x=>x.slot==="front")?.visible===true,null,{timeout:5000});
   await referenceDialog.locator('[data-ref-slot="top"]').click();
   await frame.waitForFunction(() => window.ForgeReferenceStudio.status().view==="top" &&
     window.ForgeReferenceStudio.status().slots.find(x=>x.slot==="front")?.visible===false,null,{timeout:5000});
@@ -334,7 +340,7 @@ try {
     consoleErrors,
     failedRequests,
     screenshots: ["forge-port-desktop.png", "forge-port-mobile.png"],
-    referenceStudio: {loaded:true, calibration:referenceBeforeViewSwitch.guide.worldWidth, orthographicVisibility:true, sceneEntityIsolation:referenceCleanup.entityCount===referenceBeforeViewSwitch.entityCount, cleanup:referenceCleanup.referenceCount===0}
+    referenceStudio: {loaded:true, calibration:referenceBeforeViewSwitch.guide.worldWidth, orthographicVisibility:true, hiddenDuringPlay:true, sceneEntityIsolation:referenceCleanup.entityCount===referenceBeforeViewSwitch.entityCount, cleanup:referenceCleanup.referenceCount===0}
   };
   if (entityCountAfterAdd !== entityCountBefore + 1) throw new Error("Creating a sphere did not update scene state.");
   if (playState.running !== true || stoppedState.running !== false) throw new Error("Play/Stop did not change the real engine state.");
