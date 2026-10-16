@@ -224,7 +224,10 @@ export function importJson(text: string): boolean {
     pushHistory()
     setState({
       objects: data.objects,
-      selectedId: null,
+      selectedId:
+        typeof data.selectedId === 'string' && data.objects.some((o) => o.id === data.selectedId)
+          ? data.selectedId
+          : null,
       projectName: typeof data.name === 'string' ? data.name : 'Imported Project',
     })
     return true
