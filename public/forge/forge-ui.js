@@ -110,7 +110,7 @@ const loadForgeRuntime=async()=>{
   return forgeRuntimePromise;
 };
 const engine=new ForgeEngine($("viewport"),write);
-try{bootMessage("Starting renderer and physics…");await engine.init();window.Forge=engine;bootMessage("Loading spatial core and editor systems…");await import("./forge-spatial.js");for(const module of [
+try{bootMessage("Starting renderer and physics…");await engine.init();window.Forge=engine;bootMessage("Building the 3D workspace and camera controls…");await import("./forge-viewport.js");bootMessage("Loading spatial core and editor systems…");await import("./forge-spatial.js");for(const module of [
   "./forge-production.js","./forge-project.js","./forge-render.js","./forge-ui-system.js","./forge-vfx.js",
   "./forge-2d.js","./forge-ai.js","./forge-gameplay-data.js","./forge-network.js","./forge-replay.js",
   "./forge-session.js","./forge-shader.js","./forge-terrain.js","./forge-qa.js","./forge-animation.js","./forge-gameplay.js",
@@ -129,7 +129,8 @@ let forgeGizmoLoad=null;
 function ensureForgeGizmo(){
   if(window.ForgeGizmo?.nativeReady) return Promise.resolve(window.ForgeGizmo);
   if(forgeGizmoLoad) return forgeGizmoLoad;
-  forgeGizmoLoad=import("./forge-gizmo.js").then(()=>window.ForgeGizmo).catch(error=>{
+  const fallbackState=window.ForgeGizmo?.state||{};
+  forgeGizmoLoad=import("./forge-gizmo.js").then(()=>{const api=window.ForgeGizmo;if(api?.state){api.state.mode=["select","translate","rotate","scale"].includes(fallbackState.mode)?fallbackState.mode:"select";api.setSpace?.(fallbackState.space==="local"?"local":"world");api.sync?.()}return api}).catch(error=>{
     forgeGizmoLoad=null;
     write("Native gizmo load failed: "+error.message,"error");
     return window.ForgeGizmo;
@@ -137,10 +138,10 @@ function ensureForgeGizmo(){
   return forgeGizmoLoad;
 }
 if(!window.ForgeGizmo){
-  const state={mode:"translate",space:"world",layer:null,gizmos:{},ready:true,nativeReady:false,initializing:false};
+  const state={mode:"select",space:"world",layer:null,gizmos:{},ready:true,nativeReady:false,initializing:false};
   window.ForgeGizmo={
     state,
-    setMode(mode){if(!["translate","rotate","scale"].includes(mode))return false;state.mode=mode;return true},
+    setMode(mode){if(!["select","translate","rotate","scale"].includes(mode))return false;state.mode=mode;return true},
     setSpace(space){state.space=space==="local"?"local":"world";return state.space},
     init(){return ensureForgeGizmo().then(g=>g?.init?.().then?.(()=>g)??g)}
   };
@@ -250,7 +251,7 @@ document.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>{
 });
 $("apply").onclick=apply;["px","py","pz","rx","ry","rz","sx","sy","sz","name"].forEach(id=>$(id).onchange=apply);
 $("duplicate").onclick=()=>{if(engine.duplicate()){refresh();inspect()}};$("undo")?.addEventListener("click",()=>{if(engine.undo()){refresh();inspect()}});$("redo")?.addEventListener("click",()=>{if(engine.redo()){refresh();inspect()}});
-$("delete").onclick=()=>{engine.delete();refresh();inspect()};$("focus").onclick=()=>engine.focus();$("frame").onclick=()=>engine.frame();$("reset")?.addEventListener("click",()=>location.reload());
+$("delete").onclick=()=>{engine.delete();refresh();inspect()};$("focus")?.addEventListener("click",()=>engine.focus());$("focusViewport")?.addEventListener("click",()=>engine.focus());$("frame").onclick=()=>engine.frame();$("reset")?.addEventListener("click",()=>location.reload());
 $("play").onclick=()=>{engine.running=!engine.running;$("play").textContent=engine.running?"■ Stop":"▶ Play";engine.timelinePlaying=engine.running};$("timelinePlay").onclick=()=>$("play").click();
 $("rewind").onclick=()=>{engine.timelineTime=0;$("time").value=0;engine.evalAnimation(0);inspect()};$("time").oninput=e=>{engine.timelineTime=+e.target.value||0;engine.evalAnimation(engine.timelineTime);$("playhead").style.left=(engine.timelineTime*60)+"px";inspect()};$("key").onclick=()=>{engine.key();toast("Keyframe added")};
 $("projectName")?.addEventListener("change",()=>{const n=$("projectName").value.trim()||"Untitled Project";document.title=n+" — Forge Studio";localStorage.setItem("forge.projectName",n);$("projectName").value=n;});
@@ -258,7 +259,7 @@ const storedProjectName=localStorage.getItem("forge.projectName");if(storedProje
 $("newProject")?.addEventListener("click",()=>{if(confirm("Start a new Forge scene?")){engine.resetScene(true);refresh();inspect();toast("New scene created")}});
 $("importCar")?.addEventListener("click",async()=>{try{const url="https://assets.macaly-user-data.dev/krejgsf8oalserz1lhd45fy0/r06pdypbhojqest3cylj93hy/wVK1ftf-ULse2N7EQTYgz/car-concept-qaTX70WS.glb";toast("Loading Car Concept…");const res=await fetch(url);if(!res.ok)throw new Error("Car asset HTTP "+res.status);const blob=await res.blob();await engine.importFile(new File([blob],"Car-Concept.glb",{type:"model/gltf-binary"}));refresh();inspect();engine.focus();toast("Car Concept imported") }catch(e){write("Car import failed: "+e.message,"error");toast("Car import failed")}});
 
-$("importAssets").onclick=()=>$("assetInput").click();$("assetInput").onchange=e=>loadFiles([...e.target.files]);
+document.querySelectorAll("[data-import-assets]").forEach(b=>b.addEventListener("click",()=>$("assetInput").click()));$("assetInput").onchange=e=>loadFiles([...e.target.files]);
 async function loadFiles(files){for(const f of files)try{await window.ForgeProduction?.assets?.storeFile?.(f);const r=await engine.importFile(f);if(r.type==="project")await engine.load(r.data);write("Imported "+f.name)}catch(e){write("Import failed "+f.name+": "+e.message,"error")}refresh();inspect()}
 document.addEventListener("dragover",e=>{e.preventDefault();$("dropOverlay").classList.remove("hidden")});document.addEventListener("drop",e=>{e.preventDefault();$("dropOverlay").classList.add("hidden");if(e.dataTransfer?.files?.length)loadFiles([...e.dataTransfer.files])});
 $("saveProject").onclick=()=>{const n=(($("projectName")?.value||"ForgeProject").trim().replace(/[^a-z0-9_-]+/gi,"-").replace(/^-+|-+$/g,"")||"ForgeProject");window.ForgeProject.download(n+".forge.json");toast("Project saved")};$("openProject").onclick=()=>$("projectInput").click();$("projectInput").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{await window.ForgeProject.load(JSON.parse(await f.text()));refresh();inspect();toast("Complete Forge project loaded")}catch(err){write("Project load failed: "+err.message,"error")}};
@@ -294,9 +295,12 @@ window.addEventListener("keydown",e=>{
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){e.preventDefault();if(engine.undo()){refresh();inspect()}return}
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="y"){e.preventDefault();if(engine.redo()){refresh();inspect()}return}
 
-  if(e.key==="1")document.querySelector('[data-gizmo="translate"]')?.click();
-  else if(e.key==="2")document.querySelector('[data-gizmo="rotate"]')?.click();
-  else if(e.key==="3")document.querySelector('[data-gizmo="scale"]')?.click();
+  const key=e.key.toLowerCase();
+  if(key==="f"){engine.focus();return}
+  if(key==="q"||key==="1")document.querySelector('[data-gizmo="select"]')?.click();
+  else if(key==="w"||key==="2")document.querySelector('[data-gizmo="translate"]')?.click();
+  else if(key==="e"||key==="3")document.querySelector('[data-gizmo="rotate"]')?.click();
+  else if(key==="r"||key==="4")document.querySelector('[data-gizmo="scale"]')?.click();
 });
 $("mImport")?.addEventListener("click",()=>$("assetInput")?.click());
 $("mUndo")?.addEventListener("click",()=>{if(engine.undo()){refresh();inspect()}});
@@ -304,16 +308,16 @@ $("mPlay")?.addEventListener("click",()=>$("play")?.click());
 $("mExport")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.exportSource(),"Source export"));
 
 function smoke(){
-  const d=engine.diagnostics(),v=window.AssetForgeLiveVision?.visualHealth?.()||null;
+  const d=engine.diagnostics(),v=window.AssetForgeLiveVision?.visualHealth?.()||null,viewport=window.ForgeViewport?.status?.()||null;
   const vision={camera:!!engine.camera(),objects:[...engine.entities.values()].filter(x=>x.entity.render?.meshInstances?.length).map(x=>({id:x.id,name:x.name,kind:x.kind}))};
-  const checks=[["renderer",d.renderer==="WebGPU"||d.renderer==="WebGL2"],["scene",d.entities>0],["camera",[...engine.entities.values()].some(x=>x.kind==="camera")],["ground",[...engine.entities.values()].some(x=>x.name==="Ground")],["physics",d.physics>0],["spatialCore",!!d.spatial],["renderLoop",d.fps>=0],["sceneVision",!!vision]];
-  return{ok:checks.every(x=>x[1])&&(v?.ok!==false),checks,diagnostics:d,vision,visualHealth:v}
+  const checks=[["renderer",d.renderer==="WebGPU"||d.renderer==="WebGL2"],["scene",d.entities>0],["camera",[...engine.entities.values()].some(x=>x.kind==="camera")],["ground",[...engine.entities.values()].some(x=>x.name==="Ground")],["physics",d.physics>0],["spatialCore",!!d.spatial],["renderLoop",d.fps>=0],["sceneVision",!!vision],["true3DViewport",viewport?.ok===true],["3DNavigation",viewport?.navigation?.orbit===true&&viewport?.navigation?.pan===true&&viewport?.navigation?.zoom===true]];
+  return{ok:checks.every(x=>x[1])&&(v?.ok!==false),checks,diagnostics:d,vision,visualHealth:v,viewport3d:viewport}
 }
-$("qa").onclick=()=>{$("qaReport").textContent=JSON.stringify(smoke(),null,2);$("qaDialog").showModal()};$("runQA").onclick=()=>{$("qaReport").textContent=JSON.stringify(smoke(),null,2)};$("grid")?.addEventListener("click",()=>{const on=!document.querySelector(".editor-grid")?.classList.toggle("hidden");$("grid")?.classList.toggle("active",on);});
+$("qa").onclick=()=>{$("qaReport").textContent=JSON.stringify(smoke(),null,2);$("qaDialog").showModal()};$("runQA").onclick=()=>{$("qaReport").textContent=JSON.stringify(smoke(),null,2)};$("grid")?.addEventListener("click",()=>{const on=window.ForgeViewport?.toggleGrid?.()??false;$("grid")?.classList.toggle("active",on);});
 $("script").onclick=()=>{const r=engine.selected();if(!r)return toast("Select an entity");$("scriptDialog").showModal();$("code").value=engine.scripts.get(r.id)||$("code").value};$("saveScript").onclick=()=>{const r=engine.selected();if(r){engine.attachScript(r.id,$("code").value);$("scriptDialog").close();toast("Script attached")}};
 document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>$(b.dataset.close).close());$("clear").onclick=()=>out.textContent="";
 document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-view]").forEach(x=>x.classList.remove("active"));b.classList.add("active");engine.setView(b.dataset.view);refresh();inspect()});
-$("snapToggle")?.addEventListener("click",()=>{engine.snapEnabled=!engine.snapEnabled;$("snapToggle").classList.toggle("active",!!engine.snapEnabled);window.ForgeSpatial?.setSnap(engine.snapSize);write("Snap: "+(engine.snapEnabled?"On":"Off"))});
+$("snapToggle")?.addEventListener("click",()=>{engine.snapEnabled=!engine.snapEnabled;$("snapToggle").classList.toggle("active",!!engine.snapEnabled);$("snapToggle").textContent=engine.snapEnabled?"Snap On":"Snap Off";window.ForgeSpatial?.setSnap(engine.snapSize);write("Snap: "+(engine.snapEnabled?"On":"Off"))});
 $("snapSize")?.addEventListener("change",e=>{engine.snapSize=Math.max(.001,+e.target.value||.25);window.ForgeSpatial?.setSnap(engine.snapSize)});
 $("boundsToggle")?.addEventListener("change",e=>{if(window.ForgeSpatial)window.ForgeSpatial.showBounds=e.target.checked});
 $("visionRefresh")?.addEventListener("click",()=>{$("visionReport").textContent=JSON.stringify(window.ForgeSpatial?.sceneVision?.()||{},null,2)});
@@ -374,6 +378,7 @@ window.ForgeVision={scan:()=>window.ForgeSpatial?.sceneVision?.()||{},inspect:id
 function stats(){const d=engine.diagnostics();if($("renderer"))$("renderer").textContent=d.renderer;if($("rendererSide"))$("rendererSide").textContent=d.renderer;if($("fps"))$("fps").textContent=d.fps;if($("physics"))$("physics").textContent=d.physics;requestAnimationFrame(stats)}
 const waitForPublicAPIs=async()=>{
   const required={
+    ForgeViewport:["status","toggleGrid","setGridVisible"],
     ForgeGameplay:["createThirdPersonTemplate","createRacingTemplate","createShowcaseGame","status"],
     Forge2D:["createPlatformerTemplate","status"],
     ForgeProject:["serialize","load"],

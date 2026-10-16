@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - agent/forge-reverse-engineering-port
+      - agent/forge-true-3d-workspace
   workflow_dispatch:
 permissions:
   contents: read
@@ -69,7 +70,7 @@ jobs:
           const html=fs.readFileSync(path.join(root,"index.html"),"utf8");
           const required=[
             "forge-ui.js","forge-engine.js","forge-runtime.js","forge-spatial.js",
-            "forge-production.js","forge-project.js","forge-render.js","forge-vfx.js",
+            "forge-production.js","forge-project.js","forge-render.js","forge-viewport.js","forge-vfx.js",
             "forge-2d.js","forge-ai.js","forge-gameplay-data.js","forge-network.js",
             "forge-replay.js","forge-session.js","forge-shader.js","forge-terrain.js",
             "forge-qa.js","forge-animation.js","forge-gameplay.js","forge-gizmo.js",

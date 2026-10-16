@@ -1,6 +1,6 @@
 const pc=window.ForgePlayCanvas;
 const F=window.Forge;
-const state={mode:"translate",space:"world",layer:null,gizmos:{},ready:true,nativeReady:false,initializing:false};
+const state={mode:"select",space:"world",layer:null,gizmos:{},ready:true,nativeReady:false,initializing:false};
 function log(s){try{F.log(s)}catch{console.info("[Forge Gizmo]",s)}}
 function cameraComponent(){return F?.camera?.()?.camera||null}
 function attach(){
@@ -35,7 +35,7 @@ function sync(){
   for(const[name,g]of Object.entries(state.gizmos)){g.enabled=Boolean(node)&&name===state.mode;if(g.coordSpace!==state.space)g.coordSpace=state.space;g.snap=Boolean(F.snapEnabled);g.snapIncrement=Number(F.snapSize||.25);if(g.enabled)g.attach([node]);else g.detach()}
 }
 function setMode(mode){
-  if(!["translate","rotate","scale"].includes(mode))return false;
+  if(!["select","translate","rotate","scale"].includes(mode))return false;
   state.mode=mode;
   if(state.nativeReady)sync();
   return true

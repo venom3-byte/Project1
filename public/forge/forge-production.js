@@ -197,7 +197,7 @@ const assets=new AssetPipeline(),world=new WorldSystems(),graph=new ForgeGraph()
 window.ForgeProduction={assets,world,graph,profiler};
 
 const style=document.createElement("style");
-style.textContent=".forge-prod{position:fixed;right:14px;bottom:14px;z-index:90;display:flex;gap:5px;flex-wrap:wrap;max-width:430px}.forge-prod button{border:1px solid #29455f;background:#081727;color:#e8f1ff;border-radius:9px;padding:8px 10px;box-shadow:0 8px 26px #0007}.forge-modal{width:min(900px,94vw);border:1px solid #2d4e6d;background:#091523;color:#e8f1ff;border-radius:15px;padding:0}.forge-modal::backdrop{background:#000b;backdrop-filter:blur(8px)}.fm-head{display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #1b304a}.fm-body{padding:12px;max-height:70vh;overflow:auto}.fm-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.fm-card{border:1px solid #1b304a;background:#0b1727;border-radius:10px;padding:10px}.fm-card h4{margin:0 0 7px}.fm-actions{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.fm-table{width:100%;border-collapse:collapse;font-size:11px}.fm-table td,.fm-table th{padding:6px;border-bottom:1px solid #162a40;text-align:left}.fm-node{position:relative;border:1px solid #315a7e;background:#0d1f33;border-radius:8px;padding:8px;margin:5px 0}.fm-code{white-space:pre-wrap;font:11px ui-monospace,monospace;background:#06101b;padding:9px;border-radius:8px}.fm-good{color:#48e28a}.fm-warn{color:#ffca66}.fm-bad{color:#ff7f8d}@media(max-width:700px){.forge-prod{left:8px;right:8px;bottom:64px;max-width:none;flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;padding:3px 0;scrollbar-width:none;-webkit-overflow-scrolling:touch}.forge-prod::-webkit-scrollbar{display:none}.forge-prod button{flex:0 0 auto;white-space:nowrap;font-size:11px;padding:7px 9px}.fm-grid{grid-template-columns:1fr}}";
+style.textContent=".forge-modal{width:min(900px,94vw);border:1px solid #2d4e6d;background:#091523;color:#e8f1ff;border-radius:15px;padding:0}.forge-modal::backdrop{background:#000b;backdrop-filter:blur(8px)}.toolbox-intro{margin:0 0 14px;color:#93a5b7;font-size:12px;line-height:1.5}.toolbox-sections{display:grid;grid-template-columns:1fr 1fr;gap:14px}.toolbox-section h3{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#8ecbe9}.toolbox-grid{display:grid;gap:7px}.toolbox-card{display:grid;grid-template-columns:28px minmax(0,1fr) 14px;gap:9px;align-items:center;width:100%;min-height:56px;padding:9px 10px;text-align:left;border:1px solid #263c51;background:#0d1b2a;color:#e5eef7;border-radius:9px;cursor:pointer}.toolbox-card:hover{background:#152a3e;border-color:#4a85ad}.toolbox-card-mark{display:grid;place-items:center;width:28px;height:28px;border:1px solid #35536c;border-radius:7px;background:#11263a;color:#85d8fa;font-size:15px}.toolbox-card-copy{display:grid;gap:4px;min-width:0}.toolbox-card-copy b{font-size:11px}.toolbox-card-copy small{font-size:10px;line-height:1.35;color:#8fa4b8}.toolbox-arrow{color:#607f98;font-size:13px}.forge-modal .fm-head b{font-size:12px;letter-spacing:.5px}.forge-modal .fm-body{padding:14px}.fm-head{display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #1b304a}.fm-body{padding:12px;max-height:70vh;overflow:auto}.fm-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.fm-card{border:1px solid #1b304a;background:#0b1727;border-radius:10px;padding:10px}.fm-card h4{margin:0 0 7px}.fm-actions{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.fm-table{width:100%;border-collapse:collapse;font-size:11px}.fm-table td,.fm-table th{padding:6px;border-bottom:1px solid #162a40;text-align:left}.fm-node{position:relative;border:1px solid #315a7e;background:#0d1f33;border-radius:8px;padding:8px;margin:5px 0}.fm-code{white-space:pre-wrap;font:11px ui-monospace,monospace;background:#06101b;padding:9px;border-radius:8px}.fm-good{color:#48e28a}.fm-warn{color:#ffca66}.fm-bad{color:#ff7f8d}@media(max-width:700px){.fm-grid{grid-template-columns:1fr}.toolbox-sections{grid-template-columns:1fr}.toolbox-card{min-height:51px}}";
 document.head.appendChild(style);
 
 function modal(title,body){
@@ -356,8 +356,43 @@ function open2D(){
   d.querySelector("#twoDState").textContent=JSON.stringify(window.Forge2D?.status?.(),null,2);
 }
 function addBar(){
-  const bar=document.createElement("div");bar.className="forge-prod";
-  const buttons=[["Asset Lab",openAssets],["Material",openMaterial],["Shader",openShader],["Animation",openAnimation],["Anim Graph",openAnimationGraph],["Sequencer",openCinematics],["Render",openRender],["VFX",openVFX],["2D",open2D],["World / PCG",openPCG],["Logic Graph",openGraph],["Profiler",openProfiler],["Vision",()=>window.AssetForgeLiveVision?.open()],["Runtime",openRuntime],["Build Web",openBuild]];
-  buttons.forEach(([t,f])=>{const b=document.createElement("button");b.textContent=t;b.onclick=f;bar.append(b)});document.body.append(bar);
+  const launcher=document.getElementById("productionTools");
+  if(!launcher)return;
+  const groups=[
+    {title:"Assets & Materials",items:[
+      ["asset","Asset Lab","Import, inspect and prepare 2D/3D assets",openAssets],
+      ["material","Material Lab","PBR color, roughness and metalness",openMaterial],
+      ["shader","Shader Lab","Shader presets and material graphs",openShader],
+      ["render","Render Settings","Render quality and output profiles",openRender]
+    ]},
+    {title:"Animation & Effects",items:[
+      ["animation","Animation","Keyframes and animation channels",openAnimation],
+      ["anim-graph","Animation Graph","Animation-state authoring",openAnimationGraph],
+      ["sequencer","Sequencer","Timeline and cinematic tracks",openCinematics],
+      ["vfx","Visual Effects","Particles and runtime effects",openVFX],
+      ["two-d","2D / Sprites","Sprite-based project tools",open2D]
+    ]},
+    {title:"World & Gameplay",items:[
+      ["world","World Builder","Terrain, procedural content and world partition",openPCG],
+      ["logic","Logic Graph","Visual gameplay logic",openGraph],
+      ["runtime","Runtime","Game runtime state and inputs",openRuntime],
+      ["build","Build Web","Package a playable web build",openBuild]
+    ]},
+    {title:"Diagnostics",items:[
+      ["profiler","Profiler","Frame timing and runtime counters",openProfiler],
+      ["vision","Visual QA","Scene vision and interaction checks",()=>window.AssetForgeLiveVision?.open()]
+    ]}
+  ];
+  launcher.addEventListener("click",()=>{
+    const icons={asset:"▧",material:"◒",shader:"◇",render:"◉",animation:"⌁","anim-graph":"⌘",sequencer:"▤",vfx:"✳","two-d":"▦",world:"⌗",logic:"⑂",runtime:"▷",build:"⇧",profiler:"▥",vision:"◎"};
+    const body=groups.map(group=>'<section class="toolbox-section"><h3>'+group.title+'</h3><div class="toolbox-grid">'+group.items.map(([id,title,desc])=>'<button class="toolbox-card" data-production-tool="'+id+'"><span class="toolbox-card-mark" aria-hidden="true">'+(icons[id]||"•")+'</span><span class="toolbox-card-copy"><b>'+title+'</b><small>'+desc+'</small></span><span class="toolbox-arrow" aria-hidden="true">↗</span></button>').join("")+'</div></section>').join("");
+    const d=modal("Forge Production Toolbox",'<p class="toolbox-intro">Choose a focused workspace tool. The 3D viewport stays clear while each tool opens only when needed.</p><div class="toolbox-sections">'+body+'</div>');
+    d.querySelectorAll("[data-production-tool]").forEach(button=>button.addEventListener("click",()=>{
+      const item=groups.flatMap(g=>g.items).find(entry=>entry[0]===button.dataset.productionTool);
+      if(!item)return;
+      d.close();
+      requestAnimationFrame(()=>item[3]());
+    }));
+  });
 }
 addBar();
