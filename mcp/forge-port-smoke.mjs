@@ -69,10 +69,12 @@ try {
       animation: !!window.ForgeAnimation,
       spatial: !!window.ForgeSpatial,
       agent: !!window.ForgeAgent,
-      agentServerBridgeConfigured: typeof window.ForgeServerBridge?.webSocketUrl === "string" && !!window.ForgeServerBridge.webSocketUrl,
-      agentServerCapable: window.ForgeAgent?.serverCapable?.() ?? null,
       runtime: !!window.ForgeRuntime,
       qa: !!window.ForgeQAPro
+    },
+    agentServer: {
+      configured: typeof window.ForgeServerBridge?.webSocketUrl === "string" && !!window.ForgeServerBridge.webSocketUrl,
+      capable: window.ForgeAgent?.serverCapable?.() ?? null
     },
     bootText: document.querySelector("#forgeBootText")?.textContent || null
   }));
@@ -89,7 +91,7 @@ try {
   for (const [name, present] of Object.entries(initial.modules)) {
     if (!present) throw new Error("Expected Forge module did not load: " + name);
   }
-  if (!initial.modules.agentServerBridgeConfigured && initial.modules.agentServerCapable !== false) {
+  if (!initial.agentServer?.configured && initial.agentServer?.capable !== false) {
     throw new Error("Static Forge must not infer a live WebSocket endpoint when no server bridge is configured.");
   }
 
