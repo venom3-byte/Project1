@@ -140,4 +140,105 @@ describe('GameSim', () => {
     run(3)
     expect(sim.isRunning).toBe(true)
   })
+
+  it('lets a physics body fall, land on the ground and be pushed by the player', () => {
+    const crate = makeObject('box', { name: 'Crate', position: [1.2, 3, 0], behavior: 'physics' })
+    const { items, sim, run } = setup([ground(), player(), crate])
+    sim.start()
+    run(1.5)
+    const c = items[2].node
+    expect(c.position.y).toBeGreaterThan(0.45)
+    expect(c.position.y).toBeLessThan(0.6)
+    const startX = c.position.x
+    sim.keys.add('KeyD')
+    run(1)
+    expect(c.position.x).toBeGreaterThan(startX + 1)
+  })
+
+  it('launches the player from a jump pad', () => {
+    const pad = makeObject('box', {
+      name: 'Pad',
+      position: [0, 0.1, 0],
+      scale: [2, 0.2, 2],
+      solid: true,
+      behavior: 'jumppad',
+    })
+    const { items, sim, run } = setup([ground(), pad, player(0, 0.5, 0)])
+    sim.start()
+    let maxY = 0
+    for (let i = 0; i < 120; i += 1) {
+      sim.update(1 / 60)
+      maxY = Math.max(maxY, items[2].node.position.y)
+    }
+    expect(maxY).toBeGreaterThan(4)
+    run(0)
+  })
+
+  it('saves a checkpoint and respawns there', () => {
+    const cp = makeObject('box', { name: 'CP', position: [0.8, 0.5, 0], behavior: 'checkpoint' })
+    const { items, sim, run, status } = setup([ground(), player(0, 0.5, 0), cp])
+    sim.start()
+    run(0.3)
+    expect(status().message).toBe('Checkpoint saved')
+    items[1].node.position.set(10, -40, 0)
+    run(0.2)
+    expect(items[1].node.position.x).toBeCloseTo(0.8, 0)
+  })
+})
+
+describe('applyProps materials', () => {
+  it('applies PBR and glow settings to primitive meshes', () => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial())
+    const obj = makeObject('box', {
+      roughness: 0.2,
+      metalness: 0.9,
+      opacity: 0.5,
+      emissive: '#ff0000',
+      emissiveIntensity: 0.7,
+    })
+    applyProps(obj, mesh)
+    const m = mesh.material as THREE.MeshStandardMaterial
+    expect(m.roughness).toBeCloseTo(0.2)
+    expect(m.metalness).toBeCloseTo(0.9)
+    expect(m.transparent).toBe(true)
+    expect(m.emissive.getHexString()).toBe('ff0000')
+    expect(m.emissiveIntensity).toBeCloseTo(0.7)
+  })
+})
+
+describe('rules', () => {
+  it('hides a target when the player touches the object (touch rule)', () => {
+    const door = makeObject('box', { name: 'Door', position: [5, 1, 0], scale: [1, 2, 1], solid: true })
+    const button = makeObject('box', {
+      name: 'Button',
+      position: [0.8, 0.5, 0],
+      rules: [{ id: 'a', on: 'touch', action: 'hide', target: door.id, once: true }],
+    })
+    const { items, sim, run } = setup([ground(), player(0, 0.5, 0), button, door])
+    sim.start()
+    expect(items[3].node.visible).toBe(true)
+    run(0.2)
+    expect(items[3].node.visible).toBe(false)
+  })
+
+  it('runs start rules and the win action', () => {
+    const init = makeObject('box', {
+      name: 'Init',
+      position: [0, 10, 0],
+      rules: [{ id: 's', on: 'start', action: 'message', text: 'Find the gem', once: true }],
+    })
+    const flag = makeObject('box', {
+      name: 'Flag',
+      position: [0.8, 0.5, 0],
+      rules: [{ id: 'w', on: 'touch', action: 'win', text: 'Done!', once: true }],
+    })
+    const a = setup([ground(), player(0, 0.5, 0), init])
+    a.sim.start()
+    expect(a.status().message).toBe('Find the gem')
+    const b = setup([ground(), player(0, 0.5, 0), flag])
+    b.sim.start()
+    b.run(0.2)
+    expect(b.status().state).toBe('won')
+    expect(b.status().message).toBe('Done!')
+  })
 })
