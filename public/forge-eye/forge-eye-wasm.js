@@ -34,16 +34,22 @@ function callJson(exportName, value) {
  * Load the pure Rust/WASM kernel. It has no browser imports: the bridge owns the
  * small JSON ABI so the same geometry code can be tested natively and used on web.
  */
-export async function initForgeEyeCore(url = "./forge_eye_core.wasm") {
+export async function initForgeEyeCore(url = "./forge_eye_core.wasm.gz") {
   if (rustReady) return rustReady;
   rustReady = (async () => {
     const response = await fetch(url, { cache: "no-cache" });
     if (!response.ok) throw new Error("Rust WASM returned HTTP " + response.status + ": " + url);
     let result;
-    try {
-      result = await WebAssembly.instantiateStreaming(response.clone(), {});
-    } catch {
-      result = await WebAssembly.instantiate(await response.arrayBuffer(), {});
+    if (url.endsWith(".gz")) {
+      if (typeof DecompressionStream !== "function") throw new Error("This browser lacks DecompressionStream required for the compact Rust WASM artifact.");
+      const stream = response.body.pipeThrough(new DecompressionStream("gzip"));
+      result = await WebAssembly.instantiate(await new Response(stream).arrayBuffer(), {});
+    } else {
+      try {
+        result = await WebAssembly.instantiateStreaming(response.clone(), {});
+      } catch {
+        result = await WebAssembly.instantiate(await response.arrayBuffer(), {});
+      }
     }
     rustExports = result.instance?.exports || result.exports;
     for (const name of ["memory", "forge_eye_alloc", "forge_eye_dealloc", "forge_eye_free_output", "forge_eye_lathe_json", "forge_eye_animation_json"]) {
