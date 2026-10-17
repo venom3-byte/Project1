@@ -373,3 +373,16 @@ button:disabled{opacity:.35;cursor:not-allowed}
   .trace-toolbar .secondary-button,.trace-toolbar .primary-build-button{flex:1 1 calc(50% - 5px);font-size:9px}
   .trace-toolbar>span{flex:1 0 100%;margin:0 0 3px}
 }
+
+
+/* Spin profile reference workflow: preserve image ratio and keep axis snapping explicit. */
+.profile-reference-controls{display:flex;flex-direction:column;gap:8px;padding:8px;border:1px solid #2a414f;border-radius:4px;background:#0c151d}
+.profile-reference-controls .range-property{display:flex;flex-direction:column;gap:5px;color:#91a8b7;font-size:9px}
+.profile-reference-controls .range-property>span{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.profile-reference-controls input[type=range]{width:100%;accent-color:#76c9ed}
+.profile-reference-controls output{color:#b9ddea;font:9px var(--mono)}
+.profile-fit-row{display:flex;align-items:center;justify-content:space-between;gap:10px;color:#91a8b7;font-size:9px}
+.profile-fit-row select{flex:0 1 68%;min-width:0;height:28px;padding:0 7px;border:1px solid #314754;border-radius:4px;background:#0a1118;color:#d3e1e9;font-size:9px}
+.profile-reference-controls .toggle-row{font-size:9px}
+.profile-reference-controls p{margin:0;color:#7e99aa;font-size:9px;line-height:1.55}
+#profileClearRef:disabled{opacity:.35}
