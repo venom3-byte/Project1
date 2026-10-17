@@ -44,6 +44,7 @@ function setWorkspace(name,{save=true}={}){
   if(name==="assets")setLeftPanel("assets",{save:false});
   if(["layout","modeling","references","review"].includes(name))setLeftPanel("scene",{save:false});
   if(name==="references")setInspectorPanel("references",{save:false});
+  if(name==="modeling")setInspectorPanel("properties",{save:false});
   if(name==="materials"){setInspectorPanel("properties",{save:false});$("#materialSection").classList.add("is-open")}
   if(name==="world")setInspectorPanel("scene",{save:false});
   if(name==="animation")refreshTimeline();
