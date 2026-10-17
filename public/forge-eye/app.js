@@ -350,10 +350,5 @@ function bindEvents(){
   });
   window.addEventListener("beforeunload",e=>{if(state.dirty){e.preventDefault();e.returnValue=""}})
 }
-function setTool(name){
-  state.tool=name;const map={select:"toolSelect",translate:"toolMove",rotate:"toolRotate",scale:"toolScale"};
-  for(const [key,id] of Object.entries(map)){const on=key===name;$("#"+id).classList.toggle("is-active",on);$("#"+id).setAttribute("aria-pressed",String(on))}
-  state.engine.spatial?.setTool?.(name)
-}
 async function init(){bindEvents();$("#rustBadge").textContent="Starting Rust Core";await boot()}
 init();
