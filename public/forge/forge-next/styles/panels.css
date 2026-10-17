@@ -235,3 +235,19 @@
   .lathe-title span{font-size:7px}
   .lathe-tools>p{font-size:8px}
 }
+
+
+/* Automatic reference-image reconstruction and subdivision controls. */
+.lathe-smoothing{display:flex;flex-direction:column;gap:5px;color:#9eb4c3;font-size:9px}
+.lathe-smoothing select{width:100%;height:29px;padding:0 8px;border:1px solid #334b5b;border-radius:4px;background:#0a1219;color:#dae7ef;font:10px var(--font-mono)}
+.lathe-tools #autoSpinImage{border-color:#3e829f;background:linear-gradient(100deg,#163d50,#1c3546);color:#d8f4ff}
+.lathe-tools #autoSpinImage:hover{border-color:#6ab5d4;background:linear-gradient(100deg,#1a4c63,#213f52)}
+.silhouette-tools #autoSilhouetteModel{border-color:#3e829f;background:linear-gradient(100deg,#163d50,#1c3546);color:#d8f4ff}
+.silhouette-tools #autoSilhouetteModel:hover{border-color:#6ab5d4;background:linear-gradient(100deg,#1a4c63,#213f52)}
+#traceAutoDetect{border-color:#3c718a;background:#152f3d;color:#bfe5f5}
+#traceAutoDetect:hover{background:#1d4355;border-color:#5da5c8}
+.lathe-tools p,.silhouette-tools p{max-width:100%;overflow-wrap:anywhere}
+@media(max-width:520px){
+  .lathe-dimensions{grid-template-columns:1fr}
+  .lathe-tools .wide-secondary,.silhouette-tools .wide-secondary{min-height:36px;white-space:normal;line-height:1.3}
+}
