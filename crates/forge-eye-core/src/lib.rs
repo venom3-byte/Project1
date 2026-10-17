@@ -6,11 +6,13 @@
 
 pub mod animation;
 pub mod geometry;
+pub mod visual_hull;
 
 pub use animation::{AnimationTrack, KeyInterpolation, Transform, TransformKey};
 pub use geometry::{
     Axis, LatheOptions, LatheProfilePoint, MeshData, MeshError, generate_lathe_mesh,
 };
+pub use visual_hull::{generate_visual_hull_mesh, VisualHullError, VisualHullOptions, VisualHullResult};
 
 #[cfg(target_arch = "wasm32")]
 mod wasm_abi;
