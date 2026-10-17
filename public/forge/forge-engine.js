@@ -210,24 +210,25 @@ export class ForgeEngine{
     out.components.material={color:[...color],metalness:0.05,roughness:0.65,opacity:1};
     return out;
   }
-  createSilhouetteVisualHull({name="Two-view Silhouette Hull",frontContour=[],sideContour=[],width=3,height=2,depth=3,resolution=32,color=[.3,.62,.78],record=null}={}){
-    const front=frontContour.map(p=>[Number(p[0]),Number(p[1])]),side=sideContour.map(p=>[Number(p[0]),Number(p[1])]);
-    triangulateContour(front);triangulateContour(side);
+  createSilhouetteVisualHull({name="Multi-view Silhouette Hull",frontContour=[],sideContour=[],topContour=[],width=3,height=2,depth=3,resolution=32,color=[.3,.62,.78],record=null}={}){
+    const front=frontContour.map(p=>[Number(p[0]),Number(p[1])]),side=sideContour.map(p=>[Number(p[0]),Number(p[1])]),top=topContour.map(p=>[Number(p[0]),Number(p[1])]);
+    triangulateContour(front);triangulateContour(side);if(top.length)triangulateContour(top);
     const w=Math.max(.01,Math.min(10000,Number(width)||3)),h=Math.max(.01,Math.min(10000,Number(height)||2)),d=Math.max(.01,Math.min(10000,Number(depth)||3));
     const r=Math.max(12,Math.min(48,Math.round(Number(resolution)||32))),slice=r*r;
-    const frontMask=new Uint8Array(slice),sideMask=new Uint8Array(slice),occupied=new Uint8Array(slice*r);
+    const frontMask=new Uint8Array(slice),sideMask=new Uint8Array(slice),topMask=top.length?new Uint8Array(slice):null,occupied=new Uint8Array(slice*r);
     for(let j=0;j<r;j++){
       const v=(j+.5)/r;
       for(let i=0;i<r;i++){
         const u=(i+.5)/r;
         frontMask[j*r+i]=pointInContour([u,v],front)?1:0;
         sideMask[j*r+i]=pointInContour([u,v],side)?1:0;
+        if(topMask)topMask[j*r+i]=pointInContour([u,v],top)?1:0;
       }
     }
     let filled=0;
     for(let k=0;k<r;k++)for(let j=0;j<r;j++)for(let i=0;i<r;i++){
       const at=i+r*(j+r*k);
-      if(frontMask[j*r+i]&&sideMask[j*r+k]){occupied[at]=1;filled++}
+      if(frontMask[j*r+i]&&sideMask[j*r+k]&&(!topMask||topMask[k*r+i])){occupied[at]=1;filled++}
     }
     if(!filled)throw new Error("The front and side silhouettes do not intersect. Check view alignment and shared height.");
     if(filled>slice*r*.92)throw new Error("The silhouettes fill nearly the entire volume. Check that both outlines closely follow the object.");
@@ -255,9 +256,9 @@ export class ForgeEngine{
     out.name=name;out.kind="mesh";out.entity.name=name;if(out.entity.render)out.entity.removeComponent("render");
     out.entity.addComponent("render",{meshInstances:[meshInstance]});out.entity.render.layers=[pc.LAYERID_WORLD];out.entity.render.frustumCulling=false;
     out.entity.setLocalPosition(0,h/2,0);out.entity.setLocalEulerAngles(0,0,0);out.entity.setLocalScale(1,1,1);
-    out.components.geometry={kind:"silhouette-visual-hull",version:1,frontContour:front,sideContour:side,width:w,height:h,depth:d,resolution:r,color:[...color],sourceName:String(name)};
+    out.components.geometry={kind:"silhouette-visual-hull",version:2,frontContour:front,sideContour:side,topContour:top,width:w,height:h,depth:d,resolution:r,color:[...color],sourceName:String(name)};
     out.components.material={color:[...color],metalness:.05,roughness:.68,opacity:1};
-    out.components.diagnostics={method:"two-view silhouette intersection",occupiedVoxels:filled,resolution:r};
+    out.components.diagnostics={method:top.length?"three-view silhouette intersection":"two-view silhouette intersection",viewCount:top.length?3:2,occupiedVoxels:filled,resolution:r};
     return out;
   }
   attachScript(id,code){this.scripts.set(id,code)}
