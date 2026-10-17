@@ -176,7 +176,7 @@ function refreshReferences(){
   for(const record of all){
     const meta=record.components.reference,row=document.createElement("div");row.className="reference-row";
     const select=document.createElement("button");select.type="button";select.className="reference-row-main"+(record.id===state.engine.selectedId?" is-selected":"");
-    const name=document.createElement("b");name.textContent=record.name;name.title=record.name;const details=document.createElement("small");details.textContent=String(meta.axis||"front").toUpperCase()+" · "+Number(meta.width||0).toFixed(2)+" m";
+    const name=document.createElement("b");name.textContent=record.name;name.title=record.name;const outlineInfo=Array.isArray(meta.outline)&&meta.outline.length>=3?(" · "+meta.outline.length+" pts"):" · no outline";const details=document.createElement("small");details.textContent=String(meta.axis||"front").toUpperCase()+" · "+Number(meta.width||0).toFixed(2)+" m"+outlineInfo;
     select.append(name,details);select.addEventListener("click",()=>{state.engine.select(record.id);$("#referenceAxis").value=meta.axis||"front";$("#referenceWidth").value=String(meta.width||3);$("#referenceOpacity").value=String(meta.opacity??0.45);$("#referenceOpacityValue").textContent=Math.round((meta.opacity??0.45)*100)+"%";chooseView(meta.axis==="side"?"right":meta.axis||"front")});row.append(select);
     const visibility=document.createElement("button");visibility.type="button";visibility.className="reference-visibility";visibility.textContent=record.entity.enabled===false?"Show":"Hide";
     visibility.addEventListener("click",()=>{record.entity.enabled=record.entity.enabled===false;meta.visible=record.entity.enabled;refreshReferences();status(record.entity.enabled?"Reference shown":"Reference hidden","dirty")});row.append(visibility);list.append(row);
@@ -219,9 +219,9 @@ async function startSilhouetteTrace(){
   try{
     const bitmap=await createImageBitmap(entry.file),scale=Math.min(1000/bitmap.width,800/bitmap.height),width=Math.max(1,Math.round(bitmap.width*scale)),height=Math.max(1,Math.round(bitmap.height*scale));
     const canvas=$("#traceCanvas");canvas.width=width;canvas.height=height;
-    state.trace={record,bitmap,points:[],closed:false,axis:meta.axis||"front",width:Number(meta.width)||3,height:Number(meta.height)||((Number(meta.width)||3)/(Number(meta.aspect)||1))};
+    state.trace={record,bitmap,points:Array.isArray(meta.outline)?meta.outline.map(point=>[...point]):[],closed:false,axis:meta.axis||"front",width:Number(meta.width)||3,height:Number(meta.height)||((Number(meta.width)||3)/(Number(meta.aspect)||1))};
     $("#traceDepth").value=$("#silhouetteDepth").value||"0.35";
-    $("#traceMessage").textContent="Tap around the object outline. Click near the first point to close the contour, or Build 3D mesh closes it automatically.";
+    $("#traceMessage").textContent=state.trace.points.length?"Loaded saved "+state.trace.points.length+"-point outline. Continue editing it or save a revised contour.":"Tap around the object outline. Click near the first point to close the contour, or Build 3D mesh closes it automatically.";
     $("#traceDialog").showModal();traceDraw();
   }catch(error){reportError("Could not open silhouette tracing",error)}
 }
@@ -255,6 +255,49 @@ function buildTraceMesh(){
     state.engine.select(record.id);state.engine.frame();refreshAll();setWorkspace("modeling");closeTraceEditor();
     status("3D silhouette mesh built · refine the geometry and compare other views","dirty");
   }catch(error){$("#traceMessage").textContent=error?.message||String(error);status("Silhouette mesh could not be built","error")}
+}
+
+function saveTraceOutline(){
+  const trace=state.trace;if(!trace)return;
+  if(trace.points.length<3){$("#traceMessage").textContent="Add at least three points before saving an outline.";return}
+  const meta=trace.record.components.reference;
+  meta.outline=trace.points.map(point=>[Number(point[0]),Number(point[1])]);
+  meta.outlineSavedAt=new Date().toISOString();meta.outlineClosed=true;
+  refreshReferences();refreshHierarchy();
+  $("#traceMessage").textContent="Saved "+meta.axis+" outline · "+meta.outline.length+" points. This reference can now contribute to a two-view volume.";
+  status("Reference outline saved","dirty");
+}
+function buildSilhouetteHull(){
+  const references=[...state.engine.entities.values()].filter(record=>record.components?.reference&&Array.isArray(record.components.reference.outline)&&record.components.reference.outline.length>=3);
+  const front=references.find(record=>record.components.reference.axis==="front");
+  const side=references.find(record=>record.components.reference.axis==="side");
+  if(!front||!side){
+    $("#hullStatus").textContent="Need two saved outlines: one Front and one Side. Select each image, choose its plane, trace the contour, then tap Save outline.";
+    status("Two-view volume needs front and side outlines","warn");return;
+  }
+  const fm=front.components.reference,sm=side.components.reference;
+  const frontHeight=Number(fm.height)||Number(fm.width)/(Number(fm.aspect)||1);
+  const sideHeight=Number(sm.height)||Number(sm.width)/(Number(sm.aspect)||1);
+  const mismatch=Math.abs(frontHeight-sideHeight)/Math.max(frontHeight,sideHeight,.01);
+  if(mismatch>.05){
+    $("#hullStatus").textContent="Reference heights differ by "+(mismatch*100).toFixed(1)+"%. Adjust the known width for one reference so both show the same real object height (within 5%).";
+    status("Align front and side reference scale","warn");return;
+  }
+  try{
+    const height=(frontHeight+sideHeight)/2,width=clamp(fm.width,.01,10000,3),depth=clamp(sm.width,.01,10000,3),resolution=clamp($("#hullResolution").value,12,48,32);
+    $("#hullStatus").textContent="Building "+resolution+"³ voxel visual hull from "+front.name+" and "+side.name+"…";
+    const record=state.engine.createSilhouetteVisualHull({
+      name:front.name.replace(/\.[^.]+$/,"")+" — Two-view Hull",
+      frontContour:fm.outline,sideContour:sm.outline,width,height,depth,resolution,color:[.32,.62,.76]
+    });
+    state.engine.select(record.id);window.ForgeViewport?.frame?.();refreshAll();setWorkspace("modeling");
+    const diag=record.components.diagnostics||{};
+    $("#hullStatus").textContent="Visual hull built · "+Number(diag.occupiedVoxels||0).toLocaleString()+" occupied voxels at "+resolution+"³. Refine the mesh and inspect all orthographic views.";
+    status("Two-view visual hull built · check front, side and perspective","dirty");
+  }catch(error){
+    $("#hullStatus").textContent=error?.message||String(error);
+    status("Two-view volume could not be built","error");
+  }
 }
 function refreshDiagnostics(){
   const engine=state.engine;if(!engine)return;const d=engine.diagnostics();$("#rendererStatus").textContent=d.renderer||"WebGL";$("#fpsStatus").textContent=(Number(d.fps)||0).toFixed(0)+" FPS · "+(Number(d.frameMs)||0).toFixed(1)+" ms";$("#entityStatus").textContent=d.entities+" entities";$("#unitLabel").textContent=String(d.unitSystem||"meters").toUpperCase();$("#unitSystem").value=d.unitSystem==="centimeters"?"centimeters":"meters";$("#snapEnabled").checked=engine.snapEnabled===true;$("#showGrid").checked=state.grid;$("#engineStatus").textContent=state.preview?"Scene preview active":"Engine ready";$("#diagnosticStatus").textContent=state.lastError?"1 error":"No errors";$("#diagnosticStatus").classList.toggle("diagnostic-error",!!state.lastError);if(state.timelinePlaying)refreshTimeline();
@@ -329,7 +372,9 @@ function bindUI(){
   $("#traceCanvas").addEventListener("pointerdown",event=>{event.preventDefault();addTracePoint(event)});
   $("#traceUndo").addEventListener("click",()=>{if(state.trace){state.trace.points.pop();state.trace.closed=false;$("#traceMessage").textContent="Last point removed.";traceDraw()}});
   $("#traceClear").addEventListener("click",()=>{if(state.trace){state.trace.points=[];state.trace.closed=false;$("#traceMessage").textContent="Outline cleared.";traceDraw()}});
+  $("#traceSaveOutline").addEventListener("click",saveTraceOutline);
   $("#traceBuild").addEventListener("click",buildTraceMesh);
+  $("#buildSilhouetteHull").addEventListener("click",buildSilhouetteHull);
   $("#traceClose").addEventListener("click",closeTraceEditor);
   $("#traceDialog").addEventListener("cancel",event=>{event.preventDefault();closeTraceEditor()});
   $("#referenceInput").addEventListener("change",e=>{const files=[...e.target.files];if(files.length)void loadReferenceImages(files);e.target.value=""});
