@@ -117,8 +117,11 @@ function refreshTimeline(){
   $("#timelinePlay").setAttribute("aria-pressed",String(engine.timelinePlaying===true));
   $("#timelinePlay").textContent=engine.timelinePlaying?"Ⅱ":"▶";
   $("#timelineStatus").textContent="24 FPS · "+frame+" F";
+  state.timelinePlaying=engine.timelinePlaying===true;
   $("#autoKeyButton").setAttribute("aria-pressed",String(state.autoKey));
   $("#autoKeyButton").classList.toggle("is-active",state.autoKey);
+  $("#timelineLoop").setAttribute("aria-pressed",String(engine.timelineLoop!==false));
+  $("#timelineLoop").classList.toggle("is-active",engine.timelineLoop!==false);
   $("#keyInterpolation").value=engine.keyInterpolation||"ease";
   const record=selectedRecord(),keys=record?(engine.keyframes.get(record.id)||[]):[];
   $("#keyCount").textContent=keys.length+(keys.length===1?" key":" keys");
@@ -388,7 +391,8 @@ function chooseView(mode){
 }
 function frameSelection(){if(selectedRecord())state.engine.frame();else window.ForgeViewport?.frame?.()}
 function togglePreview(force){const next=typeof force==="boolean"?force:!state.preview;state.preview=next;state.engine.running=next;const b=$("#previewScene");b.setAttribute("aria-pressed",String(next));b.querySelector(".preview-symbol").textContent=next?"■":"▷";b.querySelector("[data-preview-label]").textContent=next?"Stop":"Preview";b.title=next?"Stop scene preview":"Run or stop scene preview";status(next?"Scene preview active":"Engine ready");window.dispatchEvent(new CustomEvent("forge-play-state",{detail:{running:next}}))}
-function toggleTimeline(){state.engine.timelinePlaying=!state.engine.timelinePlaying;state.timelinePlaying=state.engine.timelinePlaying;refreshTimeline()}
+function toggleTimeline(){state.engine.timelinePlaying=!state.engine.timelinePlaying;state.timelinePlaying=state.engine.timelinePlaying;refreshTimeline();status(state.timelinePlaying?"Timeline playback running":"Timeline playback stopped")}
+function toggleTimelineLoop(){state.engine.timelineLoop=state.engine.timelineLoop===false;refreshTimeline();status(state.engine.timelineLoop?"Timeline loop enabled":"Timeline loop disabled")}
 function setTimelineFrame(value){const frame=clamp(Math.round(Number(value)||0),0,240,0);state.engine.timelineTime=frame/24;state.engine.evalAnimation(state.engine.timelineTime);refreshInspector();refreshTimeline()}
 function setSplitter(handle,event){
   event.preventDefault();const side=handle.dataset.splitter,key=side==="left"?"--left-dock-width":"--right-dock-width",root=document.documentElement,start=event.clientX,old=parseInt(getComputedStyle(root).getPropertyValue(key),10)||(side==="left"?defaults.left:defaults.right);
@@ -410,7 +414,7 @@ function registerCommands(){
   registerCommand("collapse-left",()=>toggleCollapsed("left"));registerCommand("collapse-right",()=>toggleCollapsed("right"));registerCommand("scene-menu",sceneSummary);registerCommand("inspector-menu",()=>{refreshInspector();status("Inspector refreshed")});
   registerCommand("grid",()=>toggleGrid());registerCommand("snap",()=>toggleSnap());registerCommand("frame-selected",frameSelection);registerCommand("frame-all",()=>{state.engine.frame();status("Framed scene")});registerCommand("fullscreen",fullscreenViewport);
   registerCommand("duplicate",()=>{if(state.engine.duplicate())changed()});registerCommand("delete",()=>{const r=selectedRecord();if(r&&confirm("Delete "+r.name+"?")){state.engine.delete();changed()}});
-  registerCommand("timeline-play",toggleTimeline);registerCommand("timeline-start",()=>setTimelineFrame(0));registerCommand("timeline-end",()=>setTimelineFrame(240));registerCommand("toggle-auto-key",toggleAutoKey);registerCommand("keyframe",()=>{state.engine.keyInterpolation=$("#keyInterpolation").value;const result=state.engine.key({interpolation:$("#keyInterpolation").value});refreshTimeline();status(result?.updated?"Keyframe replaced":"Keyframe inserted","dirty")});registerCommand("apply-reference-setup",()=>applyReferenceSetup());registerCommand("focus-reference-view",focusReferenceView);registerCommand("toggle-reference-visibility",()=>{const record=selectedRecord();if(!record?.components?.reference){notice("Image Modeling","Select a reference image plane first.");return}record.entity.enabled=record.entity.enabled===false;record.components.reference.visible=record.entity.enabled;refreshReferences();status(record.entity.enabled?"Reference shown":"Reference hidden","dirty")});registerCommand("close-timeline",()=>{document.documentElement.classList.add("timeline-manually-closed");status("Timeline hidden")});registerCommand("close-notice",()=>$("#noticeDialog").close());
+  registerCommand("timeline-play",toggleTimeline);registerCommand("timeline-loop",toggleTimelineLoop);registerCommand("timeline-start",()=>setTimelineFrame(0));registerCommand("timeline-end",()=>setTimelineFrame(240));registerCommand("toggle-auto-key",toggleAutoKey);registerCommand("keyframe",()=>{state.engine.keyInterpolation=$("#keyInterpolation").value;const result=state.engine.key({interpolation:$("#keyInterpolation").value});refreshTimeline();status(result?.updated?"Keyframe replaced":"Keyframe inserted","dirty")});registerCommand("apply-reference-setup",()=>applyReferenceSetup());registerCommand("focus-reference-view",focusReferenceView);registerCommand("toggle-reference-visibility",()=>{const record=selectedRecord();if(!record?.components?.reference){notice("Image Modeling","Select a reference image plane first.");return}record.entity.enabled=record.entity.enabled===false;record.components.reference.visible=record.entity.enabled;refreshReferences();status(record.entity.enabled?"Reference shown":"Reference hidden","dirty")});registerCommand("close-timeline",()=>{document.documentElement.classList.add("timeline-manually-closed");status("Timeline hidden")});registerCommand("close-notice",()=>$("#noticeDialog").close());
 }
 function bindUI(){
   registerCommands();
