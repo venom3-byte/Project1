@@ -1,0 +1,49 @@
+name: Forge Eye Rust/WASM CI
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "forge-eye/**"
+      - ".github/workflows/forge-eye-rust.yml"
+  pull_request:
+    paths:
+      - "forge-eye/**"
+      - ".github/workflows/forge-eye-rust.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rust-core:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: forge-eye
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install stable Rust and WebAssembly target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: forge-eye
+      - name: Check Rust formatting
+        run: cargo fmt --all -- --check
+      - name: Run native core and bridge tests
+        run: cargo test --workspace --locked
+      - name: Run Clippy without warnings
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Build WebAssembly release module
+        run: cargo build -p forge-eye-wasm --target wasm32-unknown-unknown --release --locked
+      - name: Upload WASM build
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-eye-wasm
+          path: forge-eye/target/wasm32-unknown-unknown/release/forge_eye_wasm.wasm
+          if-no-files-found: error
