@@ -1,7 +1,8 @@
 //! Scene, command, history, and animation contracts shared by Forge Eye web/native hosts.
 use crate::{
     ExtrusionRequest, GeometryError, HullRequest, LatheRequest, MeshData, MeshDiagnostics,
-    SpinRequest, build_extruded_silhouette, build_lathed_profile, build_spin_profile, build_visual_hull,
+    SpinRequest, build_extruded_silhouette, build_lathed_profile, build_spin_profile,
+    build_visual_hull,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -70,468 +71,9 @@ impl Transform {
 
     fn interpolate(a: Self, b: Self, t: f32) -> Self {
         let mix = |x: f32, y: f32| x + (y - x) * t;
-        Self {
-            position: std::array::from_fn(|i| mix(a.position[i], b.position[i])),
-            rotation: std::array::from_fn(|i| mix(a.rotation[i], b.rotation[i])),
-            scale: std::array::from_fn(|i| mix(a.scale[i], b.scale[i])),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum Interpolation {
-    Linear,
-    #[default]
-    Ease,
-    Hold,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct TransformKeyframe {
-    pub frame: u32,
-    pub transform: Transform,
-    #[serde(default)]
-    pub interpolation: Interpolation,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct MaterialState {
-    pub base_color: [f32; 4],
-    pub metalness: f32,
-    pub roughness: f32,
-    pub opacity: f32,
-}
-
-impl Default for MaterialState {
-    fn default() -> Self {
-        Self {
-            base_color: default_color(),
-            metalness: 0.05,
-            roughness: 0.65,
-            opacity: 1.0,
-        }
-    }
-}
-
-impl MaterialState {
-    pub fn validate(&self) -> Result<(), GeometryError> {
-        if self
-            .base_color
-            .iter()
-            .any(|v| !v.is_finite() || !(0.0..=1.0).contains(v))
-        {
-            return Err(GeometryError(
-                "Material base color must be finite RGBA values in [0, 1].".into(),
-            ));
-        }
-        for (name, value) in [
-            ("metalness", self.metalness),
-            ("roughness", self.roughness),
-            ("opacity", self.opacity),
-        ] {
-            if !value.is_finite() || !(0.0..=1.0).contains(&value) {
-                return Err(GeometryError(format!(
-                    "Material {name} must be between 0 and 1."
-                )));
-            }
-        }
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum ObjectKind {
-    Primitive { primitive: PrimitiveKind },
-    Mesh,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct SceneObject {
-    pub id: u64,
-    pub name: String,
-    pub kind: ObjectKind,
-    pub transform: Transform,
-    pub material: MaterialState,
-    pub visible: bool,
-    #[serde(default)]
-    pub mesh: Option<MeshData>,
-    #[serde(default)]
-    pub keyframes: Vec<TransformKeyframe>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct TimelineState {
-    pub fps: u32,
-    pub start_frame: u32,
-    pub end_frame: u32,
-    pub current_frame: u32,
-    pub looping: bool,
-    pub playing: bool,
-    pub auto_key: bool,
-}
-
-impl Default for TimelineState {
-    fn default() -> Self {
-        Self {
-            fps: default_fps(),
-            start_frame: 0,
-            end_frame: default_timeline_end(),
-            current_frame: 0,
-            looping: true,
-            playing: false,
-            auto_key: false,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Scene {
-    pub schema_version: u32,
-    pub next_id: u64,
-    pub selected_id: Option<u64>,
-    pub objects: BTreeMap<u64, SceneObject>,
-    pub timeline: TimelineState,
-}
-
-impl Default for Scene {
-    fn default() -> Self {
-        Self {
-            schema_version: 1,
-            next_id: 1,
-            selected_id: None,
-            objects: BTreeMap::new(),
-            timeline: TimelineState::default(),
-        }
-    }
-}
-
-impl Scene {
-    fn allocate_id(&mut self) -> Result<u64, GeometryError> {
-        let id = self.next_id;
-        self.next_id = self
-            .next_id
-            .checked_add(1)
-            .ok_or_else(|| GeometryError("Scene exhausted its object ID space.".into()))?;
-        Ok(id)
-    }
-
-    pub fn object(&self, id: u64) -> Option<&SceneObject> {
-        self.objects.get(&id)
-    }
-    pub fn object_mut(&mut self, id: u64) -> Option<&mut SceneObject> {
-        self.objects.get_mut(&id)
-    }
-
-    fn insert_mesh(&mut self, mesh: MeshData) -> Result<u64, GeometryError> {
-        let id = self.allocate_id()?;
-        let name = mesh.name.clone();
-        self.objects.insert(
-            id,
-            SceneObject {
-                id,
-                name,
-                kind: ObjectKind::Mesh,
-                transform: Transform::default(),
-                material: MaterialState {
-                    base_color: mesh.color,
-                    ..Default::default()
-                },
-                visible: true,
-                mesh: Some(mesh),
-                keyframes: Vec::new(),
-            },
-        );
-        self.selected_id = Some(id);
-        Ok(id)
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum EditorCommand {
-    CreatePrimitive {
-        primitive: PrimitiveKind,
-        #[serde(default)]
-        name: Option<String>,
-    },
-    Select {
-        id: Option<u64>,
-    },
-    SetTransform {
-        id: u64,
-        transform: Transform,
-        #[serde(default)]
-        auto_key: bool,
-    },
-    SetMaterial {
-        id: u64,
-        material: MaterialState,
-    },
-    SetVisibility {
-        id: u64,
-        visible: bool,
-    },
-    DuplicateObject {
-        id: u64,
-    },
-    InsertKeyframe {
-        id: u64,
-        frame: u32,
-        #[serde(default)]
-        interpolation: Interpolation,
-    },
-    DeleteObject {
-        id: u64,
-    },
-    SetTimeline {
-        fps: u32,
-        start_frame: u32,
-        end_frame: u32,
-        looping: bool,
-    },
-    SetAutoKey {
-        enabled: bool,
-    },
-    EvaluateFrame {
-        frame: u32,
-    },
-    SetPlaying {
-        playing: bool,
-    },
-    ExtrudeSilhouette {
-        request: ExtrusionRequest,
-    },
-    LatheProfile {
-        request: LatheRequest,
-    },
-    SpinProfile {
-        request: SpinRequest,
-    },
-    BuildVisualHull {
-        request: HullRequest,
-    },
-    Undo,
-    Redo,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum CommandResult {
-    Created {
-        id: u64,
-    },
-    Selected {
-        id: Option<u64>,
-    },
-    TransformUpdated {
-        id: u64,
-        keyed: bool,
-    },
-    MaterialUpdated {
-        id: u64,
-    },
-    VisibilityUpdated {
-        id: u64,
-        visible: bool,
-    },
-    KeyframeUpdated {
-        id: u64,
-        frame: u32,
-        replaced: bool,
-        count: usize,
-    },
-    Deleted {
-        id: u64,
-    },
-    TimelineUpdated,
-    FrameEvaluated {
-        frame: u32,
-    },
-    PlaybackUpdated {
-        playing: bool,
-    },
-    MeshCreated {
-        id: u64,
-        diagnostics: MeshDiagnostics,
-    },
-    HistoryUpdated {
-        can_undo: bool,
-        can_redo: bool,
-    },
-}
-
-#[derive(Debug, Clone)]
-pub struct EditorSession {
-    pub scene: Scene,
-    undo_stack: Vec<Scene>,
-    redo_stack: Vec<Scene>,
-    history_limit: usize,
-}
-
-impl Default for EditorSession {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl EditorSession {
-    pub fn new() -> Self {
-        Self {
-            scene: Scene::default(),
-            undo_stack: Vec::new(),
-            redo_stack: Vec::new(),
-            history_limit: 128,
-        }
-    }
-    pub fn with_scene(scene: Scene) -> Result<Self, GeometryError> {
-        validate_scene(&scene)?;
-        Ok(Self {
-            scene,
-            undo_stack: Vec::new(),
-            redo_stack: Vec::new(),
-            history_limit: 128,
-        })
-    }
-    pub fn can_undo(&self) -> bool {
-        !self.undo_stack.is_empty()
-    }
-    pub fn can_redo(&self) -> bool {
-        !self.redo_stack.is_empty()
-    }
-
-    pub fn execute_json(&mut self, input: &str) -> Result<String, GeometryError> {
-        let command: EditorCommand = serde_json::from_str(input)
-            .map_err(|e| GeometryError(format!("Invalid editor command JSON: {e}")))?;
-        let result = self.execute(command)?;
-        serde_json::to_string(&serde_json::json!({
-            "result": result,
-            "scene": self.scene,
-            "history": {"can_undo": self.can_undo(), "can_redo": self.can_redo()}
-        }))
-        .map_err(|e| GeometryError(format!("Could not serialize editor result: {e}")))
-    }
-
-    pub fn load_scene_json(&mut self, input: &str) -> Result<(), GeometryError> {
-        let scene: Scene = serde_json::from_str(input)
-            .map_err(|e| GeometryError(format!("Invalid scene JSON: {e}")))?;
-        validate_scene(&scene)?;
-        self.scene = scene;
-        self.undo_stack.clear();
-        self.redo_stack.clear();
-        Ok(())
-    }
-
-    pub fn execute(&mut self, command: EditorCommand) -> Result<CommandResult, GeometryError> {
-        if matches!(command, EditorCommand::Undo) {
-            return self.undo();
-        }
-        if matches!(command, EditorCommand::Redo) {
-            return self.redo();
-        }
-        let history = !matches!(
-            command,
-            EditorCommand::Select { .. }
-                | EditorCommand::EvaluateFrame { .. }
-                | EditorCommand::SetPlaying { .. }
-        );
-        let previous = self.scene.clone();
-        let result = self.apply(command)?;
-        if history && self.scene != previous {
-            self.undo_stack.push(previous);
-            if self.undo_stack.len() > self.history_limit {
-                self.undo_stack.remove(0);
-            }
-            self.redo_stack.clear();
-        }
-        Ok(result)
-    }
-
-    fn apply(&mut self, command: EditorCommand) -> Result<CommandResult, GeometryError> {
-        match command {
-            EditorCommand::CreatePrimitive { primitive, name } => {
-                let id = self.scene.allocate_id()?;
-                let default_name = format!("{:?} {}", primitive, id);
-                self.scene.objects.insert(
-                    id,
-                    SceneObject {
-                        id,
-                        name: name
-                            .filter(|x| !x.trim().is_empty())
-                            .unwrap_or(default_name),
-                        kind: ObjectKind::Primitive { primitive },
-                        transform: Transform::default(),
-                        material: MaterialState::default(),
-                        visible: true,
-                        mesh: None,
-                        keyframes: Vec::new(),
-                    },
-                );
-                self.scene.selected_id = Some(id);
-                Ok(CommandResult::Created { id })
-            }
-            EditorCommand::Select { id } => {
-                if let Some(value) = id {
-                    if !self.scene.objects.contains_key(&value) {
-                        return Err(GeometryError(format!("Object {value} does not exist.")));
-                    }
-                }
-                self.scene.selected_id = id;
-                Ok(CommandResult::Selected { id })
-            }
-            EditorCommand::SetTransform {
-                id,
-                transform,
-                auto_key,
-            } => {
-                transform.validate()?;
-                let record = self
-                    .scene
-                    .objects
-                    .get_mut(&id)
-                    .ok_or_else(|| GeometryError(format!("Object {id} does not exist.")))?;
-                record.transform = transform;
-                let should_key = auto_key || self.scene.timeline.auto_key;
-                let frame = self.scene.timeline.current_frame;
-                let interpolation = Interpolation::Ease;
-                let keyed = if should_key {
-                    insert_keyframe(record, frame, interpolation)?;
-                    true
-                } else {
-                    false
-                };
-                Ok(CommandResult::TransformUpdated { id, keyed })
-            }
-            EditorCommand::SetMaterial { id, material } => {
-                material.validate()?;
-                let record = self.scene.objects.get_mut(&id)
-                    .ok_or_else(|| GeometryError(format!("Object {id} does not exist.")))?;
-                record.material = material;
-                Ok(CommandResult::MaterialUpdated { id })
-            }
-            EditorCommand::SetVisibility { id, visible } => {
-                let record = self.scene.objects.get_mut(&id)
-                    .ok_or_else(|| GeometryError(format!("Object {id} does not exist.")))?;
-                record.visible = visible;
-                Ok(CommandResult::VisibilityUpdated { id, visible })
-            }
-            EditorCommand::DuplicateObject { id } => {
-                let mut duplicate = self.scene.objects.get(&id).cloned()
-                    .ok_or_else(|| GeometryError(format!("Object {id} does not exist.")))?;
-                let new_id = self.scene.allocate_id()?;
-                duplicate.id = new_id;
-                duplicate.name = format!("{} Copy", duplicate.name);
-                duplicate.transform.position[0] =
-                    (duplicate.transform.position[0] + 1.0).clamp(-10_000.0, 10_000.0);
-                self.scene.objects.insert(new_id, duplicate);
-                self.scene.selected_id = Some(new_id);
-                Ok(CommandResult::Created { id: new_id })
-            }
-            EditorCommand::InsertKeyframe {
-                id,
-                frame,
-                interpolation,
+ 
+…[1 chars truncated — re-run with head/grep/tail for full output]…
+nterpolation,
             } => {
                 if frame > 1_000_000 {
                     return Err(GeometryError(
@@ -898,9 +440,16 @@ mod tests {
         let request = SpinRequest {
             name: "Bottle from reference".into(),
             profile: vec![
-                [0.50, 0.94], [0.78, 0.94], [0.82, 0.90],
-                [0.78, 0.84], [0.67, 0.77], [0.62, 0.69],
-                [0.62, 0.30], [0.59, 0.23], [0.55, 0.19], [0.50, 0.18],
+                [0.50, 0.94],
+                [0.78, 0.94],
+                [0.82, 0.90],
+                [0.78, 0.84],
+                [0.67, 0.77],
+                [0.62, 0.69],
+                [0.62, 0.30],
+                [0.59, 0.23],
+                [0.55, 0.19],
+                [0.50, 0.18],
             ],
             diameter: 0.08,
             height: 0.25,
@@ -909,7 +458,9 @@ mod tests {
             smooth_shading: true,
             color: default_color(),
         };
-        let result = session.execute(EditorCommand::SpinProfile { request }).unwrap();
+        let result = session
+            .execute(EditorCommand::SpinProfile { request })
+            .unwrap();
         let CommandResult::MeshCreated { id, diagnostics } = result else {
             panic!("Spin profile should produce a mesh.");
         };
@@ -961,15 +512,34 @@ mod tests {
     #[test]
     fn material_validation_and_duplicate_object_are_deterministic() {
         let mut session = EditorSession::new();
-        let created = session.execute(EditorCommand::CreatePrimitive {
-            primitive: PrimitiveKind::Cube, name: Some("Block".into())
-        }).unwrap();
-        let CommandResult::Created { id } = created else { panic!("expected creation") };
-        let material = MaterialState { base_color: [0.8,0.2,0.1,1.0], metalness: 0.4, roughness: 0.3, opacity: 1.0 };
-        session.execute(EditorCommand::SetMaterial { id, material: material.clone() }).unwrap();
+        let created = session
+            .execute(EditorCommand::CreatePrimitive {
+                primitive: PrimitiveKind::Cube,
+                name: Some("Block".into()),
+            })
+            .unwrap();
+        let CommandResult::Created { id } = created else {
+            panic!("expected creation")
+        };
+        let material = MaterialState {
+            base_color: [0.8, 0.2, 0.1, 1.0],
+            metalness: 0.4,
+            roughness: 0.3,
+            opacity: 1.0,
+        };
+        session
+            .execute(EditorCommand::SetMaterial {
+                id,
+                material: material.clone(),
+            })
+            .unwrap();
         assert_eq!(session.scene.objects[&id].material, material);
-        let duplicate = session.execute(EditorCommand::DuplicateObject { id }).unwrap();
-        let CommandResult::Created { id: copy_id } = duplicate else { panic!("expected duplicate") };
+        let duplicate = session
+            .execute(EditorCommand::DuplicateObject { id })
+            .unwrap();
+        let CommandResult::Created { id: copy_id } = duplicate else {
+            panic!("expected duplicate")
+        };
         assert_eq!(session.scene.objects[&copy_id].name, "Block Copy");
         assert_eq!(session.scene.objects[&copy_id].material, material);
         assert_eq!(session.scene.objects[&copy_id].transform.position[0], 1.0);
@@ -981,13 +551,23 @@ mod tests {
     #[test]
     fn invalid_material_does_not_mutate_scene() {
         let mut session = EditorSession::new();
-        session.execute(EditorCommand::CreatePrimitive {
-            primitive: PrimitiveKind::Cube, name: None
-        }).unwrap();
+        session
+            .execute(EditorCommand::CreatePrimitive {
+                primitive: PrimitiveKind::Cube,
+                name: None,
+            })
+            .unwrap();
         let before = session.scene.clone();
         let mut invalid = MaterialState::default();
         invalid.base_color[0] = f32::NAN;
-        assert!(session.execute(EditorCommand::SetMaterial { id: 1, material: invalid }).is_err());
+        assert!(
+            session
+                .execute(EditorCommand::SetMaterial {
+                    id: 1,
+                    material: invalid
+                })
+                .is_err()
+        );
         assert_eq!(before, session.scene);
     }
 
