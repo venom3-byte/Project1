@@ -241,7 +241,7 @@ function configureTraceDialog(mode){
   $("#traceDialogTitle").textContent=lathe?"Trace lathe / spin profile":"Trace image silhouette";
   $("#traceModeLabel").textContent=lathe?"PROFILE · REVOLVE 360°":"OUTLINE · CLOSE · EXTRUDE";
   $("#traceInstructions").textContent=lathe
-    ?"Trace one side from the centerline at the bottom, around the exterior to the rim, then inward and down the inner wall if a hollow bottle is needed. Centerline is the middle of the image."
+    ?"Trace a closed half-section: start at the outer bottom edge, follow the exterior up to the rim, trace inward and down the inner wall, then end at the inner bottom edge. The Spin operation connects the final point back to the start to form the bottle base."
     :"Tap around the outside edge of the object. Use at least three points; tracing should not cross itself. The 3D blockout uses the reference width and height set in the Images panel.";
   $("#traceDepthField").hidden=lathe;
   $("#traceBuild").hidden=lathe;
