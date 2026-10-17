@@ -229,23 +229,61 @@ async function startSilhouetteTrace(){
   try{
     const bitmap=await createImageBitmap(entry.file),scale=Math.min(1000/bitmap.width,800/bitmap.height),width=Math.max(1,Math.round(bitmap.width*scale)),height=Math.max(1,Math.round(bitmap.height*scale));
     const canvas=$("#traceCanvas");canvas.width=width;canvas.height=height;
-    state.trace={record,bitmap,points:Array.isArray(meta.outline)?meta.outline.map(point=>[...point]):[],closed:false,axis:meta.axis||"front",width:Number(meta.width)||3,height:Number(meta.height)||((Number(meta.width)||3)/(Number(meta.aspect)||1))};
+    state.trace={record,bitmap,points:Array.isArray(meta.outline)?meta.outline.map(point=>[...point]):[],closed:false,editing:Array.isArray(meta.outline)&&meta.outline.length>=3,axis:meta.axis||"front",width:Number(meta.width)||3,height:Number(meta.height)||((Number(meta.width)||3)/(Number(meta.aspect)||1))};
     $("#traceDepth").value=$("#silhouetteDepth").value||"0.35";
     $("#traceMessage").textContent=state.trace.points.length?"Loaded saved "+state.trace.points.length+"-point outline. Continue editing it or save a revised contour.":"Tap around the object outline. Click near the first point to close the contour, or Build 3D mesh closes it automatically.";
     $("#traceDialog").showModal();traceDraw();
   }catch(error){reportError("Could not open silhouette tracing",error)}
 }
+function traceImagePoint(event){
+  const canvas=$("#traceCanvas"),rect=canvas.getBoundingClientRect();
+  if(!rect.width||!rect.height)return null;
+  return{point:[clamp((event.clientX-rect.left)/rect.width,0,1,0),clamp((event.clientY-rect.top)/rect.height,0,1,0)],rect,canvas};
+}
+function segmentDistancePixels(point,a,b,canvas){
+  const px=point[0]*canvas.width,py=point[1]*canvas.height,ax=a[0]*canvas.width,ay=a[1]*canvas.height,bx=b[0]*canvas.width,by=b[1]*canvas.height,dx=bx-ax,dy=by-ay;
+  const t=clamp(((px-ax)*dx+(py-ay)*dy)/(dx*dx+dy*dy||1),0,1,0),qx=ax+t*dx,qy=ay+t*dy;
+  return Math.hypot(px-qx,py-qy);
+}
 function addTracePoint(event){
-  const trace=state.trace,canvas=$("#traceCanvas");if(!trace||trace.closed)return;
-  const rect=canvas.getBoundingClientRect();if(!rect.width||!rect.height)return;
-  const p=[clamp((event.clientX-rect.left)/rect.width,0,1,0),clamp((event.clientY-rect.top)/rect.height,0,1,0)];
+  const trace=state.trace,result=traceImagePoint(event);if(!trace||trace.closed||!result)return;
+  const {point:p,canvas}=result,threshold=Math.max(12,Math.min(canvas.width,canvas.height)*.025);
   if(trace.points.length>=3){
     const first=trace.points[0],distance=Math.hypot((p[0]-first[0])*canvas.width,(p[1]-first[1])*canvas.height);
-    if(distance<Math.max(12,Math.min(canvas.width,canvas.height)*.025)){trace.closed=true;$("#traceMessage").textContent="Contour closed. Review the outline, then build the 3D mesh.";traceDraw();return}
+    if(distance<threshold){trace.closed=true;$("#traceMessage").textContent="Contour closed. Review the outline, then save it or build a 3D mesh.";traceDraw();return}
   }
-  if(trace.points.length){const last=trace.points[trace.points.length-1];if(Math.hypot((p[0]-last[0])*canvas.width,(p[1]-last[1])*canvas.height)<5)return}
+  for(let i=0;i<trace.points.length;i++){
+    const vertex=trace.points[i],distance=Math.hypot((p[0]-vertex[0])*canvas.width,(p[1]-vertex[1])*canvas.height);
+    if(distance<6)return;
+  }
   if(trace.points.length>=256){$("#traceMessage").textContent="The outline reached 256 points. Build this contour or clear it and trace a simpler boundary.";return}
   trace.points.push(p);$("#traceMessage").textContent="Point added. Continue around the silhouette in one direction.";traceDraw();
+}
+function handleTracePointerDown(event){
+  event.preventDefault();const trace=state.trace,result=traceImagePoint(event);if(!trace||!result)return;
+  const {point,canvas}=result,limit=Math.max(12,Math.min(canvas.width,canvas.height)*.025);
+  if(trace.points.length>=3&&Math.hypot((point[0]-trace.points[0][0])*canvas.width,(point[1]-trace.points[0][1])*canvas.height)<limit){addTracePoint(event);return}
+  let nearest=-1,nearestDistance=Infinity;
+  for(let i=1;i<trace.points.length;i++){
+    const v=trace.points[i],d=Math.hypot((point[0]-v[0])*canvas.width,(point[1]-v[1])*canvas.height);
+    if(d<nearestDistance){nearest=i;nearestDistance=d}
+  }
+  if(nearest>=1&&nearestDistance<limit){
+    const index=nearest;let moved=false;trace.closed=false;
+    const move=moveEvent=>{const p=traceImagePoint(moveEvent)?.point;if(!p)return;trace.points[index]=p;moved=true;$("#traceMessage").textContent="Moving contour point "+(index+1)+". Release to keep the new position.";traceDraw()};
+    const finish=()=>{document.removeEventListener("pointermove",move);document.removeEventListener("pointerup",finish);document.removeEventListener("pointercancel",finish);if(moved){trace.editing=true;$("#traceMessage").textContent="Contour point moved. Save outline to update the reference.";traceDraw()}};
+    document.addEventListener("pointermove",move);document.addEventListener("pointerup",finish,{once:true});document.addEventListener("pointercancel",finish,{once:true});return;
+  }
+  if(trace.editing&&trace.points.length>=3){
+    let best=Infinity,bestAfter=-1;
+    for(let i=0;i<trace.points.length;i++){
+      const j=(i+1)%trace.points.length,d=segmentDistancePixels(point,trace.points[i],trace.points[j],canvas);
+      if(d<best){best=d;bestAfter=j}
+    }
+    if(best<limit&&trace.points.length<256){trace.points.splice(bestAfter,0,point);trace.closed=false;$("#traceMessage").textContent="Point inserted into the nearest contour edge. Save outline to keep the change.";traceDraw();return}
+    $("#traceMessage").textContent="To refine a saved outline, drag a point or tap close to an existing edge. To start a new outline, clear it first.";return;
+  }
+  addTracePoint(event);
 }
 function closeTraceEditor(){
   if(state.trace?.bitmap)state.trace.bitmap.close?.();state.trace=null;
@@ -389,7 +427,7 @@ function bindUI(){
   $("#assetInput").addEventListener("change",e=>{const files=[...e.target.files];if(files.length)void loadAssets(files);e.target.value=""});
   $("#addReferenceImages").addEventListener("click",()=>$("#referenceInput").click());
   $("#traceSilhouette").addEventListener("click",()=>void startSilhouetteTrace());
-  $("#traceCanvas").addEventListener("pointerdown",event=>{event.preventDefault();addTracePoint(event)});
+  $("#traceCanvas").addEventListener("pointerdown",handleTracePointerDown);
   $("#traceUndo").addEventListener("click",()=>{if(state.trace){state.trace.points.pop();state.trace.closed=false;$("#traceMessage").textContent="Last point removed.";traceDraw()}});
   $("#traceClear").addEventListener("click",()=>{if(state.trace){state.trace.points=[];state.trace.closed=false;$("#traceMessage").textContent="Outline cleared.";traceDraw()}});
   $("#traceSaveOutline").addEventListener("click",saveTraceOutline);
