@@ -129,7 +129,7 @@ try {
   await page.locator('[data-workspace="references"]').click();
   await page.waitForFunction(()=>document.documentElement.dataset.forgeWorkspace==="references"&&!document.querySelector('[data-inspector-panel="references"]').hidden,null,{timeout:5000});
   await page.locator("#referenceAxis").selectOption("front");await page.locator("#referenceWidth").fill("3.2");
-  const frontPng=Buffer.from(await page.evaluate(()=>{const c=document.createElement("canvas");c.width=2;c.height=2;const x=c.getContext("2d");x.fillStyle="#f0f0f0";x.fillRect(0,0,2,2);return c.toDataURL("image/png").split(",")[1]),"base64");
+  const frontPng=Buffer.from(await page.evaluate(()=>{const c=document.createElement("canvas");c.width=2;c.height=2;const x=c.getContext("2d");x.fillStyle="#f0f0f0";x.fillRect(0,0,2,2);return c.toDataURL("image/png").split(",")[1]}),"base64");
   await page.locator("#referenceInput").setInputFiles({name:"qa-front-reference.png",mimeType:"image/png",buffer:frontPng});
   await page.waitForFunction(()=>[...window.Forge.entities.values()].some(r=>r.components?.reference?.name==="qa-front-reference.png"),null,{timeout:10000});
   const front=await page.evaluate(()=>{const r=[...window.Forge.entities.values()].find(o=>o.components?.reference?.name==="qa-front-reference.png"),rot=r.entity.getLocalEulerAngles(),scale=r.entity.getLocalScale();return{axis:r.components.reference.axis,width:r.components.reference.width,scale:[scale.x,scale.y,scale.z],rotation:[rot.x,rot.y,rot.z],panelCount:Number(document.querySelector("#referenceCount").textContent)}});
@@ -161,7 +161,7 @@ try {
   // Import a dimensionally aligned side reference and save its separate outline.
   await page.locator('[data-workspace="references"]').click();
   await page.locator("#referenceAxis").selectOption("side");await page.locator("#referenceWidth").fill("4.5");
-  const sidePng=Buffer.from(await page.evaluate(()=>{const c=document.createElement("canvas");c.width=45;c.height=32;const x=c.getContext("2d");x.fillStyle="#dedede";x.fillRect(0,0,c.width,c.height);return c.toDataURL("image/png").split(",")[1]),"base64");
+  const sidePng=Buffer.from(await page.evaluate(()=>{const c=document.createElement("canvas");c.width=45;c.height=32;const x=c.getContext("2d");x.fillStyle="#dedede";x.fillRect(0,0,c.width,c.height);return c.toDataURL("image/png").split(",")[1]}),"base64");
   await page.locator("#referenceInput").setInputFiles({name:"qa-side-reference.png",mimeType:"image/png",buffer:sidePng});
   await page.waitForFunction(()=>[...window.Forge.entities.values()].some(r=>r.components?.reference?.name==="qa-side-reference.png"),null,{timeout:10000});
   const side=await page.evaluate(()=>{const r=[...window.Forge.entities.values()].find(o=>o.components?.reference?.name==="qa-side-reference.png");return{axis:r.components.reference.axis,width:r.components.reference.width,height:r.components.reference.height}});
