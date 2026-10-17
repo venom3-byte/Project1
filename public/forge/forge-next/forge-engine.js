@@ -386,9 +386,17 @@ export class ForgeEngine{
       if(d.kind==='camera')r.entity.addComponent('camera',{clearColor:new pc.Color(.02,.05,.09)});
       if(d.kind==='light')r.entity.addComponent('light',{type:'directional',intensity:2,castShadows:true});
       r.components=d.components||{};
-      if(d.components?.geometry?.kind==="extruded-silhouette")this.createExtrudedSilhouette({record:r,name:d.name,...d.components.geometry});
-      else if(d.components?.geometry?.kind==="silhouette-visual-hull")this.createSilhouetteVisualHull({record:r,name:d.name,...d.components.geometry});
-      else if(d.components?.geometry?.kind==="lathe-profile")this.createLathedProfileMesh({record:r,name:d.name,...d.components.geometry});
+      const savedGeometry=d.components?.geometry;
+      if(savedGeometry?.kind==="extruded-silhouette"){
+        this.createExtrudedSilhouette({record:r,name:d.name,...savedGeometry});
+        if(savedGeometry.sourceReference)r.components.geometry.sourceReference=savedGeometry.sourceReference;
+      }else if(savedGeometry?.kind==="silhouette-visual-hull"){
+        this.createSilhouetteVisualHull({record:r,name:d.name,...savedGeometry});
+        if(savedGeometry.sourceReference)r.components.geometry.sourceReference=savedGeometry.sourceReference;
+      }else if(savedGeometry?.kind==="lathe-profile"){
+        this.createLathedProfileMesh({record:r,name:d.name,...savedGeometry});
+        if(savedGeometry.sourceReference)r.components.geometry.sourceReference=savedGeometry.sourceReference;
+      }
       if(d.components?.material){
         const previous=this.selectedId;
         this.selectedId=r.id; this.applyMaterial(d.components.material); this.selectedId=previous;
