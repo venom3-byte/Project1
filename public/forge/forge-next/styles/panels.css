@@ -182,3 +182,32 @@
 .timeline-loop-button{min-width:25px;padding:0 5px;color:#839bad;font-size:14px}
 .timeline-loop-button.is-active,.timeline-loop-button[aria-pressed="true"]{border-color:#345d71;background:#173343;color:#9cd7ef}
 @media(max-width:520px){.timeline-loop-button{min-width:24px;padding:0 3px;font-size:13px}}
+
+
+/* Blender-inspired Dope Sheet / Graph Editor views. */
+.timeline-view-switch{display:flex;align-items:center;gap:5px;min-height:29px;padding:3px 8px;border-top:1px solid #23323e;border-bottom:1px solid #263742;background:#0c141c}
+.timeline-view-tab{height:23px;padding:0 9px;border:1px solid transparent;border-radius:3px;background:transparent;color:#7f95a6;font-size:9px;white-space:nowrap;cursor:pointer}
+.timeline-view-tab:hover{color:#c1d6e4;background:#15232e}
+.timeline-view-tab.is-active,.timeline-view-tab[aria-selected="true"]{border-color:#365365;background:#172a37;color:#c7e5f4}
+.graph-channel-field{display:flex;align-items:center;gap:6px;margin-left:auto;color:#71899b;font:8px var(--font-mono);white-space:nowrap}
+.graph-channel-field select{height:23px;max-width:145px;padding:0 6px;border:1px solid #314553;border-radius:3px;background:#0b131a;color:#c1d2de;font:9px system-ui,sans-serif}
+.graph-editor-pane{display:flex;min-height:0;flex:1 1 auto;flex-direction:column;overflow:hidden;background:#0b1219}
+#graphEditorCanvas{display:block;width:100%;height:142px;min-height:105px;flex:1 1 auto;touch-action:none;cursor:crosshair}
+.graph-editor-hint{display:flex;justify-content:space-between;gap:8px;padding:5px 9px;border-top:1px solid #243440;color:#71899b;font-size:8px;white-space:nowrap}
+#graphChannelSummary{color:#9bcbe1;font:9px var(--font-mono)}
+.timeline-panel{min-height:0}
+@media(max-width:850px){
+  .timeline-view-switch{gap:3px;padding:3px 5px}
+  .timeline-view-tab{padding:0 6px;font-size:8px}
+  .graph-channel-field{gap:3px}
+  .graph-channel-field select{max-width:116px;font-size:8px}
+  #graphEditorCanvas{min-height:95px}
+  .graph-editor-hint{white-space:normal;font-size:7px}
+}
+@media(max-width:520px){
+  .timeline-view-switch{flex-wrap:wrap;min-height:48px;padding:4px}
+  .timeline-view-tab{height:22px}
+  .graph-channel-field{flex:1 1 100%;margin-left:0;justify-content:space-between}
+  .graph-channel-field select{max-width:none;flex:1}
+  #graphEditorCanvas{height:120px;min-height:95px}
+}
