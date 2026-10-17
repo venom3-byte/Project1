@@ -1,0 +1,11 @@
+[package]
+name = "forge-eye-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Deterministic, testable geometry and reconstruction algorithms shared by Forge Eye web and native builds."
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
