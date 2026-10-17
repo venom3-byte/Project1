@@ -36,7 +36,13 @@ function sceneObjects(){return Object.values(state.scene?.objects||{}).sort((a,b
 function recordForRust(id){const rendererId=state.renderMap.get(Number(id));return rendererId?state.engine.entities.get(rendererId)||null:null}
 function rustIdForRenderer(record){return Number(record?.components?.forgeEye?.rustId)||0}
 function setRendererTransform(record,t){if(record&&t){record.entity.setLocalPosition(...t.position);record.entity.setLocalEulerAngles(...t.rotation);record.entity.setLocalScale(...t.scale)}}
-function setRendererMaterial(record,m){if(!record||!m)return;state.engine.applyMaterial({color:m.base_color.slice(0,3),metalness:m.metalness,roughness:m.roughness,opacity:m.opacity});record.components.material={color:m.base_color.slice(0,3),metalness:m.metalness,roughness:m.roughness,opacity:m.opacity}}
+function setRendererMaterial(record,m){
+  if(!record||!m)return;
+  const previous=state.engine.selectedId;
+  try{state.engine.selectedId=record.id;state.engine.applyMaterial({color:m.base_color.slice(0,3),metalness:m.metalness,roughness:m.roughness,opacity:m.opacity})}
+  finally{state.engine.selectedId=previous}
+  record.components.material={color:m.base_color.slice(0,3),metalness:m.metalness,roughness:m.roughness,opacity:m.opacity}
+}
 function removeRendererObject(rustId){const rendererId=state.renderMap.get(Number(rustId));if(!rendererId)return;const record=state.engine.entities.get(rendererId);if(record){state.engine.removePhysics?.(rendererId);record.entity.destroy();state.engine.entities.delete(rendererId);if(state.engine.selectedId===rendererId)state.engine.selectedId=null}state.renderMap.delete(Number(rustId))}
 function addRendererObject(object){
   let record;
@@ -63,7 +69,24 @@ function syncSceneToRenderer(){
   refreshAll();
 }
 async function runCore(command,{dirty=true}={}){
-  const out=coreCommand(command);syncSceneToRenderer();if(dirty)setDirty(true);refreshHistoryButtons();return out
+  const out=coreCommand(command),type=command.type;
+  if(["create_primitive","duplicate_object","delete_object","spin_profile","extrude_silhouette","build_visual_hull"].includes(type))syncSceneToRenderer();
+  else if(type==="evaluate_frame"){
+    for(const obj of sceneObjects()){const r=recordForRust(obj.id);if(r){setRendererTransform(r,obj.transform);r.entity.enabled=obj.visible!==false;state.engine.keyframes.set(r.id,(obj.keyframes||[]).map(k=>({time:k.frame/(state.scene.timeline.fps||24),p:[...k.transform.position],r:[...k.transform.rotation],s:[...k.transform.scale],interpolation:k.interpolation||"ease"})))}}
+    refreshInspector();refreshAnimation()
+  }else if(type==="select"){
+    const r=command.id==null?null:recordForRust(command.id);state.syncingSelection=true;try{state.engine.select(r?.id||null)}finally{state.syncingSelection=false}refreshAll()
+  }else{
+    const obj=command.id==null?selectedObject():state.scene.objects[String(command.id)],r=obj?recordForRust(obj.id):null;
+    if(r){
+      if(type==="set_transform")setRendererTransform(r,obj.transform);
+      else if(type==="set_material")setRendererMaterial(r,obj.material);
+      else if(type==="set_visibility")r.entity.enabled=obj.visible!==false;
+      else if(type==="insert_keyframe")state.engine.keyframes.set(r.id,(obj.keyframes||[]).map(k=>({time:k.frame/(state.scene.timeline.fps||24),p:[...k.transform.position],r:[...k.transform.rotation],s:[...k.transform.scale],interpolation:k.interpolation||"ease"})));
+    }
+    refreshInspector();refreshAnimation();refreshHierarchy()
+  }
+  if(dirty)setDirty(true);refreshHistoryButtons();return out
 }
 function attachRendererEvents(){window.addEventListener("forge-selection",event=>{if(state.syncingSelection)return;const id=rustIdForRenderer(event.detail||state.engine.selected());if(!id)return;try{coreCommand({type:"select",id});refreshAll()}catch(error){console.error(error)}})}
 function refreshHistoryButtons(){$("#undoBtn").disabled=!state.session?.can_undo();$("#redoBtn").disabled=!state.session?.can_redo()}
@@ -192,7 +215,7 @@ function drawProfile(){
   const c=$("#profileCanvas"),ctx=c.getContext("2d"),w=c.width,h=c.height;ctx.clearRect(0,0,w,h);ctx.fillStyle="#0b141c";ctx.fillRect(0,0,w,h);
   for(let i=0;i<=10;i++){const x=i*w/10,y=i*h/10;ctx.strokeStyle=i===5?"#3e728a":"#223643";ctx.lineWidth=i===5?1.5:1;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}
   ctx.strokeStyle="#b8cddd";ctx.setLineDash([5,5]);ctx.beginPath();ctx.moveTo(w*.5,0);ctx.lineTo(w*.5,h);ctx.stroke();ctx.setLineDash([]);
-  if(state.profileReference){const img=new Image();img.onload=()=>{ctx.globalAlpha=.4;ctx.drawImage(img,0,0,w,h);ctx.globalAlpha=1;state.profileReference=null;drawProfile()};img.src=state.profileReference;return}
+  if(state.profileImage?.complete&&state.profileImage.naturalWidth){ctx.save();ctx.globalAlpha=.25;ctx.drawImage(state.profileImage,0,0,w,h);ctx.restore()}
   const xy=state.profile.map(p=>[p[0]*w,p[1]*h]);if(xy.length){ctx.strokeStyle="#72d4f8";ctx.lineWidth=2.3;ctx.lineJoin="round";ctx.beginPath();xy.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.stroke();xy.forEach(([x,y],i)=>{ctx.beginPath();ctx.arc(x,y,4.5,0,Math.PI*2);ctx.fillStyle=i===0||i===xy.length-1?"#fff":"#86dfff";ctx.fill()})}
 }
 function profilePoint(e){const c=$("#profileCanvas"),r=c.getBoundingClientRect();return[clamp((e.clientX-r.left)/r.width,0,1,.5),clamp((e.clientY-r.top)/r.height,0,1,.5)]}
@@ -254,7 +277,7 @@ async function saveProject(){
 async function openProjectFile(file){
   const data=JSON.parse(await file.text());if(data.format!=="forge-eye-project"||!data.scene?.objects)throw new Error("This isn't a Forge Eye project file.");
   state.session.load_scene_json(JSON.stringify(data.scene));state.scene=JSON.parse(state.session.scene_json());
-  for(const ref of Object.values(state.references))if(ref)removeReference(ref);state.references={front:null,side:null,top:null};state.externalAssets=data.externalAssets||[];state.renderMap.clear();
+  for(const ref of Object.values(state.references))if(ref)removeReference(ref);state.references={front:null,side:null,top:null};state.externalAssets=data.externalAssets||[];for(const id of [...state.renderMap.keys()])removeRendererObject(id);
   for(const [axis,ref] of Object.entries(data.references||{})){if(!ref?.dataUrl)continue;const file=await dataUrlToFile(ref.dataUrl,ref.name||axis+".png");await createReference(file,axis,ref.width);const current=state.references[axis];current.outline=(ref.outline||[]).map(p=>[...p]);const record=state.engine.entities.get(current.id);if(record?.components?.reference)record.components.reference.outline=current.outline}
   $("#projectName").value=data.name||"Untitled Project";state.profile=(data.spinProfile||defaultProfile).map(p=>[...p]);syncSceneToRenderer();setWorkspace(data.workspace||"scene");drawProfile();refreshReferences();setDirty(false);setStatus("Project loaded and validated","success")
 }
@@ -291,7 +314,7 @@ function bindEvents(){
   $("#saveProjectBtn").addEventListener("click",()=>void saveProject());$("#saveProjectInline").addEventListener("click",()=>void saveProject());$("#exportObj").addEventListener("click",exportObj);
   $("#assetImportButton").addEventListener("click",()=>$("#assetInput").click());$("#assetInput").addEventListener("change",e=>{void importFiles([...e.target.files]);e.target.value=""});
   $("#referenceInput").addEventListener("change",e=>{const f=e.target.files?.[0];if(f)createReference(f,state.referenceView,$("#referenceWidth").value).catch(err=>toast(err.message,"error"));e.target.value=""});$("#uploadReference").addEventListener("click",()=>$("#referenceInput").click());
-  $("#profileReferenceInput").addEventListener("change",async e=>{const f=e.target.files?.[0];if(f){state.profileReference=await fileToDataUrl(f);drawProfile()}e.target.value=""});
+  $("#profileReferenceInput").addEventListener("change",async e=>{const f=e.target.files?.[0];if(f){state.profileReference=await fileToDataUrl(f);const img=new Image();img.onload=()=>{state.profileImage=img;drawProfile()};img.src=state.profileReference}e.target.value=""});
   $("#traceReference").addEventListener("click",()=>openTrace().catch(err=>toast(err.message,"error")));$("#closeTrace").addEventListener("click",()=>$("#traceDialog").close());
   $("#traceCanvas").addEventListener("pointerdown",traceDown);$("#traceCanvas").addEventListener("pointermove",traceMove);$("#traceCanvas").addEventListener("pointerup",traceUp);$("#traceCanvas").addEventListener("pointercancel",traceUp);
   $("#traceUndo").addEventListener("click",()=>{if(state.trace){state.trace.points.pop();traceDraw()}});$("#traceClear").addEventListener("click",()=>{if(state.trace){state.trace.points=[];traceDraw()}});
