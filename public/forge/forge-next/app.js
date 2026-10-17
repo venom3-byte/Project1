@@ -472,14 +472,14 @@ function bindUI(){
 function bootFailed(error){state.lastError=error?.message||String(error);$("#bootMessage").textContent="Startup failed: "+state.lastError;$("#bootScreen").querySelector(".boot-meter").hidden=true;console.error("[Forge Next] Startup failed",error)}
 async function boot(){
   loadPrefs();status("Loading engine…");
-  const {ForgeEngine,pc}=await import("../forge-engine.js");
+  const {ForgeEngine,pc}=await import("./forge-engine.js");
   window.ForgePC=pc;
   const engine=new ForgeEngine($("#viewport"),message=>console.info("[Forge Engine]",message));state.engine=engine;await engine.init();window.Forge=engine;
-  status("Installing viewport…");await import("../forge-viewport.js");
-  try{await import("../forge-spatial.js")}catch(error){console.warn("Spatial overlay unavailable",error)}
-  try{await import("../forge-gizmo.js")}catch(error){console.warn("Transform gizmo adapter unavailable",error)}
-  await import("../forge-project.js");
-  try{await import("../forge-export.js")}catch(error){console.warn("Asset export adapter unavailable",error)}
+  status("Installing viewport…");await import("./forge-viewport.js");
+  try{await import("./forge-spatial.js")}catch(error){console.warn("Spatial overlay unavailable",error)}
+  try{await import("./forge-gizmo.js")}catch(error){console.warn("Transform gizmo adapter unavailable",error)}
+  await import("./forge-project.js");
+  try{await import("./forge-export.js")}catch(error){console.warn("Asset export adapter unavailable",error)}
   window.ForgeReady=true;window.ForgeBootState="ready";window.dispatchEvent(new Event("forge-ready"));bindUI();
   const cube=engine.primitive("box","Cube");engine.select(cube.id);engine.frame();try{await window.ForgeGizmo?.init?.()}catch(error){console.warn("Native gizmo did not attach",error)}
   toggleGrid(true);chooseTool("select");chooseView("perspective");setWorkspace("layout",{save:false});setLeftPanel(state.leftPanel,{save:false});setInspectorPanel(state.inspectorPanel,{save:false});refreshAll();
