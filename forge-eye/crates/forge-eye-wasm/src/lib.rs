@@ -1,5 +1,5 @@
 use forge_eye_core::EditorSession;
-use forge_eye_core::{ExtrusionRequest, HullRequest, build_extruded_silhouette, build_visual_hull};
+use forge_eye_core::{LatheRequest, ExtrusionRequest, HullRequest, build_extruded_silhouette, build_lathed_profile, build_visual_hull};
 use wasm_bindgen::prelude::*;
 
 /// Stateful, deterministic command session shared by the browser and native hosts.
@@ -96,6 +96,20 @@ pub fn build_extruded_silhouette_json(request_json: &str) -> Result<String, JsVa
     build_extruded_silhouette_json_impl(request_json).map_err(|error| JsValue::from_str(&error))
 }
 
+
+fn build_lathed_profile_json_impl(request_json: &str) -> Result<String, String> {
+    let request: LatheRequest = serde_json::from_str(request_json)
+        .map_err(|error| format!("Invalid lathe-profile request: {error}"))?;
+    let mesh = build_lathed_profile(&request).map_err(|error| error.to_string())?;
+    serde_json::to_string(&mesh)
+        .map_err(|error| format!("Could not serialize lathe mesh: {error}"))
+}
+
+#[wasm_bindgen]
+pub fn build_lathed_profile_json(request_json: &str) -> Result<String, JsValue> {
+    build_lathed_profile_json_impl(request_json).map_err(|error| JsValue::from_str(&error))
+}
+
 fn validate_contour_json_impl(contour_json: &str) -> Result<String, String> {
     let contour: Vec<[f32; 2]> = serde_json::from_str(contour_json)
         .map_err(|error| format!("Invalid contour JSON: {error}"))?;
@@ -129,6 +143,22 @@ mod tests {
         let value = build_visual_hull_json_impl(request).unwrap();
         assert!(value.contains("occupied_voxels"));
         assert!(value.contains("vertices"));
+    }
+
+
+    #[test]
+    fn bridge_returns_a_lathed_bottle_mesh() {
+        let request = r#"{"name":"Bottle","profile":[[0.80,0.90],[0.80,0.78],[0.70,0.68],[0.61,0.56],[0.58,0.43],[0.58,0.18],[0.55,0.11],[0.53,0.18],[0.53,0.43],[0.56,0.58],[0.67,0.70],[0.76,0.79],[0.76,0.88]],"diameter":0.08,"height":0.25,"segments":32}"#;
+        let value = build_lathed_profile_json_impl(request).unwrap();
+        assert!(value.contains("spin / lathe profile"));
+        assert!(value.contains("vertices"));
+        assert!(value.contains("triangle_count"));
+    }
+
+    #[test]
+    fn bridge_rejects_invalid_lathe_dimensions() {
+        let request = r#"{"name":"Bottle","profile":[[0.8,0.9],[0.8,0.2],[0.55,0.1],[0.53,0.2],[0.53,0.9]],"diameter":0.0,"height":0.25,"segments":32}"#;
+        assert!(build_lathed_profile_json_impl(request).is_err());
     }
 
     #[test]
