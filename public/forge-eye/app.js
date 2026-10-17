@@ -3,7 +3,7 @@ import initWasm,{ForgeEyeSession,engine_version,validate_contour_json} from "./p
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const clamp=(v,min,max,fallback)=>{const n=Number(v);return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback};
 const defaultProfile=[[.50,.94],[.78,.94],[.82,.90],[.78,.84],[.67,.77],[.62,.69],[.62,.30],[.59,.23],[.55,.19],[.50,.18]];
-const state={wasm:null,session:null,scene:null,engine:null,pc:null,renderMap:new Map(),references:{front:null,side:null,top:null},referenceView:"front",workspace:"scene",animationView:"dope",graphChannel:"position:0",profile:defaultProfile.map(p=>[...p]),profileUndo:[],profileReference:null,profileDrag:null,trace:null,traceImageRect:null,syncingSelection:false,syncingForm:false,playing:false,lastFrameAt:0,raf:0,dirty:false,externalAssets:[]};
+const state={wasm:null,session:null,scene:null,engine:null,pc:null,renderMap:new Map(),references:{front:null,side:null,top:null},referenceView:"front",workspace:"scene",animationView:"dope",graphChannel:"position:0",profile:defaultProfile.map(p=>[...p]),profileUndo:[],profileReference:null,profileReferenceOpacity:.25,profileReferenceFit:"contain",profileAxisSnap:true,profileImage:null,profileImageRect:null,profileDrag:null,trace:null,traceImageRect:null,syncingSelection:false,syncingForm:false,playing:false,lastFrameAt:0,raf:0,dirty:false,externalAssets:[]};
 const primitiveGlyph={cube:"◇",sphere:"●",cylinder:"◉",plane:"▱",cone:"△",torus:"◎",camera:"▣",light:"☼"};
 const hexOf=c=>"#"+(c||[.32,.62,.76]).slice(0,3).map(v=>Math.round(clamp(v,0,1,0)*255).toString(16).padStart(2,"0")).join("").toUpperCase();
 const color4=hex=>{const s=String(hex||"#529ec9").replace("#","");return[0,2,4].map(i=>parseInt(s.slice(i,i+2),16)/255).concat(1)};
@@ -248,16 +248,39 @@ async function buildHull(){
     toast(result.textContent,"error");return null;
   }
 }
-function drawProfile(){
-  const c=$("#profileCanvas"),ctx=c.getContext("2d"),w=c.width,h=c.height;ctx.clearRect(0,0,w,h);ctx.fillStyle="#0b141c";ctx.fillRect(0,0,w,h);
-  for(let i=0;i<=10;i++){const x=i*w/10,y=i*h/10;ctx.strokeStyle=i===5?"#3e728a":"#223643";ctx.lineWidth=i===5?1.5:1;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}
-  ctx.strokeStyle="#b8cddd";ctx.setLineDash([5,5]);ctx.beginPath();ctx.moveTo(w*.5,0);ctx.lineTo(w*.5,h);ctx.stroke();ctx.setLineDash([]);
-  if(state.profileImage?.complete&&state.profileImage.naturalWidth){ctx.save();ctx.globalAlpha=.25;ctx.drawImage(state.profileImage,0,0,w,h);ctx.restore()}
-  const xy=state.profile.map(p=>[p[0]*w,p[1]*h]);if(xy.length){ctx.strokeStyle="#72d4f8";ctx.lineWidth=2.3;ctx.lineJoin="round";ctx.beginPath();xy.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.stroke();xy.forEach(([x,y],i)=>{ctx.beginPath();ctx.arc(x,y,4.5,0,Math.PI*2);ctx.fillStyle=i===0||i===xy.length-1?"#fff":"#86dfff";ctx.fill()})}
+function profileImageBounds(image,w,h){
+  if(!image?.naturalWidth||!image?.naturalHeight)return null;
+  if(state.profileReferenceFit==="stretch")return{x:0,y:0,w,h};
+  const scale=state.profileReferenceFit==="crop"?Math.max(w/image.naturalWidth,h/image.naturalHeight):Math.min(w/image.naturalWidth,h/image.naturalHeight);
+  const iw=image.naturalWidth*scale,ih=image.naturalHeight*scale;
+  return{x:(w-iw)/2,y:(h-ih)/2,w:iw,h:ih};
 }
-function profilePoint(e){const c=$("#profileCanvas"),r=c.getBoundingClientRect();return[clamp((e.clientX-r.left)/r.width,0,1,.5),clamp((e.clientY-r.top)/r.height,0,1,.5)]}
+function drawProfile(){
+  const c=$("#profileCanvas"),ctx=c.getContext("2d"),w=c.width,h=c.height;
+  ctx.clearRect(0,0,w,h);ctx.fillStyle="#0b141c";ctx.fillRect(0,0,w,h);
+  state.profileImageRect=null;
+  if(state.profileImage?.complete&&state.profileImage.naturalWidth){
+    const rect=profileImageBounds(state.profileImage,w,h);state.profileImageRect=rect;
+    ctx.save();ctx.globalAlpha=state.profileReferenceOpacity;
+    if(state.profileReferenceFit==="crop"){ctx.beginPath();ctx.rect(0,0,w,h);ctx.clip()}
+    ctx.drawImage(state.profileImage,rect.x,rect.y,rect.w,rect.h);ctx.restore();
+  }
+  for(let i=0;i<=10;i++){const x=i*w/10,y=i*h/10;ctx.strokeStyle=i===5?"#477890":"#263844";ctx.lineWidth=i===5?1.5:1;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}
+  ctx.strokeStyle="#c5dae5";ctx.setLineDash([5,5]);ctx.beginPath();ctx.moveTo(w*.5,0);ctx.lineTo(w*.5,h);ctx.stroke();ctx.setLineDash([]);
+  const xy=state.profile.map(p=>[p[0]*w,p[1]*h]);
+  if(xy.length){ctx.strokeStyle="#72d4f8";ctx.lineWidth=2.3;ctx.lineJoin="round";ctx.beginPath();xy.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.stroke();xy.forEach(([x,y],i)=>{ctx.beginPath();ctx.arc(x,y,4.5,0,Math.PI*2);ctx.fillStyle=Math.abs(state.profile[i][0]-.5)<.001?"#fff":"#86dfff";ctx.fill()})}
+  if(state.profileAxisSnap){ctx.fillStyle="#c0dce9";ctx.font="10px ui-monospace,monospace";ctx.textAlign="left";ctx.fillText("AXIS SNAP ON",7,13)}
+  $("#profileClearRef").disabled=!state.profileReference;
+  $("#profileReferenceOpacityValue").textContent=Math.round(state.profileReferenceOpacity*100)+"%";
+}
+function normalizeProfilePoint(point){
+  const p=[clamp(point[0],0,1,.5),clamp(point[1],0,1,.5)];
+  if(state.profileAxisSnap&&Math.abs(p[0]-.5)<=.035)p[0]=.5;
+  return p;
+}
+function profilePoint(e){const c=$("#profileCanvas"),r=c.getBoundingClientRect();return normalizeProfilePoint([(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height])}
 function saveProfileUndo(){state.profileUndo.push(state.profile.map(p=>[...p]));if(state.profileUndo.length>50)state.profileUndo.shift()}
-function profileDown(e){const p=profilePoint(e),c=$("#profileCanvas");let index=-1,best=14;state.profile.forEach((v,i)=>{const d=Math.hypot((v[0]-p[0])*c.width,(v[1]-p[1])*c.height);if(d<best){best=d;index=i}});saveProfileUndo();if(index<0){if(state.profile.length>=256)return toast("Profile limit is 256 points.","error");state.profile.push(p);index=state.profile.length-1}state.profileDrag={index};try{c.setPointerCapture(e.pointerId)}catch{}drawProfile()}
+function profileDown(e){const p=profilePoint(e),c=$("#profileCanvas");let index=-1,best=14;state.profile.forEach((v,i)=>{const d=Math.hypot((v[0]-p[0])*c.width,(v[1]-p[1])*c.height);if(d<best){best=d;index=i}});saveProfileUndo();if(index<0){if(state.profile.length>=256)return toast("Profile limit is 256 points.","error");state.profile.push(p);index=state.profile.length-1;$("#profileStatus").textContent="Added profile point "+state.profile.length+" · tap near the center axis to snap it."}state.profileDrag={index};try{c.setPointerCapture(e.pointerId)}catch{}drawProfile()}
 function profileMove(e){if(!state.profileDrag)return;state.profile[state.profileDrag.index]=profilePoint(e);drawProfile()}
 async function buildSpin(){
   const request={name:"Spin Profile Mesh",profile:state.profile,diameter:clamp($("#spinDiameter").value,.001,1000,.08),height:clamp($("#spinHeight").value,.001,1000,.25),segments:clamp($("#spinSegments").value,12,128,24),subdivision_level:clamp($("#spinSubdivision").value,0,3,2),smooth_shading:$("#spinSmooth").checked,color:[.32,.62,.76,1]};
@@ -308,7 +331,7 @@ function playTick(now){
   state.raf=requestAnimationFrame(playTick)
 }
 async function saveProject(){
-  const project={format:"forge-eye-project",schema_version:1,name:$("#projectName").value.trim()||"Untitled Project",saved_at:new Date().toISOString(),scene:JSON.parse(state.session.scene_json()),references:state.references,externalAssets:state.externalAssets,workspace:state.workspace,spinProfile:state.profile};
+  const project={format:"forge-eye-project",schema_version:1,name:$("#projectName").value.trim()||"Untitled Project",saved_at:new Date().toISOString(),scene:JSON.parse(state.session.scene_json()),references:state.references,externalAssets:state.externalAssets,workspace:state.workspace,spinProfile:state.profile,spinProfileReference:state.profileReference,spinReferenceOpacity:state.profileReferenceOpacity,spinReferenceFit:state.profileReferenceFit,spinAxisSnap:state.profileAxisSnap};
   downloadText(safeFilename(project.name)+".forge-eye.json",JSON.stringify(project,null,2));setDirty(false);setStatus("Project file downloaded","success");toast("Saved Forge Eye project.","success")
 }
 async function openProjectFile(file){
@@ -316,7 +339,7 @@ async function openProjectFile(file){
   state.session.load_scene_json(JSON.stringify(data.scene));state.scene=JSON.parse(state.session.scene_json());
   for(const ref of Object.values(state.references))if(ref)removeReference(ref);state.references={front:null,side:null,top:null};state.externalAssets=data.externalAssets||[];for(const id of [...state.renderMap.keys()])removeRendererObject(id);
   for(const [axis,ref] of Object.entries(data.references||{})){if(!ref?.dataUrl)continue;const file=await dataUrlToFile(ref.dataUrl,ref.name||axis+".png");await createReference(file,axis,ref.width);const current=state.references[axis];current.outline=(ref.outline||[]).map(p=>[...p]);const record=state.engine.entities.get(current.id);if(record?.components?.reference)record.components.reference.outline=current.outline}
-  $("#projectName").value=data.name||"Untitled Project";state.profile=(data.spinProfile||defaultProfile).map(p=>[...p]);syncSceneToRenderer();setWorkspace(data.workspace||"scene");drawProfile();refreshReferences();setDirty(false);setStatus("Project loaded and validated","success")
+  $("#projectName").value=data.name||"Untitled Project";state.profile=(data.spinProfile||defaultProfile).map(p=>[...p]);state.profileReference=typeof data.spinProfileReference==="string"?data.spinProfileReference:null;state.profileReferenceOpacity=clamp(data.spinReferenceOpacity,.05,1,.25);state.profileReferenceFit=["contain","crop","stretch"].includes(data.spinReferenceFit)?data.spinReferenceFit:"contain";state.profileAxisSnap=data.spinAxisSnap!==false;state.profileImage=null;$("#profileReferenceOpacity").value=String(state.profileReferenceOpacity);$("#profileReferenceFit").value=state.profileReferenceFit;$("#profileAxisSnap").checked=state.profileAxisSnap;if(state.profileReference){const image=new Image();image.onload=()=>{state.profileImage=image;drawProfile();$("#profileStatus").textContent="Restored reference · "+image.naturalWidth+" × "+image.naturalHeight+" px";};image.onerror=()=>{state.profileReference=null;state.profileImage=null;$("#profileStatus").textContent="Saved profile reference could not be decoded.";drawProfile()};image.src=state.profileReference}syncSceneToRenderer();setWorkspace(data.workspace||"scene");drawProfile();refreshReferences();setDirty(false);setStatus("Project loaded and validated","success")
 }
 function exportObj(){
   const obj=selectedObject();if(!obj?.mesh){toast("Select a Rust-generated mesh before exporting OBJ.","error");return}
@@ -346,12 +369,16 @@ function bindEvents(){
   $("#objectVisible").addEventListener("change",()=>{const o=selectedObject();if(o)void runCore({type:"set_visibility",id:o.id,visible:$("#objectVisible").checked})});
   $("#undoBtn").addEventListener("click",()=>{try{state.session.undo_json();state.scene=JSON.parse(state.session.scene_json());syncSceneToRenderer();setDirty(true)}catch(e){toast(e.message,"error")}});
   $("#redoBtn").addEventListener("click",()=>{try{state.session.redo_json();state.scene=JSON.parse(state.session.scene_json());syncSceneToRenderer();setDirty(true)}catch(e){toast(e.message,"error")}});
-  $("#newProjectBtn").addEventListener("click",()=>{if(state.dirty&&!confirm("Discard unsaved changes?"))return;state.session=new ForgeEyeSession();state.scene=JSON.parse(state.session.scene_json());for(const r of Object.values(state.references))if(r)removeReference(r);state.references={front:null,side:null,top:null};state.externalAssets=[];state.renderMap.clear();$("#projectName").value="Untitled Project";syncSceneToRenderer();void runCore({type:"create_primitive",primitive:"cube",name:"Cube"},{dirty:false});setDirty(false);toast("New Forge Eye project created.","success")});
+  $("#newProjectBtn").addEventListener("click",()=>{if(state.dirty&&!confirm("Discard unsaved changes?"))return;state.session=new ForgeEyeSession();state.scene=JSON.parse(state.session.scene_json());for(const r of Object.values(state.references))if(r)removeReference(r);state.references={front:null,side:null,top:null};state.externalAssets=[];state.renderMap.clear();state.profileReference=null;state.profileImage=null;state.profileImageRect=null;state.profileReferenceOpacity=.25;state.profileReferenceFit="contain";state.profileAxisSnap=true;$("#profileReferenceOpacity").value=".25";$("#profileReferenceFit").value="contain";$("#profileAxisSnap").checked=true;$("#profileStatus").textContent="Preset ready · import a side reference, adjust opacity, then drag points to match its silhouette.";$("#projectName").value="Untitled Project";drawProfile();syncSceneToRenderer();void runCore({type:"create_primitive",primitive:"cube",name:"Cube"},{dirty:false});setDirty(false);toast("New Forge Eye project created.","success")});
   $("#openProjectBtn").addEventListener("click",()=>$("#projectInput").click());$("#projectInput").addEventListener("change",e=>{const f=e.target.files?.[0];if(f)openProjectFile(f).catch(err=>toast(err.message,"error"));e.target.value=""});
   $("#saveProjectBtn").addEventListener("click",()=>void saveProject());$("#saveProjectInline").addEventListener("click",()=>void saveProject());$("#exportObj").addEventListener("click",exportObj);
   $("#assetImportButton").addEventListener("click",()=>$("#assetInput").click());$("#assetInput").addEventListener("change",e=>{void importFiles([...e.target.files]);e.target.value=""});
   $("#referenceInput").addEventListener("change",e=>{const f=e.target.files?.[0];if(f)createReference(f,state.referenceView,$("#referenceWidth").value).catch(err=>toast(err.message,"error"));e.target.value=""});$("#uploadReference").addEventListener("click",()=>$("#referenceInput").click());
-  $("#profileReferenceInput").addEventListener("change",async e=>{const f=e.target.files?.[0];if(f){state.profileReference=await fileToDataUrl(f);const img=new Image();img.onload=()=>{state.profileImage=img;drawProfile()};img.src=state.profileReference}e.target.value=""});
+  $("#profileReferenceInput").addEventListener("change",async e=>{const f=e.target.files?.[0];if(f){try{state.profileReference=await fileToDataUrl(f);const img=new Image();img.onload=()=>{state.profileImage=img;state.profileImageRect=profileImageBounds(img,$("#profileCanvas").width,$("#profileCanvas").height);$("#profileStatus").textContent="Reference loaded · "+img.naturalWidth+" × "+img.naturalHeight+" px · image aspect preserved";drawProfile();setDirty(true)};img.onerror=()=>{state.profileReference=null;state.profileImage=null;drawProfile();toast("Profile reference image could not be decoded.","error")};img.src=state.profileReference}catch(error){toast(error?.message||String(error),"error")}}e.target.value=""});
+  $("#profileReferenceOpacity").addEventListener("input",()=>{state.profileReferenceOpacity=clamp($("#profileReferenceOpacity").value,.05,1,.25);$("#profileReferenceOpacityValue").textContent=Math.round(state.profileReferenceOpacity*100)+"%";drawProfile();setDirty(true)});
+  $("#profileReferenceFit").addEventListener("change",()=>{state.profileReferenceFit=["contain","crop","stretch"].includes($("#profileReferenceFit").value)?$("#profileReferenceFit").value:"contain";drawProfile();setDirty(true);$("#profileStatus").textContent=state.profileReferenceFit==="contain"?"Image fits without distorting proportions.":state.profileReferenceFit==="crop"?"Image fills the profile canvas; edges may be cropped.":"Image is stretched to the canvas; proportions may be distorted."});
+  $("#profileAxisSnap").addEventListener("change",()=>{state.profileAxisSnap=$("#profileAxisSnap").checked;$("#profileStatus").textContent=state.profileAxisSnap?"Axis snap enabled · points within 3.5% of center snap to the rotation axis.":"Axis snap disabled · profile points move freely.";drawProfile();setDirty(true)});
+  $("#profileClearRef").addEventListener("click",()=>{state.profileReference=null;state.profileImage=null;state.profileImageRect=null;$("#profileReferenceInput").value="";$("#profileStatus").textContent="Reference cleared · profile points remain editable.";drawProfile();setDirty(true)});
   $("#traceReference").addEventListener("click",()=>openTrace().catch(err=>toast(err.message,"error")));$("#closeTrace").addEventListener("click",()=>$("#traceDialog").close());
   $("#traceCanvas").addEventListener("pointerdown",traceDown);$("#traceCanvas").addEventListener("pointermove",traceMove);$("#traceCanvas").addEventListener("pointerup",traceUp);$("#traceCanvas").addEventListener("pointercancel",traceUp);
   $("#traceUndo").addEventListener("click",()=>{if(state.trace){state.trace.points.pop();traceDraw()}});$("#traceClear").addEventListener("click",()=>{if(state.trace){state.trace.points=[];traceDraw()}});
