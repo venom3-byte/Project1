@@ -1,7 +1,7 @@
 //! Scene, command, history, and animation contracts shared by Forge Eye web/native hosts.
 use crate::{
     ExtrusionRequest, GeometryError, HullRequest, LatheRequest, MeshData, MeshDiagnostics,
-    build_extruded_silhouette, build_lathed_profile, build_visual_hull,
+    SpinRequest, build_extruded_silhouette, build_lathed_profile, build_spin_profile, build_visual_hull,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -295,6 +295,9 @@ pub enum EditorCommand {
     LatheProfile {
         request: LatheRequest,
     },
+    SpinProfile {
+        request: SpinRequest,
+    },
     BuildVisualHull {
         request: HullRequest,
     },
@@ -578,6 +581,12 @@ impl EditorSession {
                 let id = self.scene.insert_mesh(mesh)?;
                 Ok(CommandResult::MeshCreated { id, diagnostics })
             }
+            EditorCommand::SpinProfile { request } => {
+                let mesh = build_spin_profile(&request)?;
+                let diagnostics = mesh.diagnostics.clone();
+                let id = self.scene.insert_mesh(mesh)?;
+                Ok(CommandResult::MeshCreated { id, diagnostics })
+            }
             EditorCommand::BuildVisualHull { request } => {
                 let mesh = build_visual_hull(&request)?;
                 let diagnostics = mesh.diagnostics.clone();
@@ -840,6 +849,38 @@ mod tests {
             .unwrap();
         assert!((s.scene.objects[&1].transform.position[0] - 4.0).abs() < 1e-4);
     }
+    #[test]
+    fn spin_profile_command_creates_smoothed_mesh_and_supports_undo_redo() {
+        let mut session = EditorSession::new();
+        let request = SpinRequest {
+            name: "Bottle from reference".into(),
+            profile: vec![
+                [0.50, 0.94], [0.78, 0.94], [0.82, 0.90],
+                [0.78, 0.84], [0.67, 0.77], [0.62, 0.69],
+                [0.62, 0.30], [0.59, 0.23], [0.55, 0.19], [0.50, 0.18],
+            ],
+            diameter: 0.08,
+            height: 0.25,
+            segments: 24,
+            subdivision_level: 2,
+            smooth_shading: true,
+            color: default_color(),
+        };
+        let result = session.execute(EditorCommand::SpinProfile { request }).unwrap();
+        let CommandResult::MeshCreated { id, diagnostics } = result else {
+            panic!("Spin profile should produce a mesh.");
+        };
+        assert_eq!(diagnostics.view_count, 1);
+        assert!(diagnostics.method.contains("profile smoothing (level 2)"));
+        assert!(diagnostics.triangle_count > 24 * 10);
+        assert!(session.scene.objects.contains_key(&id));
+        assert!(session.can_undo());
+        session.undo().unwrap();
+        assert!(session.scene.objects.is_empty());
+        session.redo().unwrap();
+        assert!(session.scene.objects.contains_key(&id));
+    }
+
     #[test]
     fn lathe_profile_command_creates_mesh_and_supports_undo() {
         let mut session = EditorSession::new();
