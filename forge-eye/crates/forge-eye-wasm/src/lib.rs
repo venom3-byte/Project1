@@ -1,7 +1,7 @@
 use forge_eye_core::EditorSession;
 use forge_eye_core::{
-    ExtrusionRequest, HullRequest, LatheRequest, build_extruded_silhouette, build_lathed_profile,
-    build_visual_hull,
+    ExtrusionRequest, HullRequest, LatheRequest, SpinRequest, build_extruded_silhouette,
+    build_lathed_profile, build_spin_profile, build_visual_hull,
 };
 use wasm_bindgen::prelude::*;
 
@@ -111,6 +111,19 @@ pub fn build_lathed_profile_json(request_json: &str) -> Result<String, JsValue> 
     build_lathed_profile_json_impl(request_json).map_err(|error| JsValue::from_str(&error))
 }
 
+fn build_spin_profile_json_impl(request_json: &str) -> Result<String, String> {
+    let request: SpinRequest = serde_json::from_str(request_json)
+        .map_err(|error| format!("Invalid Spin Tool request: {error}"))?;
+    let mesh = build_spin_profile(&request).map_err(|error| error.to_string())?;
+    serde_json::to_string(&mesh)
+        .map_err(|error| format!("Could not serialize spun mesh: {error}"))
+}
+
+#[wasm_bindgen]
+pub fn build_spin_profile_json(request_json: &str) -> Result<String, JsValue> {
+    build_spin_profile_json_impl(request_json).map_err(|error| JsValue::from_str(&error))
+}
+
 fn validate_contour_json_impl(contour_json: &str) -> Result<String, String> {
     let contour: Vec<[f32; 2]> = serde_json::from_str(contour_json)
         .map_err(|error| format!("Invalid contour JSON: {error}"))?;
@@ -159,6 +172,22 @@ mod tests {
     fn bridge_rejects_invalid_lathe_dimensions() {
         let request = r#"{"name":"Bottle","profile":[[0.8,0.9],[0.8,0.2],[0.55,0.1],[0.53,0.2],[0.53,0.9]],"diameter":0.0,"height":0.25,"segments":32}"#;
         assert!(build_lathed_profile_json_impl(request).is_err());
+    }
+
+    #[test]
+    fn bridge_builds_a_blender_style_spun_bottle() {
+        let request = r#"{"name":"Bottle","profile":[[0.5,0.94],[0.78,0.94],[0.82,0.90],[0.78,0.84],[0.67,0.77],[0.62,0.69],[0.62,0.30],[0.59,0.23],[0.55,0.19],[0.5,0.18]],"diameter":0.08,"height":0.25,"segments":24,"subdivision_level":2,"smooth_shading":true}"#;
+        let json = build_spin_profile_json_impl(request).unwrap();
+        assert!(json.contains("profile smoothing (level 2)"));
+        assert!(json.contains("smooth normals"));
+        assert!(json.contains("vertices"));
+        assert!(json.contains("triangle_count"));
+    }
+
+    #[test]
+    fn bridge_rejects_excessive_spin_subdivision() {
+        let request = r#"{"name":"Bottle","profile":[[0.5,0.94],[0.78,0.94],[0.82,0.90],[0.78,0.84],[0.67,0.77],[0.62,0.69],[0.62,0.30],[0.59,0.23],[0.55,0.19],[0.5,0.18]],"diameter":0.08,"height":0.25,"segments":24,"subdivision_level":9}"#;
+        assert!(build_spin_profile_json_impl(request).unwrap_err().contains("subdivision"));
     }
 
     #[test]
