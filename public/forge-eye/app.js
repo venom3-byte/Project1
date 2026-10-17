@@ -700,7 +700,7 @@ async function boot(){
   loadPrefs();status("Loading Rust geometry core…");
   try{
     const {initForgeEyeCore}=await import("./forge-eye-wasm.js");
-    state.rustCore=await initForgeEyeCore("./forge_eye_core.wasm");
+    state.rustCore=await initForgeEyeCore("./forge_eye_core.wasm.gz");
     window.ForgeEyeRust=state.rustCore;setRustStatus("Rust/WASM core ready",true);
   }catch(error){
     state.rustCore=null;window.ForgeEyeRust=null;setRustStatus("Rust core unavailable · "+(error?.message||String(error)),false);
