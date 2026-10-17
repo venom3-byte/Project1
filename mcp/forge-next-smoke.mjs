@@ -102,7 +102,7 @@ try {
 
   // Graph Editor must plot a selected transform channel and make its key value draggable.
   await page.locator('[data-timeline-view="graph"]').click();
-  await page.waitForFunction(()=>!document.querySelector("#graphEditorPane").hidden&&!document.querySelector("#timelineDopeSheet").hidden===false,null,{timeout:5000}).catch(()=>{});
+  await page.waitForFunction(()=>!document.querySelector("#graphEditorPane").hidden&&document.querySelector("#timelineDopeSheet").hidden,null,{timeout:5000});
   const graphInitial=await page.evaluate(()=>({visible:!document.querySelector("#graphEditorPane").hidden,canvas:[document.querySelector("#graphEditorCanvas").width,document.querySelector("#graphEditorCanvas").height],label:document.querySelector("#graphChannelSummary").textContent,metrics:!!document.querySelector("#graphEditorCanvas").__graphMetrics,keys:window.Forge.keyframes.get(window.Forge.selectedId)?.length||0,channel:document.querySelector("#graphChannel").value}));
   if(!graphInitial.visible||graphInitial.canvas[0]<120||graphInitial.canvas[1]<80||graphInitial.label!=="Location X"||!graphInitial.metrics||graphInitial.keys!==2||graphInitial.channel!=="p0")throw new Error("Graph Editor curve did not initialize: "+JSON.stringify(graphInitial));
   const graphPoint=await page.evaluate(()=>{const c=document.querySelector("#graphEditorCanvas"),m=c.__graphMetrics,k=window.Forge.keyframes.get(window.Forge.selectedId).find(x=>Math.round(x.time*24)===24);return{x:m.xFor(k.time),y:m.yFor(k.p[0]),value:k.p[0]}});
