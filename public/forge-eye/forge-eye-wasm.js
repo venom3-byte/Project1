@@ -52,7 +52,7 @@ export async function initForgeEyeCore(url = "./forge_eye_core.wasm.gz") {
       }
     }
     rustExports = result.instance?.exports || result.exports;
-    for (const name of ["memory", "forge_eye_alloc", "forge_eye_dealloc", "forge_eye_free_output", "forge_eye_lathe_json", "forge_eye_animation_json"]) {
+    for (const name of ["memory", "forge_eye_alloc", "forge_eye_dealloc", "forge_eye_free_output", "forge_eye_lathe_json", "forge_eye_visual_hull_json", "forge_eye_animation_json"]) {
       if (!(name in rustExports)) throw new Error("Rust WASM is missing exported symbol: " + name);
     }
     return {
@@ -62,6 +62,12 @@ export async function initForgeEyeCore(url = "./forge_eye_core.wasm.gz") {
         options: { radial_segments: 64, profile_subdivisions: 1, cap_ends: true, axis: "y", ...options }
       }).mesh,
       evaluateAnimation: (track, frame) => callJson("forge_eye_animation_json", { track, frame }).transform,
+      visualHullMesh: (frontContour, sideContour, topContour = [], options = {}) => callJson("forge_eye_visual_hull_json", {
+        front_contour: frontContour,
+        side_contour: sideContour,
+        top_contour: topContour.length ? topContour : null,
+        options: { width: 3, height: 2, depth: 3, resolution: 24, ...options }
+      }),
       rawExports: () => rustExports,
     };
   })();
