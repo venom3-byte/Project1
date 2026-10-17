@@ -1,12 +1,8 @@
 //! Minimal JSON ABI so the browser can call the same Rust code without generated glue.
 //! Wasm callers must pass valid (pointer, length) pairs allocated through forge_eye_alloc.
 
-use crate::{
-    AnimationTrack, Axis, LatheOptions, LatheProfilePoint, Transform, TransformKey,
-    generate_lathe_mesh,
-};
+use crate::{AnimationTrack, LatheOptions, LatheProfilePoint, Transform, generate_lathe_mesh};
 use serde::{Deserialize, Serialize};
-use std::mem;
 use std::slice;
 
 #[derive(Deserialize)]
@@ -143,6 +139,7 @@ pub unsafe extern "C" fn forge_eye_animation_json(pointer: u32, length: u32) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Axis;
 
     #[test]
     fn request_contract_defaults_to_y_axis_64_segments_and_smoothing() {
