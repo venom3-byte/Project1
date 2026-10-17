@@ -307,6 +307,19 @@ export class ForgeEngine{
       if(d.script)this.scripts.set(r.id,d.script);
 
       const asset=d.components?.asset;
+      const referenceData=d.components?.reference?.imageDataUrl;
+      if(asset?.name&&asset.type==='image'&&referenceData){
+        try{
+          const response=await fetch(referenceData);
+          if(!response.ok)throw new Error("Embedded reference image could not be read");
+          const file=await response.blob(),bitmap=await createImageBitmap(file),canvas=document.createElement('canvas');
+          canvas.width=bitmap.width;canvas.height=bitmap.height;canvas.getContext('2d').drawImage(bitmap,0,0);bitmap.close?.();
+          const texture=new pc.Texture(this.app.graphicsDevice,{width:canvas.width,height:canvas.height,format:pc.PIXELFORMAT_R8_G8_B8_A8});
+          texture.setSource(canvas);const material=this.material([1,1,1]);material.diffuseMap=texture;material.emissiveMap=texture;material.emissive=new pc.Color(1,1,1);material.cull=pc.CULLFACE_NONE;material.update();
+          for(const instance of(r.entity.render?.meshInstances||[]))instance.material=material;
+          this.assets.set(asset.name,{type:'image',file,url:referenceData,embedded:true});
+        }catch(error){this.log("Reference image restore failed: "+(error?.message||String(error)),"error")}
+      }
       if(asset?.name&&assetRoot&&asset.type==='model'){
         const a=new pc.Asset(asset.name,'container',{url:assetRoot+'assets/'+encodeURIComponent(asset.name)});
         this.app.assets.add(a);
