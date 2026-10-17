@@ -179,6 +179,26 @@ try {
   if(hull.kind!=="mesh"||hull.geoKind!=="silhouette-visual-hull"||Math.abs(hull.width-3.2)>0.01||Math.abs(hull.height-3.2)>0.05||Math.abs(hull.depth-4.5)>0.01||hull.resolution!==20||hull.frontPoints!==4||hull.sidePoints!==4||hull.voxels<=0||hull.rendered!==1||hull.indices<36||!hull.saved||hull.savedFront!==4||hull.savedSide!==4)throw new Error("Two-view visual hull build/persistence failed: "+JSON.stringify(hull));
   await page.screenshot({path:path.join(ARTIFACTS,"forge-next-two-view-hull.png"),fullPage:true});
 
+  // Reload the serialized scene and verify both embedded image textures and both outlines survive.
+  const sceneBeforeReload=await page.evaluate(()=>window.Forge.serialize());
+  const assetPersistence=await page.evaluate(async scene=>{
+    const beforeRefs=scene.entities.filter(e=>e.components?.reference);
+    const embedded=beforeRefs.length===2&&beforeRefs.every(e=>typeof e.components.reference.imageDataUrl==="string"&&e.components.reference.imageDataUrl.startsWith("data:image/"));
+    await window.Forge.load(scene);
+    const refs=[...window.Forge.entities.values()].filter(r=>r.components?.reference);
+    const front=refs.find(r=>r.components.reference.name==="qa-front-reference.png");
+    const side=refs.find(r=>r.components.reference.name==="qa-side-reference.png");
+    const hull=[...window.Forge.entities.values()].find(r=>r.components?.geometry?.kind==="silhouette-visual-hull");
+    const imageRestored=r=>!!r&&!!window.Forge.assets.get(r.components.asset.name)?.file&&!!r.entity.render?.meshInstances?.[0]?.material?.diffuseMap;
+    return{embedded,referenceCount:refs.length,frontOutline:front?.components.reference.outline?.length||0,sideOutline:side?.components.reference.outline?.length||0,frontTextureRestored:imageRestored(front),sideTextureRestored:imageRestored(side),hullRestored:!!hull&&!!hull.entity.render?.meshInstances?.length,hullResolution:hull?.components.geometry.resolution||0};
+  },sceneBeforeReload);
+  if(!assetPersistence.embedded||assetPersistence.referenceCount!==2||assetPersistence.frontOutline!==4||assetPersistence.sideOutline!==4||!assetPersistence.frontTextureRestored||!assetPersistence.sideTextureRestored||!assetPersistence.hullRestored||assetPersistence.hullResolution!==20)throw new Error("Reference/contour/hull project round-trip failed: "+JSON.stringify(assetPersistence));
+  await page.evaluate(()=>{const r=[...window.Forge.entities.values()].find(o=>o.components?.reference?.name==="qa-side-reference.png");window.Forge.select(r.id)});
+  await page.locator("#traceSilhouette").click();
+  await page.waitForFunction(()=>document.querySelector("#traceDialog").open&&document.querySelector("#tracePointCount").textContent.includes("4 points"),null,{timeout:10000});
+  await page.locator("#traceClose").click();
+  await page.waitForFunction(()=>!document.querySelector("#traceDialog").open,null,{timeout:5000});
+
   // Resizing docks must persist layout dimensions without pushing the main page horizontally.
   const leftBefore=await page.evaluate(()=>parseInt(getComputedStyle(document.documentElement).getPropertyValue("--left-dock-width"),10));
   const splitter=page.locator('[data-splitter="left"]');
