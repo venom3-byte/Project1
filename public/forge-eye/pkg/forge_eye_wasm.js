@@ -474,8 +474,22 @@ async function __wbg_init(module_or_path) {
         }
     }
 
-    if (module_or_path === undefined) {
-        module_or_path = new URL('forge_eye_wasm_bg.wasm', import.meta.url);
+    const useEmbeddedBase64 = module_or_path === undefined;
+    if (useEmbeddedBase64) {
+        // Git-backed static previews store WASM as base64 text because the GitHub
+        // contents API used by the preview publisher does not upload binary blobs.
+        const response = await fetch(new URL('forge_eye_wasm_bg.wasm.b64', import.meta.url), { cache: 'no-store' });
+        if (!response.ok) {
+            throw new Error(`Failed to fetch embedded Forge Eye WASM: ${response.status} ${response.statusText}`);
+        }
+        const encoded = (await response.text()).replace(/\\s+/g, '');
+        if (!encoded || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) {
+            throw new Error('Embedded Forge Eye WASM is not valid base64 text.');
+        }
+        const binary = atob(encoded);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        module_or_path = bytes;
     }
     const imports = __wbg_get_imports();
 
