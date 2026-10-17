@@ -4,6 +4,9 @@
 //! operations can run natively in tests, in WebAssembly, and in a future desktop host.
 
 use serde::{Deserialize, Serialize};
+
+pub mod editor;
+pub use editor::{CommandResult, EditorCommand, EditorSession, Interpolation, MaterialState, ObjectKind, PrimitiveKind, Scene, SceneObject, TimelineState, Transform, TransformKeyframe};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
