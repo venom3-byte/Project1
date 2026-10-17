@@ -635,6 +635,22 @@ function bindUI(){
   $("#drawerScrim").addEventListener("click",closeMobileDrawers);
   $("#sceneSearch").addEventListener("input",refreshHierarchy);$("#assetSearch").addEventListener("input",refreshAssetList);
   $("#assetInput").addEventListener("change",e=>{const files=[...e.target.files];if(files.length)void loadAssets(files);e.target.value=""});
+  $("#createBottleQuick").addEventListener("click",()=>safeRun("Rust bottle generation",quickCreateBottle));
+  $("#openLatheEditor").addEventListener("click",openLatheEditor);
+  $("#useReferenceForLathe").addEventListener("click",()=>safeRun("Profile from reference",useReferenceOutlineForLathe));
+  $("#latheProfileCanvas").addEventListener("pointerdown",lathePointerDown);
+  window.addEventListener("pointermove",lathePointerMove);
+  window.addEventListener("pointerup",lathePointerUp);
+  window.addEventListener("pointercancel",lathePointerUp);
+  $("#latheClose").addEventListener("click",()=>$("#latheDialog").close());
+  $("#latheDialog").addEventListener("cancel",()=>{state.latheDrag=null});
+  $("#lathePreset").addEventListener("change",event=>setLathePreset(event.target.value));
+  $("#latheAddPoint").addEventListener("click",addLatheProfilePoint);
+  $("#latheRemovePoint").addEventListener("click",removeLatheProfilePoint);
+  $("#latheResetProfile").addEventListener("click",()=>setLathePreset($("#lathePreset").value||"bottle"));
+  $("#latheCreateMesh").addEventListener("click",()=>safeRun("Rust lathe mesh",()=>generateLatheFromProfile()));
+  $("#latheSegments").addEventListener("change",()=>{$("#latheStatus").textContent="Quality changed. Generate again to apply the new radial segment count."});
+  $("#latheSmoothing").addEventListener("change",()=>{$("#latheStatus").textContent="Profile smoothing changed. Generate again to apply it."});
   $("#addReferenceImages").addEventListener("click",()=>$("#referenceInput").click());
   $("#traceSilhouette").addEventListener("click",()=>void startSilhouetteTrace());
   $("#traceCanvas").addEventListener("pointerdown",handleTracePointerDown);
@@ -652,7 +668,7 @@ function bindUI(){
   $$("[data-timeline-view]").forEach(button=>button.addEventListener("click",()=>setGraphView(button.dataset.timelineView)));
   $("#graphChannel").addEventListener("change",event=>{state.graphChannel=event.target.value;refreshTimeline()});
   $("#graphEditorCanvas").addEventListener("pointerdown",graphPointerDown);
-  window.addEventListener("resize",()=>{if(state.timelineView==="graph")drawGraphEditor()});
+  window.addEventListener("resize",()=>{if(state.timelineView==="graph")drawGraphEditor();if($("#latheDialog")?.open)drawLatheProfile()});
   $("#timelineTrack").addEventListener("keydown",event=>{if(event.key==="ArrowLeft"||event.key==="ArrowRight"){event.preventDefault();setTimelineFrame(Number($("#currentFrame").value)+(event.key==="ArrowRight"?1:-1))}});
   $("#projectInput").addEventListener("change",async e=>{const file=e.target.files?.[0];e.target.value="";if(!file)return;try{const data=JSON.parse(await file.text());await window.ForgeProject.load(data);$("#projectName").value=data.meta?.name||file.name.replace(/\.forge\.json$|\.json$/i,"");refreshAll();status("Project loaded")}catch(error){reportError("Project could not be opened",error)}});
   $("#viewportStage").addEventListener("dragover",e=>{e.preventDefault();$("#viewportStage").classList.add("is-dragover")});
@@ -681,7 +697,16 @@ function bindUI(){
 }
 function bootFailed(error){state.lastError=error?.message||String(error);$("#bootMessage").textContent="Startup failed: "+state.lastError;$("#bootScreen").querySelector(".boot-meter").hidden=true;console.error("[Forge Next] Startup failed",error)}
 async function boot(){
-  loadPrefs();status("Loading engine…");
+  loadPrefs();status("Loading Rust geometry core…");
+  try{
+    const {initForgeEyeCore}=await import("./forge-eye-wasm.js");
+    state.rustCore=await initForgeEyeCore("./forge_eye_core.wasm");
+    window.ForgeEyeRust=state.rustCore;setRustStatus("Rust/WASM core ready",true);
+  }catch(error){
+    state.rustCore=null;window.ForgeEyeRust=null;setRustStatus("Rust core unavailable · "+(error?.message||String(error)),false);
+    console.error("[Forge Eye] Rust WASM initialization failed",error);
+  }
+  status("Loading 3D renderer…");
   const {ForgeEngine,pc}=await import("./forge-engine.js");
   window.ForgePC=pc;
   const engine=new ForgeEngine($("#viewport"),message=>console.info("[Forge Engine]",message));state.engine=engine;await engine.init();window.Forge=engine;
@@ -693,6 +718,6 @@ async function boot(){
   window.ForgeReady=true;window.ForgeBootState="ready";window.dispatchEvent(new Event("forge-ready"));bindUI();
   const cube=engine.primitive("box","Cube");engine.select(cube.id);engine.frame();try{await window.ForgeGizmo?.init?.()}catch(error){console.warn("Native gizmo did not attach",error)}
   toggleGrid(true);chooseTool("select");chooseView("perspective");setWorkspace("layout",{save:false});setLeftPanel(state.leftPanel,{save:false});setInspectorPanel(state.inspectorPanel,{save:false});refreshAll();
-  $("#bootMessage").textContent="Ready";$("#bootScreen").hidden=true;$("#forgeApp").classList.remove("is-booting");$("#forgeApp").classList.add("is-ready");status("Forge Next ready");state.statusTimer=window.setInterval(refreshDiagnostics,500);
+  $("#bootMessage").textContent="Ready";$("#bootScreen").hidden=true;$("#forgeApp").classList.remove("is-booting");$("#forgeApp").classList.add("is-ready");status(state.rustCore?"Forge Eye ready · Rust/WASM":"Forge Eye ready · Rust core unavailable","ready");if(state.latheProfile.length)drawLatheProfile();state.statusTimer=window.setInterval(refreshDiagnostics,500);
 }
 boot().catch(bootFailed);
