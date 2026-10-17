@@ -151,7 +151,7 @@ jobs:
           grep -q 'createExtrudedSilhouette' /tmp/forge-next-forge-engine.js
           grep -q 'createLathedProfileMesh' /tmp/forge-next-forge-engine.js
           grep -q 'selectedRadius(record)' /tmp/forge-next-forge-engine.js
-          grep -q 'traceLatheProfile' /tmp/forge-next-app.js
+          grep -q 'traceLatheProfile' /tmp/forge-next-public.js
           grep -q 'timelineLoop' /tmp/forge-next-forge-engine.js
           grep -q 'href="./forge-icon.svg"' /tmp/forge-next-public.html
           echo "Public Forge Next route verified: HTML/CSS/JS and all isolated runtime dependencies returned HTTP 200; visual-hull and animation engine are served from this preview, not the legacy editor."
