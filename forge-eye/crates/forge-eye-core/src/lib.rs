@@ -789,8 +789,12 @@ fn push_triangle(mesh: &mut MeshData, p: [Point3; 3], normal: Point3) -> Result<
     Ok(())
 }
 fn push_flat_triangle(mesh: &mut MeshData, p: [Point3; 3]) -> Result<(), GeometryError> {
-    let normal = normalize3(cross3(sub3(p[1], p[0]), sub3(p[2], p[0])))
-        .ok_or_else(|| error("Degenerate lathe triangle."))?;
+    // Revolving profile points that touch the axis or lie on a straight section
+    // can generate zero-area triangles at the poles. Do not serialize degenerate
+    // faces into the renderer/export buffers; skip them and validate the final mesh.
+    let Some(normal) = normalize3(cross3(sub3(p[1], p[0]), sub3(p[2], p[0]))) else {
+        return Ok(());
+    };
     push_triangle(mesh, p, normal)
 }
 fn push_flat_quad(mesh: &mut MeshData, p: [Point3; 4]) -> Result<(), GeometryError> {
