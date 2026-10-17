@@ -1,0 +1,105 @@
+name: Forge Eye Rust/WASM build and browser QA
+
+on:
+  push:
+    branches:
+      - agent/forge-eye-rust-rebuild-2026-10-17
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forge-eye-rust-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  forge-eye:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install web dependencies
+        run: npm ci
+      - name: Set up stable Rust and WebAssembly target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+      - name: Check Rust formatting
+        run: cargo fmt --all -- --check
+      - name: Run deterministic Rust core tests
+        run: cargo test --workspace --locked
+      - name: Lint Rust core without warnings
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Build Rust/WebAssembly core and verify packaged artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build -p forge-eye-core --release --locked --target wasm32-unknown-unknown
+          mkdir -p public/forge-eye
+          gzip -n -9 -c target/wasm32-unknown-unknown/release/forge_eye_core.wasm > /tmp/forge_eye_core.wasm.gz
+          gzip -t public/forge-eye/forge_eye_core.wasm.gz
+          gzip -cd public/forge-eye/forge_eye_core.wasm.gz | cmp - target/wasm32-unknown-unknown/release/forge_eye_core.wasm
+          test -s /tmp/forge_eye_core.wasm.gz
+          printf 'Rust wasm: %s bytes; checked-in gzip: %s bytes\n' "$(wc -c < target/wasm32-unknown-unknown/release/forge_eye_core.wasm)" "$(wc -c < public/forge-eye/forge_eye_core.wasm.gz)"
+      - name: Validate Forge Eye browser modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do node --check "$file"; done < <(find public/forge-eye -type f -name '*.js' -print0)
+          node --check mcp/forge-eye-smoke.mjs
+      - name: Build static web editor
+        env:
+          DEV_BUILD: "1"
+          STATIC_EXPORT: "1"
+          VITE_BASE_PATH: "/"
+        run: npm run build
+      - name: Start static preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/forge-eye-preview.log 2>&1 &
+          for attempt in $(seq 1 40); do
+            if curl --fail --silent --max-time 2 http://127.0.0.1:4173/forge-eye/index.html >/tmp/forge-eye-preview.html; then break; fi
+            sleep 1
+          done
+          grep -q 'FORGE EYE' /tmp/forge-eye-preview.html
+          curl --fail --silent http://127.0.0.1:4173/forge-eye/forge_eye_core.wasm.gz -o /tmp/forge-eye-served.wasm.gz
+          gzip -t /tmp/forge-eye-served.wasm.gz
+      - name: Test Forge Eye in desktop and mobile Chromium
+        env:
+          FORGE_EYE_URL: http://127.0.0.1:4173/forge-eye/index.html
+          FORGE_EYE_ARTIFACTS: ${{ runner.temp }}/forge-eye-qa
+        run: node mcp/forge-eye-smoke.mjs
+      - name: Verify isolated public Forge Eye preview route
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://forge-studio.forgemail-agent.workers.dev"
+          for asset in index.html app.js forge-engine.js forge-viewport.js forge-eye-wasm.js forge_eye_core.wasm.gz; do
+            curl --fail --silent --show-error --max-time 20 "$base/forge-eye/$asset" -o "/tmp/forge-eye-public-$asset"
+            test -s "/tmp/forge-eye-public-$asset"
+          done
+          grep -q 'import("./forge-eye-wasm.js")' /tmp/forge-eye-public-app.js
+          gzip -t /tmp/forge-eye-public-forge_eye_core.wasm.gz
+          echo "Forge Eye preview assets and Rust WASM gzip artifact are publicly available."
+      - name: Upload browser reports and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-eye-rust-browser-qa
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/forge-eye-qa/
+            /tmp/forge-eye-preview.log
+            /tmp/forge-eye-served.wasm.gz
