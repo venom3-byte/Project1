@@ -404,15 +404,16 @@ function buildSilhouetteHull(){
   const side=references.find(record=>record.components.reference.axis==="side");
   const top=references.find(record=>record.components.reference.axis==="top");
   if(!front||!side){
-    $("#hullStatus").textContent="Required: saved Front + Side outlines. A saved Top outline is optional and tightens the reconstructed volume. Select each image, trace it, then tap Save outline.";
+    $("#hullStatus").textContent="Required: saved Front + Side outlines. A saved Top outline is optional and tightens the reconstructed volume. Trace each image, then tap Save outline.";
     $("#hullStatus").dataset.state="error";status("Visual hull needs front and side outlines","warn");return;
   }
+  if(!state.rustCore?.visualHullMesh)throw new Error("Rust/WASM visual-hull generator is unavailable. Reload after the Rust core finishes loading.");
   const fm=front.components.reference,sm=side.components.reference,tm=top?.components.reference;
   const frontHeight=Number(fm.height)||Number(fm.width)/(Number(fm.aspect)||1);
   const sideHeight=Number(sm.height)||Number(sm.width)/(Number(sm.aspect)||1);
   const heightMismatch=Math.abs(frontHeight-sideHeight)/Math.max(frontHeight,sideHeight,.01);
   if(heightMismatch>.05){
-    $("#hullStatus").textContent="Front/side image heights differ by "+(heightMismatch*100).toFixed(1)+"%. Adjust known image widths so both share the same real object height (within 5%).";
+    $("#hullStatus").textContent="Front/side image heights differ by "+(heightMismatch*100).toFixed(1)+"%. Align their real-world heights within 5%.";
     $("#hullStatus").dataset.state="error";status("Align front and side reference scale","warn");return;
   }
   if(top){
@@ -420,151 +421,29 @@ function buildSilhouetteHull(){
     const widthMismatch=Math.abs(topWidth-Number(fm.width))/Math.max(topWidth,Number(fm.width),.01);
     const depthMismatch=Math.abs(topDepth-Number(sm.width))/Math.max(topDepth,Number(sm.width),.01);
     if(widthMismatch>.05||depthMismatch>.05){
-      $("#hullStatus").textContent="Top reference scale must match Front width and Side depth. Width mismatch: "+(widthMismatch*100).toFixed(1)+"%; depth mismatch: "+(depthMismatch*100).toFixed(1)+"%. Adjust its known width, then retry.";
+      $("#hullStatus").textContent="Top reference scale must match Front width and Side depth. Width mismatch: "+(widthMismatch*100).toFixed(1)+"%; depth mismatch: "+(depthMismatch*100).toFixed(1)+"%.";
       $("#hullStatus").dataset.state="error";status("Align top reference dimensions","warn");return;
     }
   }
   try{
-    const height=(frontHeight+sideHeight)/2,width=clamp(fm.width,.01,10000,3),depth=clamp(sm.width,.01,10000,3),resolution=clamp($("#hullResolution").value,12,48,32),viewCount=top?3:2;
-    $("#hullStatus").textContent="Building "+resolution+"³ voxel visual hull from "+viewCount+" calibrated view outlines…";$("#hullStatus").dataset.state="";
-    const record=state.engine.createSilhouetteVisualHull({
-      name:front.name.replace(/\.[^.]+$/,"")+" — "+viewCount+"-view Hull",
-      frontContour:fm.outline,sideContour:sm.outline,topContour:tm?.outline||[],width,height,depth,resolution,color:[.32,.62,.76]
+    const height=(frontHeight+sideHeight)/2,width=clamp(fm.width,.01,10000,3),depth=clamp(sm.width,.01,10000,3),resolution=clamp($("#hullResolution").value,12,48,24),viewCount=top?3:2;
+    $("#hullStatus").textContent="Rust/WASM is intersecting "+viewCount+" silhouettes at "+resolution+"³…";$("#hullStatus").dataset.state="";
+    setRustStatus("Building visual hull in Rust/WASM…",true);
+    const result=state.rustCore.visualHullMesh(fm.outline,sm.outline,tm?.outline||[],{width,height,depth,resolution});
+    const record=state.engine.createVisualHullMeshFromData({
+      name:front.name.replace(/\.[^.]+$/,"")+" — "+viewCount+"-view Rust Hull",
+      result,frontContour:fm.outline,sideContour:sm.outline,topContour:tm?.outline||[],
+      width,height,depth,resolution,color:[.32,.62,.76]
     });
-    state.engine.select(record.id);window.ForgeViewport?.frame?.();refreshAll();setWorkspace("modeling");
+    state.engine.select(record.id);refreshAll();setWorkspace("modeling");
     const diag=record.components.diagnostics||{};
-    $("#hullStatus").textContent=viewCount+"-view visual hull built · "+Number(diag.occupiedVoxels||0).toLocaleString()+" occupied voxels at "+resolution+"³. This is a blockout; inspect orthographic views and refine details.";
-    $("#hullStatus").dataset.state="success";status(viewCount+"-view visual hull built · inspect all orthographic views","dirty");
+    $("#hullStatus").textContent=viewCount+"-view Rust visual hull built · "+Number(diag.occupiedVoxels||0).toLocaleString()+" voxels · "+record.components.geometry.triangleCount.toLocaleString()+" triangles. Review and refine the mesh.";
+    $("#hullStatus").dataset.state="success";setRustStatus("Rust/WASM geometry core ready",true);
+    status(viewCount+"-view Rust visual hull generated · inspect all orthographic views","dirty");
   }catch(error){
     $("#hullStatus").textContent=error?.message||String(error);$("#hullStatus").dataset.state="error";
-    status("Multi-view volume could not be built","error");
+    setRustStatus("Rust/WASM visual-hull build failed",false);status("Multi-view volume could not be built","error");
   }
-}
-
-function lathePresetProfile(name="bottle"){
-  const presets={
-    bottle:[[0,0],[0.34,0],[0.39,.045],[0.4,.16],[0.39,.88],[0.37,1.13],[0.27,1.31],[0.2,1.35],[0.2,1.62],[0.22,1.72],[0.19,1.75],[0,1.75]],
-    vase:[[0,0],[.25,0],[.38,.08],[.48,.35],[.58,.65],[.56,1.05],[.42,1.43],[.28,1.8],[.25,1.94],[0,1.94]],
-    cup:[[0,0],[.36,0],[.4,.06],[.42,.15],[.44,.75],[.43,.82],[.35,.82],[.35,.18],[0,.18]],
-    flask:[[0,0],[.3,0],[.41,.08],[.43,.26],[.4,.55],[.32,.72],[.17,.82],[.13,1.05],[.15,1.23],[0,1.23]]
-  };
-  const points=presets[name]||presets.bottle;
-  return points.map(([radius,height])=>({radius,height}));
-}
-function setRustStatus(message,ready){
-  const led=$("#rustCoreLed"),label=$("#rustCoreStatus");
-  if(label)label.textContent=message;
-  if(led){led.dataset.ready=ready===true?"true":ready===false?"false":"";led.style.background=ready===true?"#7bd8a7":ready===false?"#f0a17c":""}
-}
-function latheMetricBounds(){
-  const maxRadius=Math.max(.2,...state.latheProfile.map(p=>Number(p.radius)||0))*1.18;
-  const maxHeight=Math.max(.2,...state.latheProfile.map(p=>Number(p.height)||0))*1.08;
-  return{maxRadius,maxHeight};
-}
-function drawLatheProfile(){
-  const canvas=$("#latheProfileCanvas");if(!canvas)return;
-  const box=canvas.getBoundingClientRect(),w=Math.max(240,box.width||720),h=Math.max(220,box.height||600),dpr=Math.max(1,Math.min(2,window.devicePixelRatio||1));
-  if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr)}
-  const ctx=canvas.getContext("2d");if(!ctx)return;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle="#0a1118";ctx.fillRect(0,0,w,h);
-  const pad={left:42,right:18,top:20,bottom:32},plotW=Math.max(40,w-pad.left-pad.right),plotH=Math.max(40,h-pad.top-pad.bottom),bounds=latheMetricBounds();
-  const xFor=radius=>pad.left+Math.max(0,Math.min(1,(Number(radius)||0)/bounds.maxRadius))*plotW;
-  const yFor=height=>pad.top+(1-Math.max(0,Math.min(1,(Number(height)||0)/bounds.maxHeight)))*plotH;
-  ctx.font="10px ui-monospace,monospace";ctx.textBaseline="middle";ctx.lineWidth=1;
-  for(let i=0;i<=5;i++){
-    const x=pad.left+plotW*i/5;ctx.strokeStyle=i===0?"#537287":"#243541";ctx.beginPath();ctx.moveTo(x,pad.top);ctx.lineTo(x,pad.top+plotH);ctx.stroke();
-    ctx.fillStyle="#71899a";ctx.textAlign="center";ctx.fillText((bounds.maxRadius*i/5).toFixed(2),x,h-15);
-    const y=pad.top+plotH*i/5;ctx.strokeStyle="#253541";ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(pad.left+plotW,y);ctx.stroke();
-    ctx.fillStyle="#8197a7";ctx.textAlign="right";ctx.fillText((bounds.maxHeight*(1-i/5)).toFixed(2),pad.left-7,y);
-  }
-  ctx.strokeStyle="#5b9abb";ctx.lineWidth=1.4;ctx.setLineDash([5,4]);ctx.beginPath();ctx.moveTo(xFor(0),pad.top);ctx.lineTo(xFor(0),pad.top+plotH);ctx.stroke();ctx.setLineDash([]);
-  const points=state.latheProfile;
-  if(points.length){
-    ctx.strokeStyle="#79cbed";ctx.lineWidth=2.2;ctx.lineJoin="round";ctx.beginPath();
-    points.forEach((p,i)=>{const x=xFor(p.radius),y=yFor(p.height);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)});ctx.stroke();
-    points.forEach((p,i)=>{const x=xFor(p.radius),y=yFor(p.height),selected=i===state.latheSelectedPoint;ctx.beginPath();ctx.arc(x,y,selected?7:4.3,0,Math.PI*2);ctx.fillStyle=selected?"#effaff":(i===0||i===points.length-1?"#8bd8ab":"#57b4dd");ctx.fill();ctx.lineWidth=1.5;ctx.strokeStyle=selected?"#3885a9":"#0d2633";ctx.stroke()});
-  }
-  ctx.fillStyle="#9cb2c1";ctx.font="10px system-ui,sans-serif";ctx.textAlign="left";ctx.fillText("SPIN AXIS",pad.left+6,pad.top+12);
-  canvas.__latheMetrics={pad,plotW,plotH,maxRadius:bounds.maxRadius,maxHeight:bounds.maxHeight,xFor,yFor,w,h};
-}
-function openLatheEditor(){
-  if(!state.rustCore){notice("Rust geometry kernel","The Rust WebAssembly core did not initialize. Reload the page after the core asset is available.");return}
-  if(!state.latheProfile.length)state.latheProfile=lathePresetProfile($("#lathePreset").value||"bottle");
-  $("#latheDialog").showModal();requestAnimationFrame(drawLatheProfile);status("Profile editor opened · Rust mesh generation ready");
-}
-function setLathePreset(name){
-  state.latheProfile=lathePresetProfile(name);state.latheSelectedPoint=0;$("#lathePreset").value=name;drawLatheProfile();
-  $("#latheStatus").textContent="Profile preset loaded. Edit points or generate the mesh.";
-}
-function latheCanvasPoint(event){
-  const canvas=$("#latheProfileCanvas"),m=canvas.__latheMetrics,rect=canvas.getBoundingClientRect();if(!m||!rect.width||!rect.height)return null;
-  const x=(event.clientX-rect.left)/rect.width*m.w,y=(event.clientY-rect.top)/rect.height*m.h;
-  return{radius:Math.max(0,Math.min(m.maxRadius,(x-m.pad.left)/m.plotW*m.maxRadius)),height:Math.max(0,Math.min(m.maxHeight,(1-(y-m.pad.top)/m.plotH)*m.maxHeight)),x,y};
-}
-function lathePointerDown(event){
-  if(!state.latheProfile.length)setLathePreset($("#lathePreset").value||"bottle");
-  event.preventDefault();const point=latheCanvasPoint(event);if(!point)return;
-  const m=$("#latheProfileCanvas").__latheMetrics;let nearest=-1,distance=16;
-  state.latheProfile.forEach((p,i)=>{const d=Math.hypot(m.xFor(p.radius)-point.x,m.yFor(p.height)-point.y);if(d<distance){distance=d;nearest=i}});
-  if(nearest<0){
-    const added={radius:point.radius,height:point.height};state.latheProfile.push(added);state.latheProfile.sort((a,b)=>a.height-b.height);state.latheSelectedPoint=state.latheProfile.indexOf(added);$("#lathePreset").value="custom";drawLatheProfile();$("#latheStatus").textContent="Profile point added. Drag it to refine the silhouette.";return;
-  }
-  state.latheSelectedPoint=nearest;state.latheDrag={point:state.latheProfile[nearest]};$("#lathePreset").value="custom";
-  $("#latheProfileCanvas").setPointerCapture?.(event.pointerId);drawLatheProfile();
-}
-function lathePointerMove(event){
-  if(!state.latheDrag)return;const point=latheCanvasPoint(event);if(!point)return;
-  const profile=state.latheProfile,index=profile.indexOf(state.latheDrag.point);if(index<0)return;
-  const item=state.latheDrag.point;
-  if(index===0||index===profile.length-1)item.radius=0;else item.radius=point.radius;
-  const low=index===0?0:profile[index-1].height+.002,high=index===profile.length-1?latheMetricBounds().maxHeight:profile[index+1].height-.002;
-  item.height=Math.max(low,Math.min(Math.max(low,high),point.height));state.latheSelectedPoint=index;drawLatheProfile();
-}
-function lathePointerUp(){
-  if(!state.latheDrag)return;state.latheProfile.sort((a,b)=>a.height-b.height);state.latheSelectedPoint=Math.max(0,state.latheProfile.indexOf(state.latheDrag.point));state.latheDrag=null;drawLatheProfile();
-  $("#latheStatus").textContent="Profile updated. Generate to rebuild the 3D surface.";
-}
-function addLatheProfilePoint(){
-  const profile=state.latheProfile;if(profile.length<2)state.latheProfile=lathePresetProfile("bottle");
-  let largest=-1,index=0;
-  for(let i=0;i<state.latheProfile.length-1;i++){const gap=state.latheProfile[i+1].height-state.latheProfile[i].height;if(gap>largest){largest=gap;index=i}}
-  const a=state.latheProfile[index],b=state.latheProfile[index+1],point={radius:Math.max(0,(a.radius+b.radius)/2),height:(a.height+b.height)/2};
-  state.latheProfile.splice(index+1,0,point);state.latheSelectedPoint=index+1;$("#lathePreset").value="custom";drawLatheProfile();
-}
-function removeLatheProfilePoint(){
-  const i=state.latheSelectedPoint;if(i<=0||i>=state.latheProfile.length-1){$("#latheStatus").textContent="The first and last axis points are kept to close the profile.";return}
-  state.latheProfile.splice(i,1);state.latheSelectedPoint=Math.min(i,state.latheProfile.length-1);$("#lathePreset").value="custom";drawLatheProfile();
-}
-async function generateLatheFromProfile({quick=false}={}){
-  if(!state.rustCore)throw new Error("Rust WebAssembly core is not ready.");
-  const profile=state.latheProfile.map(p=>({radius:Number(p.radius),height:Number(p.height)}));
-  if(profile.length<3)throw new Error("Add at least three profile points before generating the mesh.");
-  if(profile.some(p=>!Number.isFinite(p.radius)||!Number.isFinite(p.height)||p.radius<0))throw new Error("Profile contains an invalid radius or height.");
-  const options={radial_segments:Number($("#latheSegments").value)||64,profile_subdivisions:Number($("#latheSmoothing").value)||0,cap_ends:$("#latheCaps").checked,axis:$("#latheAxis").value==="z"?"z":"y"};
-  $("#latheStatus").textContent="Rust is generating vertices, indices and smooth normals…";setRustStatus("Generating mesh in Rust/WASM…",true);
-  const meshData=state.rustCore.latheMesh(profile,options);
-  const preset=$("#lathePreset").value||"custom",name=(preset==="custom"?"Custom Revolved Mesh":preset.charAt(0).toUpperCase()+preset.slice(1)+" · Rust Lathe");
-  const record=state.engine.createLatheMeshFromData({name,meshData,profile,options,color:[.34,.62,.78]});
-  const stats=meshData.positions.length+" vertices · "+Math.floor(meshData.indices.length/3)+" triangles · "+options.radial_segments+" radial segments";
-  $("#latheMeshStats").textContent=stats;$("#latheStatus").textContent="Generated by forge-eye-core (Rust/WASM). Inspect the mesh from front, side and perspective.";
-  if($("#latheDialog").open)$("#latheDialog").close();
-  refreshAll();state.engine.frame();setWorkspace("modeling");status("Rust generated "+stats,"dirty");return record;
-}
-function quickCreateBottle(){
-  setLathePreset("bottle");$("#latheAxis").value="y";$("#latheSegments").value="64";$("#latheSmoothing").value="2";$("#latheCaps").checked=true;
-  return generateLatheFromProfile({quick:true});
-}
-function useReferenceOutlineForLathe(){
-  const record=selectedRecord(),meta=record?.components?.reference;
-  if(!meta||!Array.isArray(meta.outline)||meta.outline.length<3){notice("Profile from image","Select an image reference with a saved silhouette outline first. Use Trace outline, then Save outline.");return}
-  const width=Math.max(.01,Number(meta.width)||3),height=Math.max(.01,Number(meta.height)||width/(Number(meta.aspect)||1)),center=.5;
-  const side=meta.outline.filter(p=>Number(p[0])>=center).map(p=>({radius:Math.max(0,(Number(p[0])-center)*width),height:(1-Number(p[1]))*height})).filter(p=>Number.isFinite(p.radius)&&Number.isFinite(p.height));
-  side.sort((a,b)=>a.height-b.height);
-  const reduced=[];for(const p of side){const last=reduced[reduced.length-1];if(!last||Math.abs(last.height-p.height)>.003)reduced.push(p);else if(p.radius>last.radius)last.radius=p.radius}
-  if(reduced.length<2){notice("Profile from image","The saved outline did not contain enough points on the right side of the assumed center axis. Re-trace the silhouette so it spans both sides of the image.");return}
-  const minH=reduced[0].height,maxH=reduced[reduced.length-1].height;
-  const profile=[{radius:0,height:minH},...reduced.filter(p=>p.radius>.002),{radius:0,height:maxH}].sort((a,b)=>a.height-b.height);
-  state.latheProfile=profile;state.latheSelectedPoint=Math.min(1,profile.length-1);$("#lathePreset").value="custom";$("#latheDialog").showModal();requestAnimationFrame(drawLatheProfile);
-  $("#latheStatus").textContent="Loaded "+profile.length+" radial-profile samples from "+record.name+". Review the axis and profile before generating.";
 }
 function refreshDiagnostics(){
   const engine=state.engine;if(!engine)return;const d=engine.diagnostics();$("#rendererStatus").textContent=d.renderer||"WebGL";$("#fpsStatus").textContent=(Number(d.fps)||0).toFixed(0)+" FPS · "+(Number(d.frameMs)||0).toFixed(1)+" ms";$("#entityStatus").textContent=d.entities+" entities";$("#unitLabel").textContent=String(d.unitSystem||"meters").toUpperCase();$("#unitSystem").value=d.unitSystem==="centimeters"?"centimeters":"meters";$("#snapEnabled").checked=engine.snapEnabled===true;$("#showGrid").checked=state.grid;$("#engineStatus").textContent=state.preview?"Scene preview active":"Engine ready";$("#diagnosticStatus").textContent=state.lastError?"1 error":"No errors";$("#diagnosticStatus").classList.toggle("diagnostic-error",!!state.lastError);if(state.timelinePlaying)refreshTimeline();
