@@ -43,6 +43,23 @@ function triangulateContour(points){
   return triangles;
 }
 
+
+function smoothOpenProfile(points,levels=0){
+  let out=points.map(p=>[p[0],p[1]]);
+  const steps=Math.max(0,Math.min(3,Math.round(Number(levels)||0)));
+  for(let pass=0;pass<steps;pass++){
+    if(out.length>2048)throw new Error("Profile subdivision limit reached. Use fewer points or a lower smoothing level.");
+    const next=[out[0]];
+    for(let i=0;i<out.length-1;i++){
+      const a=out[i],b=out[i+1];
+      next.push([a[0]*.75+b[0]*.25,a[1]*.75+b[1]*.25]);
+      next.push([a[0]*.25+b[0]*.75,a[1]*.25+b[1]*.75]);
+    }
+    next.push(out[out.length-1]);out=next;
+  }
+  return out;
+}
+
 function pointInContour(point,contour){
   const x=point[0],y=point[1];let inside=false;
   for(let i=0,j=contour.length-1;i<contour.length;j=i++){
@@ -239,11 +256,12 @@ export class ForgeEngine{
     out.components.material={color:[...color],metalness:0.05,roughness:0.65,opacity:1};
     return out;
   }
-  createLathedProfileMesh({name="Lathed Profile",profile=[],diameter=.08,height=.25,segments=32,color=[.42,.62,.76],record=null}={}){
-    const pts=profile.map(p=>[Number(p[0]),Number(p[1])]);
-    if(pts.length<3||pts.length>256)throw new Error("A spin profile needs 3–256 points.");
-    if(pts.some(p=>!Number.isFinite(p[0])||!Number.isFinite(p[1])||p[0]<0||p[0]>1||p[1]<0||p[1]>1))throw new Error("Profile points must be normalized image coordinates between 0 and 1.");
-    for(let i=1;i<pts.length;i++)if(Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1])<.002)throw new Error("Two profile points are almost identical. Remove the duplicate point.");
+  createLathedProfileMesh({name="Lathed Profile",profile=[],diameter=.08,height=.25,segments=32,smoothing=0,color=[.42,.62,.76],record=null}={}){
+    const sourcePts=profile.map(p=>[Number(p[0]),Number(p[1])]);
+    if(sourcePts.length<3||sourcePts.length>256)throw new Error("A spin profile needs 3–256 points.");
+    if(sourcePts.some(p=>!Number.isFinite(p[0])||!Number.isFinite(p[1])||p[0]<0||p[0]>1||p[1]<0||p[1]>1))throw new Error("Profile points must be normalized image coordinates between 0 and 1.");
+    for(let i=1;i<sourcePts.length;i++)if(Math.hypot(sourcePts[i][0]-sourcePts[i-1][0],sourcePts[i][1]-sourcePts[i-1][1])<.002)throw new Error("Two profile points are almost identical. Remove the duplicate point.");
+    const smoothLevel=Math.max(0,Math.min(3,Math.round(Number(smoothing)||0))),pts=smoothOpenProfile(sourcePts,smoothLevel);
     const d=Math.max(.001,Math.min(1000,Number(diameter)||.08)),h=Math.max(.001,Math.min(1000,Number(height)||.25)),seg=Math.max(12,Math.min(128,Math.round(Number(segments)||32)));
     const axisX=.5,radialExtent=Math.max(...pts.map(p=>Math.abs(p[0]-axisX))),yMin=Math.min(...pts.map(p=>p[1])),yMax=Math.max(...pts.map(p=>p[1]));
     if(radialExtent<.015)throw new Error("The profile is too close to the rotation axis. Trace from the centerline out to the bottle edge.");
@@ -276,9 +294,9 @@ export class ForgeEngine{
     out.name=name;out.kind="mesh";out.entity.name=name;if(out.entity.render)out.entity.removeComponent("render");
     out.entity.addComponent("render",{meshInstances:[instance]});out.entity.render.layers=[pc.LAYERID_WORLD];out.entity.render.frustumCulling=false;
     out.entity.setLocalPosition(0,h/2,0);out.entity.setLocalEulerAngles(0,0,0);out.entity.setLocalScale(1,1,1);
-    out.components.geometry={kind:"lathe-profile",version:1,profile:pts,diameter:d,height:h,segments:seg,axis:"Y",revolveDegrees:360,color:[...color],sourceName:String(name)};
+    out.components.geometry={kind:"lathe-profile",version:2,profile:sourcePts,diameter:d,height:h,segments:seg,smoothing:smoothLevel,axis:"Y",revolveDegrees:360,color:[...color],sourceName:String(name)};
     out.components.material={color:[...color],metalness:.04,roughness:.32,opacity:1};
-    out.components.diagnostics={method:"spin / lathe profile",vertices:positions.length/3,triangles:indices.length/3,segments:seg,profilePoints:pts.length,revolveDegrees:360};
+    out.components.diagnostics={method:"spin / lathe profile",vertices:positions.length/3,triangles:indices.length/3,segments:seg,profilePoints:sourcePts.length,smoothedProfilePoints:pts.length,smoothing:smoothLevel,revolveDegrees:360};
     return out;
   }
   createSilhouetteVisualHull({name="Multi-view Silhouette Hull",frontContour=[],sideContour=[],topContour=[],width=3,height=2,depth=3,resolution=32,color=[.3,.62,.78],record=null}={}){
