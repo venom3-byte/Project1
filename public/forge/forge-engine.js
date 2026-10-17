@@ -55,7 +55,7 @@ function pointInContour(point,contour){
 export class ForgeEngine{
   constructor(canvas,log=()=>{}){
     this.canvas=canvas;this.log=log;this.app=null;this.root=null;this.entities=new Map();this.selectedId=null;this.assets=new Map();
-    this.rapier=null;this.world=null;this.physics=new Map();this.keyframes=new Map();this.scripts=new Map();this.timelineTime=0;this.running=false;this.timelinePlaying=false;this.autoKey=false;this.keyInterpolation='ease';this.fps=0;this.frames=0;this.lastFPS=performance.now();this.frameMs=0;
+    this.rapier=null;this.world=null;this.physics=new Map();this.keyframes=new Map();this.scripts=new Map();this.timelineTime=0;this.timelineStart=0;this.timelineEnd=10;this.timelineLoop=true;this.running=false;this.timelinePlaying=false;this.autoKey=false;this.keyInterpolation='ease';this.fps=0;this.frames=0;this.lastFPS=performance.now();this.frameMs=0;
     this.physicsAccumulator=0;this.physicsFixedDt=1/60;this.physicsMaxSubsteps=5;this.prePhysicsSystems=new Set();this.postPhysicsSystems=new Set();this.collisionListeners=new Set();this.colliderEntityMap=new Map();this.eventQueue=null;
     this.triangleCache=new WeakMap();this.pickBudget=120000;this.unitSystem='meters';this.viewMode='perspective';this.gizmoSpace='world';this.snapEnabled=false;this.snapSize=.25;this.history=[];this.redoStack=[];this.historyLimit=100;
   }
@@ -105,7 +105,16 @@ export class ForgeEngine{
     this.frameMs=dt*1000;this.frames++;const now=performance.now();if(now-this.lastFPS>800){this.fps=this.frames*1000/(now-this.lastFPS);this.frames=0;this.lastFPS=now}
     const frameDt=Math.min(.1,Math.max(0,dt));
     if(this.world){this.physicsAccumulator=Math.min(this.physicsAccumulator+frameDt,this.physicsFixedDt*this.physicsMaxSubsteps);let steps=0;while(this.physicsAccumulator>=this.physicsFixedDt&&steps<this.physicsMaxSubsteps){for(const fn of this.prePhysicsSystems){try{fn(this.physicsFixedDt)}catch(e){this.log('Pre-physics error: '+e.message,'error')}}this.world.step(this.eventQueue);this.eventQueue?.drainCollisionEvents((h1,h2,started)=>this.emitCollision(h1,h2,started));for(const fn of this.postPhysicsSystems){try{fn(this.physicsFixedDt)}catch(e){this.log('Post-physics error: '+e.message,'error')}}this.physicsAccumulator-=this.physicsFixedDt;steps++}for(const[id,p]of this.physics){if(p.mode==='fixed')continue;const r=this.entities.get(id);if(!r)continue;const t=p.body.translation(),q=p.body.rotation();r.entity.setPosition(t.x,t.y,t.z);r.entity.setRotation(q.x,q.y,q.z,q.w)}}
-    if(this.timelinePlaying){this.timelineTime+=frameDt;this.evalAnimation(this.timelineTime)}if(this.running)this.runScripts(frameDt)
+    if(this.timelinePlaying){
+      const start=Math.max(0,Number(this.timelineStart)||0),end=Math.max(start+.01,Number(this.timelineEnd)||10);
+      this.timelineTime+=frameDt;
+      if(this.timelineTime>=end){
+        if(this.timelineLoop)this.timelineTime=start+(this.timelineTime-start)%(end-start);
+        else{this.timelineTime=end;this.timelinePlaying=false}
+      }
+      this.evalAnimation(this.timelineTime);
+    }
+    if(this.running)this.runScripts(frameDt)
   }
   worldBounds(){
     const b={min:V(Infinity,Infinity,Infinity),max:V(-Infinity,-Infinity,-Infinity)};let count=0;
