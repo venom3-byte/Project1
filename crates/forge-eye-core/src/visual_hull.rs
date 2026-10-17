@@ -58,202 +58,399 @@ pub enum VisualHullError {
 
 impl Display for VisualHullError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let meÕÈZ®Ëkºwµçkz»§Â+a…æş
-Ş§ûZŠWè­û¥–‹­¦ëNÛÛİ\“İ]ÚYS›Ü›X[^™Y›İ[™ÈOˆÂˆ“İ][™HÛÛÜ™[˜]\È]\İ™H›Ü›X[^™YÈH8 $ÌH[XYÙH˜[™ÙKˆ‚ˆBˆÙ[‘YÙ[™\˜]PÛÛİ\ˆOˆ•Hİ][™H\È›È\ØX›H\™XKˆ‹ˆÙ[”Ù[’[\œÙXİ[™ĞÛÛİ\ˆOˆÂˆ•Hİ][™HÜ›ÜÜÙ\È]Ù[‹ˆš^HÜ›ÜÜÚ[™ÈÚ[È™Y›Ü™H™XÛÛœİXİ[Û‹ˆ‚ˆBˆÙ[’[˜[Y[Y[œÚ[ÛœÈOˆÂˆ”™Y™\™[˜ÙH[Y[œÚ[ÛœÈ]\İ™Hš[š]H[™™]ÙY[ˆŒH[™LÛÜ›[š]Ëˆ‚ˆBˆÙ[’[˜[Y™\ÛÛ][ÛˆOˆ•›Ş[™\ÛÛ][Ûˆ]\İ™H™]ÙY[ˆLˆ[™ˆ‹ˆÙ[‘[\R[\œÙXİ[ÛˆOˆÂˆ•HØ[Xœ˜]YÚ[İY]\ÈÈ›İ[\œÙXİˆÚXÚÈÜšY[][Ûˆ[™ØØ[Kˆ‚ˆBˆÙ[‘^Ù\ÜÚ]™SØØİ\[˜ŞHOˆÂˆ•HÚ[İY]\Èš[™X\›HH[\™H™XÛÛœİXİ[Ûˆ›Û[YKˆ™Yš[™HHİ][™\Ëˆ‚ˆBˆÙ[“Y\ÚÛÓ\™ÙHOˆÂˆ•H™XÛÛœİXİYİ\™˜XÙH^ÙYYÈHØY™HY\Ú™\^[Z]ˆ™YXÙH›Ş[™\ÛÛ][Û‹ˆ‚ˆBˆNÂˆ‹Üš]WÜİŠY\ÜØYÙJBˆBŸB‚š[\İ™\œ›Ü‘\œ›Üˆ›Üˆš\İX[[\œ›ÜˆßB‚‹ËËÈZ[HØ]\YÚ›Ş[X›İ[™\Hš\İX[[œ›ÛHØ[Xœ˜]Y[XYÙHÚ[İY]\Ë‚‹ËËÂ‹ËËÈÛÛÜ™[˜]\È\™H›Ü›X[^™YÈÌWHÚ]H[XYÙHÜšYÚ[ˆ]]ÈÜ[Y‚‹ËËÈœ›ÛX\È
-JKÚYHX\È
-‹JK[™Ü[Û˜[ÜX\È
-ŠKˆ\È\ÈB‹ËËÈÛØ\œÙHš\İX[Z[™XÛÛœİXİ[Û‹›İ[ˆ\İ[X]HÙˆY[ˆÛÛ˜Ø]š]Y\Ë‚œXˆ›ˆÙ[™\˜]Wİš\İX[Ú[ÛY\Ú
-ˆœ›ÛØÛÛİ\ˆ	–ÖÙŒÌÈ—WKˆÚYWØÛÛİ\ˆ	–ÖÙŒÌÈ—WKˆÜØÛÛİ\ˆÜ[Û	–ÖÙŒÌÈ—WO‹ˆÜ[ÛœÎˆš\İX[[Ü[ÛœËŠHOˆ™\İ[š\İX[[™\İ[š\İX[[\œ›ÜˆÂˆ˜[Y]WØÛÛİ\Šœ›ÛØÛÛİ\ŠOÎÂˆ˜[Y]WØÛÛİ\ŠÚYWØÛÛİ\ŠOÎÂˆYˆ]ÛÛYJÜ
-HHÜØÛÛİ\ˆÂˆ˜[Y]WØÛÛİ\ŠÜ
-OÎÂˆBˆ›Üˆ[Y[œÚ[Ûˆ[ˆÛÜ[ÛœËÚYÜ[ÛœËšZYÚÜ[ÛœË™\HÂˆYˆY[Y[œÚ[Û‹š\×Ùš[š]J
-HJŒK‹LLÌŒ
-K˜ÛÛZ[œÊ	™[Y[œÚ[ÛŠHÂˆ™]\›ˆ\œŠš\İX[[\œ›Ü’[˜[Y[Y[œÚ[ÛœÊNÂˆBˆBˆYˆJRS—Ô‘TÓÓUSÓ‹‹SPVÔ‘TÓÓUSÓŠK˜ÛÛZ[œÊ	›Ü[ÛœËœ™\ÛÛ][ÛŠHÂˆ™]\›ˆ\œŠš\İX[[\œ›Ü’[˜[Y™\ÛÛ][ÛŠNÂˆB‚ˆ]ˆHÜ[ÛœËœ™\ÛÛ][Ûˆ\È\Ú^™NÂˆ][™HHˆ
-ˆÂˆ]]]œ›ÛÛX\ÚÈH™XÈVÌİNÈ[™WNÂˆ]]]ÚYWÛX\ÚÈH™XÈVÌİNÈ[™WNÂˆ]]]ÜÛX\ÚÈHÜØÛÛİ\‹›X\
-ß™XÈVÌİNÈ[™WJNÂ‚ˆ›Üˆˆ[ˆ‹œˆÂˆ]ˆH
-ˆ\ÈŒÌˆ
-ÈJHÈˆ\ÈŒÌÂˆ›ÜˆH[ˆ‹œˆÂˆ]HH
-H\ÈŒÌˆ
-ÈJHÈˆ\ÈŒÌÂˆ][™^Hˆ
-ˆˆ
-ÈNÂˆœ›ÛÛX\ÚÖÚ[™^HHN™œ›ÛJÚ[Ú[—ÜÛYÛÛŠİK—Kœ›ÛØÛÛİ\ŠJNÂˆÚYWÛX\ÚÖÚ[™^HHN™œ›ÛJÚ[Ú[—ÜÛYÛÛŠİK—KÚYWØÛÛİ\ŠJNÂˆYˆ]
-ÛÛYJÜ
-KÛÛYJX\ÚÊJHH
-ÜØÛÛİ\‹ÜÛX\ÚË˜\×Û]]
+        let message = match self {
+            Self::TooFewContourPoints => "Each reference outline needs at least three points.",
+            Self::TooManyContourPoints => "An outline may contain at most 256 points.",
+            Self::InvalidContourPoint => "Outline coordinates must be finite numbers.",
+            Self::ContourOutsideNormalizedBounds => {
+                "Outline coordinates must be normalized to the 0â€“1 image range."
+            }
+            Self::DegenerateContour => "The outline has no usable area.",
+            Self::SelfIntersectingContour => {
+                "The outline crosses itself. Fix the crossing points before reconstruction."
+            }
+            Self::InvalidDimensions => {
+                "Reference dimensions must be finite and between 0.01 and 10000 world units."
+            }
+            Self::InvalidResolution => "Voxel resolution must be between 12 and 48.",
+            Self::EmptyIntersection => {
+                "The calibrated silhouettes do not intersect. Check orientation and scale."
+            }
+            Self::ExcessiveOccupancy => {
+                "The silhouettes fill nearly the entire reconstruction volume. Refine the outlines."
+            }
+            Self::MeshTooLarge => {
+                "The reconstructed surface exceeds the safe mesh vertex limit. Reduce voxel resolution."
+            }
+        };
+        f.write_str(message)
+    }
+}
 
-JHÂˆX\ÚÖÚ[™^HHN™œ›ÛJÚ[Ú[—ÜÛYÛÛŠİK—KÜ
-JNÂˆBˆBˆB‚ˆ]]]ØØİ\YYH™XÈVÌİNÈ[™H
-ˆ—NÂˆ]]]ØØİ\YYİ›Ş[ÈHİ\Ú^™NÂˆ›ÜˆÈ[ˆ‹œˆÂˆ›Üˆˆ[ˆ‹œˆÂˆ›ÜˆH[ˆ‹œˆÂˆ][™^HH
-Èˆ
-ˆ
-ˆ
-Èˆ
-ˆÊNÂˆ]š]×Ùœ›ÛHœ›ÛÛX\ÚÖÚˆ
-ˆˆ
-ÈWHOHÂˆ]š]×ÜÚYHHÚYWÛX\ÚÖÚˆ
-ˆˆ
-È×HOHÂˆ]š]×İÜHÜÛX\ÚË˜\×Ü™YŠ
-Kš\×Û›Û™WÛÜŠX\ÚßX\ÚÖÚÈ
-ˆˆ
-ÈWHOH
-NÂˆYˆš]×Ùœ›Û	‰ˆš]×ÜÚYH	‰ˆš]×İÜÂˆØØİ\YYÚ[™^HHNÂˆØØİ\YYİ›Ş[È
-ÏHNÂˆBˆBˆBˆB‚ˆ]›Ş[ØÛİ[H[™H
-ˆÂˆYˆØØİ\YYİ›Ş[ÈOHÂˆ™]\›ˆ\œŠš\İX[[\œ›Ü‘[\R[\œÙXİ[ÛŠNÂˆBˆYˆØØİ\YYİ›Ş[È\ÈŒÌˆˆ›Ş[ØÛİ[\ÈŒÌˆ
-ˆLˆÂˆ™]\›ˆ\œŠš\İX[[\œ›Ü‘^Ù\ÜÚ]™SØØİ\[˜ŞJNÂˆB‚ˆ]HÜ[ÛœËÚYÈˆ\ÈŒÌÂˆ]HHÜ[ÛœËšZYÚÈˆ\ÈŒÌÂˆ]ˆHÜ[ÛœË™\Èˆ\ÈŒÌÂˆ]]]ÜÚ][ÛœÎˆ™XÏÙŒÌÈ×OˆH™XÎ›™]Ê
-NÂˆ]]]›Ü›X[Îˆ™XÏÙŒÌÈ×OˆH™XÎ›™]Ê
-NÂˆ]]][™XÙ\Îˆ™XÏLÌˆH™XÎ›™]Ê
-NÂ‚ˆ]\ÈHNˆ\Ú^™Kˆ\Ú^™KÎˆ\Ú^™_Oˆ›ÛÛÂˆYˆHˆÈHHˆ\È\Ú^™HˆHˆ\È\Ú^™HÈHˆ\È\Ú^™HÂˆ™]\›ˆ˜[ÙNÂˆBˆØØİ\YYÚH\È\Ú^™H
-Èˆ
-ˆ
-ˆ\È\Ú^™H
-Èˆ
-ˆÈ\È\Ú^™JWHOHˆNÂ‚ˆ›ÜˆÈ[ˆ‹œˆÂˆ›Üˆˆ[ˆ‹œˆÂˆ›ÜˆH[ˆ‹œˆÂˆYˆZ\ÊH\È\Ú^™Kˆ\È\Ú^™KÈ\È\Ú^™JHÂˆÛÛ[YNÂˆBˆ]H[Ü[ÛœËÚYÈ‹Œ
-ÈH\ÈŒÌˆ
-ˆÂˆ]HH
-ÈÂˆ]LHÜ[ÛœËšZYÚÈ‹ŒHˆ\ÈŒÌˆ
-ˆNÂˆ]LHHLHNÂˆ]ŒH[Ü[ÛœË™\È‹Œ
-ÈÈ\ÈŒÌˆ
-ˆÂˆ]ŒHHŒ
-ÈÂ‚ˆYˆZ\ÊH\È\Ú^™HHKˆ\È\Ú^™KÈ\È\Ú^™JHÂˆ\ÚÜ]XY
-ˆ	›]]ÜÚ][ÛœËˆ	›]]›Ü›X[Ëˆ	›]][™XÙ\ËˆÖŞLŒKŞLKŒKŞLKŒWKŞLŒWWKˆËLKŒŒŒKˆ
-OÎÂˆBˆYˆZ\ÊH\È\Ú^™H
-ÈKˆ\È\Ú^™KÈ\È\Ú^™JHÂˆ\ÚÜ]XY
-ˆ	›]]ÜÚ][ÛœËˆ	›]]›Ü›X[Ëˆ	›]][™XÙ\ËˆÖŞKLŒWKŞKLKŒWKŞKLKŒKŞKLŒWKˆÌKŒŒŒKˆ
-OÎÂˆBˆYˆZ\ÊH\È\Ú^™Kˆ\È\Ú^™HHKÈ\È\Ú^™JHÂˆ\ÚÜ]XY
-ˆ	›]]ÜÚ][ÛœËˆ	›]]›Ü›X[Ëˆ	›]][™XÙ\ËˆÖŞLŒKŞLŒWKŞKLŒWKŞKLŒWKˆÌŒKŒŒKˆ
-OÎÂˆBˆYˆZ\ÊH\È\Ú^™Kˆ\È\Ú^™H
-ÈKÈ\È\Ú^™JHÂˆ\ÚÜ]XY
-ˆ	›]]ÜÚ][ÛœËˆ	›]]›Ü›X[Ëˆ	›]][™XÙ\ËˆÖŞKLKŒWKŞLKŒWKŞLKŒKŞKLKŒWKˆÌŒLKŒŒKˆ
-OÎÂˆBˆYˆZ\ÊH\È\Ú^™Kˆ\È\Ú^™KÈ\È\Ú^™HHJHÂˆ\ÚÜ]XY
-ˆ	›]]ÜÚ][ÛœËˆ	›]]›Ü›X[Ëˆ	›]][™XÙ\ËˆÖŞKLŒKŞKLKŒKŞLKŒKŞLŒWKˆÌŒŒLKŒKˆ
-OÎÂˆBˆYˆZ\ÊH\È\Ú^™Kˆ\È\Ú^™KÈ\È\Ú^™H
-ÈJHÂˆ\ÚÜ]XY
-ˆ	›]]ÜÚ][ÛœËˆ	›]]›Ü›X[Ëˆ	›]][™XÙ\ËˆÖŞLŒWKŞKLŒWKŞKLKŒWKŞLKŒWWKˆÌŒŒKŒKˆ
-OÎÂˆBˆBˆBˆB‚ˆÚÊš\İX[[™\İ[ÂˆY\ÚˆY\Ú]HÂˆÜÚ][ÛœËˆ›Ü›X[Ëˆ[™XÙ\ËˆKˆØØİ\YYİ›Ş[ËˆšY]×ØÛİ[ˆYˆÜØÛÛİ\‹š\×ÜÛÛYJ
-HÈÈH[ÙHÈˆKˆ™\ÛÛ][ÛˆÜ[ÛœËœ™\ÛÛ][Û‹ˆJBŸB‚™›ˆ\ÚÜ]XY
-ˆÜÚ][ÛœÎˆ	›]]™XÏÙŒÌÈ×O‹ˆ›Ü›X[Îˆ	›]]™XÏÙŒÌÈ×O‹ˆ[™XÙ\Îˆ	›]]™XÏLÌ‹ˆ™\XÙ\ÎˆÖÙŒÌÈ×NÈKˆ›Ü›X[ˆÙŒÌÈ×KŠHOˆ™\İ[
+impl std::error::Error for VisualHullError {}
 
-Kš\İX[[\œ›ÜˆÂˆYˆÜÚ][ÛœË›[Š
-KœØ]\˜][™×ØY
+/// Build a watertight voxel-boundary visual hull from calibrated image silhouettes.
+///
+/// Coordinates are normalized to [0, 1] with the image origin at its top-left.
+/// Front maps (X,Y), Side maps (Z,Y), and optional Top maps (X,Z). This is a
+/// coarse visual-hull reconstruction, not an estimate of hidden concavities.
+pub fn generate_visual_hull_mesh(
+    front_contour: &[[f32; 2]],
+    side_contour: &[[f32; 2]],
+    top_contour: Option<&[[f32; 2]]>,
+    options: VisualHullOptions,
+) -> Result<VisualHullResult, VisualHullError> {
+    validate_contour(front_contour)?;
+    validate_contour(side_contour)?;
+    if let Some(top) = top_contour {
+        validate_contour(top)?;
+    }
+    for dimension in [options.width, options.height, options.depth] {
+        if !dimension.is_finite() || !(0.01..=10_000.0).contains(&dimension) {
+            return Err(VisualHullError::InvalidDimensions);
+        }
+    }
+    if !(MIN_RESOLUTION..=MAX_RESOLUTION).contains(&options.resolution) {
+        return Err(VisualHullError::InvalidResolution);
+    }
 
-HˆPVÔÕT‘PÑWÕ‘T•PÑTÈÂˆ™]\›ˆ\œŠš\İX[[\œ›Ü“Y\ÚÛÓ\™ÙJNÂˆBˆ]˜\ÙHHÜÚ][ÛœË›[Š
-H\ÈLÌÂˆÜÚ][ÛœË™^[™
-™\XÙ\ÊNÂˆ›Ü›X[Ë™^[™
-Û›Ü›X[ÈJNÂˆ[™XÙ\Ë™^[™
-Ø˜\ÙK˜\ÙH
-ÈK˜\ÙH
-È‹˜\ÙK˜\ÙH
-È‹˜\ÙH
-È×JNÂˆÚÊ
+    let r = options.resolution as usize;
+    let plane = r * r;
+    let mut front_mask = vec![0_u8; plane];
+    let mut side_mask = vec![0_u8; plane];
+    let mut top_mask = top_contour.map(|_| vec![0_u8; plane]);
 
-JBŸB‚™›ˆ˜[Y]WØÛÛİ\ŠÚ[Îˆ	–ÖÙŒÌÈ—WJHOˆ™\İ[
+    for j in 0..r {
+        let v = (j as f32 + 0.5) / r as f32;
+        for i in 0..r {
+            let u = (i as f32 + 0.5) / r as f32;
+            let index = j * r + i;
+            front_mask[index] = u8::from(point_in_polygon([u, v], front_contour));
+            side_mask[index] = u8::from(point_in_polygon([u, v], side_contour));
+            if let (Some(top), Some(mask)) = (top_contour, top_mask.as_mut()) {
+                mask[index] = u8::from(point_in_polygon([u, v], top));
+            }
+        }
+    }
 
-Kš\İX[[\œ›ÜˆÂˆYˆÚ[Ë›[Š
-HÈÂˆ™]\›ˆ\œŠš\İX[[\œ›Ü•ÛÑ™]ĞÛÛİ\”Ú[ÊNÂˆBˆYˆÚ[Ë›[Š
-HˆPVĞÓÓ•ÕT—ÔÒS•ÈÂˆ™]\›ˆ\œŠš\İX[[\œ›Ü•ÛÓX[PÛÛİ\”Ú[ÊNÂˆBˆYˆÚ[Ëš]\Š
-K™›][Š
-K˜[J˜[Y_]˜[YKš\×Ùš[š]J
-JHÂˆ™]\›ˆ\œŠš\İX[[\œ›Ü’[˜[YÛÛİ\”Ú[
-NÂˆBˆYˆÚ[Âˆš]\Š
-Bˆ™›][Š
-Bˆ˜[J˜[Y_JŒ‹LKŒ
-K˜ÛÛZ[œÊ˜[YJJBˆÂˆ™]\›ˆ\œŠš\İX[[\œ›ÜÛÛİ\“İ]ÚYS›Ü›X[^™Y›İ[™ÊNÂˆBˆ]]]ÚXÙWØ\™XHHŒÂˆ›Üˆ[™^[ˆ‹œÚ[Ë›[Š
-HÂˆ]HHÚ[ÖÚ[™^NÂˆ]ˆHÚ[ÖÊ[™^
-ÈJH	HÚ[Ë›[Š
-WNÂˆÚXÙWØ\™XH
-ÏHVÌH
-ˆ–ÌWHH–ÌH
-ˆVÌWNÂˆBˆYˆÙ[—Ú[\œÙXİÊÚ[ÊHÂˆ™]\›ˆ\œŠš\İX[[\œ›Ü”Ù[’[\œÙXİ[™ĞÛÛİ\ŠNÂˆBˆYˆÚXÙWØ\™XK˜XœÊ
-HTÒSÓˆÂˆ™]\›ˆ\œŠš\İX[[\œ›Ü‘YÙ[™\˜]PÛÛİ\ŠNÂˆBˆÚÊ
+    let mut occupied = vec![0_u8; plane * r];
+    let mut occupied_voxels = 0_usize;
+    for k in 0..r {
+        for j in 0..r {
+            for i in 0..r {
+                let index = i + r * (j + r * k);
+                let fits_front = front_mask[j * r + i] != 0;
+                let fits_side = side_mask[j * r + k] != 0;
+                let fits_top = top_mask.as_ref().is_none_or(|mask| mask[k * r + i] != 0);
+                if fits_front && fits_side && fits_top {
+                    occupied[index] = 1;
+                    occupied_voxels += 1;
+                }
+            }
+        }
+    }
 
-JBŸB‚™›ˆÙ[—Ú[\œÙXİÊÚ[Îˆ	–ÖÙŒÌÈ—WJHOˆ›ÛÛÂˆ]ˆHÚ[Ë›[Š
-NÂˆ›ÜˆH[ˆ‹›ˆÂˆ]HHÚ[ÖÚWNÂˆ]ˆHÚ[ÖÊH
-ÈJH	H—NÂˆ›Üˆˆ[ˆ
-H
-ÈJK‹›ˆÂˆYˆˆOHHˆOH
-H
-ÈJH	Hˆ
-ˆ
-ÈJH	HˆOHHÂˆÛÛ[YNÂˆBˆ]ÈHÚ[ÖÚ—NÂˆ]HÚ[ÖÊˆ
-ÈJH	H—NÂˆYˆÙYÛY[×Ú[\œÙXİ
-K‹Ë
-HÂˆ™]\›ˆYNÂˆBˆBˆBˆ˜[ÙBŸB‚™›ˆÜšY[][ÛŠNˆÙŒÌÈ—KˆÙŒÌÈ—KÎˆÙŒÌÈ—JHOˆŒÌˆÂˆ
-–ÌHHVÌJH
-ˆ
-ÖÌWHHVÌWJHH
-–ÌWHHVÌWJH
-ˆ
-ÖÌHHVÌJBŸB‚™›ˆÙYÛY[×Ú[\œÙXİ
-NˆÙŒÌÈ—KˆÙŒÌÈ—KÎˆÙŒÌÈ—KˆÙŒÌÈ—JHOˆ›ÛÛÂˆ]
-ÌKÌ‹ÌËÍ
-HH
-ˆÜšY[][ÛŠK‹ÊKˆÜšY[][ÛŠK‹
-KˆÜšY[][ÛŠËJKˆÜšY[][ÛŠËŠKˆ
-NÂˆ
-ÌHˆTÒSÓˆ	‰ˆÌˆQTÒSÓˆÌHQTÒSÓˆ	‰ˆÌˆˆTÒSÓŠBˆ	‰ˆ
-ÌÈˆTÒSÓˆ	‰ˆÍQTÒSÓˆÌÈQTÒSÓˆ	‰ˆÍˆTÒSÓŠBŸB‚™›ˆÚ[Ú[—ÜÛYÛÛŠÚ[ˆÙŒÌÈ—KÛYÛÛˆ	–ÖÙŒÌÈ—WJHOˆ›ÛÛÂˆ]
-JHH
-Ú[ÌKÚ[ÌWJNÂˆ]]][œÚYHH˜[ÙNÂˆ]]]™]š[İ\ÈHÛYÛÛ–ÜÛYÛÛ‹›[Š
-HHWNÂˆ›Üˆİ\œ™[[ˆÛYÛÛˆÂˆ]Ü›ÜÜÚ[™ÈH
-İ\œ™[ÌWHˆJHOH
-™]š[İ\ÖÌWHˆJBˆ	‰ˆ
-™]š[İ\ÖÌHHİ\œ™[ÌJH
-ˆ
-HHİ\œ™[ÌWJHÈ
-™]š[İ\ÖÌWHHİ\œ™[ÌWJBˆ
-Èİ\œ™[ÌNÂˆYˆÜ›ÜÜÚ[™ÈÂˆ[œÚYHHZ[œÚYNÂˆBˆ™]š[İ\ÈH
-˜İ\œ™[ÂˆBˆ[œÚYBŸB‚ˆÖØÙ™Ê\İ
-WB›[Ù\İÈÂˆ\ÙHİ\\ŠÂ‚ˆ›ˆÜ]X\™JZ[ˆŒÌ‹X^ˆŒÌŠHOˆ™XÏÙŒÌÈ—OˆÂˆ™XÈVÖÛZ[‹Z[—KÛX^Z[—KÛX^X^KÛZ[‹X^WBˆB‚ˆÖİ\İBˆ›ˆÛ×İšY]×Ú[ØÜ™X]\×ØWİ˜[YÛY\Ú
+    let voxel_count = plane * r;
+    if occupied_voxels == 0 {
+        return Err(VisualHullError::EmptyIntersection);
+    }
+    if occupied_voxels as f32 > voxel_count as f32 * 0.92 {
+        return Err(VisualHullError::ExcessiveOccupancy);
+    }
 
-HÂˆ]™\İ[HÙ[™\˜]Wİš\İX[Ú[ÛY\Ú
-ˆ	œÜ]X\™JŒKJKˆ	œÜ]X\™JŒKJKˆ›Û™Kˆš\İX[[Ü[ÛœÈÂˆÚYˆËŒˆZYÚˆ‹Œˆ\ˆŒˆ™\ÛÛ][ÛˆM‹ˆKˆ
-Bˆ[Ü˜\
+    let dx = options.width / r as f32;
+    let dy = options.height / r as f32;
+    let dz = options.depth / r as f32;
+    let mut positions: Vec<[f32; 3]> = Vec::new();
+    let mut normals: Vec<[f32; 3]> = Vec::new();
+    let mut indices: Vec<u32> = Vec::new();
 
-NÂˆ\ÜÙ\J™\İ[›ØØİ\YYİ›Ş[Èˆ
-NÂˆ\ÜÙ\Ù\HJ™\İ[šY]×ØÛİ[ŠNÂˆ\ÜÙ\Ù\HJ™\İ[›Y\ÚœÜÚ][ÛœË›[Š
-K™\İ[›Y\Ú››Ü›X[Ë›[Š
-JNÂˆ\ÜÙ\J\™\İ[›Y\Úš[™XÙ\Ëš\×Ù[\J
-JNÂˆ\ÜÙ\Ù\HJ™\İ[›Y\Úš[™XÙ\Ë›[Š
-H	HË
-NÂˆ\ÜÙ\Jˆ™\İ[ˆ›Y\ÚˆœÜÚ][ÛœÂˆš]\Š
-Bˆ™›][Š
-Bˆ˜[
-š\×Ùš[š]J
-JBˆ
-NÂˆ\ÜÙ\J™\İ[›Y\Ú››Ü›X[Ëš]\Š
-K™›][Š
-K˜[
-š\×Ùš[š]J
-JJNÂˆ\ÜÙ\Jˆ™\İ[ˆ›Y\Úˆš[™XÙ\Âˆš]\Š
-Bˆ˜[
-_
+    let has = |i: isize, j: isize, k: isize| -> bool {
+        if i < 0 || j < 0 || k < 0 || i >= r as isize || j >= r as isize || k >= r as isize {
+            return false;
+        }
+        occupied[i as usize + r * (j as usize + r * k as usize)] != 0
+    };
 
-šH\È\Ú^™JH™\İ[›Y\ÚœÜÚ][ÛœË›[Š
-JBˆ
-NÂˆB‚ˆÖİ\İBˆ›ˆÜÜÚ[İY]WİYÚ[œ×İWİ›Û[YJ
-HÂˆ]œ›ÛHÜ]X\™JŒKMJNÂˆ]ÚYHHÜ]X\™JŒKMJNÂˆ]ÚYWİÜHÜ]X\™JŒKJNÂˆ]˜\œ›İ×İÜHÜ]X\™JŒÍKJNÂˆ]Ü[ÛœÈHš\İX[[Ü[ÛœÈÂˆÚYˆËŒˆZYÚˆ‹Œˆ\ˆËŒˆ™\ÛÛ][ÛˆˆNÂˆ]ÚYHHÙ[™\˜]Wİš\İX[Ú[ÛY\Ú
-	™œ›Û	œÚYKÛÛYJ	ÚYWİÜ
-KÜ[ÛœÊK[Ü˜\
+    for k in 0..r {
+        for j in 0..r {
+            for i in 0..r {
+                if !has(i as isize, j as isize, k as isize) {
+                    continue;
+                }
+                let x0 = -options.width / 2.0 + i as f32 * dx;
+                let x1 = x0 + dx;
+                let y0 = options.height / 2.0 - j as f32 * dy;
+                let y1 = y0 - dy;
+                let z0 = -options.depth / 2.0 + k as f32 * dz;
+                let z1 = z0 + dz;
 
-NÂˆ]˜\œ›İÈHÙ[™\˜]Wİš\İX[Ú[ÛY\Ú
-	™œ›Û	œÚYKÛÛYJ	›˜\œ›İ×İÜ
-KÜ[ÛœÊK[Ü˜\
+                if !has(i as isize - 1, j as isize, k as isize) {
+                    push_quad(
+                        &mut positions,
+                        &mut normals,
+                        &mut indices,
+                        [[x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1]],
+                        [-1.0, 0.0, 0.0],
+                    )?;
+                }
+                if !has(i as isize + 1, j as isize, k as isize) {
+                    push_quad(
+                        &mut positions,
+                        &mut normals,
+                        &mut indices,
+                        [[x1, y0, z1], [x1, y1, z1], [x1, y1, z0], [x1, y0, z0]],
+                        [1.0, 0.0, 0.0],
+                    )?;
+                }
+                if !has(i as isize, j as isize - 1, k as isize) {
+                    push_quad(
+                        &mut positions,
+                        &mut normals,
+                        &mut indices,
+                        [[x0, y0, z0], [x0, y0, z1], [x1, y0, z1], [x1, y0, z0]],
+                        [0.0, 1.0, 0.0],
+                    )?;
+                }
+                if !has(i as isize, j as isize + 1, k as isize) {
+                    push_quad(
+                        &mut positions,
+                        &mut normals,
+                        &mut indices,
+                        [[x1, y1, z1], [x0, y1, z1], [x0, y1, z0], [x1, y1, z0]],
+                        [0.0, -1.0, 0.0],
+                    )?;
+                }
+                if !has(i as isize, j as isize, k as isize - 1) {
+                    push_quad(
+                        &mut positions,
+                        &mut normals,
+                        &mut indices,
+                        [[x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [x0, y0, z0]],
+                        [0.0, 0.0, -1.0],
+                    )?;
+                }
+                if !has(i as isize, j as isize, k as isize + 1) {
+                    push_quad(
+                        &mut positions,
+                        &mut normals,
+                        &mut indices,
+                        [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]],
+                        [0.0, 0.0, 1.0],
+                    )?;
+                }
+            }
+        }
+    }
 
-NÂˆ\ÜÙ\J˜\œ›İË›ØØİ\YYİ›Ş[ÈÚYK›ØØİ\YYİ›Ş[ÊNÂˆ\ÜÙ\Ù\HJ˜\œ›İËšY]×ØÛİ[ÊNÂˆB‚ˆÖİ\İBˆ›ˆ™Z™Xİ×ÜÙ[—Ú[\œÙXİ[™×Ûİ][™\Ê
-HÂˆ]›İİYHH™XÈVÖÌŒKŒWKÌKWKÌŒKWKÌKŒWWNÂˆ\ÜÙ\Ù\HJˆÙ[™\˜]Wİš\İX[Ú[ÛY\Ú
-ˆ	˜›İİYKˆ	œÜ]X\™JŒKJKˆ›Û™Kˆš\İX[[Ü[ÛœÎ™Y˜][
+    Ok(VisualHullResult {
+        mesh: MeshData {
+            positions,
+            normals,
+            indices,
+        },
+        occupied_voxels,
+        view_count: if top_contour.is_some() { 3 } else { 2 },
+        resolution: options.resolution,
+    })
+}
 
-Bˆ
-Bˆ[Ü˜\Ù\œŠ
-Kˆš\İX[[\œ›Ü”Ù[’[\œÙXİ[™ĞÛÛİ\‚ˆ
-NÂˆB‚ˆÖİ\İBˆ›ˆ™Z™Xİ×Ú[˜[YÜ™\ÛÛ][Û—Ø[™Ù[Y[œÚ[ÛœÊ
-HÂˆ]ÛÛİ\ˆHÜ]X\™JŒKJNÂˆ]Ü[ÛœÈHš\İX[[Ü[ÛœÈÂˆ™\ÛÛ][Ûˆˆ‹•š\İX[[Ü[ÛœÎ™Y˜][
+fn push_quad(
+    positions: &mut Vec<[f32; 3]>,
+    normals: &mut Vec<[f32; 3]>,
+    indices: &mut Vec<u32>,
+    vertices: [[f32; 3]; 4],
+    normal: [f32; 3],
+) -> Result<(), VisualHullError> {
+    if positions.len().saturating_add(4) > MAX_SURFACE_VERTICES {
+        return Err(VisualHullError::MeshTooLarge);
+    }
+    let base = positions.len() as u32;
+    positions.extend(vertices);
+    normals.extend([normal; 4]);
+    indices.extend([base, base + 1, base + 2, base, base + 2, base + 3]);
+    Ok(())
+}
 
-BˆNÂˆ\ÜÙ\Ù\HJˆÙ[™\˜]Wİš\İX[Ú[ÛY\Ú
-	˜ÛÛİ\‹	˜ÛÛİ\‹›Û™KÜ[ÛœÊK[Ü˜\Ù\œŠ
-Kˆš\İX[[\œ›Ü’[˜[Y™\ÛÛ][Û‚ˆ
-NÂˆ]Ü[ÛœÈHš\İX[[Ü[ÛœÈÂˆ™\ÛÛ][ÛˆM‹ˆÚYˆŒÌ’S‘’S’UKˆ‹•š\İX[[Ü[ÛœÎ™Y˜][
+fn validate_contour(points: &[[f32; 2]]) -> Result<(), VisualHullError> {
+    if points.len() < 3 {
+        return Err(VisualHullError::TooFewContourPoints);
+    }
+    if points.len() > MAX_CONTOUR_POINTS {
+        return Err(VisualHullError::TooManyContourPoints);
+    }
+    if points.iter().flatten().any(|value| !value.is_finite()) {
+        return Err(VisualHullError::InvalidContourPoint);
+    }
+    if points
+        .iter()
+        .flatten()
+        .any(|value| !(0.0..=1.0).contains(value))
+    {
+        return Err(VisualHullError::ContourOutsideNormalizedBounds);
+    }
+    let mut twice_area = 0.0;
+    for index in 0..points.len() {
+        let a = points[index];
+        let b = points[(index + 1) % points.len()];
+        twice_area += a[0] * b[1] - b[0] * a[1];
+    }
+    if self_intersects(points) {
+        return Err(VisualHullError::SelfIntersectingContour);
+    }
+    if twice_area.abs() < EPSILON {
+        return Err(VisualHullError::DegenerateContour);
+    }
+    Ok(())
+}
 
-BˆNÂˆ\ÜÙ\Ù\HJˆÙ[™\˜]Wİš\İX[Ú[ÛY\Ú
-	˜ÛÛİ\‹	˜ÛÛİ\‹›Û™KÜ[ÛœÊK[Ü˜\Ù\œŠ
-Kˆš\İX[[\œ›Ü’[˜[Y[Y[œÚ[ÛœÂˆ
-NÂˆBŸB
+fn self_intersects(points: &[[f32; 2]]) -> bool {
+    let n = points.len();
+    for i in 0..n {
+        let a = points[i];
+        let b = points[(i + 1) % n];
+        for j in (i + 1)..n {
+            if j == i || j == (i + 1) % n || (j + 1) % n == i {
+                continue;
+            }
+            let c = points[j];
+            let d = points[(j + 1) % n];
+            if segments_intersect(a, b, c, d) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn orientation(a: [f32; 2], b: [f32; 2], c: [f32; 2]) -> f32 {
+    (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+}
+
+fn segments_intersect(a: [f32; 2], b: [f32; 2], c: [f32; 2], d: [f32; 2]) -> bool {
+    let (o1, o2, o3, o4) = (
+        orientation(a, b, c),
+        orientation(a, b, d),
+        orientation(c, d, a),
+        orientation(c, d, b),
+    );
+    (o1 > EPSILON && o2 < -EPSILON || o1 < -EPSILON && o2 > EPSILON)
+        && (o3 > EPSILON && o4 < -EPSILON || o3 < -EPSILON && o4 > EPSILON)
+}
+
+fn point_in_polygon(point: [f32; 2], polygon: &[[f32; 2]]) -> bool {
+    let (x, y) = (point[0], point[1]);
+    let mut inside = false;
+    let mut previous = polygon[polygon.len() - 1];
+    for current in polygon {
+        let crossing = (current[1] > y) != (previous[1] > y)
+            && x < (previous[0] - current[0]) * (y - current[1]) / (previous[1] - current[1])
+                + current[0];
+        if crossing {
+            inside = !inside;
+        }
+        previous = *current;
+    }
+    inside
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn square(min: f32, max: f32) -> Vec<[f32; 2]> {
+        vec![[min, min], [max, min], [max, max], [min, max]]
+    }
+
+    #[test]
+    fn two_view_hull_creates_a_valid_mesh() {
+        let result = generate_visual_hull_mesh(
+            &square(0.1, 0.9),
+            &square(0.1, 0.9),
+            None,
+            VisualHullOptions {
+                width: 3.0,
+                height: 2.0,
+                depth: 4.0,
+                resolution: 16,
+            },
+        )
+        .unwrap();
+        assert!(result.occupied_voxels > 0);
+        assert_eq!(result.view_count, 2);
+        assert_eq!(result.mesh.positions.len(), result.mesh.normals.len());
+        assert!(!result.mesh.indices.is_empty());
+        assert_eq!(result.mesh.indices.len() % 3, 0);
+        assert!(
+            result
+                .mesh
+                .positions
+                .iter()
+                .flatten()
+                .all(|x| x.is_finite())
+        );
+        assert!(result.mesh.normals.iter().flatten().all(|x| x.is_finite()));
+        assert!(
+            result
+                .mesh
+                .indices
+                .iter()
+                .all(|i| (*i as usize) < result.mesh.positions.len())
+        );
+    }
+
+    #[test]
+    fn top_silhouette_tightens_the_volume() {
+        let front = square(0.05, 0.95);
+        let side = square(0.05, 0.95);
+        let wide_top = square(0.1, 0.9);
+        let narrow_top = square(0.35, 0.65);
+        let options = VisualHullOptions {
+            width: 3.0,
+            height: 2.0,
+            depth: 3.0,
+            resolution: 24,
+        };
+        let wide = generate_visual_hull_mesh(&front, &side, Some(&wide_top), options).unwrap();
+        let narrow = generate_visual_hull_mesh(&front, &side, Some(&narrow_top), options).unwrap();
+        assert!(narrow.occupied_voxels < wide.occupied_voxels);
+        assert_eq!(narrow.view_count, 3);
+    }
+
+    #[test]
+    fn rejects_self_intersecting_outlines() {
+        let bowtie = vec![[0.1, 0.1], [0.9, 0.9], [0.1, 0.9], [0.9, 0.1]];
+        assert_eq!(
+            generate_visual_hull_mesh(
+                &bowtie,
+                &square(0.1, 0.9),
+                None,
+                VisualHullOptions::default()
+            )
+            .unwrap_err(),
+            VisualHullError::SelfIntersectingContour
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_resolution_and_dimensions() {
+        let contour = square(0.1, 0.9);
+        let options = VisualHullOptions {
+            resolution: 8,
+            ..VisualHullOptions::default()
+        };
+        assert_eq!(
+            generate_visual_hull_mesh(&contour, &contour, None, options).unwrap_err(),
+            VisualHullError::InvalidResolution
+        );
+        let options = VisualHullOptions {
+            resolution: 16,
+            width: f32::INFINITY,
+            ..VisualHullOptions::default()
+        };
+        assert_eq!(
+            generate_visual_hull_mesh(&contour, &contour, None, options).unwrap_err(),
+            VisualHullError::InvalidDimensions
+        );
+    }
+}
