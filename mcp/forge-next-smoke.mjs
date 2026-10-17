@@ -193,6 +193,7 @@ try {
     return{embedded,referenceCount:refs.length,frontOutline:front?.components.reference.outline?.length||0,sideOutline:side?.components.reference.outline?.length||0,frontTextureRestored:imageRestored(front),sideTextureRestored:imageRestored(side),hullRestored:!!hull&&!!hull.entity.render?.meshInstances?.length,hullResolution:hull?.components.geometry.resolution||0};
   },sceneBeforeReload);
   if(!assetPersistence.embedded||assetPersistence.referenceCount!==2||assetPersistence.frontOutline!==4||assetPersistence.sideOutline!==4||!assetPersistence.frontTextureRestored||!assetPersistence.sideTextureRestored||!assetPersistence.hullRestored||assetPersistence.hullResolution!==20)throw new Error("Reference/contour/hull project round-trip failed: "+JSON.stringify(assetPersistence));
+  await page.locator('[data-workspace="references"]').click();
   await page.evaluate(()=>{const r=[...window.Forge.entities.values()].find(o=>o.components?.reference?.name==="qa-side-reference.png");window.Forge.select(r.id)});
   await page.locator("#traceSilhouette").click();
   await page.waitForFunction(()=>document.querySelector("#traceDialog").open&&document.querySelector("#tracePointCount").textContent.includes("4 points"),null,{timeout:10000});
