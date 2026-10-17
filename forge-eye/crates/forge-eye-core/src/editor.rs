@@ -71,9 +71,262 @@ impl Transform {
     fn interpolate(a: Self, b: Self, t: f32) -> Self {
         let mix = |x: f32, y: f32| x + (y - x) * t;
         Self {
-            position: std::array::from_fn(|i| mix(a.positio
-…[1 chars truncated — re-run with head/grep/tail for full output]…
-   playing: bool,
+            position: std::array::from_fn(|i| mix(a.position[i], b.position[i])),
+            rotation: std::array::from_fn(|i| mix(a.rotation[i], b.rotation[i])),
+            scale: std::array::from_fn(|i| mix(a.scale[i], b.scale[i])),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Interpolation {
+    Linear,
+    #[default]
+    Ease,
+    Hold,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TransformKeyframe {
+    pub frame: u32,
+    pub transform: Transform,
+    #[serde(default)]
+    pub interpolation: Interpolation,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MaterialState {
+    pub base_color: [f32; 4],
+    pub metalness: f32,
+    pub roughness: f32,
+    pub opacity: f32,
+}
+
+impl Default for MaterialState {
+    fn default() -> Self {
+        Self {
+            base_color: default_color(),
+            metalness: 0.05,
+            roughness: 0.65,
+            opacity: 1.0,
+        }
+    }
+}
+
+impl MaterialState {
+    pub fn validate(&self) -> Result<(), GeometryError> {
+        if self
+            .base_color
+            .iter()
+            .any(|v| !v.is_finite() || !(0.0..=1.0).contains(v))
+        {
+            return Err(GeometryError(
+                "Material base color must be finite RGBA values in [0, 1].".into(),
+            ));
+        }
+        for (name, value) in [
+            ("metalness", self.metalness),
+            ("roughness", self.roughness),
+            ("opacity", self.opacity),
+        ] {
+            if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+                return Err(GeometryError(format!(
+                    "Material {name} must be between 0 and 1."
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ObjectKind {
+    Primitive { primitive: PrimitiveKind },
+    Mesh,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SceneObject {
+    pub id: u64,
+    pub name: String,
+    pub kind: ObjectKind,
+    pub transform: Transform,
+    pub material: MaterialState,
+    pub visible: bool,
+    #[serde(default)]
+    pub mesh: Option<MeshData>,
+    #[serde(default)]
+    pub keyframes: Vec<TransformKeyframe>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TimelineState {
+    pub fps: u32,
+    pub start_frame: u32,
+    pub end_frame: u32,
+    pub current_frame: u32,
+    pub looping: bool,
+    pub playing: bool,
+    pub auto_key: bool,
+}
+
+impl Default for TimelineState {
+    fn default() -> Self {
+        Self {
+            fps: default_fps(),
+            start_frame: 0,
+            end_frame: default_timeline_end(),
+            current_frame: 0,
+            looping: true,
+            playing: false,
+            auto_key: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Scene {
+    pub schema_version: u32,
+    pub next_id: u64,
+    pub selected_id: Option<u64>,
+    pub objects: BTreeMap<u64, SceneObject>,
+    pub timeline: TimelineState,
+}
+
+impl Default for Scene {
+    fn default() -> Self {
+        Self {
+            schema_version: 1,
+            next_id: 1,
+            selected_id: None,
+            objects: BTreeMap::new(),
+            timeline: TimelineState::default(),
+        }
+    }
+}
+
+impl Scene {
+    fn allocate_id(&mut self) -> Result<u64, GeometryError> {
+        let id = self.next_id;
+        self.next_id = self
+            .next_id
+            .checked_add(1)
+            .ok_or_else(|| GeometryError("Scene exhausted its object ID space.".into()))?;
+        Ok(id)
+    }
+
+    pub fn object(&self, id: u64) -> Option<&SceneObject> {
+        self.objects.get(&id)
+    }
+    pub fn object_mut(&mut self, id: u64) -> Option<&mut SceneObject> {
+        self.objects.get_mut(&id)
+    }
+
+    fn insert_mesh(&mut self, mesh: MeshData) -> Result<u64, GeometryError> {
+        let id = self.allocate_id()?;
+        let name = mesh.name.clone();
+        self.objects.insert(
+            id,
+            SceneObject {
+                id,
+                name,
+                kind: ObjectKind::Mesh,
+                transform: Transform::default(),
+                material: MaterialState {
+                    base_color: mesh.color,
+                    ..Default::default()
+                },
+                visible: true,
+                mesh: Some(mesh),
+                keyframes: Vec::new(),
+            },
+        );
+        self.selected_id = Some(id);
+        Ok(id)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum EditorCommand {
+    CreatePrimitive {
+        primitive: PrimitiveKind,
+        #[serde(default)]
+        name: Option<String>,
+    },
+    Select {
+        id: Option<u64>,
+    },
+    SetTransform {
+        id: u64,
+        transform: Transform,
+        #[serde(default)]
+        auto_key: bool,
+    },
+    InsertKeyframe {
+        id: u64,
+        frame: u32,
+        #[serde(default)]
+        interpolation: Interpolation,
+    },
+    DeleteObject {
+        id: u64,
+    },
+    SetTimeline {
+        fps: u32,
+        start_frame: u32,
+        end_frame: u32,
+        looping: bool,
+    },
+    SetAutoKey {
+        enabled: bool,
+    },
+    EvaluateFrame {
+        frame: u32,
+    },
+    SetPlaying {
+        playing: bool,
+    },
+    ExtrudeSilhouette {
+        request: ExtrusionRequest,
+    },
+    BuildVisualHull {
+        request: HullRequest,
+    },
+    Undo,
+    Redo,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum CommandResult {
+    Created {
+        id: u64,
+    },
+    Selected {
+        id: Option<u64>,
+    },
+    TransformUpdated {
+        id: u64,
+        keyed: bool,
+    },
+    KeyframeUpdated {
+        id: u64,
+        frame: u32,
+        replaced: bool,
+        count: usize,
+    },
+    Deleted {
+        id: u64,
+    },
+    TimelineUpdated,
+    FrameEvaluated {
+        frame: u32,
+    },
+    PlaybackUpdated {
+        playing: bool,
     },
     MeshCreated {
         id: u64,
@@ -602,3 +855,4 @@ mod tests {
         assert_eq!(before, s.scene);
     }
 }
+
