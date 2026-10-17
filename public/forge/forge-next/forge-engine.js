@@ -219,6 +219,45 @@ export class ForgeEngine{
     out.components.material={color:[...color],metalness:0.05,roughness:0.65,opacity:1};
     return out;
   }
+  createLathedProfileMesh({name="Lathed Profile",profile=[],diameter=.08,height=.25,segments=32,color=[.42,.62,.76],record=null}={}){
+    const pts=profile.map(p=>[Number(p[0]),Number(p[1])]);
+    if(pts.length<3||pts.length>256)throw new Error("A spin profile needs 3–256 points.");
+    if(pts.some(p=>!Number.isFinite(p[0])||!Number.isFinite(p[1])||p[0]<0||p[0]>1||p[1]<0||p[1]>1))throw new Error("Profile points must be normalized image coordinates between 0 and 1.");
+    for(let i=1;i<pts.length;i++)if(Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1])<.002)throw new Error("Two profile points are almost identical. Remove the duplicate point.");
+    const d=Math.max(.001,Math.min(1000,Number(diameter)||.08)),h=Math.max(.001,Math.min(1000,Number(height)||.25)),seg=Math.max(12,Math.min(128,Math.round(Number(segments)||32)));
+    const axisX=.5,radialExtent=Math.max(...pts.map(p=>Math.abs(p[0]-axisX))),yMin=Math.min(...pts.map(p=>p[1])),yMax=Math.max(...pts.map(p=>p[1]));
+    if(radialExtent<.015)throw new Error("The profile is too close to the rotation axis. Trace from the centerline out to the bottle edge.");
+    if(yMax-yMin<.05)throw new Error("The profile height is too small. Trace from the bottom to the top of the reference.");
+    const positions=[],indices=[];
+    for(const p of pts){
+      const radius=Math.abs(p[0]-axisX)/radialExtent*(d/2),y=((yMax-p[1])/(yMax-yMin))*h-h/2;
+      for(let j=0;j<seg;j++){
+        const theta=j/seg*Math.PI*2;
+        positions.push(Math.cos(theta)*radius,y,Math.sin(theta)*radius);
+      }
+    }
+    for(let i=0;i<pts.length-1;i++){
+      const radiusA=Math.abs(pts[i][0]-axisX)/radialExtent*(d/2),radiusB=Math.abs(pts[i+1][0]-axisX)/radialExtent*(d/2);
+      if(radiusA<1e-6&&radiusB<1e-6)continue;
+      for(let j=0;j<seg;j++){
+        const n=(j+1)%seg,a=i*seg+j,b=i*seg+n,c=(i+1)*seg+j,e=(i+1)*seg+n;
+        if(radiusA<1e-6){indices.push(a,c,e)}
+        else if(radiusB<1e-6){indices.push(a,c,b)}
+        else indices.push(a,c,b,b,c,e);
+      }
+    }
+    if(indices.length<seg*3)throw new Error("Could not create a usable revolved surface from this profile.");
+    const mesh=new pc.Mesh(this.app.graphicsDevice);mesh.setPositions(positions);mesh.setIndices(indices);mesh.setNormals(pc.calculateNormals(positions,indices));mesh.update();
+    const mat=this.material(color);mat.cull=pc.CULLFACE_NONE;mat.update();const instance=new pc.MeshInstance(mesh,mat);
+    let out=record;if(!out){const entity=new pc.Entity(name);this.root.addChild(entity);out=this.rec(name,"mesh",entity)}
+    out.name=name;out.kind="mesh";out.entity.name=name;if(out.entity.render)out.entity.removeComponent("render");
+    out.entity.addComponent("render",{meshInstances:[instance]});out.entity.render.layers=[pc.LAYERID_WORLD];out.entity.render.frustumCulling=false;
+    out.entity.setLocalPosition(0,h/2,0);out.entity.setLocalEulerAngles(0,0,0);out.entity.setLocalScale(1,1,1);
+    out.components.geometry={kind:"lathe-profile",version:1,profile:pts,diameter:d,height:h,segments:seg,axis:"Y",revolveDegrees:360,color:[...color],sourceName:String(name)};
+    out.components.material={color:[...color],metalness:.04,roughness:.32,opacity:1};
+    out.components.diagnostics={method:"spin / lathe profile",vertices:positions.length/3,triangles:indices.length/3,segments:seg,profilePoints:pts.length,revolveDegrees:360};
+    return out;
+  }
   createSilhouetteVisualHull({name="Multi-view Silhouette Hull",frontContour=[],sideContour=[],topContour=[],width=3,height=2,depth=3,resolution=32,color=[.3,.62,.78],record=null}={}){
     const front=frontContour.map(p=>[Number(p[0]),Number(p[1])]),side=sideContour.map(p=>[Number(p[0]),Number(p[1])]),top=topContour.map(p=>[Number(p[0]),Number(p[1])]);
     triangulateContour(front);triangulateContour(side);if(top.length)triangulateContour(top);
@@ -308,6 +347,7 @@ export class ForgeEngine{
       r.components=d.components||{};
       if(d.components?.geometry?.kind==="extruded-silhouette")this.createExtrudedSilhouette({record:r,name:d.name,...d.components.geometry});
       else if(d.components?.geometry?.kind==="silhouette-visual-hull")this.createSilhouetteVisualHull({record:r,name:d.name,...d.components.geometry});
+      else if(d.components?.geometry?.kind==="lathe-profile")this.createLathedProfileMesh({record:r,name:d.name,...d.components.geometry});
       if(d.components?.material){
         const previous=this.selectedId;
         this.selectedId=r.id; this.applyMaterial(d.components.material); this.selectedId=previous;
