@@ -298,7 +298,15 @@ try {
     await page.waitForFunction(()=>document.documentElement.dataset.forgeWorkspace==="animation"&&!document.querySelector("#timelinePanel").hidden,null,{timeout:5000});
     const timelineVisible=await page.evaluate(()=>{const e=document.querySelector("#timelinePanel"),r=e.getBoundingClientRect();return r.width>0&&r.height>0&&r.bottom<=innerHeight-document.querySelector(".mobile-panel-bar").getBoundingClientRect().height+2});
     if(!timelineVisible)throw new Error("Mobile Animation workspace does not leave the timeline accessible at "+viewport.width+"px.");
-    mobileReports.push({...base,timelineVisible});
+    await page.locator('[data-timeline-view="graph"]').click();
+    await page.waitForFunction(()=>!document.querySelector("#graphEditorPane").hidden&&document.querySelector("#timelineDopeSheet").hidden,null,{timeout:5000});
+    const graphMobile=await page.evaluate(()=>{const c=document.querySelector("#graphEditorCanvas"),r=c.getBoundingClientRect();return{visible:r.width>220&&r.height>60,bounds:{width:Math.round(r.width),height:Math.round(r.height)},channel:document.querySelector("#graphChannelSummary").textContent,rootOverflow:document.documentElement.scrollWidth-innerWidth,metrics:!!c.__graphMetrics}});
+    if(!graphMobile.visible||graphMobile.rootOverflow>1||!graphMobile.metrics)throw new Error("Graph Editor is not usable on mobile at "+viewport.width+"px: "+JSON.stringify(graphMobile));
+    await page.locator("#graphChannel").selectOption("r1");
+    await page.waitForFunction(()=>document.querySelector("#graphChannelSummary").textContent==="Rotation Y",null,{timeout:5000});
+    await page.locator('[data-timeline-view="dopesheet"]').click();
+    await page.waitForFunction(()=>!document.querySelector("#timelineDopeSheet").hidden&&document.querySelector("#graphEditorPane").hidden,null,{timeout:5000});
+    mobileReports.push({...base,timelineVisible,graphMobile});
     await page.screenshot({path:path.join(ARTIFACTS,"forge-next-mobile-"+viewport.width+".png"),fullPage:true});
   }
   await page.evaluate(()=>{window.Forge.timelinePlaying=false;window.Forge.running=false});
