@@ -482,7 +482,7 @@ async function __wbg_init(module_or_path) {
         if (!response.ok) {
             throw new Error(`Failed to fetch embedded Forge Eye WASM: ${response.status} ${response.statusText}`);
         }
-        const encoded = (await response.text()).replace(/\\s+/g, '');
+        const encoded = (await response.text()).replace(/\s+/g, '');
         if (!encoded || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) {
             throw new Error('Embedded Forge Eye WASM is not valid base64 text.');
         }
