@@ -73,8 +73,8 @@ try {
   await page.locator('[data-view="perspective"]').click();
   await page.waitForFunction(()=>window.Forge.viewMode==="perspective",null,{timeout:5000});
   await page.locator('[data-tool="translate"]').click();
-  const moveTool=await page.evaluate(()=>({mode:window.ForgeGizmo.state.mode,active:document.querySelector('[data-tool="translate"]').classList.contains("is-active")}));
-  if(moveTool.mode!=="translate"||!moveTool.active)throw new Error("Move tool state failed: "+JSON.stringify(moveTool));
+  const moveTool=await page.evaluate(()=>({mode:window.ForgeGizmo.state.mode,active:document.querySelector('[data-tool="translate"]').classList.contains("is-active"),size:window.ForgeGizmo.state.gizmos.translate.size}));
+  if(moveTool.mode!=="translate"||!moveTool.active||Math.abs(moveTool.size-.55)>.001)throw new Error("Move tool state or viewport gizmo scale failed: "+JSON.stringify(moveTool));
 
   // Materials and timeline are separate workspaces. Preview state never toggles timeline playback.
   await page.locator('[data-workspace="materials"]').click();
