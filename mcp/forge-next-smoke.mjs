@@ -253,6 +253,10 @@ try {
   await page.locator("#traceClose").click();
   await page.waitForFunction(()=>!document.querySelector("#traceDialog").open,null,{timeout:5000});
 
+  // Isolate the rotational-modeling test from earlier reference volumes so the bottle can be visually inspected.
+  await page.evaluate(()=>{window.Forge.resetScene(true);window.ForgeRefreshUI?.()});
+  await page.waitForFunction(()=>window.Forge.entities.size===3,null,{timeout:5000});
+
   // Follow the video technique: trace a bottle's radial cross-section, then Spin 360 degrees.
   await page.locator('[data-workspace="references"]').click();
   await page.waitForFunction(()=>!document.querySelector('[data-inspector-panel="references"]').hidden,null,{timeout:5000});
