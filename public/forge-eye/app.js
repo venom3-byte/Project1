@@ -19,8 +19,21 @@ function notifyEngine(message){console.info("[Forge Eye Engine]",message)}
 async function boot(){
   try{
     setStatus("Loading Rust WebAssembly core…");
-    const encoded=await fetch("./pkg/forge_eye_wasm_bg.wasm.b64",{cache:"no-store"}).then(r=>{if(!r.ok)throw new Error("Rust WASM binary returned HTTP "+r.status);return r.text()});
-    const bytes=Uint8Array.from(atob(encoded.replace(/\s+/g,"")),c=>c.charCodeAt(0));await initWasm(bytes);
+    const partUrls=Array.from({length:4},(_,i)=>"./pkg/forge_eye_wasm_bg.wasm.gz.b64."+String(i).padStart(2,"0"));
+    const parts=await Promise.all(partUrls.map(async url=>{
+      const response=await fetch(url,{cache:"no-store"});
+      if(!response.ok)throw new Error("Rust WASM payload shard returned HTTP "+response.status+": "+url);
+      const text=(await response.text()).trim();
+      if(!text||!/^[A-Za-z0-9+/]+={0,2}$/.test(text))throw new Error("Rust WASM payload shard is corrupt: "+url);
+      return text;
+    }));
+    const encoded=parts.join("");
+    const compressed=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));
+    if(typeof DecompressionStream!=="function")throw new Error("This browser does not support gzip streams required by the Forge Eye WASM loader.");
+    const stream=new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip"));
+    const bytes=new Uint8Array(await new Response(stream).arrayBuffer());
+    if(bytes.length<1000||bytes[0]!==0||bytes[1]!==97||bytes[2]!==115||bytes[3]!==109)throw new Error("Decoded Rust module failed the WebAssembly magic/header check.");
+    await initWasm(bytes);
     state.wasm={ForgeEyeSession,engine_version,validate_contour_json};state.session=new ForgeEyeSession();state.scene=JSON.parse(state.session.scene_json());
     const mod=await import("./runtime/forge-engine.js");state.pc=mod.pc;window.ForgePC=mod.pc;state.engine=new mod.ForgeEngine($("#viewport"),notifyEngine);await state.engine.init();window.Forge=state.engine;
     await import("./runtime/forge-viewport.js");attachRendererEvents();
