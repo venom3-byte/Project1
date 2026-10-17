@@ -236,6 +236,169 @@ function graphPointerDown(event){
   setTimelineFrame(Math.round(clamp((point[0]-metrics.pad.left)/metrics.plotW,0,1,0)*240));
 }
 function toggleAutoKey(){state.autoKey=!state.autoKey;state.engine.autoKey=state.autoKey;state.engine.keyInterpolation=$("#keyInterpolation").value;refreshTimeline();status(state.autoKey?"Auto-key enabled for transforms":"Auto-key disabled")}
+
+function medianNumber(values){
+  if(!values.length)return 0;const sorted=[...values].sort((a,b)=>a-b),m=sorted.length>>1;
+  return sorted.length%2?sorted[m]:(sorted[m-1]+sorted[m])/2;
+}
+function contourArea(points){
+  let area=0;for(let i=0;i<points.length;i++){const a=points[i],b=points[(i+1)%points.length];area+=a[0]*b[1]-b[0]*a[1]}return area/2;
+}
+function pointLineDistance(point,a,b){
+  const dx=b[0]-a[0],dy=b[1]-a[1],den=dx*dx+dy*dy;
+  const t=clamp(((point[0]-a[0])*dx+(point[1]-a[1])*dy)/(den||1),0,1,0);
+  return Math.hypot(point[0]-(a[0]+t*dx),point[1]-(a[1]+t*dy));
+}
+function simplifyOpenPath(points,tolerance){
+  if(points.length<=2)return points.slice();
+  const keep=new Uint8Array(points.length);keep[0]=1;keep[points.length-1]=1;const stack=[[0,points.length-1]],tol2=tolerance*tolerance;
+  while(stack.length){
+    const [start,end]=stack.pop();let max=tol2,index=-1;
+    for(let i=start+1;i<end;i++){const distance=pointLineDistance(points[i],points[start],points[end]);if(distance*distance>max){max=distance*distance;index=i}}
+    if(index>=0){keep[index]=1;stack.push([start,index],[index,end])}
+  }
+  return points.filter((_,i)=>keep[i]);
+}
+function simplifyClosedPath(points){
+  if(points.length<=12)return points;
+  let farthest=1,max=0;for(let i=1;i<points.length;i++){const d=(points[i][0]-points[0][0])**2+(points[i][1]-points[0][1])**2;if(d>max){max=d;farthest=i}}
+  const a=points.slice(0,farthest+1),b=points.slice(farthest).concat([points[0]]);
+  let tolerance=1.25,result;
+  do{
+    const left=simplifyOpenPath(a,tolerance),right=simplifyOpenPath(b,tolerance);
+    result=left.slice(0,-1).concat(right.slice(0,-1));tolerance*=1.35;
+  }while(result.length>180&&tolerance<Math.max(5,Math.min(40,Math.max(...points.map(p=>p[0]))*.08)));
+  if(result.length>180){
+    const stride=Math.ceil(result.length/180);result=result.filter((_,i)=>i%stride===0);
+  }
+  return result;
+}
+function maskOuterContour(mask,width,height){
+  const edges=[],outgoing=new Map(),key=(x,y)=>y*(width+1)+x;
+  const add=(x1,y1,x2,y2)=>{
+    const edge={a:[x1,y1],b:[x2,y2],used:false,dir:Math.abs(x2-x1)>0?(x2>x1?0:2):(y2>y1?1:3)},id=edges.length,k=key(x1,y1);
+    edges.push(edge);if(!outgoing.has(k))outgoing.set(k,[]);outgoing.get(k).push(id);
+  };
+  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+    const at=y*width+x;if(!mask[at])continue;
+    if(y===0||!mask[at-width])add(x,y,x+1,y);
+    if(x===width-1||!mask[at+1])add(x+1,y,x+1,y+1);
+    if(y===height-1||!mask[at+width])add(x+1,y+1,x,y+1);
+    if(x===0||!mask[at-1])add(x,y+1,x,y);
+  }
+  const loops=[];
+  for(let id=0;id<edges.length;id++){
+    if(edges[id].used)continue;const start=edges[id].a,loop=[];let current=id,closed=false,guard=0;
+    while(guard++<=edges.length){
+      const edge=edges[current];if(edge.used)break;edge.used=true;loop.push(edge.a);
+      const end=edge.b;if(end[0]===start[0]&&end[1]===start[1]){closed=true;break}
+      const candidates=(outgoing.get(key(end[0],end[1]))||[]).filter(next=>!edges[next].used);if(!candidates.length)break;
+      const prev=edge.dir,rank=dir=>{
+        const turn=(dir-prev+4)%4;return turn===1?0:turn===0?1:turn===3?2:3;
+      };
+      candidates.sort((a,b)=>rank(edges[a].dir)-rank(edges[b].dir));current=candidates[0];
+    }
+    if(closed&&loop.length>=8&&Math.abs(contourArea(loop))>20)loops.push(loop);
+  }
+  if(!loops.length)throw new Error("Could not follow a stable outer contour. Use a clean cutout or trace the outline manually.");
+  loops.sort((a,b)=>Math.abs(contourArea(b))-Math.abs(contourArea(a)));
+  return simplifyClosedPath(loops[0]);
+}
+async function extractForegroundFromBitmap(sourceBitmap,{maxSide=560}={}){
+  const scale=Math.min(1,maxSide/Math.max(sourceBitmap.width,sourceBitmap.height)),width=Math.max(1,Math.round(sourceBitmap.width*scale)),height=Math.max(1,Math.round(sourceBitmap.height*scale)),canvas=document.createElement("canvas");
+  canvas.width=width;canvas.height=height;const ctx=canvas.getContext("2d",{willReadFrequently:true});if(!ctx)throw new Error("Could not create the image-analysis canvas.");
+  ctx.clearRect(0,0,width,height);ctx.drawImage(sourceBitmap,0,0,width,height);
+  const pixels=ctx.getImageData(0,0,width,height).data,total=width*height,edge=[],step=Math.max(1,Math.floor(Math.min(width,height)/120));
+  for(let x=0;x<width;x+=step){edge.push((x)*4,((height-1)*width+x)*4)}
+  for(let y=0;y<height;y+=step){edge.push((y*width)*4,(y*width+width-1)*4)}
+  const borderAlpha=edge.map(i=>pixels[i+3]),transparent=borderAlpha.filter(a=>a<24).length>borderAlpha.length*.25;
+  let tolerance=36,background=[255,255,255];
+  if(!transparent){
+    const channels=[[],[],[]];for(const i of edge){channels[0].push(pixels[i]);channels[1].push(pixels[i+1]);channels[2].push(pixels[i+2])}
+    background=channels.map(medianNumber);
+    const distances=[];for(const i of edge)distances.push(Math.hypot(pixels[i]-background[0],pixels[i+1]-background[1],pixels[i+2]-background[2]));
+    tolerance=clamp(24+medianNumber(distances)*2.4,24,76,36);
+  }
+  const nearBackground=new Uint8Array(total);
+  for(let i=0;i<total;i++){
+    const at=i*4;
+    if(transparent)nearBackground[i]=pixels[at+3]<40?1:0;
+    else nearBackground[i]=(Math.hypot(pixels[at]-background[0],pixels[at+1]-background[1],pixels[at+2]-background[2])<=tolerance)?1:0;
+  }
+  const backgroundFlood=new Uint8Array(total),queue=new Int32Array(total);let head=0,tail=0;
+  const enqueue=idx=>{if(idx>=0&&idx<total&&nearBackground[idx]&&!backgroundFlood[idx]){backgroundFlood[idx]=1;queue[tail++]=idx}};
+  for(let x=0;x<width;x++){enqueue(x);enqueue((height-1)*width+x)}
+  for(let y=0;y<height;y++){enqueue(y*width);enqueue(y*width+width-1)}
+  while(head<tail){
+    const i=queue[head++],x=i%width,y=(i/width)|0;
+    if(x>0)enqueue(i-1);if(x<width-1)enqueue(i+1);if(y>0)enqueue(i-width);if(y<height-1)enqueue(i+width);
+  }
+  const foreground=new Uint8Array(total);let foregroundCount=0;
+  for(let i=0;i<total;i++)if(!backgroundFlood[i]&&(transparent?pixels[i*4+3]>40:true)){foreground[i]=1;foregroundCount++}
+  if(foregroundCount<Math.max(40,total*.002)||foregroundCount>total*.92)throw new Error("Background separation was ambiguous. Use a transparent/plain-background image or draw the outline manually.");
+  // Keep the largest connected foreground component so shadows and unrelated marks don't become geometry.
+  const visited=new Uint8Array(total),componentQueue=new Int32Array(total);let largest=[],largestBounds=null;
+  for(let i=0;i<total;i++){
+    if(!foreground[i]||visited[i])continue;
+    let qh=0,qt=0,minX=width,minY=height,maxX=0,maxY=0;componentQueue[qt++]=i;visited[i]=1;
+    while(qh<qt){
+      const cur=componentQueue[qh++],x=cur%width,y=(cur/width)|0;minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);
+      for(let yy=Math.max(0,y-1);yy<=Math.min(height-1,y+1);yy++)for(let xx=Math.max(0,x-1);xx<=Math.min(width-1,x+1);xx++){
+        const n=yy*width+xx;if(foreground[n]&&!visited[n]){visited[n]=1;componentQueue[qt++]=n}
+      }
+    }
+    if(qt>largest.length){largest=Array.from(componentQueue.subarray(0,qt));largestBounds={minX,minY,maxX,maxY}}
+  }
+  if(!largestBounds||largest.length<Math.max(40,total*.002))throw new Error("Could not isolate a main foreground object.");
+  const mask=new Uint8Array(total);for(const idx of largest)mask[idx]=1;
+  const contourPixels=maskOuterContour(mask,width,height),contour=contourPixels.map(p=>[p[0]/width,p[1]/height]);
+  const rows=[];
+  for(let y=largestBounds.minY;y<=largestBounds.maxY;y++){
+    let min=width,max=-1,count=0;for(let x=largestBounds.minX;x<=largestBounds.maxX;x++)if(mask[y*width+x]){min=Math.min(min,x);max=Math.max(max,x);count++}
+    if(max>=min)rows.push({y,min,max,count,radius:0,center:(min+max)/2});
+  }
+  const maxSpan=Math.max(...rows.map(row=>row.max-row.min+1));
+  const centers=rows.filter(row=>row.max-row.min+1>=maxSpan*.2).map(row=>row.center),axis=medianNumber(centers.length?centers:rows.map(row=>row.center));
+  for(const row of rows)row.radius=Math.max(Math.abs(row.min-axis),Math.abs(row.max-axis));
+  const symmetrySamples=rows.filter(row=>row.max-row.min+1>=maxSpan*.25),symmetryError=symmetrySamples.length?medianNumber(symmetrySamples.map(row=>Math.abs((row.max-axis)-(axis-row.min))/Math.max(1,row.max-row.min+1))):1;
+  return{bitmap:canvas,width,height,mask,contour,bounds:largestBounds,foregroundRatio:largest.length/total,axisX:axis/width,symmetryScore:clamp(1-symmetryError,0,1,0),rows,maxRadius:Math.max(...rows.map(row=>row.radius)),tolerance,transparent};
+}
+function sampleRadiusAtY(segmentation,y){
+  const rows=segmentation.rows;let nearest=null,distance=Infinity;
+  for(const row of rows){const d=Math.abs(row.y-y);if(d<distance){distance=d;nearest=row}}
+  if(!nearest)return 0;
+  const neighborhood=rows.filter(row=>Math.abs(row.y-y)<=2).map(row=>row.radius);
+  return medianNumber(neighborhood.length?neighborhood:[nearest.radius]);
+}
+function profileFromLatheSilhouette(segmentation,{diameter=.08,height=.25,wallThickness=.002,baseThickness=.003}={}){
+  const {width:w,height:h,bounds}=segmentation,axis=segmentation.axisX,maxRadius=segmentation.maxRadius;
+  if(!bounds||maxRadius<8)throw new Error("The object silhouette is too narrow for a stable rotation axis.");
+  if(segmentation.symmetryScore<.58)throw new Error("This silhouette is not close enough to rotationally symmetric for automatic Spin. Use manual half-profile tracing or the multi-view volume workflow instead.");
+  const yTop=bounds.minY,yBottom=bounds.maxY,span=yBottom-yTop;
+  if(span<20)throw new Error("The bottle silhouette is too short. Use a larger, tightly cropped reference image.");
+  const d=clamp(diameter,.001,1000,.08),hReal=clamp(height,.001,1000,.25),wall=clamp(wallThickness,.0001,Math.min(1,d*.25),.002),base=clamp(baseThickness,.0001,Math.min(1,hReal*.25),.003);
+  const radialExtent=.45,wallN=clamp(wall/(d/2)*radialExtent,.003,radialExtent*.35,.02),yBottomN=yBottom/h,yTopN=yTop/h,baseN=clamp(base/hReal*(yBottomN-yTopN),.004,(yBottomN-yTopN)*.2,.015),innerBottomY=yBottomN-baseN;
+  const sampleCount=Math.max(24,Math.min(64,Math.ceil(span/3))),yValues=[];
+  for(let i=0;i<sampleCount;i++)yValues.push(yBottom-(span*i/(sampleCount-1)));
+  const radiusNorm=y=>clamp(sampleRadiusAtY(segmentation,y)/maxRadius*radialExtent,0,radialExtent,0);
+  const profile=[[.5,yBottomN],[.5+radiusNorm(yBottom),yBottomN]];
+  let lastOuterY=yBottomN;
+  for(const y of yValues.slice(1)){
+    const yy=y/h;if(yy>=yTopN&&yy<lastOuterY-.0005){profile.push([.5+radiusNorm(y),yy]);lastOuterY=yy}
+  }
+  const topRadius=radiusNorm(yTop),innerTop=Math.max(0,topRadius-wallN);
+  if(Math.hypot(profile[profile.length-1][0]-(.5+innerTop),profile[profile.length-1][1]-yTopN)>.002)profile.push([.5+innerTop,yTopN]);
+  for(const y of yValues.slice().reverse().slice(1)){
+    const yy=y/h;if(yy>yTopN+.0005&&yy<innerBottomY-.0005){
+      const innerRadius=Math.max(0,radiusNorm(y)-wallN);profile.push([.5+innerRadius,yy]);
+    }
+  }
+  profile.push([.5,innerBottomY]);
+  const clean=[];for(const point of profile)if(!clean.length||Math.hypot(point[0]-clean[clean.length-1][0],point[1]-clean[clean.length-1][1])>=.002)clean.push(point);
+  if(clean.length<12)throw new Error("Automatic bottle profile was too simple. Use manual tracing to refine the walls and rim.");
+  return{profile:clean,wallThickness:wall,baseThickness:base,axisX:axis,foregroundRatio:segmentation.foregroundRatio,symmetryScore:segmentation.symmetryScore,sourceBounds:bounds};
+}
+
 function configureTraceDialog(mode){
   const lathe=mode==="lathe-profile";
   $("#traceDialogTitle").textContent=lathe?"Trace lathe / spin profile":"Trace image silhouette";
