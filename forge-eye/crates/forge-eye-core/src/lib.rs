@@ -17,6 +17,8 @@ const EPSILON: f32 = 1.0e-6;
 const MAX_CONTOUR_POINTS: usize = 512;
 const MIN_RESOLUTION: usize = 8;
 const MAX_RESOLUTION: usize = 64;
+const MIN_LATHE_SEGMENTS: usize = 12;
+const MAX_LATHE_SEGMENTS: usize = 128;
 
 /// A normalized 2D image coordinate. Origin is top-left; both axes are in [0, 1].
 pub type Point2 = [f32; 2];
@@ -95,6 +97,19 @@ pub struct ExtrusionRequest {
     pub width: f32,
     pub height: f32,
     pub depth: f32,
+    #[serde(default = "default_color")]
+    pub color: [f32; 4],
+}
+
+/// A normalized half-section spun around the Y axis. The contour must close
+/// around the wall section (outer base → outside → rim → inside → inner base).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct LatheRequest {
+    pub name: String,
+    pub profile: Vec<Point2>,
+    pub diameter: f32,
+    pub height: f32,
+    pub segments: usize,
     #[serde(default = "default_color")]
     pub color: [f32; 4],
 }
@@ -439,6 +454,95 @@ pub fn build_extruded_silhouette(request: &ExtrusionRequest) -> Result<MeshData,
     Ok(mesh)
 }
 
+
+/// Builds a closed, 360-degree rotational mesh from a traced half-profile.
+/// Coordinates are normalized image coordinates; x=0.5 is the revolution axis.
+pub fn build_lathed_profile(request: &LatheRequest) -> Result<MeshData, GeometryError> {
+    validate_dimensions(request.diameter, request.height, request.diameter)?;
+    validate_color(request.color)?;
+    if !(MIN_LATHE_SEGMENTS..=MAX_LATHE_SEGMENTS).contains(&request.segments) {
+        return Err(error(format!(
+            "Lathe segments must be between {MIN_LATHE_SEGMENTS} and {MAX_LATHE_SEGMENTS}."
+        )));
+    }
+    validate_contour(&request.profile)?;
+    if request.profile.iter().any(|p| p[0] < 0.0 || p[0] > 1.0 || p[1] < 0.0 || p[1] > 1.0) {
+        return Err(error("Lathe profile coordinates must be normalized to [0, 1]."));
+    }
+
+    let axis_x = 0.5_f32;
+    let radial_extent = request.profile.iter().map(|p| (p[0] - axis_x).abs()).fold(0.0_f32, f32::max);
+    let min_y = request.profile.iter().map(|p| p[1]).fold(f32::INFINITY, f32::min);
+    let max_y = request.profile.iter().map(|p| p[1]).fold(f32::NEG_INFINITY, f32::max);
+    if radial_extent < 0.015 {
+        return Err(error("Lathe profile is too close to the rotation axis; trace out to the outer wall."));
+    }
+    if max_y - min_y < 0.05 {
+        return Err(error("Lathe profile is too short; trace from the base to the top rim."));
+    }
+
+    let seg = request.segments;
+    let mut radii = Vec::with_capacity(request.profile.len());
+    let mut rings: Vec<Vec<Point3>> = Vec::with_capacity(request.profile.len());
+    for p in &request.profile {
+        let radius = ((p[0] - axis_x).abs() / radial_extent) * (request.diameter * 0.5);
+        let y = ((max_y - p[1]) / (max_y - min_y)) * request.height - request.height * 0.5;
+        radii.push(radius);
+        let mut ring = Vec::with_capacity(seg);
+        for j in 0..seg {
+            let angle = (j as f32 / seg as f32) * std::f32::consts::TAU;
+            ring.push([angle.cos() * radius, y, angle.sin() * radius]);
+        }
+        rings.push(ring);
+    }
+
+    let mut mesh = MeshData {
+        name: if request.name.trim().is_empty() {
+            "Forge Eye Lathed Mesh".to_owned()
+        } else {
+            request.name.clone()
+        },
+        vertices: Vec::new(),
+        normals: Vec::new(),
+        indices: Vec::new(),
+        color: request.color,
+        diagnostics: MeshDiagnostics {
+            method: "spin / lathe profile".into(),
+            view_count: 1,
+            resolution: seg,
+            ..Default::default()
+        },
+    };
+    for i in 0..rings.len() {
+        let next_profile = (i + 1) % rings.len();
+        let radius_a = radii[i];
+        let radius_b = radii[next_profile];
+        if radius_a <= EPSILON && radius_b <= EPSILON {
+            continue;
+        }
+        for j in 0..seg {
+            let next_angle = (j + 1) % seg;
+            let a = rings[i][j];
+            let b = rings[i][next_angle];
+            let c = rings[next_profile][j];
+            let d = rings[next_profile][next_angle];
+            if radius_a <= EPSILON {
+                push_flat_triangle(&mut mesh, [a, c, d])?;
+            } else if radius_b <= EPSILON {
+                push_flat_triangle(&mut mesh, [a, c, b])?;
+            } else {
+                push_flat_triangle(&mut mesh, [a, c, b])?;
+                push_flat_triangle(&mut mesh, [b, c, d])?;
+            }
+        }
+    }
+    if mesh.indices.len() < seg * 3 {
+        return Err(error("Lathe profile did not produce a valid rotational surface."));
+    }
+    finish_diagnostics(&mut mesh);
+    Ok(mesh)
+}
+
 fn validate_dimensions(width: f32, height: f32, depth: f32) -> Result<(), GeometryError> {
     for (name, value) in [("width", width), ("height", height), ("depth", depth)] {
         if !value.is_finite() || value <= 0.0 || value > 10_000.0 {
@@ -546,6 +650,11 @@ fn push_triangle(mesh: &mut MeshData, p: [Point3; 3], normal: Point3) -> Result<
     mesh.normals.extend([normal; 3]);
     mesh.indices.extend([base, base + 1, base + 2]);
     Ok(())
+}
+fn push_flat_triangle(mesh: &mut MeshData, p: [Point3; 3]) -> Result<(), GeometryError> {
+    let normal = normalize3(cross3(sub3(p[1], p[0]), sub3(p[2], p[0])))
+        .ok_or_else(|| error("Degenerate lathe triangle."))?;
+    push_triangle(mesh, p, normal)
 }
 fn push_flat_quad(mesh: &mut MeshData, p: [Point3; 4]) -> Result<(), GeometryError> {
     let u = sub3(p[1], p[0]);
@@ -713,6 +822,50 @@ mod tests {
                 .contains("resolution")
         );
     }
+    fn bottle_profile() -> Vec<Point2> {
+        vec![
+            [0.80, 0.90], [0.80, 0.78], [0.70, 0.68], [0.61, 0.56],
+            [0.58, 0.43], [0.58, 0.18], [0.55, 0.11], [0.53, 0.18],
+            [0.53, 0.43], [0.56, 0.58], [0.67, 0.70], [0.76, 0.79],
+            [0.76, 0.88],
+        ]
+    }
+
+    #[test]
+    fn lathe_profile_builds_a_closed_rotational_mesh() {
+        let request = LatheRequest {
+            name: "Bottle".into(),
+            profile: bottle_profile(),
+            diameter: 0.08,
+            height: 0.25,
+            segments: 32,
+            color: default_color(),
+        };
+        let mesh = build_lathed_profile(&request).unwrap();
+        assert!(mesh.diagnostics.triangle_count > request.segments * request.profile.len());
+        assert_eq!(mesh.diagnostics.vertex_count, mesh.indices.len());
+        assert_eq!(mesh.diagnostics.resolution, 32);
+        assert_eq!(mesh.diagnostics.method, "spin / lathe profile");
+        assert!((mesh.diagnostics.bounds_min[1] + 0.125).abs() < 1.0e-5);
+        assert!((mesh.diagnostics.bounds_max[1] - 0.125).abs() < 1.0e-5);
+    }
+
+    #[test]
+    fn lathe_profile_rejects_invalid_segments_and_crossing_profile() {
+        let mut request = LatheRequest {
+            name: "Bottle".into(),
+            profile: bottle_profile(),
+            diameter: 0.08,
+            height: 0.25,
+            segments: 8,
+            color: default_color(),
+        };
+        assert!(build_lathed_profile(&request).unwrap_err().0.contains("segments"));
+        request.segments = 32;
+        request.profile = vec![[0.2, 0.2], [0.8, 0.8], [0.2, 0.8], [0.8, 0.2]];
+        assert!(build_lathed_profile(&request).is_err());
+    }
+
     #[test]
     fn serializes_mesh_diagnostics() {
         let req = HullRequest {
