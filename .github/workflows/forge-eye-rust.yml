@@ -66,13 +66,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/forge-eye-preview.log 2>&1 &
-          for attempt in $(seq 1 40); do
-            if curl --fail --silent --max-time 2 http://127.0.0.1:4173/forge-eye/index.html >/tmp/forge-eye-preview.html; then break; fi
+          test -s .output/public/forge-eye/index.html
+          test -s .output/public/forge-eye/forge_eye_core.wasm.gz
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory .output/public > /tmp/forge-eye-preview.log 2>&1 &
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent --max-time 2 http://127.0.0.1:4173/forge-eye/index.html -o /tmp/forge-eye-preview.html; then break; fi
             sleep 1
           done
-          grep -q 'FORGE EYE' /tmp/forge-eye-preview.html
-          curl --fail --silent http://127.0.0.1:4173/forge-eye/forge_eye_core.wasm.gz -o /tmp/forge-eye-served.wasm.gz
+          if ! grep -q 'FORGE EYE' /tmp/forge-eye-preview.html; then
+            cat /tmp/forge-eye-preview.log
+            find .output/public/forge-eye -maxdepth 2 -type f -print
+            exit 1
+          fi
+          curl --fail --silent --show-error --max-time 10 http://127.0.0.1:4173/forge-eye/forge_eye_core.wasm.gz -o /tmp/forge-eye-served.wasm.gz
           gzip -t /tmp/forge-eye-served.wasm.gz
       - name: Test Forge Eye in desktop and mobile Chromium
         env:
