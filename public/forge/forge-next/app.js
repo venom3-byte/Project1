@@ -2,7 +2,7 @@ const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const PREFS_KEY = "forge.next.preferences.v1";
 const defaults = { left:264, right:302, timeline:178, leftCollapsed:false, rightCollapsed:false };
-const state = {engine:null,workspace:"layout",leftPanel:"scene",inspectorPanel:"properties",tool:"select",preview:false,timelinePlaying:false,autoKey:false,snap:false,grid:true,assets:[],trace:null,statusTimer:0,prefs:{...defaults},lastError:null};
+const state = {engine:null,workspace:"layout",leftPanel:"scene",inspectorPanel:"properties",tool:"select",preview:false,timelinePlaying:false,timelineView:"dopesheet",graphChannel:"p0",autoKey:false,snap:false,grid:true,assets:[],trace:null,statusTimer:0,prefs:{...defaults},lastError:null};
 const commands = new Map();
 function registerCommand(name, execute){if(commands.has(name))throw new Error("Duplicate command: "+name);commands.set(name,execute)}
 function clamp(n,min,max,fallback){const v=Number(n);return Number.isFinite(v)?Math.max(min,Math.min(max,v)):fallback}
@@ -154,6 +154,86 @@ function refreshTimeline(){
   };
   renderLane("#timelineKeyMarkers","location");renderLane("#timelineRotationMarkers","rotation");renderLane("#timelineScaleMarkers","scale");
   $("#timelinePlayhead").style.left=(clamp(engine.timelineTime/10,0,1,0)*100)+"%";
+  $("#timelineRuler").hidden=state.timelineView==="graph";
+  $("#timelineDopeSheet").hidden=state.timelineView!=="dopesheet";
+  $("#graphEditorPane").hidden=state.timelineView!=="graph";
+  $$("[data-timeline-view]").forEach(button=>{const active=button.dataset.timelineView===state.timelineView;button.classList.toggle("is-active",active);button.setAttribute("aria-selected",String(active))});
+  $("#graphChannel").value=state.graphChannel;
+  $("#graphChannelSummary").textContent=graphChannelLabel(state.graphChannel);
+  $("#timelineStatusHint").textContent=state.timelineView==="graph"?"Graph Editor · drag a key vertically to edit its value":"Dope Sheet · key = transform at a frame; interpolation creates motion between keys";
+  if(state.timelineView==="graph")drawGraphEditor();
+}
+function graphChannelLabel(channel){
+  const labels={p0:"Location X",p1:"Location Y",p2:"Location Z",r0:"Rotation X",r1:"Rotation Y",r2:"Rotation Z",s0:"Scale X",s1:"Scale Y",s2:"Scale Z"};
+  return labels[channel]||"Location X";
+}
+function graphValues(keys,channel){
+  const group=channel[0],axis=Number(channel[1]);
+  return keys.map(key=>({time:Number(key.time)||0,value:Number((key[group]||[0,0,0])[axis])||0,key}));
+}
+function graphCurveValue(a,b,t){
+  const duration=Math.max(0.0001,b.time-a.time);let f=clamp((t-a.time)/duration,0,1,0);
+  const mode=a.key.interpolation||"linear";
+  if(mode==="constant")f=0;else if(mode==="ease")f=f*f*(3-2*f);
+  return a.value+(b.value-a.value)*f;
+}
+function drawGraphEditor(){
+  const canvas=$("#graphEditorCanvas");if(!canvas||state.timelineView!=="graph")return;
+  const box=canvas.getBoundingClientRect();if(box.width<1||box.height<1)return;
+  const dpr=Math.max(1,Math.min(2,window.devicePixelRatio||1)),w=box.width,h=box.height;
+  if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr)}
+  const ctx=canvas.getContext("2d");if(!ctx)return;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
+  ctx.fillStyle="#0b1219";ctx.fillRect(0,0,w,h);
+  const pad={left:42,right:14,top:12,bottom:22},plotW=Math.max(20,w-pad.left-pad.right),plotH=Math.max(30,h-pad.top-pad.bottom),timeMax=10;
+  const record=selectedRecord(),keys=record?(state.engine.keyframes.get(record.id)||[]):[],values=graphValues(keys,state.graphChannel);
+  const finite=values.map(v=>v.value).filter(Number.isFinite);let min=finite.length?Math.min(...finite):-1,max=finite.length?Math.max(...finite):1;
+  let span=max-min;if(span<1e-4){span=Math.max(Math.abs(max)*.2,.5);min-=span;max+=span}else{min-=span*.16;max+=span*.16}
+  const xFor=t=>pad.left+clamp(t/timeMax,0,1,0)*plotW,yFor=v=>pad.top+(1-clamp((v-min)/(max-min),0,1,.5))*plotH;
+  ctx.font="9px ui-monospace, monospace";ctx.textBaseline="middle";
+  for(let i=0;i<=10;i++){
+    const x=pad.left+plotW*i/10;ctx.strokeStyle=i===0?"#405363":"#253440";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,pad.top);ctx.lineTo(x,pad.top+plotH);ctx.stroke();
+    ctx.fillStyle="#7f96a7";ctx.textAlign="center";ctx.fillText(String(i*24),x,h-10);
+  }
+  for(let i=0;i<=4;i++){
+    const y=pad.top+plotH*i/4,value=max-(max-min)*i/4;ctx.strokeStyle="#253440";ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(pad.left+plotW,y);ctx.stroke();
+    ctx.fillStyle="#8498a7";ctx.textAlign="right";ctx.fillText(Math.abs(value)>=100?value.toFixed(0):value.toFixed(2),pad.left-6,y);
+  }
+  ctx.save();ctx.beginPath();ctx.rect(pad.left,pad.top,plotW,plotH);ctx.clip();
+  if(values.length){
+    ctx.strokeStyle="#72c6ee";ctx.lineWidth=2;ctx.beginPath();
+    if(values.length===1){const point=values[0];ctx.moveTo(xFor(point.time),yFor(point.value));ctx.lineTo(xFor(point.time)+.1,yFor(point.value))}
+    else{
+      ctx.moveTo(xFor(values[0].time),yFor(values[0].value));
+      for(let i=0;i<values.length-1;i++){const a=values[i],b=values[i+1];for(let j=1;j<=16;j++){const t=a.time+(b.time-a.time)*j/16;ctx.lineTo(xFor(t),yFor(graphCurveValue(a,b,t)))}}
+    }
+    ctx.stroke();
+    values.forEach(point=>{const x=xFor(point.time),y=yFor(point.value);ctx.save();ctx.translate(x,y);ctx.rotate(Math.PI/4);ctx.fillStyle="#a7dff8";ctx.strokeStyle="#1a4258";ctx.lineWidth=1.4;ctx.fillRect(-4,-4,8,8);ctx.strokeRect(-4,-4,8,8);ctx.restore()});
+  }
+  const playX=xFor(state.engine.timelineTime||0);ctx.strokeStyle="#e59a67";ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(playX,pad.top);ctx.lineTo(playX,pad.top+plotH);ctx.stroke();
+  ctx.restore();
+  if(!values.length){ctx.fillStyle="#8095a5";ctx.font="11px system-ui, sans-serif";ctx.textAlign="center";ctx.fillText("Insert a keyframe to see the animation curve",pad.left+plotW/2,pad.top+plotH/2)}
+  canvas.__graphMetrics={pad,plotW,plotH,min,max,timeMax,w,h,xFor,yFor};
+}
+function setGraphView(name){
+  state.timelineView=name==="graph"?"graph":"dopesheet";refreshTimeline();
+}
+function graphPointerDown(event){
+  const canvas=$("#graphEditorCanvas"),metrics=canvas.__graphMetrics;if(!metrics)return;
+  const rect=canvas.getBoundingClientRect(),point=[(event.clientX-rect.left),event.clientY-rect.top],record=selectedRecord(),keys=record?(state.engine.keyframes.get(record.id)||[]):[],values=graphValues(keys,state.graphChannel);
+  let nearest=null,distance=14;
+  for(const v of values){const d=Math.hypot(metrics.xFor(v.time)-point[0],metrics.yFor(v.value)-point[1]);if(d<distance){distance=d;nearest=v}}
+  if(nearest){
+    event.preventDefault();event.stopPropagation();const selected=nearest;
+    const move=e=>{
+      const y=e.clientY-rect.top,ratio=clamp(1-(y-metrics.pad.top)/metrics.plotH,0,1,.5),value=metrics.min+ratio*(metrics.max-metrics.min),group=state.graphChannel[0],axis=Number(state.graphChannel[1]);
+      selected.key[group][axis]=value;
+      state.engine.evalAnimation(state.engine.timelineTime);
+      refreshInspector();drawGraphEditor();
+    };
+    const end=()=>{document.removeEventListener("pointermove",move);document.removeEventListener("pointerup",end);document.removeEventListener("pointercancel",end);refreshTimeline();status(graphChannelLabel(state.graphChannel)+" key edited","dirty")};
+    document.addEventListener("pointermove",move);document.addEventListener("pointerup",end,{once:true});document.addEventListener("pointercancel",end,{once:true});return;
+  }
+  setTimelineFrame(Math.round(clamp((point[0]-metrics.pad.left)/metrics.plotW,0,1,0)*240));
 }
 function toggleAutoKey(){state.autoKey=!state.autoKey;state.engine.autoKey=state.autoKey;state.engine.keyInterpolation=$("#keyInterpolation").value;refreshTimeline();status(state.autoKey?"Auto-key enabled for transforms":"Auto-key disabled")}
 function applyReferenceMaterial(record,opacity){
@@ -443,6 +523,10 @@ function bindUI(){
   $("#referenceOpacity").addEventListener("input",()=>$("#referenceOpacityValue").textContent=Math.round(Number($("#referenceOpacity").value)*100)+"%");
   $("#keyInterpolation").addEventListener("change",()=>{state.engine.keyInterpolation=$("#keyInterpolation").value;refreshTimeline()});
   $("#timelineTrack").addEventListener("click",event=>{if(event.target.closest(".timeline-key-marker"))return;const rect=$("#timelineTrack").getBoundingClientRect();setTimelineFrame(Math.round(clamp((event.clientX-rect.left)/Math.max(1,rect.width),0,1,0)*240))});
+  $$("[data-timeline-view]").forEach(button=>button.addEventListener("click",()=>setGraphView(button.dataset.timelineView)));
+  $("#graphChannel").addEventListener("change",event=>{state.graphChannel=event.target.value;refreshTimeline()});
+  $("#graphEditorCanvas").addEventListener("pointerdown",graphPointerDown);
+  window.addEventListener("resize",()=>{if(state.timelineView==="graph")drawGraphEditor()});
   $("#timelineTrack").addEventListener("keydown",event=>{if(event.key==="ArrowLeft"||event.key==="ArrowRight"){event.preventDefault();setTimelineFrame(Number($("#currentFrame").value)+(event.key==="ArrowRight"?1:-1))}});
   $("#projectInput").addEventListener("change",async e=>{const file=e.target.files?.[0];e.target.value="";if(!file)return;try{const data=JSON.parse(await file.text());await window.ForgeProject.load(data);$("#projectName").value=data.meta?.name||file.name.replace(/\.forge\.json$|\.json$/i,"");refreshAll();status("Project loaded")}catch(error){reportError("Project could not be opened",error)}});
   $("#viewportStage").addEventListener("dragover",e=>{e.preventDefault();$("#viewportStage").classList.add("is-dragover")});
