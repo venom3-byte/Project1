@@ -454,7 +454,6 @@ pub fn build_extruded_silhouette(request: &ExtrusionRequest) -> Result<MeshData,
     Ok(mesh)
 }
 
-
 /// Builds a closed, 360-degree rotational mesh from a traced half-profile.
 /// Coordinates are normalized image coordinates; x=0.5 is the revolution axis.
 pub fn build_lathed_profile(request: &LatheRequest) -> Result<MeshData, GeometryError> {
@@ -466,19 +465,41 @@ pub fn build_lathed_profile(request: &LatheRequest) -> Result<MeshData, Geometry
         )));
     }
     validate_contour(&request.profile)?;
-    if request.profile.iter().any(|p| p[0] < 0.0 || p[0] > 1.0 || p[1] < 0.0 || p[1] > 1.0) {
-        return Err(error("Lathe profile coordinates must be normalized to [0, 1]."));
+    if request
+        .profile
+        .iter()
+        .any(|p| p[0] < 0.0 || p[0] > 1.0 || p[1] < 0.0 || p[1] > 1.0)
+    {
+        return Err(error(
+            "Lathe profile coordinates must be normalized to [0, 1].",
+        ));
     }
 
     let axis_x = 0.5_f32;
-    let radial_extent = request.profile.iter().map(|p| (p[0] - axis_x).abs()).fold(0.0_f32, f32::max);
-    let min_y = request.profile.iter().map(|p| p[1]).fold(f32::INFINITY, f32::min);
-    let max_y = request.profile.iter().map(|p| p[1]).fold(f32::NEG_INFINITY, f32::max);
+    let radial_extent = request
+        .profile
+        .iter()
+        .map(|p| (p[0] - axis_x).abs())
+        .fold(0.0_f32, f32::max);
+    let min_y = request
+        .profile
+        .iter()
+        .map(|p| p[1])
+        .fold(f32::INFINITY, f32::min);
+    let max_y = request
+        .profile
+        .iter()
+        .map(|p| p[1])
+        .fold(f32::NEG_INFINITY, f32::max);
     if radial_extent < 0.015 {
-        return Err(error("Lathe profile is too close to the rotation axis; trace out to the outer wall."));
+        return Err(error(
+            "Lathe profile is too close to the rotation axis; trace out to the outer wall.",
+        ));
     }
     if max_y - min_y < 0.05 {
-        return Err(error("Lathe profile is too short; trace from the base to the top rim."));
+        return Err(error(
+            "Lathe profile is too short; trace from the base to the top rim.",
+        ));
     }
 
     let seg = request.segments;
@@ -537,7 +558,9 @@ pub fn build_lathed_profile(request: &LatheRequest) -> Result<MeshData, Geometry
         }
     }
     if mesh.indices.len() < seg * 3 {
-        return Err(error("Lathe profile did not produce a valid rotational surface."));
+        return Err(error(
+            "Lathe profile did not produce a valid rotational surface.",
+        ));
     }
     finish_diagnostics(&mut mesh);
     Ok(mesh)
@@ -824,9 +847,18 @@ mod tests {
     }
     fn bottle_profile() -> Vec<Point2> {
         vec![
-            [0.80, 0.90], [0.80, 0.78], [0.70, 0.68], [0.61, 0.56],
-            [0.58, 0.43], [0.58, 0.18], [0.55, 0.11], [0.53, 0.18],
-            [0.53, 0.43], [0.56, 0.58], [0.67, 0.70], [0.76, 0.79],
+            [0.80, 0.90],
+            [0.80, 0.78],
+            [0.70, 0.68],
+            [0.61, 0.56],
+            [0.58, 0.43],
+            [0.58, 0.18],
+            [0.55, 0.11],
+            [0.53, 0.18],
+            [0.53, 0.43],
+            [0.56, 0.58],
+            [0.67, 0.70],
+            [0.76, 0.79],
             [0.76, 0.88],
         ]
     }
@@ -860,7 +892,12 @@ mod tests {
             segments: 8,
             color: default_color(),
         };
-        assert!(build_lathed_profile(&request).unwrap_err().0.contains("segments"));
+        assert!(
+            build_lathed_profile(&request)
+                .unwrap_err()
+                .0
+                .contains("segments")
+        );
         request.segments = 32;
         request.profile = vec![[0.2, 0.2], [0.8, 0.8], [0.2, 0.8], [0.8, 0.2]];
         assert!(build_lathed_profile(&request).is_err());
