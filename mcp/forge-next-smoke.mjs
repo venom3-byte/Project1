@@ -298,6 +298,49 @@ try {
   if(!latheReload.found||latheReload.segments!==32||latheReload.profile!==13||!latheReload.mesh||latheReload.indexCount<1800||latheReload.savedReferenceProfile!==13||!latheReload.imageEmbedded)throw new Error("Lathe profile or mesh did not survive project reload: "+JSON.stringify(latheReload));
   await page.screenshot({path:path.join(ARTIFACTS,"forge-next-spin-lathe-roundtrip.png"),fullPage:true});
 
+  // Automatic reconstruction: segment a centered bottle silhouette and build a hollow rotational mesh.
+  await page.locator('[data-workspace="references"]').click();
+  await page.waitForFunction(()=>!document.querySelector('[data-inspector-panel="references"]').hidden,null,{timeout:5000});
+  await page.locator("#referenceAxis").selectOption("front");await page.locator("#referenceWidth").fill("0.08");
+  const autoBottlePng=Buffer.from(await page.evaluate(()=>{
+    const c=document.createElement("canvas");c.width=160;c.height=240;const x=c.getContext("2d");
+    x.fillStyle="#f7f7f7";x.fillRect(0,0,c.width,c.height);x.fillStyle="#262626";x.beginPath();
+    x.moveTo(62,220);x.lineTo(98,220);x.lineTo(98,162);x.quadraticCurveTo(124,152,119,129);x.lineTo(102,93);x.lineTo(102,54);x.lineTo(93,54);x.lineTo(93,27);x.lineTo(67,27);x.lineTo(67,54);x.lineTo(58,54);x.lineTo(58,93);x.lineTo(41,129);x.quadraticCurveTo(36,152,62,162);x.closePath();x.fill();
+    return c.toDataURL("image/png").split(",")[1]
+  }),"base64");
+  await page.locator("#referenceInput").setInputFiles({name:"qa-auto-bottle.png",mimeType:"image/png",buffer:autoBottlePng});
+  await page.waitForFunction(()=>[...window.Forge.entities.values()].some(r=>r.components?.reference?.name==="qa-auto-bottle.png"),null,{timeout:10000});
+  await page.locator("#latheDiameter").fill("0.08");await page.locator("#latheHeight").fill("0.25");await page.locator("#latheSegments").selectOption("48");await page.locator("#latheSmoothing").selectOption("2");
+  await page.locator("#latheWallThickness").fill("0.002");await page.locator("#latheBaseThickness").fill("0.003");
+  await page.locator("#autoSpinImage").click();
+  await page.waitForFunction(()=>window.Forge.selected()?.components?.geometry?.kind==="lathe-profile"&&window.Forge.selected()?.components?.geometry?.sourceReference?.method==="auto rotational profile",null,{timeout:15000});
+  const autoSpin=await page.evaluate(()=>{const r=window.Forge.selected(),g=r.components.geometry,d=r.components.diagnostics||{},src=g.sourceReference||{},ref=[...window.Forge.entities.values()].find(x=>x.components?.reference?.name==="qa-auto-bottle.png");return{kind:g.kind,profile:g.profile?.length||0,diameter:g.diameter,height:g.height,segments:g.segments,smoothing:g.smoothing,smoothedProfile:d.smoothedProfilePoints||0,vertices:d.vertices||0,triangles:d.triangles||0,wall:src.wallThickness,base:src.baseThickness,symmetry:src.symmetryScore,source:src.method,savedProfile:ref?.components.reference.latheProfile?.length||0,rendered:r.entity.render?.meshInstances?.length||0}});
+  if(autoSpin.kind!=="lathe-profile"||autoSpin.profile<24||Math.abs(autoSpin.diameter-.08)>.001||Math.abs(autoSpin.height-.25)>.001||autoSpin.segments!==48||autoSpin.smoothing!==2||autoSpin.smoothedProfile<=autoSpin.profile||autoSpin.vertices!==autoSpin.smoothedProfile*autoSpin.segments||autoSpin.triangles<1200||Math.abs(autoSpin.wall-.002)>.0001||Math.abs(autoSpin.base-.003)>.0001||autoSpin.symmetry<.58||autoSpin.source!=="auto rotational profile"||autoSpin.savedProfile!==autoSpin.profile||autoSpin.rendered!==1)throw new Error("One-click automatic Spin reconstruction failed: "+JSON.stringify(autoSpin));
+  await page.screenshot({path:path.join(ARTIFACTS,"forge-next-auto-spin-bottle.png"),fullPage:true});
+
+  // Automatic outer-contour extraction must preserve a concave outline before extrusion.
+  await page.locator('[data-workspace="references"]').click();await page.locator("#referenceAxis").selectOption("front");await page.locator("#referenceWidth").fill("2.4");
+  const irregularPng=Buffer.from(await page.evaluate(()=>{
+    const c=document.createElement("canvas");c.width=180;c.height=140;const x=c.getContext("2d");x.fillStyle="#fafafa";x.fillRect(0,0,c.width,c.height);x.fillStyle="#272727";x.beginPath();
+    const p=[[20,50],[48,24],[76,40],[102,19],[125,48],[112,70],[138,95],[99,109],[80,91],[46,111],[55,78]];
+    p.forEach((q,i)=>i?x.lineTo(q[0],q[1]):x.moveTo(q[0],q[1]));x.closePath();x.fill();return c.toDataURL("image/png").split(",")[1]
+  }),"base64");
+  await page.locator("#referenceInput").setInputFiles({name:"qa-irregular-auto.png",mimeType:"image/png",buffer:irregularPng});
+  await page.waitForFunction(()=>[...window.Forge.entities.values()].some(r=>r.components?.reference?.name==="qa-irregular-auto.png"),null,{timeout:10000});
+  await page.locator("#silhouetteDepth").fill("0.4");await page.locator("#autoSilhouetteModel").click();
+  await page.waitForFunction(()=>window.Forge.selected()?.components?.geometry?.kind==="extruded-silhouette"&&window.Forge.selected()?.components?.geometry?.sourceReference?.method==="automatic outer contour",null,{timeout:15000});
+  const autoSilhouette=await page.evaluate(()=>{const r=window.Forge.selected(),g=r.components.geometry,ref=[...window.Forge.entities.values()].find(x=>x.components?.reference?.name==="qa-irregular-auto.png");return{kind:g.kind,points:g.contour?.length||0,axis:g.axis,width:g.width,height:g.height,depth:g.depth,source:g.sourceReference?.method,rendered:r.entity.render?.meshInstances?.length||0,savedOutline:ref?.components.reference.outline?.length||0,foregroundRatio:ref?.components.reference.autoSegmentation?.foregroundRatio||0}});
+  if(autoSilhouette.kind!=="extruded-silhouette"||autoSilhouette.points<10||autoSilhouette.axis!=="front"||Math.abs(autoSilhouette.width-2.4)>.001||Math.abs(autoSilhouette.depth-.4)>.001||autoSilhouette.source!=="automatic outer contour"||autoSilhouette.rendered!==1||autoSilhouette.savedOutline!==autoSilhouette.points||autoSilhouette.foregroundRatio<.01||autoSilhouette.foregroundRatio>.92)throw new Error("One-click automatic silhouette extraction failed: "+JSON.stringify(autoSilhouette));
+  await page.screenshot({path:path.join(ARTIFACTS,"forge-next-auto-silhouette.png"),fullPage:true});
+
+  // The trace editor should also detect an outline without leaving manual editing mode.
+  await page.locator('[data-workspace="references"]').click();await page.evaluate(()=>{const r=[...window.Forge.entities.values()].find(o=>o.components?.reference?.name==="qa-irregular-auto.png");window.Forge.select(r.id)});
+  await page.locator("#traceSilhouette").click();await page.waitForFunction(()=>document.querySelector("#traceDialog").open,null,{timeout:5000});
+  await page.locator("#traceAutoDetect").click();await page.waitForFunction(()=>document.querySelector("#tracePointCount").textContent.includes("points")&&Number.parseInt(document.querySelector("#tracePointCount").textContent,10)>=10,null,{timeout:10000});
+  const editorAuto=await page.evaluate(()=>({points:Number.parseInt(document.querySelector("#tracePointCount").textContent,10),mode:document.querySelector("#traceModeLabel").textContent,closed:document.querySelector("#tracePointCount").textContent.includes("closed")}));
+  if(editorAuto.points<10||!editorAuto.mode.includes("EXTRUDE"))throw new Error("Trace editor auto-detection did not return a usable outline: "+JSON.stringify(editorAuto));
+  await page.locator("#traceClose").click();await page.waitForFunction(()=>!document.querySelector("#traceDialog").open,null,{timeout:5000});
+
   // Resizing docks must persist layout dimensions without pushing the main page horizontally.
   const leftBefore=await page.evaluate(()=>parseInt(getComputedStyle(document.documentElement).getPropertyValue("--left-dock-width"),10));
   const splitter=page.locator('[data-splitter="left"]');
