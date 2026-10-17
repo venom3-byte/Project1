@@ -275,7 +275,7 @@ try {
   await page.locator("#traceLatheProfile").click();
   await page.waitForFunction(()=>document.querySelector("#traceDialog").open&&document.querySelector("#traceModeLabel").textContent.includes("REVOLVE 360"),null,{timeout:5000});
   const bottleTraceRect=await page.locator("#traceCanvas").boundingBox();
-  const bottleProfile=[[.5,.92],[.82,.92],[.82,.72],[.78,.58],[.66,.45],[.64,.25],[.64,.14],[.56,.14],[.56,.27],[.60,.46],[.73,.65],[.73,.78],[.5,.82]];
+  const bottleProfile=[[.82,.92],[.82,.72],[.78,.58],[.66,.45],[.64,.25],[.64,.14],[.56,.14],[.56,.27],[.60,.46],[.73,.65],[.73,.78],[.56,.92],[.70,.92]];
   for(const [u,v] of bottleProfile)await page.mouse.click(bottleTraceRect.x+bottleTraceRect.width*u,bottleTraceRect.y+bottleTraceRect.height*v);
   const profileCount=await page.locator("#tracePointCount").textContent();
   if(!profileCount?.includes("13 points"))throw new Error("Lathe profile tracer did not record all 13 points: "+profileCount);
