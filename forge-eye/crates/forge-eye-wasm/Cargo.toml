@@ -1,0 +1,16 @@
+[package]
+name = "forge-eye-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "wasm-bindgen API for Forge Eye geometry operations in web editors."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+forge-eye-core = { path = "../forge-eye-core" }
+serde.workspace = true
+serde_json.workspace = true
+wasm-bindgen.workspace = true

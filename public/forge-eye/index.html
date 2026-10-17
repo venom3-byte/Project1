@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en" data-forge-eye="booting">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a0f15">
+  <title>Forge Eye — Rust 3D Studio</title>
+  <link rel="icon" href="./forge-eye.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./index.html" aria-label="Forge Eye home">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 36 36"><path d="M18 2 32 10v16L18 34 4 26V10Z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M11 24V12h14M11 18h10M22 12v12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg></span>
+      <span class="brand-copy"><strong>FORGE EYE</strong><small>RUST 3D STUDIO</small></span>
+    </a>
+    <div class="project-identity">
+      <span class="project-signal"></span>
+      <input id="projectName" aria-label="Project name" value="Untitled Project" maxlength="100">
+      <span id="dirtyMark" class="dirty-mark" hidden title="Unsaved changes">●</span>
+    </div>
+    <div class="top-actions">
+      <button id="newProjectBtn" class="top-action" title="Create a new project"><span>＋</span><b>New</b></button>
+      <button id="openProjectBtn" class="top-action" title="Open a Forge Eye project"><span>↥</span><b>Open</b></button>
+      <button id="saveProjectBtn" class="top-action top-action-primary" title="Save project"><span>↓</span><b>Save</b></button>
+      <span class="top-divider"></span>
+      <button id="undoBtn" class="square-action" aria-label="Undo" title="Undo" disabled>↶</button>
+      <button id="redoBtn" class="square-action" aria-label="Redo" title="Redo" disabled>↷</button>
+    </div>
+  </header>
+
+  <nav class="workspace-strip" role="tablist" aria-label="Forge Eye workspaces">
+    <button class="workspace-tab is-active" data-workspace="scene" role="tab" aria-selected="true"><span class="tab-index">01</span>Scene</button>
+    <button class="workspace-tab" data-workspace="spin" role="tab" aria-selected="false"><span class="tab-index">02</span>Spin / Lathe</button>
+    <button class="workspace-tab" data-workspace="image" role="tab" aria-selected="false"><span class="tab-index">03</span>Image Model</button>
+    <button class="workspace-tab" data-workspace="animation" role="tab" aria-selected="false"><span class="tab-index">04</span>Animation</button>
+    <button class="workspace-tab" data-workspace="assets" role="tab" aria-selected="false"><span class="tab-index">05</span>Assets & Export</button>
+    <div class="workspace-spacer"></div>
+    <span id="rustBadge" class="engine-badge"><i></i> Rust Core Loading</span>
+  </nav>
+
+  <main class="editor-shell">
+    <aside id="leftDock" class="dock left-dock" aria-label="Scene and objects">
+      <div class="dock-heading">
+        <div><strong>SCENE HIERARCHY</strong><small id="objectCount">0 OBJECTS</small></div>
+        <button id="leftDockClose" class="mobile-close" aria-label="Close scene panel">×</button>
+      </div>
+      <div class="object-create-grid" aria-label="Create primitive">
+        <button data-create-primitive="cube"><span class="primitive-icon cube-icon"></span>Cube</button>
+        <button data-create-primitive="sphere"><span class="primitive-icon sphere-icon"></span>Sphere</button>
+        <button data-create-primitive="cylinder"><span class="primitive-icon cylinder-icon"></span>Cylinder</button>
+        <button data-create-primitive="plane"><span class="primitive-icon plane-icon"></span>Plane</button>
+      </div>
+      <div class="search-field"><span>⌕</span><input id="objectSearch" placeholder="Filter objects…" aria-label="Filter scene objects"></div>
+      <div id="objectList" class="object-list" aria-label="Scene objects"></div>
+      <div class="dock-section-footer">
+        <span>PROJECT ASSETS</span><span id="assetCount">0</span>
+      </div>
+      <div id="assetMiniList" class="asset-mini-list"><div class="empty-mini">Imported images and meshes appear here.</div></div>
+      <div class="dock-bottom-actions">
+        <button id="duplicateBtn" disabled>⧉ Duplicate</button>
+        <button id="deleteBtn" disabled>× Delete</button>
+      </div>
+    </aside>
+
+    <section class="center-column" aria-label="3D editor">
+      <div class="viewport-toolbar">
+        <div class="tool-group">
+          <button id="toolSelect" class="view-tool is-active" aria-pressed="true" title="Select object">↖</button>
+          <button id="toolMove" class="view-tool" aria-pressed="false" title="Move tool">↔</button>
+          <button id="toolRotate" class="view-tool" aria-pressed="false" title="Rotate tool">⟳</button>
+          <button id="toolScale" class="view-tool" aria-pressed="false" title="Scale tool">⤢</button>
+        </div>
+        <span class="toolbar-divider"></span>
+        <div class="tool-group camera-views" aria-label="Viewport camera">
+          <button data-view="perspective" class="camera-tool is-active" aria-pressed="true">Perspective</button>
+          <button data-view="front" class="camera-tool" aria-pressed="false">Front</button>
+          <button data-view="right" class="camera-tool" aria-pressed="false">Side</button>
+          <button data-view="top" class="camera-tool" aria-pressed="false">Top</button>
+        </div>
+        <div class="toolbar-flex"></div>
+        <button id="gridToggle" class="utility-tool is-active" aria-pressed="true" title="Toggle grid">▦ Grid</button>
+        <button id="focusView" class="utility-tool" title="Frame selected object">⌗ Focus</button>
+        <button id="fullscreenView" class="utility-tool fullscreen-tool" title="Fullscreen viewport">⛶</button>
+      </div>
+
+      <div class="viewport-wrap">
+        <canvas id="viewport" class="viewport-canvas" aria-label="Interactive 3D viewport"></canvas>
+        <div class="viewport-overlay viewport-overlay-left">
+          <span class="live-dot"></span><span id="viewportModeLabel">PERSPECTIVE · LIT</span>
+        </div>
+        <div class="viewport-overlay viewport-overlay-right">
+          <span class="axis-chip axis-x">X</span><span class="axis-chip axis-y">Y</span><span class="axis-chip axis-z">Z</span>
+        </div>
+        <div class="viewport-help">Orbit: drag · Pan: right-drag · Zoom: wheel or pinch</div>
+        <div id="viewportNotice" class="viewport-notice" hidden></div>
+      </div>
+
+      <section class="tool-shelf" aria-label="Workspace tools">
+        <div class="shelf-head">
+          <div><span id="shelfEyebrow">WORKSPACE 01</span><strong id="shelfTitle">Scene & Modeling</strong></div>
+          <div class="shelf-head-right"><span id="shelfStatus">Rust scene session</span><button id="shelfCollapse" class="square-action" aria-label="Collapse tool shelf">⌄</button></div>
+        </div>
+
+        <div class="shelf-panel is-active" data-workspace-panel="scene">
+          <div class="scene-tools-grid">
+            <div class="scene-tool-card"><span class="card-symbol">◇</span><strong>Scene Transform</strong><p>Select an object to edit exact position, rotation, and scale in the Inspector.</p><button data-focus-inspector>Open Inspector <span>→</span></button></div>
+            <div class="scene-tool-card"><span class="card-symbol">⌘</span><strong>Rust Command Core</strong><p>Validated scene commands, geometry operations, and undo/redo run through the same Rust model.</p><div class="metric-row"><span>Scene schema</span><b id="sceneSchema">v1</b></div></div>
+            <div class="scene-tool-card"><span class="card-symbol">◫</span><strong>Mesh Diagnostics</strong><p>Inspect the selected generated mesh, vertex count, triangle count, and construction method.</p><div id="meshDiagnostics" class="diagnostic-line">Select a generated mesh to inspect it.</div></div>
+          </div>
+        </div>
+
+        <div class="shelf-panel" data-workspace-panel="spin" hidden>
+          <div class="spin-layout">
+            <div class="profile-editor-block">
+              <div class="tool-subheading"><div><strong>Spin profile</strong><small>Trace a cross-section, then revolve around the vertical axis</small></div><span class="tool-tag">360°</span></div>
+              <div class="profile-canvas-frame"><canvas id="profileCanvas" width="440" height="320" aria-label="Edit the rotational profile; drag points or tap to add points"></canvas><div class="profile-axis-label">REVOLUTION AXIS</div></div>
+              <div class="profile-actions"><button id="profileReset" class="secondary-button">Reset bottle profile</button><button id="profileUndo" class="secondary-button">Undo point</button><button id="profileImportRef" class="secondary-button">Import image reference</button><button id="profileClearRef" class="secondary-button" disabled>Clear reference</button><input id="profileReferenceInput" type="file" accept="image/png,image/jpeg,image/webp,image/avif" hidden></div>
+              <div class="profile-reference-controls">
+                <label class="range-property"><span>Reference opacity <output id="profileReferenceOpacityValue">25%</output></span><input id="profileReferenceOpacity" type="range" min="0.05" max="1" step="0.05" value="0.25"></label>
+                <label class="profile-fit-row"><span>Image fit</span><select id="profileReferenceFit"><option value="contain">Fit · preserve proportions</option><option value="crop">Crop · fill canvas</option><option value="stretch">Stretch · may distort</option></select></label>
+                <label class="toggle-row"><span>Snap profile endpoints to rotation axis</span><input id="profileAxisSnap" type="checkbox" checked><i></i></label>
+                <p>Trace one side of the cross-section. Bring the top and bottom endpoints onto the center axis; Forge revolves the outline through 360° using the Rust Spin/Lathe core.</p>
+              </div>
+              <div id="profileStatus" class="inline-status">Preset ready · import a side reference, adjust opacity, then drag points to match its silhouette.</div>
+            </div>
+            <div class="spin-settings">
+              <div class="tool-subheading"><div><strong>Spin / Lathe settings</strong><small>Rust-generated mesh with validated geometry</small></div></div>
+              <label class="setting-row"><span>Diameter (m)</span><input id="spinDiameter" type="number" min="0.001" max="1000" step="0.005" value="0.08"></label>
+              <label class="setting-row"><span>Height (m)</span><input id="spinHeight" type="number" min="0.001" max="1000" step="0.005" value="0.25"></label>
+              <label class="setting-row"><span>Angular segments</span><input id="spinSegments" type="number" min="12" max="128" step="4" value="24"></label>
+              <label class="setting-row"><span>Profile smoothing <b id="spinSubdivValue">2</b></span><input id="spinSubdivision" type="range" min="0" max="3" step="1" value="2"></label>
+              <label class="toggle-row"><span>Smooth vertex normals</span><input id="spinSmooth" type="checkbox" checked><i></i></label>
+              <div class="spin-recipe">
+                <span>RECIPE</span>
+                <p>1. Trace the bottle outline from the axis outward and up. 2. Spin the profile through 360°. 3. Refine the profile and smooth the normals.</p>
+                <small>The profile-refinement setting is a Rust spline approximation, not a full Blender Catmull–Clark modifier.</small>
+              </div>
+              <button id="buildSpin" class="primary-build-button"><span>✳</span> Build 3D from profile</button>
+              <div id="spinResult" class="result-line" role="status">Ready for profile generation.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="shelf-panel" data-workspace-panel="image" hidden>
+          <div class="image-model-layout">
+            <div class="reference-manager">
+              <div class="tool-subheading"><div><strong>Reference images</strong><small>Calibrate each projection to known real-world dimensions</small></div><span class="tool-tag">2D → 3D</span></div>
+              <div class="reference-select-row">
+                <label>View<select id="referenceView"><option value="front">Front (width × height)</option><option value="side">Side (depth × height)</option><option value="top">Top (width × depth)</option></select></label>
+                <label>Known view width (m)<input id="referenceWidth" type="number" min="0.01" max="10000" step="0.01" value="3"></label>
+              </div>
+              <div class="reference-input-row">
+                <input id="referenceInput" type="file" accept="image/png,image/jpeg,image/webp,image/avif" hidden>
+                <button id="uploadReference" class="secondary-button">＋ Import active view image</button>
+                <button id="traceReference" class="secondary-button">Trace / edit outline</button>
+              </div>
+              <div class="reference-preview-row">
+                <div class="reference-thumbnail" id="referenceThumbnail"><span>NO IMAGE</span></div>
+                <div class="reference-meta"><strong id="referenceFileName">No reference image loaded</strong><small id="referenceDimensions">Import a front, side, or top view.</small><div class="reference-opacity"><span>Opacity</span><input id="referenceOpacity" type="range" min="0.1" max="1" value="0.45" step="0.05"><output id="referenceOpacityValue">45%</output></div><small id="referenceOutlineStatus">0 outline points</small></div>
+              </div>
+              <div class="reference-actions">
+                <button id="saveOutline" class="secondary-button">Save outline</button>
+                <button id="hideReference" class="secondary-button">Hide / show plane</button>
+                <button id="buildExtrusion" class="secondary-button">Extrude 1 view → 3D</button>
+              </div>
+            </div>
+            <div class="hull-builder">
+              <div class="tool-subheading"><div><strong>Multi-view reconstruction</strong><small>Intersect the front / side masks, then optionally constrain with top view</small></div><span class="tool-tag">RUST</span></div>
+              <div class="hull-dimensions">
+                <label>Width (m)<input id="hullWidth" type="number" min="0.01" max="10000" step="0.01" value="3"></label>
+                <label>Height (m)<input id="hullHeight" type="number" min="0.01" max="10000" step="0.01" value="2"></label>
+                <label>Depth (m)<input id="hullDepth" type="number" min="0.01" max="10000" step="0.01" value="2"></label>
+                <label>Voxel resolution<select id="hullResolution"><option value="12">12³ — fast</option><option value="24" selected>24³ — balanced</option><option value="32">32³ — detail</option><option value="48">48³ — heavy</option><option value="64">64³ — maximum</option></select></label>
+              </div>
+              <div class="hull-guidance"><b>Required</b> saved Front + Side outlines. A Top outline is optional and tightens the volume. Reference scales must agree within 5%.</div>
+              <button id="buildVisualHull" class="primary-build-button"><span>◈</span> Build 2–3 view visual hull</button>
+              <div id="hullResult" class="result-line" role="status">Load and trace at least a front and side outline.</div>
+              <div class="limit-note">Result is a geometry blockout. Hidden concavities, cavities, and details cannot be inferred from silhouettes alone.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="shelf-panel" data-workspace-panel="animation" hidden>
+          <div class="animation-toolbar">
+            <div class="transport"><button id="goStart" title="Go to start frame">|◀</button><button id="playTimeline" class="transport-play" aria-pressed="false" title="Play">▶</button><button id="goEnd" title="Go to end frame">▶|</button><button id="loopToggle" class="is-active" aria-pressed="true" title="Loop playback">↻</button></div>
+            <label>FRAME <input id="currentFrame" type="number" min="0" max="1000000" value="0"></label>
+            <label>FPS <input id="timelineFps" type="number" min="1" max="240" value="24"></label>
+            <label class="toggle-inline"><input id="autoKeyToggle" type="checkbox"><span>Auto Key</span></label>
+            <label>Interpolation<select id="keyInterpolation"><option value="ease">Ease</option><option value="linear">Linear</option><option value="hold">Hold</option></select></label>
+            <button id="insertKey" class="secondary-button">◆ Insert Key</button>
+          </div>
+          <div class="animation-tabs" role="tablist" aria-label="Animation editor"><button data-animation-view="dope" class="is-active" aria-selected="true">Dope Sheet</button><button data-animation-view="graph" aria-selected="false">Graph Editor</button></div>
+          <div id="dopePane" class="dope-pane">
+            <div id="dopeHeader" class="dope-header"><span>OBJECT / CHANNEL</span><div id="dopeRuler"></div></div>
+            <div id="dopeRows" class="dope-rows"><div class="empty-mini">Select an object and insert a keyframe to start animating.</div></div>
+          </div>
+          <div id="graphPane" class="graph-pane" hidden><div class="graph-control"><label>Channel<select id="graphChannel"><option value="position:0">Location X</option><option value="position:1">Location Y</option><option value="position:2">Location Z</option><option value="rotation:0">Rotation X</option><option value="rotation:1">Rotation Y</option><option value="rotation:2">Rotation Z</option><option value="scale:0">Scale X</option><option value="scale:1">Scale Y</option><option value="scale:2">Scale Z</option></select></label><small>Drag a key vertically to update the selected transform channel.</small></div><canvas id="graphCanvas" width="900" height="220" aria-label="Rust-backed animation curve editor"></canvas></div>
+          <div id="animationStatus" class="inline-status">24 FPS · Rust transform keys</div>
+        </div>
+
+        <div class="shelf-panel" data-workspace-panel="assets" hidden>
+          <div class="assets-workspace">
+            <div class="scene-tool-card"><span class="card-symbol">⇧</span><strong>Import Assets</strong><p>Load image references and supported 3D files into the active browser session.</p><button id="assetImportButton">Import files <span>→</span></button><input id="assetInput" type="file" multiple accept=".glb,.gltf,.obj,.stl,.ply,.png,.jpg,.jpeg,.webp,.avif" hidden></div>
+            <div class="scene-tool-card"><span class="card-symbol">↓</span><strong>Project package</strong><p>Save the validated Rust scene, geometry buffers, timeline, and reference images to one project file.</p><button id="saveProjectInline">Download .forge-eye.json <span>→</span></button></div>
+            <div class="scene-tool-card"><span class="card-symbol">◇</span><strong>Mesh export</strong><p>Export generated Rust meshes as Wavefront OBJ for external DCC review.</p><button id="exportObj">Export selected OBJ <span>→</span></button></div>
+          </div>
+          <div id="assetList" class="asset-list"></div>
+        </div>
+      </section>
+    </section>
+
+    <aside id="rightDock" class="dock right-dock" aria-label="Inspector">
+      <div class="dock-heading"><div><strong>INSPECTOR</strong><small id="inspectorKind">NO SELECTION</small></div><button id="rightDockClose" class="mobile-close" aria-label="Close inspector">×</button></div>
+      <div id="inspectorEmpty" class="inspector-empty"><span>◇</span><strong>Select an object</strong><small>Choose an object in the hierarchy or tap it in the 3D viewport.</small></div>
+      <div id="inspectorForm" hidden>
+        <label class="object-name-field">Object name<input id="objectName" readonly></label>
+        <section class="inspector-section">
+          <div class="inspector-section-head"><strong>Transform</strong><span>LOCAL</span></div>
+          <div class="transform-group"><label>Location</label><div class="axis-inputs"><label class="axis-x">X<input id="px" type="number" step="0.01"></label><label class="axis-y">Y<input id="py" type="number" step="0.01"></label><label class="axis-z">Z<input id="pz" type="number" step="0.01"></label></div></div>
+          <div class="transform-group"><label>Rotation (°)</label><div class="axis-inputs"><label class="axis-x">X<input id="rx" type="number" step="0.5"></label><label class="axis-y">Y<input id="ry" type="number" step="0.5"></label><label class="axis-z">Z<input id="rz" type="number" step="0.5"></label></div></div>
+          <div class="transform-group"><label>Scale</label><div class="axis-inputs"><label class="axis-x">X<input id="sx" type="number" step="0.01" min="0.0001"></label><label class="axis-y">Y<input id="sy" type="number" step="0.01" min="0.0001"></label><label class="axis-z">Z<input id="sz" type="number" step="0.01" min="0.0001"></label></div></div>
+          <button id="applyTransform" class="wide-secondary">Apply transform</button>
+          <label class="toggle-row inspector-autokey"><span>Key transform on change</span><input id="transformAutoKey" type="checkbox"><i></i></label>
+        </section>
+        <section class="inspector-section">
+          <div class="inspector-section-head"><strong>Material</strong><span>SURFACE</span></div>
+          <label class="color-row">Base color<span><input id="materialColor" type="color" value="#529ec9"><output id="materialHex">#529EC9</output></span></label>
+          <label class="range-row"><span>Metalness <output id="metalnessValue">0.05</output></span><input id="metalness" type="range" min="0" max="1" step="0.01" value="0.05"></label>
+          <label class="range-row"><span>Roughness <output id="roughnessValue">0.55</output></span><input id="roughness" type="range" min="0" max="1" step="0.01" value="0.55"></label>
+          <label class="range-row"><span>Opacity <output id="opacityValue">1.00</output></span><input id="materialOpacity" type="range" min="0.1" max="1" step="0.05" value="1"></label>
+          <button id="applyMaterial" class="wide-secondary">Apply material</button>
+        </section>
+        <section class="inspector-section">
+          <div class="inspector-section-head"><strong>Geometry</strong><span>RUST CORE</span></div>
+          <div id="geometryInfo" class="geometry-info">Primitive geometry</div>
+          <label class="toggle-row"><span>Visible in viewport</span><input id="objectVisible" type="checkbox" checked><i></i></label>
+        </section>
+        <div class="inspector-footer"><button id="duplicateInspector" class="secondary-button">⧉ Duplicate</button><button id="deleteInspector" class="danger-button">× Delete</button></div>
+      </div>
+    </aside>
+  </main>
+
+  <nav class="mobile-panel-bar" aria-label="Mobile editor panels">
+    <button data-mobile-panel="scene"><span>☷</span><b>Scene</b></button>
+    <button data-mobile-panel="tools"><span>⌘</span><b>Tools</b></button>
+    <button data-mobile-panel="references"><span>▧</span><b>Images</b></button>
+    <button data-mobile-panel="animation"><span>◷</span><b>Animate</b></button>
+    <button data-mobile-panel="inspect"><span>◇</span><b>Inspect</b></button>
+  </nav>
+  <div id="drawerScrim" class="drawer-scrim" hidden></div>
+
+  <footer class="statusbar">
+    <div><span class="status-light"></span><span id="statusText">Initializing Rust core…</span></div>
+    <div class="status-right"><span id="rendererStatus">Renderer starting</span><span class="status-separator">·</span><span id="perfStatus">— FPS</span><span class="status-separator">·</span><span id="sceneStatus">Scene v1</span></div>
+  </footer>
+
+  <dialog id="traceDialog" class="trace-dialog" aria-labelledby="traceTitle">
+    <div class="trace-dialog-shell">
+      <div class="trace-dialog-head"><div><strong id="traceTitle">Trace image outline</strong><span id="traceSubtitle">FRONT PROJECTION · CALIBRATED IMAGE</span></div><button id="closeTrace" class="square-action" aria-label="Close tracing dialog">×</button></div>
+      <p class="trace-instructions">Tap/click points around the visible outer boundary in one direction. Drag existing points to refine them. Avoid crossed lines; hidden depth cannot be recovered from a single silhouette.</p>
+      <div class="trace-canvas-frame"><canvas id="traceCanvas" width="960" height="600" aria-label="Touch editor for a reference silhouette"></canvas></div>
+      <div class="trace-toolbar"><span id="tracePointCount">0 points</span><button id="traceUndo" class="secondary-button">Undo point</button><button id="traceClear" class="secondary-button">Clear outline</button><button id="saveTraceOutline" class="primary-build-button">Save outline</button></div>
+      <p id="traceStatus" class="inline-status" role="status">Import a reference image for this view, then trace its contour.</p>
+    </div>
+  </dialog>
+
+  <input id="projectInput" type="file" accept=".forge-eye.json,.json" hidden>
+  <div id="toastRegion" class="toast-region" aria-live="polite"></div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+name: Forge Eye Rust/WASM CI
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "forge-eye/**"
+      - "public/forge-eye/**"
+      - "mcp/forge-eye-smoke.mjs"
+      - ".github/workflows/forge-eye-rust.yml"
+  pull_request:
+    paths:
+      - "forge-eye/**"
+      - "public/forge-eye/**"
+      - "mcp/forge-eye-smoke.mjs"
+      - ".github/workflows/forge-eye-rust.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rust-core-and-browser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install stable Rust and WebAssembly target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: forge-eye
+      - name: Check Rust formatting
+        working-directory: forge-eye
+        run: cargo fmt --all -- --check
+      - name: Run native core and bridge tests
+        working-directory: forge-eye
+        run: cargo test --workspace --locked
+      - name: Run Clippy without warnings
+        working-directory: forge-eye
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Build WebAssembly release module
+        working-directory: forge-eye
+        run: cargo build -p forge-eye-wasm --target wasm32-unknown-unknown --release --locked
+      - name: Install browser QA dependencies
+        run: npm install --prefix mcp --no-audit --no-fund
+      - name: Start Forge Eye static preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4174 --bind 127.0.0.1 --directory public > "${RUNNER_TEMP}/forge-eye-preview.log" 2>&1 &
+          echo $! > "${RUNNER_TEMP}/forge-eye-preview.pid"
+          for attempt in $(seq 1 40); do
+            if curl --fail --silent --max-time 3 http://127.0.0.1:4174/forge-eye/index.html -o /dev/null; then
+              echo "Forge Eye static preview is ready."
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "${RUNNER_TEMP}/forge-eye-preview.log"
+          exit 1
+      - name: Test Rust/WASM editor in desktop and mobile Chromium
+        env:
+          FORGE_EYE_URL: http://127.0.0.1:4174/forge-eye/index.html
+          FORGE_EYE_ARTIFACTS: ${{ runner.temp }}/forge-eye-qa
+        run: node mcp/forge-eye-smoke.mjs
+      - name: Upload Forge Eye screenshots and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-eye-browser-qa
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/forge-eye-qa/
+            ${{ runner.temp }}/forge-eye-preview.log
