@@ -148,3 +148,17 @@
   .timeline-ruler{padding-left:77px;padding-right:5px}
   .timeline-object-label,.timeline-channel-label{padding:0 4px}
 }
+
+
+/* Keep the profile-to-solid workflow tappable on narrow phones. */
+@media(max-width:850px){
+  .lathe-tools{margin:0 8px 9px;padding:8px}
+  .lathe-tools>.wide-secondary{min-height:34px}
+}
+@media(max-width:520px){
+  .lathe-tools p{font-size:8px}
+  .lathe-tools>.wide-secondary{font-size:9px}
+  .rust-status-row{font-size:8px}
+  .lathe-dialog .trace-dialog-head strong{font-size:12px}
+  .lathe-dialog .trace-instructions{font-size:9px}
+}
