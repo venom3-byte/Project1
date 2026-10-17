@@ -236,6 +236,32 @@ function graphPointerDown(event){
   setTimelineFrame(Math.round(clamp((point[0]-metrics.pad.left)/metrics.plotW,0,1,0)*240));
 }
 function toggleAutoKey(){state.autoKey=!state.autoKey;state.engine.autoKey=state.autoKey;state.engine.keyInterpolation=$("#keyInterpolation").value;refreshTimeline();status(state.autoKey?"Auto-key enabled for transforms":"Auto-key disabled")}
+function configureTraceDialog(mode){
+  const lathe=mode==="lathe-profile";
+  $("#traceDialogTitle").textContent=lathe?"Trace lathe / spin profile":"Trace image silhouette";
+  $("#traceModeLabel").textContent=lathe?"PROFILE · REVOLVE 360°":"OUTLINE · CLOSE · EXTRUDE";
+  $("#traceInstructions").textContent=lathe
+    ?"Trace one side from the centerline at the bottom, around the exterior to the rim, then inward and down the inner wall if a hollow bottle is needed. Centerline is the middle of the image."
+    :"Tap around the outside edge of the object. Use at least three points; tracing should not cross itself. The 3D blockout uses the reference width and height set in the Images panel.";
+  $("#traceDepthField").hidden=lathe;
+  $("#traceBuild").hidden=lathe;
+  $("#traceBuildLathe").hidden=!lathe;
+  $("#traceSaveOutline").textContent=lathe?"Save profile":"Save outline";
+  $("#traceCanvas").setAttribute("aria-label",lathe?"Trace a revolved bottle cross-section":"Trace the image silhouette");
+}
+async function startLatheProfileTrace(){
+  const record=selectedRecord(),meta=record?.components?.reference,assetName=record?.components?.asset?.name,entry=assetName?state.engine.assets.get(assetName):null;
+  if(!meta||!entry?.file){notice("Spin / Lathe Profile","Select a reference image imported in this session. Crop it tightly and align the centerline with the image middle. Re-import it if the project was reopened without its source file.");return}
+  try{
+    const bitmap=await createImageBitmap(entry.file),scale=Math.min(1000/bitmap.width,800/bitmap.height),width=Math.max(1,Math.round(bitmap.width*scale)),height=Math.max(1,Math.round(bitmap.height*scale));
+    const canvas=$("#traceCanvas");canvas.width=width;canvas.height=height;
+    const profile=Array.isArray(meta.latheProfile)?meta.latheProfile.map(point=>[...point]):[];
+    state.trace={record,bitmap,points:profile,closed:false,editing:profile.length>=3,mode:"lathe-profile",axis:meta.axis||"front",width:Number(meta.width)||3,height:Number(meta.height)||((Number(meta.width)||3)/(Number(meta.aspect)||1))};
+    configureTraceDialog("lathe-profile");
+    $("#traceMessage").textContent=profile.length?"Loaded the saved "+profile.length+"-point profile. Drag points to refine it or add points on an edge.":"Start on the centerline at the bottom, trace the exterior to the rim, then trace the inside wall back toward the bottom centerline.";
+    $("#traceDialog").showModal();traceDraw();
+  }catch(error){reportError("Could not open lathe profile tracing",error)}
+}
 function applyReferenceMaterial(record,opacity){
   const pc=window.ForgePC,blend=pc?.BLEND_NORMAL??2,none=pc?.BLEND_NONE??0;
   const walk=entity=>{for(const instance of(entity.render?.meshInstances||[])){
@@ -260,7 +286,7 @@ function refreshReferences(){
   for(const record of all){
     const meta=record.components.reference,row=document.createElement("div");row.className="reference-row";
     const select=document.createElement("button");select.type="button";select.className="reference-row-main"+(record.id===state.engine.selectedId?" is-selected":"");
-    const name=document.createElement("b");name.textContent=record.name;name.title=record.name;const outlineInfo=Array.isArray(meta.outline)&&meta.outline.length>=3?(" · "+meta.outline.length+" pts"):" · no outline";const details=document.createElement("small");details.textContent=String(meta.axis||"front").toUpperCase()+" · "+Number(meta.width||0).toFixed(2)+" m"+outlineInfo;
+    const name=document.createElement("b");name.textContent=record.name;name.title=record.name;const outlineInfo=Array.isArray(meta.outline)&&meta.outline.length>=3?(" · "+meta.outline.length+" pts"):"";const profileInfo=Array.isArray(meta.latheProfile)&&meta.latheProfile.length>=3?(" · spin "+meta.latheProfile.length+" pts"):"";const details=document.createElement("small");details.textContent=String(meta.axis||"front").toUpperCase()+" · "+Number(meta.width||0).toFixed(2)+" m"+(outlineInfo||profileInfo||" · no outline");
     select.append(name,details);select.addEventListener("click",()=>{state.engine.select(record.id);$("#referenceAxis").value=meta.axis||"front";$("#referenceWidth").value=String(meta.width||3);$("#referenceOpacity").value=String(meta.opacity??0.45);$("#referenceOpacityValue").textContent=Math.round((meta.opacity??0.45)*100)+"%";chooseView(meta.axis==="side"?"right":meta.axis||"front")});row.append(select);
     const visibility=document.createElement("button");visibility.type="button";visibility.className="reference-visibility";visibility.textContent=record.entity.enabled===false?"Show":"Hide";
     visibility.addEventListener("click",()=>{record.entity.enabled=record.entity.enabled===false;meta.visible=record.entity.enabled;refreshReferences();status(record.entity.enabled?"Reference shown":"Reference hidden","dirty")});row.append(visibility);list.append(row);
@@ -299,7 +325,7 @@ function traceDraw(){
   if(trace.points.length){
     ctx.save();ctx.lineWidth=Math.max(2,Math.min(w,h)*.0035);ctx.strokeStyle="#54d6ff";ctx.fillStyle="#b0efff";ctx.lineJoin="round";ctx.lineCap="round";
     ctx.beginPath();trace.points.forEach((p,i)=>{const x=p[0]*w,y=p[1]*h;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)});
-    if(trace.closed||trace.points.length>2)ctx.lineTo(trace.points[0][0]*w,trace.points[0][1]*h);ctx.stroke();
+    if(trace.closed||(trace.mode!=="lathe-profile"&&trace.points.length>2))ctx.lineTo(trace.points[0][0]*w,trace.points[0][1]*h);ctx.stroke();
     const r=Math.max(3,Math.min(w,h)*.006);
     trace.points.forEach((p,i)=>{ctx.beginPath();ctx.arc(p[0]*w,p[1]*h,r,0,Math.PI*2);ctx.fillStyle=i===0?"#fff":"#79dcff";ctx.fill();ctx.strokeStyle="#092331";ctx.lineWidth=1.5;ctx.stroke()});
     ctx.restore();
@@ -312,9 +338,10 @@ async function startSilhouetteTrace(){
   try{
     const bitmap=await createImageBitmap(entry.file),scale=Math.min(1000/bitmap.width,800/bitmap.height),width=Math.max(1,Math.round(bitmap.width*scale)),height=Math.max(1,Math.round(bitmap.height*scale));
     const canvas=$("#traceCanvas");canvas.width=width;canvas.height=height;
-    state.trace={record,bitmap,points:Array.isArray(meta.outline)?meta.outline.map(point=>[...point]):[],closed:false,editing:Array.isArray(meta.outline)&&meta.outline.length>=3,axis:meta.axis||"front",width:Number(meta.width)||3,height:Number(meta.height)||((Number(meta.width)||3)/(Number(meta.aspect)||1))};
+    state.trace={record,bitmap,points:Array.isArray(meta.outline)?meta.outline.map(point=>[...point]):[],closed:false,editing:Array.isArray(meta.outline)&&meta.outline.length>=3,mode:"silhouette",axis:meta.axis||"front",width:Number(meta.width)||3,height:Number(meta.height)||((Number(meta.width)||3)/(Number(meta.aspect)||1))};
     $("#traceDepth").value=$("#silhouetteDepth").value||"0.35";
-    $("#traceMessage").textContent=state.trace.points.length?"Loaded saved "+state.trace.points.length+"-point outline. Continue editing it or save a revised contour.":"Tap around the object outline. Click near the first point to close the contour, or Build 3D mesh closes it automatically.";
+    configureTraceDialog("silhouette");
+    $("#traceMessage").textContent=state.trace.points.length?"Loaded saved "+state.trace.points.length+"-point outline. Continue editing it or save a revised contour.":"Tap around the outside edge. Click near the first point to close the contour.";
     $("#traceDialog").showModal();traceDraw();
   }catch(error){reportError("Could not open silhouette tracing",error)}
 }
@@ -331,7 +358,7 @@ function segmentDistancePixels(point,a,b,canvas){
 function addTracePoint(event){
   const trace=state.trace,result=traceImagePoint(event);if(!trace||trace.closed||!result)return;
   const {point:p,canvas}=result,threshold=Math.max(12,Math.min(canvas.width,canvas.height)*.025);
-  if(trace.points.length>=3){
+  if(trace.mode!=="lathe-profile"&&trace.points.length>=3){
     const first=trace.points[0],distance=Math.hypot((p[0]-first[0])*canvas.width,(p[1]-first[1])*canvas.height);
     if(distance<threshold){trace.closed=true;$("#traceMessage").textContent="Contour closed. Review the outline, then save it or build a 3D mesh.";traceDraw();return}
   }
@@ -345,7 +372,7 @@ function addTracePoint(event){
 function handleTracePointerDown(event){
   event.preventDefault();const trace=state.trace,result=traceImagePoint(event);if(!trace||!result)return;
   const {point,canvas}=result,limit=Math.max(12,Math.min(canvas.width,canvas.height)*.025);
-  if(trace.points.length>=3&&Math.hypot((point[0]-trace.points[0][0])*canvas.width,(point[1]-trace.points[0][1])*canvas.height)<limit){addTracePoint(event);return}
+  if(trace.mode!=="lathe-profile"&&trace.points.length>=3&&Math.hypot((point[0]-trace.points[0][0])*canvas.width,(point[1]-trace.points[0][1])*canvas.height)<limit){addTracePoint(event);return}
   let nearest=-1,nearestDistance=Infinity;
   for(let i=1;i<trace.points.length;i++){
     const v=trace.points[i],d=Math.hypot((point[0]-v[0])*canvas.width,(point[1]-v[1])*canvas.height);
@@ -372,8 +399,22 @@ function closeTraceEditor(){
   if(state.trace?.bitmap)state.trace.bitmap.close?.();state.trace=null;
   if($("#traceDialog")?.open)$("#traceDialog").close();
 }
+function buildTraceLathe(){
+  const trace=state.trace;if(!trace||trace.mode!=="lathe-profile")return;
+  if(trace.points.length<4){$("#traceMessage").textContent="Add at least four profile points: bottom center, exterior contour, rim, and return path.";return}
+  try{
+    const record=state.engine.createLathedProfileMesh({
+      name:trace.record.name.replace(/\.[^.]+$/,"")+" — Spin 360°",
+      profile:trace.points,diameter:clamp($("#latheDiameter").value,.001,1000,.08),
+      height:clamp($("#latheHeight").value,.001,1000,.25),segments:clamp($("#latheSegments").value,12,128,32),color:[.42,.62,.76]
+    });
+    const diag=record.components.diagnostics||{};
+    state.engine.select(record.id);state.engine.frame();refreshAll();setWorkspace("modeling");closeTraceEditor();
+    status("Spin 360° mesh built · "+Number(diag.vertices||0).toLocaleString()+" vertices · inspect wall thickness and topology","dirty");
+  }catch(error){$("#traceMessage").textContent=error?.message||String(error);status("Lathe profile could not be built","error")}
+}
 function buildTraceMesh(){
-  const trace=state.trace;if(!trace)return;
+  const trace=state.trace;if(!trace||trace.mode==="lathe-profile")return;
   if(trace.points.length<3){$("#traceMessage").textContent="Add at least three points before building a mesh.";return}
   try{
     const reference=trace.record.components.reference,depth=clamp($("#traceDepth").value,.01,1000,.35);$("#silhouetteDepth").value=String(depth);
@@ -392,10 +433,17 @@ function saveTraceOutline(){
   const trace=state.trace;if(!trace)return;
   if(trace.points.length<3){$("#traceMessage").textContent="Add at least three points before saving an outline.";return}
   const meta=trace.record.components.reference;
+  if(trace.mode==="lathe-profile"){
+    meta.latheProfile=trace.points.map(point=>[Number(point[0]),Number(point[1])]);
+    meta.latheProfileSavedAt=new Date().toISOString();trace.editing=true;
+    refreshReferences();refreshHierarchy();
+    $("#traceMessage").textContent="Saved "+meta.axis+" spin profile · "+meta.latheProfile.length+" points. Use Spin 360° → Build mesh when ready.";
+    status("Lathe profile saved","dirty");return;
+  }
   meta.outline=trace.points.map(point=>[Number(point[0]),Number(point[1])]);
   meta.outlineSavedAt=new Date().toISOString();meta.outlineClosed=true;trace.editing=true;trace.closed=true;
   refreshReferences();refreshHierarchy();
-  $("#traceMessage").textContent="Saved "+meta.axis+" outline · "+meta.outline.length+" points. This reference can now contribute to a two-view volume.";
+  $("#traceMessage").textContent="Saved "+meta.axis+" outline · "+meta.outline.length+" points. This reference can now contribute to a silhouette volume.";
   status("Reference outline saved","dirty");
 }
 function buildSilhouetteHull(){
@@ -511,11 +559,13 @@ function bindUI(){
   $("#assetInput").addEventListener("change",e=>{const files=[...e.target.files];if(files.length)void loadAssets(files);e.target.value=""});
   $("#addReferenceImages").addEventListener("click",()=>$("#referenceInput").click());
   $("#traceSilhouette").addEventListener("click",()=>void startSilhouetteTrace());
+  $("#traceLatheProfile").addEventListener("click",()=>void startLatheProfileTrace());
   $("#traceCanvas").addEventListener("pointerdown",handleTracePointerDown);
   $("#traceUndo").addEventListener("click",()=>{if(state.trace){state.trace.points.pop();state.trace.closed=false;$("#traceMessage").textContent="Last contour point removed.";traceDraw()}});
   $("#traceClear").addEventListener("click",()=>{if(state.trace){state.trace.points=[];state.trace.closed=false;state.trace.editing=false;$("#traceMessage").textContent="Outline cleared. Trace a new contour in one direction.";traceDraw()}});
   $("#traceSaveOutline").addEventListener("click",saveTraceOutline);
   $("#traceBuild").addEventListener("click",buildTraceMesh);
+  $("#traceBuildLathe").addEventListener("click",buildTraceLathe);
   $("#buildSilhouetteHull").addEventListener("click",buildSilhouetteHull);
   $("#traceClose").addEventListener("click",closeTraceEditor);
   $("#traceDialog").addEventListener("cancel",event=>{event.preventDefault();closeTraceEditor()});
