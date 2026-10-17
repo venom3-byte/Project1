@@ -140,7 +140,18 @@ jobs:
           curl --fail --silent --show-error --max-time 20 "$base/forge-next/app.js" -o /tmp/forge-next-public.js
           grep -q 'function setWorkspace' /tmp/forge-next-public.js
           grep -q 'function toggleTimeline' /tmp/forge-next-public.js
-          echo "Public Forge Next route verified: HTTP 200 for HTML, CSS and JavaScript, with workspace and independent timeline controller."
+          # All imports must resolve inside the isolated preview folder, not the legacy /forge/ route.
+          grep -q 'import("./forge-engine.js")' /tmp/forge-next-public.js
+          ! grep -q 'import("../forge-engine.js")' /tmp/forge-next-public.js
+          for asset in forge-engine.js forge-viewport.js forge-spatial.js forge-gizmo.js forge-project.js forge-export.js forge-icon.svg; do
+            curl --fail --silent --show-error --max-time 20 "$base/forge-next/$asset" -o "/tmp/forge-next-$asset"
+            test -s "/tmp/forge-next-$asset"
+          done
+          grep -q 'createSilhouetteVisualHull' /tmp/forge-next-forge-engine.js
+          grep -q 'createExtrudedSilhouette' /tmp/forge-next-forge-engine.js
+          grep -q 'timelineLoop' /tmp/forge-next-forge-engine.js
+          grep -q 'href="./forge-icon.svg"' /tmp/forge-next-public.html
+          echo "Public Forge Next route verified: HTML/CSS/JS and all isolated runtime dependencies returned HTTP 200; visual-hull and animation engine are served from this preview, not the legacy editor."
       - name: Upload screenshots, diagnostics and browser logs
         if: always()
         uses: actions/upload-artifact@v4
