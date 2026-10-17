@@ -62,7 +62,7 @@ function testGeometryAbi(exports, label) {
 
 async function loadAndValidate(bytes, label) {
   const module = await WebAssembly.compile(bytes);
-  const names = WebAssembly.Module.exports(module).map(item => item.name);
+  const names = WebAssembly.Module.exports(module).map(item => item.name).sort();
   for (const name of required) assert(names.includes(name), label + ": missing WASM export " + name);
   const { instance } = await WebAssembly.instantiate(module, {});
   const exports = instance.exports;
