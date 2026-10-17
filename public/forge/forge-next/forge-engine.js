@@ -256,11 +256,14 @@ export class ForgeEngine{
         positions.push(Math.cos(theta)*radius,y,Math.sin(theta)*radius);
       }
     }
-    for(let i=0;i<pts.length-1;i++){
-      const radiusA=Math.abs(pts[i][0]-axisX)/radialExtent*(d/2),radiusB=Math.abs(pts[i+1][0]-axisX)/radialExtent*(d/2);
+    // Spin closes the profile loop: the final edge joins the inner bottom back to the outer bottom,
+    // creating a sealed radial cross-section rather than a tube with a missing bottom face.
+    for(let i=0;i<pts.length;i++){
+      const next=(i+1)%pts.length;
+      const radiusA=Math.abs(pts[i][0]-axisX)/radialExtent*(d/2),radiusB=Math.abs(pts[next][0]-axisX)/radialExtent*(d/2);
       if(radiusA<1e-6&&radiusB<1e-6)continue;
       for(let j=0;j<seg;j++){
-        const n=(j+1)%seg,a=i*seg+j,b=i*seg+n,c=(i+1)*seg+j,e=(i+1)*seg+n;
+        const n=(j+1)%seg,a=i*seg+j,b=i*seg+n,c=next*seg+j,e=next*seg+n;
         if(radiusA<1e-6){indices.push(a,c,e)}
         else if(radiusB<1e-6){indices.push(a,c,b)}
         else indices.push(a,c,b,b,c,e);
