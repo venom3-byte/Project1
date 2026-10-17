@@ -18,6 +18,7 @@ async function dataUrlToFile(url,name){const response=await fetch(url);if(!respo
 function notifyEngine(message){console.info("[Forge Eye Engine]",message)}
 async function boot(){
   try{
+    document.documentElement.dataset.forgeEye="booting";
     setStatus("Loading Rust WebAssembly core…");
     const partUrls=Array.from({length:4},(_,i)=>"./pkg/forge_eye_wasm_bg.wasm.gz.b64."+String(i).padStart(2,"0"));
     const parts=await Promise.all(partUrls.map(async url=>{
@@ -39,9 +40,10 @@ async function boot(){
     await import("./runtime/forge-viewport.js");attachRendererEvents();
     await runCore({type:"create_primitive",primitive:"cube",name:"Cube"},{dirty:false});
     $("#rustBadge").textContent=engine_version();$("#rustBadge").classList.add("is-ready");$("#rustBadge").title="Rust geometry and scene core loaded as WebAssembly";
+    document.documentElement.dataset.forgeEye="ready";
     window.ForgeEyeReady=true;window.ForgeEyeState=state;window.ForgeEyeWasm=state.wasm;
     setStatus(engine_version()+" · scene ready","success");setWorkspace("scene");setDirty(false);requestAnimationFrame(updateRuntimeStatus);
-  }catch(error){console.error("[Forge Eye boot]",error);$("#rustBadge").textContent="Rust/WASM boot failed";$("#rustBadge").classList.add("is-error");setStatus(error?.message||String(error),"error");$("#viewportNotice").hidden=false;$("#viewportNotice").textContent="Forge Eye could not start. Check that the WebAssembly glue and .b64 binary are published in /forge-eye/pkg/.";window.ForgeEyeBootError=error?.stack||String(error)}
+  }catch(error){document.documentElement.dataset.forgeEye="error";console.error("[Forge Eye boot]",error);$("#rustBadge").textContent="Rust/WASM boot failed";$("#rustBadge").classList.add("is-error");setStatus(error?.message||String(error),"error");$("#viewportNotice").hidden=false;$("#viewportNotice").textContent="Forge Eye could not start. Check that the WebAssembly glue and .b64 binary are published in /forge-eye/pkg/.";window.ForgeEyeBootError=error?.stack||String(error)}
 }
 function updateRuntimeStatus(){if(!state.engine)return;const d=state.engine.diagnostics?.()||{};$("#rendererStatus").textContent=d.renderer||"WebGL";$("#perfStatus").textContent=(d.fps??0)+" FPS · "+(d.frameMs??0)+" ms";$("#sceneStatus").textContent="Scene v"+(state.scene?.schema_version||1)+" · "+Object.keys(state.scene?.objects||{}).length+" objects";requestAnimationFrame(updateRuntimeStatus)}
 function coreCommand(command){if(!state.session)throw new Error("Rust core isn't ready.");const out=JSON.parse(state.session.execute_json(JSON.stringify(command)));state.scene=out.scene;return out}
@@ -210,19 +212,41 @@ function saveTrace(){
   t.ref.outline=t.points.map(p=>[...p]);const record=state.engine.entities.get(t.ref.id);if(record?.components?.reference)record.components.reference.outline=t.ref.outline;
   $("#traceStatus").textContent="Saved "+t.ref.axis+" outline · "+t.ref.outline.length+" points.";refreshReferences();setDirty(true);toast("Reference outline validated by Rust.","success")
 }
-function buildFromOutline(){
-  const ref=activeReference();if(!ref?.outline||ref.outline.length<3){toast("Trace and save an outline for this view first.","error");return}
-  return runCore({type:"extrude_silhouette",request:{name:ref.name.replace(/\.[^.]+$/,"")+" — Silhouette Blockout",contour:ref.outline,axis:ref.axis,width:ref.width,height:ref.height,depth:clamp($("#hullDepth").value,.01,10000,.3),color:[.32,.62,.76,1]}})
+async function buildFromOutline(){
+  const ref=activeReference();if(!ref?.outline||ref.outline.length<3){toast("Trace and save an outline for this view first.","error");return null}
+  try{
+    const out=await runCore({type:"extrude_silhouette",request:{name:ref.name.replace(/\.[^.]+$/,"")+" — Silhouette Blockout",contour:ref.outline,axis:ref.axis,width:ref.width,height:ref.height,depth:clamp($("#hullDepth").value,.01,10000,.3),color:[.32,.62,.76,1]}});
+    const obj=selectedObject(),diag=obj?.mesh?.diagnostics;
+    $("#referenceOutlineStatus").dataset.state="success";
+    $("#referenceOutlineStatus").textContent="3D blockout built · "+(diag?.vertex_count||0).toLocaleString()+" vertices · "+(diag?.triangle_count||0).toLocaleString()+" triangles.";
+    toast("Rust generated a 3D silhouette mesh.","success");return out;
+  }catch(error){
+    $("#referenceOutlineStatus").dataset.state="error";$("#referenceOutlineStatus").textContent=error?.message||String(error);
+    toast($("#referenceOutlineStatus").textContent,"error");return null;
+  }
 }
-function buildHull(){
+async function buildHull(){
   const front=state.references.front,side=state.references.side,top=state.references.top;
-  if(!front?.outline||front.outline.length<3||!side?.outline||side.outline.length<3){$("#hullResult").dataset.state="error";$("#hullResult").textContent="Required: saved Front and Side outlines.";return}
+  const result=$("#hullResult");
+  if(!front?.outline||front.outline.length<3||!side?.outline||side.outline.length<3){result.dataset.state="error";result.textContent="Required: saved Front and Side outlines.";return null}
   const width=clamp($("#hullWidth").value,.01,10000,front.width),height=clamp($("#hullHeight").value,.01,10000,front.height),depth=clamp($("#hullDepth").value,.01,10000,side.width);
   const mismatch=Math.abs(front.height-side.height)/Math.max(front.height,side.height,.01);
-  if(mismatch>.05){$("#hullResult").dataset.state="error";$("#hullResult").textContent="Front/side heights differ by "+(mismatch*100).toFixed(1)+"%. Align the real-world scale first.";return}
-  if(top?.outline?.length>=3){const wm=Math.abs(top.width-width)/Math.max(top.width,width,.01),dm=Math.abs(top.height-depth)/Math.max(top.height,depth,.01);if(wm>.05||dm>.05){$("#hullResult").dataset.state="error";$("#hullResult").textContent="Top reference width/depth doesn't match the front/side scale.";return}}
-  const request={name:"Multi-view Visual Hull",front_contour:front.outline,side_contour:side.outline,top_contour:top?.outline?.length>=3?top.outline:undefined,width,height,depth,resolution:clamp($("#hullResolution").value,8,64,24),color:[.32,.62,.76,1]};
-  return runCore({type:"build_visual_hull",request})
+  if(mismatch>.05){result.dataset.state="error";result.textContent="Front/side heights differ by "+(mismatch*100).toFixed(1)+"%. Align the real-world scale first.";return null}
+  if(top?.outline?.length>=3){const wm=Math.abs(top.width-width)/Math.max(top.width,width,.01),dm=Math.abs(top.height-depth)/Math.max(top.height,depth,.01);if(wm>.05||dm>.05){result.dataset.state="error";result.textContent="Top reference width/depth doesn't match the front/side scale.";return null}}
+  const viewCount=top?.outline?.length>=3?3:2;
+  const request={name:"Multi-view Visual Hull",front_contour:front.outline,side_contour:side.outline,top_contour:viewCount===3?top.outline:undefined,width,height,depth,resolution:clamp($("#hullResolution").value,8,64,24),color:[.32,.62,.76,1]};
+  result.dataset.state="building";result.textContent="Building "+viewCount+"-view visual hull in Rust…";
+  try{
+    const out=await runCore({type:"build_visual_hull",request});
+    const obj=selectedObject(),diag=obj?.mesh?.diagnostics;
+    if(!obj?.mesh||!(diag?.triangle_count>0))throw new Error("Rust returned no valid mesh for the requested reference contours.");
+    result.dataset.state="success";
+    result.textContent=viewCount+"-view visual hull built · "+(diag.occupied_voxels||0).toLocaleString()+" occupied voxels · "+diag.vertex_count.toLocaleString()+" vertices · "+diag.triangle_count.toLocaleString()+" triangles. Review the blockout in orthographic views.";
+    toast("Rust generated the "+viewCount+"-view visual hull.","success");return out;
+  }catch(error){
+    result.dataset.state="error";result.textContent=error?.message||String(error);
+    toast(result.textContent,"error");return null;
+  }
 }
 function drawProfile(){
   const c=$("#profileCanvas"),ctx=c.getContext("2d"),w=c.width,h=c.height;ctx.clearRect(0,0,w,h);ctx.fillStyle="#0b141c";ctx.fillRect(0,0,w,h);
