@@ -253,6 +253,47 @@ try {
   await page.locator("#traceClose").click();
   await page.waitForFunction(()=>!document.querySelector("#traceDialog").open,null,{timeout:5000});
 
+  // Follow the video technique: trace a bottle's radial cross-section, then Spin 360 degrees.
+  await page.locator('[data-workspace="references"]').click();
+  await page.waitForFunction(()=>!document.querySelector('[data-inspector-panel="references"]').hidden,null,{timeout:5000});
+  await page.locator("#referenceAxis").selectOption("front");await page.locator("#referenceWidth").fill("0.08");
+  const bottlePng=Buffer.from(await page.evaluate(()=>{
+    const c=document.createElement("canvas");c.width=100;c.height=240;const x=c.getContext("2d");
+    x.fillStyle="#ececec";x.fillRect(0,0,c.width,c.height);
+    x.strokeStyle="#8d9aa4";x.lineWidth=2;x.fillStyle="#c8d5dc";x.beginPath();
+    x.moveTo(50,220);x.lineTo(82,220);x.lineTo(82,173);x.lineTo(78,139);x.lineTo(66,111);x.lineTo(64,60);x.lineTo(64,36);
+    x.lineTo(56,36);x.lineTo(56,60);x.lineTo(59,112);x.lineTo(71,143);x.lineTo(74,176);x.lineTo(74,190);x.lineTo(50,190);x.closePath();x.fill();x.stroke();
+    return c.toDataURL("image/png").split(",")[1]
+  }),"base64");
+  await page.locator("#referenceInput").setInputFiles({name:"qa-bottle-reference.png",mimeType:"image/png",buffer:bottlePng});
+  await page.waitForFunction(()=>[...window.Forge.entities.values()].some(r=>r.components?.reference?.name==="qa-bottle-reference.png"),null,{timeout:10000});
+  await page.locator("#latheDiameter").fill("0.08");await page.locator("#latheHeight").fill("0.25");await page.locator("#latheSegments").selectOption("32");
+  await page.locator("#traceLatheProfile").click();
+  await page.waitForFunction(()=>document.querySelector("#traceDialog").open&&document.querySelector("#traceModeLabel").textContent.includes("REVOLVE 360"),null,{timeout:5000});
+  const bottleTraceRect=await page.locator("#traceCanvas").boundingBox();
+  const bottleProfile=[[.5,.92],[.82,.92],[.82,.72],[.78,.58],[.66,.45],[.64,.25],[.64,.14],[.56,.14],[.56,.27],[.60,.46],[.73,.65],[.73,.78],[.5,.82]];
+  for(const [u,v] of bottleProfile)await page.mouse.click(bottleTraceRect.x+bottleTraceRect.width*u,bottleTraceRect.y+bottleTraceRect.height*v);
+  const profileCount=await page.locator("#tracePointCount").textContent();
+  if(!profileCount?.includes("13 points"))throw new Error("Lathe profile tracer did not record all 13 points: "+profileCount);
+  await page.locator("#traceSaveOutline").click();
+  const savedProfile=await page.evaluate(()=>{const r=[...window.Forge.entities.values()].find(o=>o.components?.reference?.name==="qa-bottle-reference.png");return{profile:r.components.reference.latheProfile?.length||0,outline:r.components.reference.outline?.length||0}});
+  if(savedProfile.profile!==13||savedProfile.outline!==0)throw new Error("Spin profile was not stored separately from a closed silhouette: "+JSON.stringify(savedProfile));
+  await page.locator("#traceBuildLathe").click();
+  await page.waitForFunction(()=>window.Forge.selected()?.components?.geometry?.kind==="lathe-profile",null,{timeout:10000});
+  const latheMesh=await page.evaluate(()=>{const r=window.Forge.selected(),g=r.components.geometry,d=r.components.diagnostics||{},instances=r.entity.render?.meshInstances||[],saved=window.Forge.serialize().entities.find(e=>e.components?.geometry?.kind==="lathe-profile");return{kind:r.kind,name:r.name,geoKind:g.kind,axis:g.axis,segments:g.segments,diameter:g.diameter,height:g.height,profile:g.profile?.length||0,revolve:g.revolveDegrees,vertices:d.vertices||0,triangles:d.triangles||0,rendered:instances.length,indexCount:instances[0]?.mesh?.primitive?.[0]?.count||0,saved:!!saved,savedPoints:saved?.components?.geometry?.profile?.length||0}});
+  if(latheMesh.kind!=="mesh"||latheMesh.geoKind!=="lathe-profile"||latheMesh.axis!=="Y"||latheMesh.segments!==32||Math.abs(latheMesh.diameter-.08)>.001||Math.abs(latheMesh.height-.25)>.001||latheMesh.profile!==13||latheMesh.revolve!==360||latheMesh.vertices!==13*32||latheMesh.triangles<600||latheMesh.rendered!==1||latheMesh.indexCount<1800||!latheMesh.saved||latheMesh.savedPoints!==13)throw new Error("Spin 360 lathe mesh creation failed: "+JSON.stringify(latheMesh));
+  await page.screenshot({path:path.join(ARTIFACTS,"forge-next-spin-lathe-bottle.png"),fullPage:true});
+  const latheScene=await page.evaluate(()=>window.Forge.serialize());
+  const latheReload=await page.evaluate(async data=>{
+    await window.Forge.load(data);
+    const r=[...window.Forge.entities.values()].find(item=>item.components?.geometry?.kind==="lathe-profile");
+    const instance=r?.entity.render?.meshInstances?.[0];
+    const ref=[...window.Forge.entities.values()].find(item=>item.components?.reference?.name==="qa-bottle-reference.png");
+    return{found:!!r,segments:r?.components.geometry.segments||0,profile:r?.components.geometry.profile?.length||0,mesh:!!instance,indexCount:instance?.mesh?.primitive?.[0]?.count||0,savedReferenceProfile:ref?.components.reference.latheProfile?.length||0,imageEmbedded:typeof ref?.components.reference.imageDataUrl==="string"&&ref.components.reference.imageDataUrl.startsWith("data:image/")};
+  },latheScene);
+  if(!latheReload.found||latheReload.segments!==32||latheReload.profile!==13||!latheReload.mesh||latheReload.indexCount<1800||latheReload.savedReferenceProfile!==13||!latheReload.imageEmbedded)throw new Error("Lathe profile or mesh did not survive project reload: "+JSON.stringify(latheReload));
+  await page.screenshot({path:path.join(ARTIFACTS,"forge-next-spin-lathe-roundtrip.png"),fullPage:true});
+
   // Resizing docks must persist layout dimensions without pushing the main page horizontally.
   const leftBefore=await page.evaluate(()=>parseInt(getComputedStyle(document.documentElement).getPropertyValue("--left-dock-width"),10));
   const splitter=page.locator('[data-splitter="left"]');
