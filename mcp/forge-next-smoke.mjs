@@ -111,6 +111,19 @@ try {
   if(!previewOnly.preview||previewOnly.timeline||previewOnly.pressed!=="true")throw new Error("Preview did not remain independent from timeline: "+JSON.stringify(previewOnly));
   await page.locator("#previewScene").click();
   await page.waitForFunction(()=>window.Forge.running===false,null,{timeout:5000});
+
+  // Verify playback wraps at the end frame when Loop is enabled, and stops when disabled.
+  const loopDefault=await page.evaluate(()=>window.Forge.timelineLoop);
+  if(loopDefault!==true)throw new Error("Animation timeline should loop by default.");
+  await page.evaluate(()=>{window.Forge.timelineStart=0;window.Forge.timelineEnd=10;window.Forge.timelineLoop=true;window.Forge.timelineTime=9.99;window.Forge.timelinePlaying=true});
+  await page.waitForFunction(()=>window.Forge.timelinePlaying&&window.Forge.timelineTime<0.2,null,{timeout:5000});
+  await page.locator("#timelineLoop").click();
+  await page.waitForFunction(()=>window.Forge.timelineLoop===false,null,{timeout:5000});
+  await page.evaluate(()=>{window.Forge.timelineTime=9.99;window.Forge.timelinePlaying=true});
+  await page.waitForFunction(()=>window.Forge.timelinePlaying===false&&window.Forge.timelineTime>=9.99,null,{timeout:5000});
+  await page.locator("#timelineLoop").click();
+  await page.waitForFunction(()=>window.Forge.timelineLoop===true,null,{timeout:5000});
+  await page.locator("#currentFrame").fill("36");await page.locator("#currentFrame").press("Tab");
   await page.locator('[data-command="toggle-auto-key"]').click();
   await page.locator("#currentFrame").fill("36");await page.locator("#currentFrame").press("Tab");
   await page.locator("#positionY").fill("3.25");await page.locator("#positionY").press("Tab");
