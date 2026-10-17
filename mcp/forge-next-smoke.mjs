@@ -99,6 +99,23 @@ try {
   await page.waitForFunction(()=>Math.abs(window.Forge.selected().entity.getLocalPosition().x-3.5)<0.05,null,{timeout:5000});
   const interpolated=await page.evaluate(()=>({frame:Number(document.querySelector("#currentFrame").value),x:window.Forge.selected().entity.getLocalPosition().x,keys:window.Forge.keyframes.get(window.Forge.selectedId).length}));
   if(interpolated.frame!==12||Math.abs(interpolated.x-3.5)>0.05)throw new Error("Timeline scrubbing or Ease interpolation failed: "+JSON.stringify(interpolated));
+
+  // Graph Editor must plot a selected transform channel and make its key value draggable.
+  await page.locator('[data-timeline-view="graph"]').click();
+  await page.waitForFunction(()=>!document.querySelector("#graphEditorPane").hidden&&!document.querySelector("#timelineDopeSheet").hidden===false,null,{timeout:5000}).catch(()=>{});
+  const graphInitial=await page.evaluate(()=>({visible:!document.querySelector("#graphEditorPane").hidden,canvas:[document.querySelector("#graphEditorCanvas").width,document.querySelector("#graphEditorCanvas").height],label:document.querySelector("#graphChannelSummary").textContent,metrics:!!document.querySelector("#graphEditorCanvas").__graphMetrics,keys:window.Forge.keyframes.get(window.Forge.selectedId)?.length||0,channel:document.querySelector("#graphChannel").value}));
+  if(!graphInitial.visible||graphInitial.canvas[0]<120||graphInitial.canvas[1]<80||graphInitial.label!=="Location X"||!graphInitial.metrics||graphInitial.keys!==2||graphInitial.channel!=="p0")throw new Error("Graph Editor curve did not initialize: "+JSON.stringify(graphInitial));
+  const graphPoint=await page.evaluate(()=>{const c=document.querySelector("#graphEditorCanvas"),m=c.__graphMetrics,k=window.Forge.keyframes.get(window.Forge.selectedId).find(x=>Math.round(x.time*24)===24);return{x:m.xFor(k.time),y:m.yFor(k.p[0]),value:k.p[0]}});
+  await page.mouse.move((await page.locator("#graphEditorCanvas").boundingBox()).x+graphPoint.x,(await page.locator("#graphEditorCanvas").boundingBox()).y+graphPoint.y);
+  await page.mouse.down();
+  const gb=await page.locator("#graphEditorCanvas").boundingBox();
+  await page.mouse.move(gb.x+graphPoint.x,gb.y+graphPoint.y+18,{steps:5});await page.mouse.up();
+  const graphEdited=await page.evaluate(()=>({value:window.Forge.keyframes.get(window.Forge.selectedId).find(x=>Math.round(x.time*24)===24).p[0],timelineView:document.querySelector('[data-timeline-view="graph"]').getAttribute("aria-selected"),objectX:window.Forge.selected().entity.getLocalPosition().x}));
+  if(!(graphEdited.value<graphPoint.value-0.1)||graphEdited.timelineView!=="true")throw new Error("Graph Editor drag did not edit the Location X key: "+JSON.stringify({graphPoint,graphEdited}));
+  await page.screenshot({path:path.join(ARTIFACTS,"forge-next-graph-editor.png"),fullPage:true});
+  await page.locator('[data-timeline-view="dopesheet"]').click();
+  await page.waitForFunction(()=>!document.querySelector("#timelineDopeSheet").hidden&&document.querySelector("#graphEditorPane").hidden,null,{timeout:5000});
+
   await page.locator('[data-command="timeline-play"]').click();
   await page.waitForFunction(()=>window.Forge.timelinePlaying===true,null,{timeout:5000});
   const timelineOnly=await page.evaluate(()=>({timeline:window.Forge.timelinePlaying,preview:window.Forge.running,pressed:document.querySelector("#timelinePlay").getAttribute("aria-pressed")}));
