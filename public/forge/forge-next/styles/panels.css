@@ -177,3 +177,8 @@
 #hullStatus{padding-top:6px;border-top:1px solid #2b3c48;color:#8ca6b7}
 #hullStatus[data-state="error"]{color:#f1a1a4}
 #hullStatus[data-state="success"]{color:#9edcb8}
+
+
+.timeline-loop-button{min-width:25px;padding:0 5px;color:#839bad;font-size:14px}
+.timeline-loop-button.is-active,.timeline-loop-button[aria-pressed="true"]{border-color:#345d71;background:#173343;color:#9cd7ef}
+@media(max-width:520px){.timeline-loop-button{min-width:24px;padding:0 3px;font-size:13px}}
