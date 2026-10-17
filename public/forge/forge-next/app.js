@@ -399,6 +399,73 @@ function profileFromLatheSilhouette(segmentation,{diameter=.08,height=.25,wallTh
   return{profile:clean,wallThickness:wall,baseThickness:base,axisX:axis,foregroundRatio:segmentation.foregroundRatio,symmetryScore:segmentation.symmetryScore,sourceBounds:bounds};
 }
 
+
+function selectedReferenceSource(){
+  const record=selectedRecord(),meta=record?.components?.reference,assetName=record?.components?.asset?.name,asset=assetName?state.engine.assets.get(assetName):null;
+  if(!record||!meta||!asset?.file)throw new Error("Select an imported reference image. Re-import the image if the project was reopened without its original file.");
+  return{record,meta,file:asset.file};
+}
+async function bitmapFromFile(file){
+  try{return await createImageBitmap(file)}catch(error){throw new Error("The selected file could not be decoded as an image: "+(error?.message||String(error)))}
+}
+async function autoBuildSilhouetteFromReference(){
+  let bitmap;
+  try{
+    const {record,meta,file}=selectedReferenceSource();status("Separating foreground and tracing the outer boundary…");
+    bitmap=await bitmapFromFile(file);const extracted=await extractForegroundFromBitmap(bitmap);bitmap.close();bitmap=null;
+    meta.outline=extracted.contour;meta.outlineSavedAt=new Date().toISOString();meta.outlineClosed=true;
+    meta.autoSegmentation={foregroundRatio:extracted.foregroundRatio,tolerance:extracted.tolerance,symmetryScore:extracted.symmetryScore,method:extracted.transparent?"alpha-mask":"border-color-flood"};
+    const depth=clamp($("#silhouetteDepth").value,.01,1000,.35);
+    const mesh=state.engine.createExtrudedSilhouette({
+      name:record.name.replace(/\.[^.]+$/,"")+" — Auto Silhouette",
+      contour:extracted.contour,axis:meta.axis||"front",width:Number(meta.width)||3,height:Number(meta.height)||3,depth,color:[.36,.57,.76]
+    });
+    mesh.components.geometry.sourceReference={name:record.name,method:"automatic outer contour",foregroundRatio:extracted.foregroundRatio,tolerance:extracted.tolerance};
+    state.engine.select(mesh.id);state.engine.frame();refreshAll();setWorkspace("modeling");
+    status("Automatic silhouette mesh created · "+extracted.contour.length+" contour points · inspect the other views","dirty");
+    return mesh;
+  }catch(error){bitmap?.close?.();status("Automatic silhouette needs a cleaner reference","error");notice("Auto silhouette",error?.message||String(error));return null}
+}
+async function autoBuildLatheFromReference(){
+  let bitmap;
+  try{
+    const {record,meta,file}=selectedReferenceSource();
+    if(meta.axis!=="front")throw new Error("Set this reference to Front / X-Y before automatic Spin. A side or top image can still be traced manually.");
+    const diameter=clamp($("#latheDiameter").value,.001,1000,.08),height=clamp($("#latheHeight").value,.001,1000,.25);
+    status("Analyzing silhouette symmetry and estimating the vessel profile…");
+    bitmap=await bitmapFromFile(file);const segmentation=await extractForegroundFromBitmap(bitmap);bitmap.close();bitmap=null;
+    const detected=profileFromLatheSilhouette(segmentation,{diameter,height,wallThickness:clamp($("#latheWallThickness").value,.0001,Math.min(1,diameter*.25),.002),baseThickness:clamp($("#latheBaseThickness").value,.0001,Math.min(1,height*.25),.003)});
+    meta.latheProfile=detected.profile.map(point=>[...point]);meta.latheProfileSavedAt=new Date().toISOString();
+    meta.autoSegmentation={foregroundRatio:segmentation.foregroundRatio,tolerance:segmentation.tolerance,symmetryScore:segmentation.symmetryScore,method:segmentation.transparent?"alpha-mask":"border-color-flood",profileMode:"auto-spin"};
+    const mesh=state.engine.createLathedProfileMesh({
+      name:record.name.replace(/\.[^.]+$/,"")+" — Auto Spin 360°",
+      profile:detected.profile,diameter,height,segments:clamp($("#latheSegments").value,12,128,32),
+      smoothing:clamp($("#latheSmoothing").value,0,3,1),color:[.42,.62,.76]
+    });
+    mesh.components.geometry.sourceReference={name:record.name,method:"auto rotational profile",wallThickness:detected.wallThickness,baseThickness:detected.baseThickness,symmetryScore:detected.symmetryScore,foregroundRatio:detected.foregroundRatio};
+    state.engine.select(mesh.id);state.engine.frame();refreshAll();setWorkspace("modeling");
+    status("Auto Spin mesh created · symmetry "+Math.round(detected.symmetryScore*100)+"% · inspect rim, cavity and base","dirty");
+    return mesh;
+  }catch(error){bitmap?.close?.();status("Automatic Spin needs a clearer rotational reference","error");notice("Auto Spin / Lathe",error?.message||String(error));return null}
+}
+async function autoDetectTrace(){
+  const trace=state.trace;if(!trace)return;
+  try{
+    $("#traceMessage").textContent="Separating object from background…";
+    const extracted=await extractForegroundFromBitmap(trace.bitmap);
+    if(trace.mode==="lathe-profile"){
+      const detected=profileFromLatheSilhouette(extracted,{diameter:clamp($("#latheDiameter").value,.001,1000,.08),height:clamp($("#latheHeight").value,.001,1000,.25),wallThickness:clamp($("#latheWallThickness").value,.0001,1,.002),baseThickness:clamp($("#latheBaseThickness").value,.0001,1,.003)});
+      trace.points=detected.profile;trace.autoProfileInfo={symmetryScore:detected.symmetryScore,foregroundRatio:detected.foregroundRatio,wallThickness:detected.wallThickness,baseThickness:detected.baseThickness};
+      trace.closed=true;trace.editing=true;
+      $("#traceMessage").textContent="Automatic half-profile generated from the outer silhouette ("+Math.round(detected.symmetryScore*100)+"% symmetry). Review the rim, inner wall and base; drag points before building.";
+    }else{
+      trace.points=extracted.contour;trace.closed=true;trace.editing=true;
+      $("#traceMessage").textContent="Automatic contour extracted · "+extracted.contour.length+" points. Inspect the outline for missing holes or background leaks, then build or edit it.";
+    }
+    traceDraw();
+  }catch(error){$("#traceMessage").textContent=error?.message||String(error);status("Auto-detect could not isolate a clean silhouette","error")}
+}
+
 function configureTraceDialog(mode){
   const lathe=mode==="lathe-profile";
   $("#traceDialogTitle").textContent=lathe?"Trace lathe / spin profile":"Trace image silhouette";
@@ -574,7 +641,8 @@ function buildTraceLathe(){
     const record=state.engine.createLathedProfileMesh({
       name:trace.record.name.replace(/\.[^.]+$/,"")+" — Spin 360°",
       profile:trace.points,diameter:clamp($("#latheDiameter").value,.001,1000,.08),
-      height:clamp($("#latheHeight").value,.001,1000,.25),segments:clamp($("#latheSegments").value,12,128,32),color:[.42,.62,.76]
+      height:clamp($("#latheHeight").value,.001,1000,.25),segments:clamp($("#latheSegments").value,12,128,32),
+      smoothing:clamp($("#latheSmoothing").value,0,3,1),color:[.42,.62,.76]
     });
     const diag=record.components.diagnostics||{};
     state.engine.select(record.id);state.engine.frame();refreshAll();setWorkspace("modeling");closeTraceEditor();
