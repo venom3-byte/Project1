@@ -1,7 +1,10 @@
 //! Minimal JSON ABI so the browser can call the same Rust code without generated glue.
 //! Wasm callers must pass valid (pointer, length) pairs allocated through forge_eye_alloc.
 
-use crate::{AnimationTrack, Axis, LatheOptions, LatheProfilePoint, Transform, TransformKey, generate_lathe_mesh};
+use crate::{
+    AnimationTrack, Axis, LatheOptions, LatheProfilePoint, Transform, TransformKey,
+    generate_lathe_mesh,
+};
 use serde::{Deserialize, Serialize};
 use std::mem;
 use std::slice;
@@ -49,11 +52,20 @@ fn pack_output(json: String) -> u64 {
 }
 
 fn failure(message: impl Into<String>) -> u64 {
-    pack_output(serde_json::to_string(&Failure { ok: false, error: message.into(), version: env!("CARGO_PKG_VERSION") }).unwrap_or_else(|_| "{\"ok\":false,\"error\":\"serialization failed\"}".to_owned()))
+    pack_output(
+        serde_json::to_string(&Failure {
+            ok: false,
+            error: message.into(),
+            version: env!("CARGO_PKG_VERSION"),
+        })
+        .unwrap_or_else(|_| "{\"ok\":false,\"error\":\"serialization failed\"}".to_owned()),
+    )
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn forge_eye_version() -> u32 { 0x0001_0000 }
+pub extern "C" fn forge_eye_version() -> u32 {
+    0x0001_0000
+}
 
 #[unsafe(no_mangle)]
 pub extern "C" fn forge_eye_alloc(length: u32) -> u32 {
@@ -63,16 +75,24 @@ pub extern "C" fn forge_eye_alloc(length: u32) -> u32 {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn forge_eye_dealloc(pointer: u32, length: u32) {
-    if pointer == 0 { return; }
+    if pointer == 0 {
+        return;
+    }
     let slice_ptr = std::ptr::slice_from_raw_parts_mut(pointer as *mut u8, length as usize);
-    unsafe { drop(Box::from_raw(slice_ptr)); }
+    unsafe {
+        drop(Box::from_raw(slice_ptr));
+    }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn forge_eye_free_output(pointer: u32, length: u32) {
-    if pointer == 0 { return; }
+    if pointer == 0 {
+        return;
+    }
     let slice_ptr = std::ptr::slice_from_raw_parts_mut(pointer as *mut u8, length as usize);
-    unsafe { drop(Box::from_raw(slice_ptr)); }
+    unsafe {
+        drop(Box::from_raw(slice_ptr));
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -84,7 +104,11 @@ pub unsafe extern "C" fn forge_eye_lathe_json(pointer: u32, length: u32) -> u64 
     };
     match generate_lathe_mesh(&request.profile, request.options) {
         Ok(mesh) => {
-            match serde_json::to_string(&SuccessMesh { ok: true, mesh: &mesh, version: env!("CARGO_PKG_VERSION") }) {
+            match serde_json::to_string(&SuccessMesh {
+                ok: true,
+                mesh: &mesh,
+                version: env!("CARGO_PKG_VERSION"),
+            }) {
                 Ok(json) => pack_output(json),
                 Err(error) => failure(format!("Could not serialize generated mesh: {error}")),
             }
@@ -103,8 +127,14 @@ pub unsafe extern "C" fn forge_eye_animation_json(pointer: u32, length: u32) -> 
     if !request.frame.is_finite() {
         return failure("Animation frame must be finite.");
     }
-    let transform = request.track.evaluate(request.frame.clamp(0.0, 1_000_000.0));
-    match serde_json::to_string(&SuccessTransform { ok: true, transform, version: env!("CARGO_PKG_VERSION") }) {
+    let transform = request
+        .track
+        .evaluate(request.frame.clamp(0.0, 1_000_000.0));
+    match serde_json::to_string(&SuccessTransform {
+        ok: true,
+        transform,
+        version: env!("CARGO_PKG_VERSION"),
+    }) {
         Ok(json) => pack_output(json),
         Err(error) => failure(format!("Could not serialize evaluated transform: {error}")),
     }
