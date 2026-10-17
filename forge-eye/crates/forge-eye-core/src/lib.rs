@@ -119,7 +119,9 @@ pub struct SpinRequest {
     #[serde(default = "default_color")]
     pub color: [f32; 4],
 }
-fn default_smooth_shading() -> bool { true }
+fn default_smooth_shading() -> bool {
+    true
+}
 
 /// A normalized half-section spun around the Y axis. The contour can represent
 /// either a closed wall section or a silhouette whose endpoints lie on the axis.
@@ -586,7 +588,6 @@ pub fn build_lathed_profile(request: &LatheRequest) -> Result<MeshData, Geometry
     Ok(mesh)
 }
 
-
 const MAX_SPIN_SUBDIVISION: usize = 3;
 
 /// Subdivide the 2D control profile before spinning it. This is a deterministic
@@ -594,38 +595,56 @@ const MAX_SPIN_SUBDIVISION: usize = 3;
 /// polygon modifier. Supporting points remain user-editable in the source profile.
 fn subdivide_spin_profile(profile: &[Point2], level: usize) -> Result<Vec<Point2>, GeometryError> {
     if level > MAX_SPIN_SUBDIVISION {
-        return Err(error(format!("Profile subdivision must be between 0 and {MAX_SPIN_SUBDIVISION}.")));
+        return Err(error(format!(
+            "Profile subdivision must be between 0 and {MAX_SPIN_SUBDIVISION}."
+        )));
     }
     validate_contour(profile)?;
-    if level == 0 { return Ok(profile.to_vec()); }
+    if level == 0 {
+        return Ok(profile.to_vec());
+    }
     let steps = 1usize << level;
     let cap = 256usize.saturating_mul(steps);
     let mut out = Vec::with_capacity((profile.len() * steps).min(cap));
     let catmull = |p0: Point2, p1: Point2, p2: Point2, p3: Point2, t: f32| -> Point2 {
-        let t2=t*t; let t3=t2*t;
+        let t2 = t * t;
+        let t3 = t2 * t;
         std::array::from_fn(|axis| {
-            let value=0.5*((2.0*p1[axis])+(-p0[axis]+p2[axis])*t
-                +(2.0*p0[axis]-5.0*p1[axis]+4.0*p2[axis]-p3[axis])*t2
-                +(-p0[axis]+3.0*p1[axis]-3.0*p2[axis]+p3[axis])*t3);
-            value.clamp(0.0,1.0)
+            let value = 0.5
+                * ((2.0 * p1[axis])
+                    + (-p0[axis] + p2[axis]) * t
+                    + (2.0 * p0[axis] - 5.0 * p1[axis] + 4.0 * p2[axis] - p3[axis]) * t2
+                    + (-p0[axis] + 3.0 * p1[axis] - 3.0 * p2[axis] + p3[axis]) * t3);
+            value.clamp(0.0, 1.0)
         })
     };
-    for i in 0..profile.len()-1 {
-        let p0=profile[i.saturating_sub(1)];
-        let p1=profile[i];
-        let p2=profile[i+1];
-        let p3=profile[(i+2).min(profile.len()-1)];
+    for i in 0..profile.len() - 1 {
+        let p0 = profile[i.saturating_sub(1)];
+        let p1 = profile[i];
+        let p2 = profile[i + 1];
+        let p3 = profile[(i + 2).min(profile.len() - 1)];
         for step in 0..steps {
-            let point=catmull(p0,p1,p2,p3,step as f32/steps as f32);
-            if out.last().is_none_or(|prev: &Point2| distance_sq(*prev,point)>EPSILON*EPSILON) {
+            let point = catmull(p0, p1, p2, p3, step as f32 / steps as f32);
+            if out
+                .last()
+                .is_none_or(|prev: &Point2| distance_sq(*prev, point) > EPSILON * EPSILON)
+            {
                 out.push(point);
             }
         }
     }
-    let last=*profile.last().expect("validated contour is not empty");
-    if out.last().is_none_or(|prev| distance_sq(*prev,last)>EPSILON*EPSILON) { out.push(last); }
-    if out.len()>MAX_CONTOUR_POINTS {
-        return Err(error(format!("Refined profile has {} points; limit is {MAX_CONTOUR_POINTS}. Reduce subdivision or input points.",out.len())));
+    let last = *profile.last().expect("validated contour is not empty");
+    if out
+        .last()
+        .is_none_or(|prev| distance_sq(*prev, last) > EPSILON * EPSILON)
+    {
+        out.push(last);
+    }
+    if out.len() > MAX_CONTOUR_POINTS {
+        return Err(error(format!(
+            "Refined profile has {} points; limit is {MAX_CONTOUR_POINTS}. Reduce subdivision or input points.",
+            out.len()
+        )));
     }
     validate_contour(&out)?;
     Ok(out)
@@ -634,49 +653,74 @@ fn subdivide_spin_profile(profile: &[Point2], level: usize) -> Result<Vec<Point2
 /// Smooth normals by averaging adjacent triangle normals at coincident positions.
 /// The mesh can retain face-local vertices for simple export while appearing smooth.
 fn smooth_mesh_normals(mesh: &mut MeshData) {
-    let key = |p: Point3| ((p[0]*100_000.0).round() as i64,
-                           (p[1]*100_000.0).round() as i64,
-                           (p[2]*100_000.0).round() as i64);
-    let mut sums: HashMap<(i64,i64,i64),Point3> = HashMap::new();
-    for (p,n) in mesh.vertices.iter().zip(mesh.normals.iter()) {
-        let value=sums.entry(key(*p)).or_insert([0.0;3]);
-        for axis in 0..3 { value[axis]+=n[axis]; }
+    let key = |p: Point3| {
+        (
+            (p[0] * 100_000.0).round() as i64,
+            (p[1] * 100_000.0).round() as i64,
+            (p[2] * 100_000.0).round() as i64,
+        )
+    };
+    let mut sums: HashMap<(i64, i64, i64), Point3> = HashMap::new();
+    for (p, n) in mesh.vertices.iter().zip(mesh.normals.iter()) {
+        let value = sums.entry(key(*p)).or_insert([0.0; 3]);
+        for axis in 0..3 {
+            value[axis] += n[axis];
+        }
     }
-    mesh.normals=mesh.vertices.iter().map(|p| {
-        let v=sums.get(&key(*p)).copied().unwrap_or([0.0,1.0,0.0]);
-        let length=(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]).sqrt().max(EPSILON);
-        [v[0]/length,v[1]/length,v[2]/length]
-    }).collect();
+    mesh.normals = mesh
+        .vertices
+        .iter()
+        .map(|p| {
+            let v = sums.get(&key(*p)).copied().unwrap_or([0.0, 1.0, 0.0]);
+            let length = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
+                .sqrt()
+                .max(EPSILON);
+            [v[0] / length, v[1] / length, v[2] / length]
+        })
+        .collect();
 }
 
 /// Blender-inspired Spin/Lathe operation: trace a profile, revolve it 360°,
 /// refine the profile, and optionally smooth shared normals.
 pub fn build_spin_profile(request: &SpinRequest) -> Result<MeshData, GeometryError> {
-    if request.subdivision_level>MAX_SPIN_SUBDIVISION {
-        return Err(error(format!("Profile subdivision must be between 0 and {MAX_SPIN_SUBDIVISION}.")));
+    if request.subdivision_level > MAX_SPIN_SUBDIVISION {
+        return Err(error(format!(
+            "Profile subdivision must be between 0 and {MAX_SPIN_SUBDIVISION}."
+        )));
     }
     if !(MIN_LATHE_SEGMENTS..=MAX_LATHE_SEGMENTS).contains(&request.segments) {
-        return Err(error(format!("Spin segments must be between {MIN_LATHE_SEGMENTS} and {MAX_LATHE_SEGMENTS}.")));
+        return Err(error(format!(
+            "Spin segments must be between {MIN_LATHE_SEGMENTS} and {MAX_LATHE_SEGMENTS}."
+        )));
     }
-    let profile=subdivide_spin_profile(&request.profile,request.subdivision_level)?;
-    let multiplier=1usize << request.subdivision_level;
-    let effective_segments=request.segments.saturating_mul(multiplier).min(MAX_LATHE_SEGMENTS);
-    let lathe=LatheRequest {
-        name:request.name.clone(),
+    let profile = subdivide_spin_profile(&request.profile, request.subdivision_level)?;
+    let multiplier = 1usize << request.subdivision_level;
+    let effective_segments = request
+        .segments
+        .saturating_mul(multiplier)
+        .min(MAX_LATHE_SEGMENTS);
+    let lathe = LatheRequest {
+        name: request.name.clone(),
         profile,
-        diameter:request.diameter,
-        height:request.height,
-        segments:effective_segments,
-        color:request.color,
+        diameter: request.diameter,
+        height: request.height,
+        segments: effective_segments,
+        color: request.color,
     };
-    let mut mesh=build_lathed_profile(&lathe)?;
-    if request.smooth_shading { smooth_mesh_normals(&mut mesh); }
-    mesh.diagnostics.method=format!(
+    let mut mesh = build_lathed_profile(&lathe)?;
+    if request.smooth_shading {
+        smooth_mesh_normals(&mut mesh);
+    }
+    mesh.diagnostics.method = format!(
         "Blender-style spin / lathe + profile smoothing (level {}){}",
         request.subdivision_level,
-        if request.smooth_shading {" + smooth normals"} else {""}
+        if request.smooth_shading {
+            " + smooth normals"
+        } else {
+            ""
+        }
     );
-    mesh.diagnostics.resolution=effective_segments;
+    mesh.diagnostics.resolution = effective_segments;
     Ok(mesh)
 }
 
