@@ -855,4 +855,3 @@ mod tests {
         assert_eq!(before, s.scene);
     }
 }
-
