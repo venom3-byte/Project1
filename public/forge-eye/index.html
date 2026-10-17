@@ -116,8 +116,14 @@
             <div class="profile-editor-block">
               <div class="tool-subheading"><div><strong>Spin profile</strong><small>Trace a cross-section, then revolve around the vertical axis</small></div><span class="tool-tag">360°</span></div>
               <div class="profile-canvas-frame"><canvas id="profileCanvas" width="440" height="320" aria-label="Edit the rotational profile; drag points or tap to add points"></canvas><div class="profile-axis-label">REVOLUTION AXIS</div></div>
-              <div class="profile-actions"><button id="profileReset" class="secondary-button">Reset bottle profile</button><button id="profileUndo" class="secondary-button">Undo point</button><button id="profileImportRef" class="secondary-button">Import image reference</button><input id="profileReferenceInput" type="file" accept="image/png,image/jpeg,image/webp,image/avif" hidden></div>
-              <div id="profileStatus" class="inline-status">Preset ready · drag a point to refine the silhouette.</div>
+              <div class="profile-actions"><button id="profileReset" class="secondary-button">Reset bottle profile</button><button id="profileUndo" class="secondary-button">Undo point</button><button id="profileImportRef" class="secondary-button">Import image reference</button><button id="profileClearRef" class="secondary-button" disabled>Clear reference</button><input id="profileReferenceInput" type="file" accept="image/png,image/jpeg,image/webp,image/avif" hidden></div>
+              <div class="profile-reference-controls">
+                <label class="range-property"><span>Reference opacity <output id="profileReferenceOpacityValue">25%</output></span><input id="profileReferenceOpacity" type="range" min="0.05" max="1" step="0.05" value="0.25"></label>
+                <label class="profile-fit-row"><span>Image fit</span><select id="profileReferenceFit"><option value="contain">Fit · preserve proportions</option><option value="crop">Crop · fill canvas</option><option value="stretch">Stretch · may distort</option></select></label>
+                <label class="toggle-row"><span>Snap profile endpoints to rotation axis</span><input id="profileAxisSnap" type="checkbox" checked><i></i></label>
+                <p>Trace one side of the cross-section. Bring the top and bottom endpoints onto the center axis; Forge revolves the outline through 360° using the Rust Spin/Lathe core.</p>
+              </div>
+              <div id="profileStatus" class="inline-status">Preset ready · import a side reference, adjust opacity, then drag points to match its silhouette.</div>
             </div>
             <div class="spin-settings">
               <div class="tool-subheading"><div><strong>Spin / Lathe settings</strong><small>Rust-generated mesh with validated geometry</small></div></div>
