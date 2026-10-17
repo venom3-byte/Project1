@@ -220,8 +220,9 @@
           <button id="addReferenceImages" class="wide-secondary reference-add">＋ Add reference images</button>
           <div class="silhouette-tools">
             <label>Extrusion depth (m)<input id="silhouetteDepth" type="number" min="0.01" max="1000" step="0.05" value="0.35"></label>
-            <button id="traceSilhouette" class="wide-secondary">Trace outline → build 3D slab</button>
-            <p>For flat silhouettes, trace the outer contour to build an editable slab. For bottles, cans, jars and other rotational objects, use the Spin / Lathe Profile workflow below.</p>
+            <button id="autoSilhouetteModel" class="wide-secondary">Auto-detect silhouette → build 3D</button>
+            <button id="traceSilhouette" class="wide-secondary">Review / edit outline manually</button>
+            <p>Auto mode works best with a transparent or plain background and one clearly separated object. It creates a true extruded mesh from the visible outer contour; hidden depth still requires other views.</p>
           </div>
           <div class="lathe-tools">
             <div class="lathe-title"><strong>Spin / Lathe Profile</strong><span>REVOLVE 360°</span></div>
@@ -230,10 +231,18 @@
               <label>Overall height (m)<input id="latheHeight" type="number" min="0.001" max="1000" step="0.01" value="0.25"></label>
             </div>
             <label class="lathe-segments">Radial segments
-              <select id="latheSegments"><option value="16">16 · Low-poly</option><option value="24">24 · Draft</option><option value="32" selected>32 · Smooth</option><option value="48">48 · Fine</option><option value="64">64 · High detail</option></select>
+              <select id="latheSegments"><option value="16">16 · Low-poly</option><option value="24">24 · Draft</option><option value="32" selected>32 · Smooth</option><option value="48">48 · Fine</option><option value="64">64 · High detail</option><option value="96">96 · Ultra</option></select>
             </label>
-            <button id="traceLatheProfile" class="wide-secondary">Trace half-profile → Spin 360°</button>
-            <p>Use a tightly cropped front reference. Start on the centerline at the bottom, trace the outer contour up to the rim, then trace inward and down the inner wall for a hollow bottle. Forge revolves the profile around the Y-axis. The mesh can be refined after creation.</p>
+            <label class="lathe-smoothing">Profile subdivision
+              <select id="latheSmoothing"><option value="0">0 · Preserve sharp profile</option><option value="1" selected>1 · Subdivision Surface style</option><option value="2">2 · Smooth profile</option><option value="3">3 · Fine profile</option></select>
+            </label>
+            <div class="lathe-dimensions">
+              <label>Wall thickness (m)<input id="latheWallThickness" type="number" min="0.0001" max="1" step="0.0005" value="0.002"></label>
+              <label>Base thickness (m)<input id="latheBaseThickness" type="number" min="0.0001" max="1" step="0.0005" value="0.003"></label>
+            </div>
+            <button id="autoSpinImage" class="wide-secondary">Auto profile → Spin 360°</button>
+            <button id="traceLatheProfile" class="wide-secondary">Review / trace half-profile manually</button>
+            <p>Auto mode segments a single centered rotational object, estimates its outside profile and builds a hollow wall/base. Best for bottles, jars, cans, knobs, vases and turned parts on a plain background. Inspect the opening, wall thickness and symmetry before accepting the mesh.</p>
           </div>
           <div class="visual-hull-tools">
             <div class="visual-hull-title"><strong>Silhouette volume</strong><span>FRONT + SIDE + TOP*</span></div>
@@ -289,7 +298,7 @@
       <p id="traceInstructions" class="trace-instructions">Tap or click around the outside edge of the object. Use at least three points; tracing should not cross itself. The 3D blockout uses the reference width and height set in the Images panel.</p>
       <label id="traceDepthField" class="trace-depth-field">Extrusion depth (m)<input id="traceDepth" type="number" min="0.01" max="1000" step="0.05" value="0.35"></label>
       <div class="trace-preview-frame"><canvas id="traceCanvas" aria-label="Image silhouette tracing canvas"></canvas></div>
-      <div class="trace-toolbar"><span id="tracePointCount" role="status">0 points</span><button id="traceUndo" class="secondary-button">Undo point</button><button id="traceClear" class="secondary-button">Clear outline</button><button id="traceSaveOutline" class="secondary-button">Save profile</button><button id="traceBuild" class="trace-build-button">Build 3D slab</button><button id="traceBuildLathe" class="trace-build-button" hidden>Spin 360° → Build mesh</button></div>
+      <div class="trace-toolbar"><span id="tracePointCount" role="status">0 points</span><button id="traceAutoDetect" class="secondary-button">Auto-detect</button><button id="traceUndo" class="secondary-button">Undo point</button><button id="traceClear" class="secondary-button">Clear outline</button><button id="traceSaveOutline" class="secondary-button">Save profile</button><button id="traceBuild" class="trace-build-button">Build 3D slab</button><button id="traceBuildLathe" class="trace-build-button" hidden>Spin 360° → Build mesh</button></div>
       <p id="traceMessage" class="trace-message" role="status">Start at a recognizable corner and work around the silhouette.</p>
     </div>
   </dialog>
