@@ -386,3 +386,10 @@ button:disabled{opacity:.35;cursor:not-allowed}
 .profile-reference-controls .toggle-row{font-size:9px}
 .profile-reference-controls p{margin:0;color:#7e99aa;font-size:9px;line-height:1.55}
 #profileClearRef:disabled{opacity:.35}
+
+
+/* Keep the active tool shelf above the WebGL canvas in overlapping/touch layouts.
+   This is important on phones and when the shelf's internal panel has been scrolled. */
+.viewport-wrap{z-index:0}
+.tool-shelf{position:relative;z-index:2;isolation:isolate}
+.shelf-panel{position:relative;z-index:0}
