@@ -281,32 +281,42 @@ function buildSilhouetteHull(){
   const references=[...state.engine.entities.values()].filter(record=>record.components?.reference&&Array.isArray(record.components.reference.outline)&&record.components.reference.outline.length>=3);
   const front=references.find(record=>record.components.reference.axis==="front");
   const side=references.find(record=>record.components.reference.axis==="side");
+  const top=references.find(record=>record.components.reference.axis==="top");
   if(!front||!side){
-    $("#hullStatus").textContent="Need two saved outlines: one Front and one Side. Select each image, choose its plane, trace the contour, then tap Save outline.";
-    status("Two-view volume needs front and side outlines","warn");return;
+    $("#hullStatus").textContent="Required: saved Front + Side outlines. A saved Top outline is optional and tightens the reconstructed volume. Select each image, trace it, then tap Save outline.";
+    $("#hullStatus").dataset.state="error";status("Visual hull needs front and side outlines","warn");return;
   }
-  const fm=front.components.reference,sm=side.components.reference;
+  const fm=front.components.reference,sm=side.components.reference,tm=top?.components.reference;
   const frontHeight=Number(fm.height)||Number(fm.width)/(Number(fm.aspect)||1);
   const sideHeight=Number(sm.height)||Number(sm.width)/(Number(sm.aspect)||1);
-  const mismatch=Math.abs(frontHeight-sideHeight)/Math.max(frontHeight,sideHeight,.01);
-  if(mismatch>.05){
-    $("#hullStatus").textContent="Reference heights differ by "+(mismatch*100).toFixed(1)+"%. Adjust the known width for one reference so both show the same real object height (within 5%).";
-    status("Align front and side reference scale","warn");return;
+  const heightMismatch=Math.abs(frontHeight-sideHeight)/Math.max(frontHeight,sideHeight,.01);
+  if(heightMismatch>.05){
+    $("#hullStatus").textContent="Front/side image heights differ by "+(heightMismatch*100).toFixed(1)+"%. Adjust known image widths so both share the same real object height (within 5%).";
+    $("#hullStatus").dataset.state="error";status("Align front and side reference scale","warn");return;
+  }
+  if(top){
+    const topWidth=Number(tm.width)||0,topDepth=Number(tm.height)||topWidth/(Number(tm.aspect)||1);
+    const widthMismatch=Math.abs(topWidth-Number(fm.width))/Math.max(topWidth,Number(fm.width),.01);
+    const depthMismatch=Math.abs(topDepth-Number(sm.width))/Math.max(topDepth,Number(sm.width),.01);
+    if(widthMismatch>.05||depthMismatch>.05){
+      $("#hullStatus").textContent="Top reference scale must match Front width and Side depth. Width mismatch: "+(widthMismatch*100).toFixed(1)+"%; depth mismatch: "+(depthMismatch*100).toFixed(1)+"%. Adjust its known width, then retry.";
+      $("#hullStatus").dataset.state="error";status("Align top reference dimensions","warn");return;
+    }
   }
   try{
-    const height=(frontHeight+sideHeight)/2,width=clamp(fm.width,.01,10000,3),depth=clamp(sm.width,.01,10000,3),resolution=clamp($("#hullResolution").value,12,48,32);
-    $("#hullStatus").textContent="Building "+resolution+"³ voxel visual hull from "+front.name+" and "+side.name+"…";
+    const height=(frontHeight+sideHeight)/2,width=clamp(fm.width,.01,10000,3),depth=clamp(sm.width,.01,10000,3),resolution=clamp($("#hullResolution").value,12,48,32),viewCount=top?3:2;
+    $("#hullStatus").textContent="Building "+resolution+"³ voxel visual hull from "+viewCount+" calibrated view outlines…";$("#hullStatus").dataset.state="";
     const record=state.engine.createSilhouetteVisualHull({
-      name:front.name.replace(/\.[^.]+$/,"")+" — Two-view Hull",
-      frontContour:fm.outline,sideContour:sm.outline,width,height,depth,resolution,color:[.32,.62,.76]
+      name:front.name.replace(/\.[^.]+$/,"")+" — "+viewCount+"-view Hull",
+      frontContour:fm.outline,sideContour:sm.outline,topContour:tm?.outline||[],width,height,depth,resolution,color:[.32,.62,.76]
     });
     state.engine.select(record.id);window.ForgeViewport?.frame?.();refreshAll();setWorkspace("modeling");
     const diag=record.components.diagnostics||{};
-    $("#hullStatus").textContent="Visual hull built · "+Number(diag.occupiedVoxels||0).toLocaleString()+" occupied voxels at "+resolution+"³. Refine the mesh and inspect all orthographic views.";
-    status("Two-view visual hull built · check front, side and perspective","dirty");
+    $("#hullStatus").textContent=viewCount+"-view visual hull built · "+Number(diag.occupiedVoxels||0).toLocaleString()+" occupied voxels at "+resolution+"³. This is a blockout; inspect orthographic views and refine details.";
+    $("#hullStatus").dataset.state="success";status(viewCount+"-view visual hull built · inspect all orthographic views","dirty");
   }catch(error){
-    $("#hullStatus").textContent=error?.message||String(error);
-    status("Two-view volume could not be built","error");
+    $("#hullStatus").textContent=error?.message||String(error);$("#hullStatus").dataset.state="error";
+    status("Multi-view volume could not be built","error");
   }
 }
 function refreshDiagnostics(){
