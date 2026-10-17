@@ -227,6 +227,12 @@ try {
   await page.evaluate(()=>{const r=[...window.Forge.entities.values()].find(o=>o.components?.reference?.name==="qa-side-reference.png");window.Forge.select(r.id)});
   await page.locator("#traceSilhouette").click();
   await page.waitForFunction(()=>document.querySelector("#traceDialog").open&&document.querySelector("#tracePointCount").textContent.includes("4 points"),null,{timeout:10000});
+  const editRect=await page.locator("#traceCanvas").boundingBox();
+  await page.mouse.move(editRect.x+editRect.width*0.8,editRect.y+editRect.height*0.2);
+  await page.mouse.down();await page.mouse.move(editRect.x+editRect.width*0.75,editRect.y+editRect.height*0.27,{steps:5});await page.mouse.up();
+  await page.locator("#traceSaveOutline").click();
+  const editedOutline=await page.evaluate(()=>{const r=[...window.Forge.entities.values()].find(o=>o.components?.reference?.name==="qa-side-reference.png");return r.components.reference.outline?.[1]||null});
+  if(!editedOutline||Math.abs(editedOutline[0]-0.75)>0.04||Math.abs(editedOutline[1]-0.27)>0.04)throw new Error("Dragging a saved contour point failed: "+JSON.stringify(editedOutline));
   await page.locator("#traceClose").click();
   await page.waitForFunction(()=>!document.querySelector("#traceDialog").open,null,{timeout:5000});
 
