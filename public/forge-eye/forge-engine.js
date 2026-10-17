@@ -219,6 +219,23 @@ export class ForgeEngine{
     out.components.material={color:[...color],metalness:0.05,roughness:0.65,opacity:1};
     return out;
   }
+  createLatheMeshFromData({name="Rust Lathe Mesh",meshData,profile=[],options={},color=[.34,.62,.78]}={}){
+    if(!meshData||!Array.isArray(meshData.positions)||!Array.isArray(meshData.indices)||meshData.indices.length<3)throw new Error("Rust did not return usable triangle geometry.");
+    if(meshData.positions.length>1000000||meshData.indices.length>6000000)throw new Error("Generated mesh exceeds the browser safety budget.");
+    const positions=meshData.positions.flatMap(point=>point.map(Number));
+    const normals=Array.isArray(meshData.normals)&&meshData.normals.length===meshData.positions.length?meshData.normals.flatMap(point=>point.map(Number)):pc.calculateNormals(positions,meshData.indices);
+    const indices=meshData.indices.map(Number);
+    if(positions.some(value=>!Number.isFinite(value))||normals.some(value=>!Number.isFinite(value))||indices.some(value=>!Number.isInteger(value)||value<0||value>=meshData.positions.length))throw new Error("Rust mesh data failed geometry validation.");
+    const mesh=new pc.Mesh(this.app.graphicsDevice);mesh.setPositions(positions);mesh.setNormals(normals);mesh.setIndices(indices);mesh.update();
+    const material=this.material(color);material.cull=pc.CULLFACE_NONE;material.update();
+    const instance=new pc.MeshInstance(mesh,material),entity=new pc.Entity(name);this.root.addChild(entity);
+    entity.addComponent("render",{meshInstances:[instance]});entity.render.layers=[pc.LAYERID_WORLD];entity.render.frustumCulling=false;
+    const record=this.rec(name,"mesh",entity);
+    record.components.geometry={kind:"rust-lathe",version:1,axis:options.axis||"y",radialSegments:Number(options.radial_segments)||64,profileSubdivisions:Number(options.profile_subdivisions)||0,vertexCount:meshData.positions.length,triangleCount:Math.floor(indices.length/3),sourceName:String(name)};
+    record.components.procedural={generator:"forge-eye-core-lathe",version:"0.1.0",profile:profile.map(point=>({radius:Number(point.radius),height:Number(point.height)})),options:{...options},authoredIn:"Rust/WebAssembly"};
+    record.components.material={color:[...color],metalness:.05,roughness:.55,opacity:1};
+    this.select(record.id);return record;
+  }
   createSilhouetteVisualHull({name="Multi-view Silhouette Hull",frontContour=[],sideContour=[],topContour=[],width=3,height=2,depth=3,resolution=32,color=[.3,.62,.78],record=null}={}){
     const front=frontContour.map(p=>[Number(p[0]),Number(p[1])]),side=sideContour.map(p=>[Number(p[0]),Number(p[1])]),top=topContour.map(p=>[Number(p[0]),Number(p[1])]);
     triangulateContour(front);triangulateContour(side);if(top.length)triangulateContour(top);
