@@ -173,26 +173,43 @@ try {
   const savedSide=await page.evaluate(()=>{const r=[...window.Forge.entities.values()].find(o=>o.components?.reference?.name==="qa-side-reference.png");return{axis:r.components.reference.axis,count:r.components.reference.outline?.length||0}});
   if(savedSide.axis!=="side"||savedSide.count!==4)throw new Error("Side contour was not saved: "+JSON.stringify(savedSide));
   await page.locator("#traceClose").click();await page.waitForFunction(()=>!document.querySelector("#traceDialog").open,null,{timeout:5000});
+
+  // Calibrate a top reference to the same X width as front and Z depth as side.
+  await page.locator("#referenceAxis").selectOption("top");await page.locator("#referenceWidth").fill("3.2");
+  const topPng=Buffer.from(await page.evaluate(()=>{const c=document.createElement("canvas");c.width=32;c.height=45;const x=c.getContext("2d");x.fillStyle="#d1d1d1";x.fillRect(0,0,c.width,c.height);return c.toDataURL("image/png").split(",")[1]}),"base64");
+  await page.locator("#referenceInput").setInputFiles({name:"qa-top-reference.png",mimeType:"image/png",buffer:topPng});
+  await page.waitForFunction(()=>[...window.Forge.entities.values()].some(r=>r.components?.reference?.name==="qa-top-reference.png"),null,{timeout:10000});
+  const topDimensions=await page.evaluate(()=>{const r=[...window.Forge.entities.values()].find(o=>o.components?.reference?.name==="qa-top-reference.png");return{axis:r.components.reference.axis,width:r.components.reference.width,height:r.components.reference.height}});
+  if(topDimensions.axis!=="top"||Math.abs(topDimensions.width-3.2)>0.001||Math.abs(topDimensions.height-4.5)>0.01)throw new Error("Top reference dimensions are inconsistent: "+JSON.stringify(topDimensions));
+  await page.locator("#traceSilhouette").click();await page.waitForFunction(()=>document.querySelector("#traceDialog").open,null,{timeout:5000});
+  const topRect=await page.locator("#traceCanvas").boundingBox();
+  for(const [u,v] of [[0.2,0.2],[0.8,0.2],[0.8,0.8],[0.2,0.8]])await page.mouse.click(topRect.x+topRect.width*u,topRect.y+topRect.height*v);
+  await page.locator("#traceSaveOutline").click();
+  const savedTop=await page.evaluate(()=>{const r=[...window.Forge.entities.values()].find(o=>o.components?.reference?.name==="qa-top-reference.png");return{axis:r.components.reference.axis,count:r.components.reference.outline?.length||0}});
+  if(savedTop.axis!=="top"||savedTop.count!==4)throw new Error("Top contour was not saved: "+JSON.stringify(savedTop));
+  await page.locator("#traceClose").click();await page.waitForFunction(()=>!document.querySelector("#traceDialog").open,null,{timeout:5000});
+
   await page.locator("#hullResolution").selectOption("20");await page.locator("#buildSilhouetteHull").click();
   await page.waitForFunction(()=>window.Forge.selected()?.components?.geometry?.kind==="silhouette-visual-hull",null,{timeout:10000});
-  const hull=await page.evaluate(()=>{const r=window.Forge.selected(),g=r.components.geometry,d=r.components.diagnostics||{},instances=r.entity.render?.meshInstances||[],saved=window.Forge.serialize().entities.find(e=>e.components?.geometry?.kind==="silhouette-visual-hull");return{kind:r.kind,geoKind:g.kind,width:g.width,height:g.height,depth:g.depth,resolution:g.resolution,frontPoints:g.frontContour?.length||0,sidePoints:g.sideContour?.length||0,voxels:d.occupiedVoxels||0,rendered:instances.length,indices:instances[0]?.mesh?.primitive?.[0]?.count||0,saved:!!saved,savedFront:saved?.components?.geometry?.frontContour?.length||0,savedSide:saved?.components?.geometry?.sideContour?.length||0}});
-  if(hull.kind!=="mesh"||hull.geoKind!=="silhouette-visual-hull"||Math.abs(hull.width-3.2)>0.01||Math.abs(hull.height-3.2)>0.05||Math.abs(hull.depth-4.5)>0.01||hull.resolution!==20||hull.frontPoints!==4||hull.sidePoints!==4||hull.voxels<=0||hull.rendered!==1||hull.indices<36||!hull.saved||hull.savedFront!==4||hull.savedSide!==4)throw new Error("Two-view visual hull build/persistence failed: "+JSON.stringify(hull));
-  await page.screenshot({path:path.join(ARTIFACTS,"forge-next-two-view-hull.png"),fullPage:true});
+  const hull=await page.evaluate(()=>{const r=window.Forge.selected(),g=r.components.geometry,d=r.components.diagnostics||{},instances=r.entity.render?.meshInstances||[],saved=window.Forge.serialize().entities.find(e=>e.components?.geometry?.kind==="silhouette-visual-hull");return{kind:r.kind,geoKind:g.kind,width:g.width,height:g.height,depth:g.depth,resolution:g.resolution,frontPoints:g.frontContour?.length||0,sidePoints:g.sideContour?.length||0,topPoints:g.topContour?.length||0,viewCount:d.viewCount||0,voxels:d.occupiedVoxels||0,rendered:instances.length,indices:instances[0]?.mesh?.primitive?.[0]?.count||0,saved:!!saved,savedFront:saved?.components?.geometry?.frontContour?.length||0,savedSide:saved?.components?.geometry?.sideContour?.length||0,savedTop:saved?.components?.geometry?.topContour?.length||0}});
+  if(hull.kind!=="mesh"||hull.geoKind!=="silhouette-visual-hull"||Math.abs(hull.width-3.2)>0.01||Math.abs(hull.height-3.2)>0.05||Math.abs(hull.depth-4.5)>0.01||hull.resolution!==20||hull.frontPoints!==4||hull.sidePoints!==4||hull.topPoints!==4||hull.viewCount!==3||hull.voxels<=0||hull.rendered!==1||hull.indices<36||!hull.saved||hull.savedFront!==4||hull.savedSide!==4||hull.savedTop!==4)throw new Error("Three-view visual hull build/persistence failed: "+JSON.stringify(hull));
+  await page.screenshot({path:path.join(ARTIFACTS,"forge-next-three-view-hull.png"),fullPage:true});
 
-  // Reload the serialized scene and verify both embedded image textures and both outlines survive.
+  // Reload the serialized scene and verify the reference images, contours, and 3D hull survive.
   const sceneBeforeReload=await page.evaluate(()=>window.Forge.serialize());
   const assetPersistence=await page.evaluate(async scene=>{
     const beforeRefs=scene.entities.filter(e=>e.components?.reference);
-    const embedded=beforeRefs.length===2&&beforeRefs.every(e=>typeof e.components.reference.imageDataUrl==="string"&&e.components.reference.imageDataUrl.startsWith("data:image/"));
+    const embedded=beforeRefs.length===3&&beforeRefs.every(e=>typeof e.components.reference.imageDataUrl==="string"&&e.components.reference.imageDataUrl.startsWith("data:image/"));
     await window.Forge.load(scene);
     const refs=[...window.Forge.entities.values()].filter(r=>r.components?.reference);
     const front=refs.find(r=>r.components.reference.name==="qa-front-reference.png");
     const side=refs.find(r=>r.components.reference.name==="qa-side-reference.png");
+    const top=refs.find(r=>r.components.reference.name==="qa-top-reference.png");
     const hull=[...window.Forge.entities.values()].find(r=>r.components?.geometry?.kind==="silhouette-visual-hull");
     const imageRestored=r=>!!r&&!!window.Forge.assets.get(r.components.asset.name)?.file&&!!r.entity.render?.meshInstances?.[0]?.material?.diffuseMap;
-    return{embedded,referenceCount:refs.length,frontOutline:front?.components.reference.outline?.length||0,sideOutline:side?.components.reference.outline?.length||0,frontTextureRestored:imageRestored(front),sideTextureRestored:imageRestored(side),hullRestored:!!hull&&!!hull.entity.render?.meshInstances?.length,hullResolution:hull?.components.geometry.resolution||0};
+    return{embedded,referenceCount:refs.length,frontOutline:front?.components.reference.outline?.length||0,sideOutline:side?.components.reference.outline?.length||0,topOutline:top?.components.reference.outline?.length||0,frontTextureRestored:imageRestored(front),sideTextureRestored:imageRestored(side),topTextureRestored:imageRestored(top),hullRestored:!!hull&&!!hull.entity.render?.meshInstances?.length,hullResolution:hull?.components.geometry.resolution||0,hullTopPoints:hull?.components.geometry.topContour?.length||0};
   },sceneBeforeReload);
-  if(!assetPersistence.embedded||assetPersistence.referenceCount!==2||assetPersistence.frontOutline!==4||assetPersistence.sideOutline!==4||!assetPersistence.frontTextureRestored||!assetPersistence.sideTextureRestored||!assetPersistence.hullRestored||assetPersistence.hullResolution!==20)throw new Error("Reference/contour/hull project round-trip failed: "+JSON.stringify(assetPersistence));
+  if(!assetPersistence.embedded||assetPersistence.referenceCount!==3||assetPersistence.frontOutline!==4||assetPersistence.sideOutline!==4||assetPersistence.topOutline!==4||!assetPersistence.frontTextureRestored||!assetPersistence.sideTextureRestored||!assetPersistence.topTextureRestored||!assetPersistence.hullRestored||assetPersistence.hullResolution!==20||assetPersistence.hullTopPoints!==4)throw new Error("Reference/contour/three-view hull project round-trip failed: "+JSON.stringify(assetPersistence));
   await page.locator('[data-workspace="references"]').click();
   await page.evaluate(()=>{const r=[...window.Forge.entities.values()].find(o=>o.components?.reference?.name==="qa-side-reference.png");window.Forge.select(r.id)});
   await page.locator("#traceSilhouette").click();
