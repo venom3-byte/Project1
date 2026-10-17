@@ -142,8 +142,19 @@
             <label class="frame-field">FRAME <input id="currentFrame" type="number" value="0" min="0" max="240" step="1"></label>
             <button class="icon-button" data-command="close-timeline" aria-label="Close timeline" title="Close timeline">×</button>
           </div>
-          <div class="timeline-ruler"><span>00</span><span>24</span><span>48</span><span>72</span><span>96</span><span>120</span><span>144</span><span>168</span><span>192</span><span>216</span><span>240</span></div>
-          <div class="timeline-track-area">
+          <div class="timeline-view-switch" role="tablist" aria-label="Animation editor">
+            <button class="timeline-view-tab is-active" data-timeline-view="dopesheet" role="tab" aria-selected="true">Dope Sheet</button>
+            <button class="timeline-view-tab" data-timeline-view="graph" role="tab" aria-selected="false">Graph Editor</button>
+            <label class="graph-channel-field">CHANNEL
+              <select id="graphChannel" aria-label="Graph channel">
+                <option value="p0">Location X</option><option value="p1">Location Y</option><option value="p2">Location Z</option>
+                <option value="r0">Rotation X</option><option value="r1">Rotation Y</option><option value="r2">Rotation Z</option>
+                <option value="s0">Scale X</option><option value="s1">Scale Y</option><option value="s2">Scale Z</option>
+              </select>
+            </label>
+          </div>
+          <div id="timelineRuler" class="timeline-ruler"><span>00</span><span>24</span><span>48</span><span>72</span><span>96</span><span>120</span><span>144</span><span>168</span><span>192</span><span>216</span><span>240</span></div>
+          <div id="timelineDopeSheet" class="timeline-track-area">
             <div class="timeline-track-label">
               <div class="timeline-object-label"><span id="timelineTrackName">Selected Object</span><span id="keyCount">0 keys</span></div>
               <div class="timeline-channel-label">Location</div><div class="timeline-channel-label">Rotation</div><div class="timeline-channel-label">Scale</div>
@@ -156,7 +167,11 @@
               <div id="timelinePlayhead" class="timeline-playhead"></div>
             </div>
           </div>
-          <div class="timeline-status"><span id="timelineStatus">24 FPS</span><span>Key = transform at a frame · interpolation creates motion between keys</span></div>
+          <div id="graphEditorPane" class="graph-editor-pane" hidden>
+            <canvas id="graphEditorCanvas" aria-label="Animation graph editor: drag a key vertically to edit the selected transform channel, click to scrub time"></canvas>
+            <div class="graph-editor-hint"><span id="graphChannelSummary">Location X</span><span>Drag a point to edit value · click to scrub</span></div>
+          </div>
+          <div class="timeline-status"><span id="timelineStatus">24 FPS</span><span id="timelineStatusHint">Key = transform at a frame · interpolation creates motion between keys</span></div>
         </section>
       </section>
 
