@@ -1,7 +1,7 @@
 //! Scene, command, history, and animation contracts shared by Forge Eye web/native hosts.
 use crate::{
-    ExtrusionRequest, GeometryError, HullRequest, MeshData, MeshDiagnostics,
-    build_extruded_silhouette, build_visual_hull,
+    ExtrusionRequest, GeometryError, HullRequest, LatheRequest, MeshData, MeshDiagnostics,
+    build_extruded_silhouette, build_lathed_profile, build_visual_hull,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -292,6 +292,9 @@ pub enum EditorCommand {
     ExtrudeSilhouette {
         request: ExtrusionRequest,
     },
+    LatheProfile {
+        request: LatheRequest,
+    },
     BuildVisualHull {
         request: HullRequest,
     },
@@ -569,6 +572,12 @@ impl EditorSession {
                 let id = self.scene.insert_mesh(mesh)?;
                 Ok(CommandResult::MeshCreated { id, diagnostics })
             }
+            EditorCommand::LatheProfile { request } => {
+                let mesh = build_lathed_profile(&request)?;
+                let diagnostics = mesh.diagnostics.clone();
+                let id = self.scene.insert_mesh(mesh)?;
+                Ok(CommandResult::MeshCreated { id, diagnostics })
+            }
             EditorCommand::BuildVisualHull { request } => {
                 let mesh = build_visual_hull(&request)?;
                 let diagnostics = mesh.diagnostics.clone();
@@ -831,6 +840,29 @@ mod tests {
             .unwrap();
         assert!((s.scene.objects[&1].transform.position[0] - 4.0).abs() < 1e-4);
     }
+    #[test]
+    fn lathe_profile_command_creates_mesh_and_supports_undo() {
+        let mut session = EditorSession::new();
+        let request = LatheRequest {
+            name: "Bottle".into(),
+            profile: vec![
+                [0.80, 0.90], [0.80, 0.78], [0.70, 0.68], [0.61, 0.56],
+                [0.58, 0.43], [0.58, 0.18], [0.55, 0.11], [0.53, 0.18],
+                [0.53, 0.43], [0.56, 0.58], [0.67, 0.70], [0.76, 0.79],
+                [0.76, 0.88],
+            ],
+            diameter: 0.08,
+            height: 0.25,
+            segments: 32,
+            color: default_color(),
+        };
+        let result = session.execute(EditorCommand::LatheProfile { request }).unwrap();
+        assert!(matches!(result, CommandResult::MeshCreated { .. }));
+        assert_eq!(session.scene.objects.len(), 1);
+        session.undo().unwrap();
+        assert!(session.scene.objects.is_empty());
+    }
+
     #[test]
     fn bad_transform_is_rejected_without_mutating_scene() {
         let mut s = EditorSession::new();
