@@ -405,6 +405,11 @@ function selectedReferenceSource(){
   if(!record||!meta||!asset?.file)throw new Error("Select an imported reference image. Re-import the image if the project was reopened without its original file.");
   return{record,meta,file:asset.file};
 }
+function hideReferenceSource(record){
+  if(!record?.components?.reference)return;
+  record.entity.enabled=false;
+  record.components.reference.visible=false;
+}
 async function bitmapFromFile(file){
   try{return await createImageBitmap(file)}catch(error){throw new Error("The selected file could not be decoded as an image: "+(error?.message||String(error)))}
 }
@@ -421,6 +426,7 @@ async function autoBuildSilhouetteFromReference(){
       contour:extracted.contour,axis:meta.axis||"front",width:Number(meta.width)||3,height:Number(meta.height)||3,depth,color:[.36,.57,.76]
     });
     mesh.components.geometry.sourceReference={name:record.name,method:"automatic outer contour",foregroundRatio:extracted.foregroundRatio,tolerance:extracted.tolerance};
+    hideReferenceSource(record);
     state.engine.select(mesh.id);state.engine.frame();refreshAll();setWorkspace("modeling");
     status("Automatic silhouette mesh created · "+extracted.contour.length+" contour points · inspect the other views","dirty");
     return mesh;
@@ -443,6 +449,7 @@ async function autoBuildLatheFromReference(){
       smoothing:clamp($("#latheSmoothing").value,0,3,1),color:[.42,.62,.76]
     });
     mesh.components.geometry.sourceReference={name:record.name,method:"auto rotational profile",wallThickness:detected.wallThickness,baseThickness:detected.baseThickness,symmetryScore:detected.symmetryScore,foregroundRatio:detected.foregroundRatio};
+    hideReferenceSource(record);
     state.engine.select(mesh.id);state.engine.frame();refreshAll();setWorkspace("modeling");
     status("Auto Spin mesh created · symmetry "+Math.round(detected.symmetryScore*100)+"% · inspect rim, cavity and base","dirty");
     return mesh;
@@ -646,6 +653,7 @@ function buildTraceLathe(){
       smoothing:clamp($("#latheSmoothing").value,0,3,1),color:[.42,.62,.76]
     });
     const diag=record.components.diagnostics||{};
+    hideReferenceSource(trace.record);
     state.engine.select(record.id);state.engine.frame();refreshAll();setWorkspace("modeling");closeTraceEditor();
     status("Spin 360° mesh built · "+Number(diag.vertices||0).toLocaleString()+" vertices · inspect wall thickness and topology","dirty");
   }catch(error){$("#traceMessage").textContent=error?.message||String(error);status("Lathe profile could not be built","error")}
@@ -661,6 +669,7 @@ function buildTraceMesh(){
       width:Number(reference.width)||trace.width,
       height:Number(reference.height)||trace.height,depth,color:[.36,.57,.76]
     });
+    hideReferenceSource(trace.record);
     state.engine.select(record.id);state.engine.frame();refreshAll();setWorkspace("modeling");closeTraceEditor();
     status("3D silhouette mesh built · refine the geometry and compare other views","dirty");
   }catch(error){$("#traceMessage").textContent=error?.message||String(error);status("Silhouette mesh could not be built","error")}
@@ -716,6 +725,7 @@ function buildSilhouetteHull(){
       name:front.name.replace(/\.[^.]+$/,"")+" — "+viewCount+"-view Hull",
       frontContour:fm.outline,sideContour:sm.outline,topContour:tm?.outline||[],width,height,depth,resolution,color:[.32,.62,.76]
     });
+    hideReferenceSource(front);hideReferenceSource(side);if(top)hideReferenceSource(top);
     state.engine.select(record.id);window.ForgeViewport?.frame?.();refreshAll();setWorkspace("modeling");
     const diag=record.components.diagnostics||{};
     $("#hullStatus").textContent=viewCount+"-view visual hull built · "+Number(diag.occupiedVoxels||0).toLocaleString()+" occupied voxels at "+resolution+"³. This is a blockout; inspect orthographic views and refine details.";
