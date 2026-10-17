@@ -125,39 +125,59 @@ try {
   if(!/\.forge\.json$/.test(download.suggestedFilename()))throw new Error("Save did not produce a Forge project file: "+download.suggestedFilename());
   await page.screenshot({path:path.join(ARTIFACTS,"forge-next-desktop.png"),fullPage:true});
 
-  // Reference images become calibrated entities in the 3D scene, not DOM-only mock data.
+  // Calibrate a front reference, save its traced contour, and build an editable 3D slab.
   await page.locator('[data-workspace="references"]').click();
   await page.waitForFunction(()=>document.documentElement.dataset.forgeWorkspace==="references"&&!document.querySelector('[data-inspector-panel="references"]').hidden,null,{timeout:5000});
   await page.locator("#referenceAxis").selectOption("front");await page.locator("#referenceWidth").fill("3.2");
-  const pngBase64=await page.evaluate(()=>{const canvas=document.createElement("canvas");canvas.width=2;canvas.height=2;const ctx=canvas.getContext("2d");ctx.fillStyle="#f0f0f0";ctx.fillRect(0,0,2,2);return canvas.toDataURL("image/png").split(",")[1]});
-  const png=Buffer.from(pngBase64,"base64");
-  await page.locator("#referenceInput").setInputFiles({name:"qa-front-reference.png",mimeType:"image/png",buffer:png});
+  const frontPng=Buffer.from(await page.evaluate(()=>{const c=document.createElement("canvas");c.width=2;c.height=2;const x=c.getContext("2d");x.fillStyle="#f0f0f0";x.fillRect(0,0,2,2);return c.toDataURL("image/png").split(",")[1]),"base64");
+  await page.locator("#referenceInput").setInputFiles({name:"qa-front-reference.png",mimeType:"image/png",buffer:frontPng});
   await page.waitForFunction(()=>[...window.Forge.entities.values()].some(r=>r.components?.reference?.name==="qa-front-reference.png"),null,{timeout:10000});
-  const reference=await page.evaluate(()=>{const r=[...window.Forge.entities.values()].find(o=>o.components?.reference?.name==="qa-front-reference.png"),rot=r.entity.getLocalEulerAngles(),scale=r.entity.getLocalScale();return{axis:r.components.reference.axis,width:r.components.reference.width,scale:[scale.x,scale.y,scale.z],rotation:[rot.x,rot.y,rot.z],panelCount:Number(document.querySelector("#referenceCount").textContent)}});
-  if(reference.axis!=="front"||Math.abs(reference.width-3.2)>0.001||Math.abs(reference.scale[0]-3.2)>0.001||Math.abs(reference.rotation[0]-90)>0.01||reference.panelCount!==1)throw new Error("Front reference calibration failed: "+JSON.stringify(reference));
+  const front=await page.evaluate(()=>{const r=[...window.Forge.entities.values()].find(o=>o.components?.reference?.name==="qa-front-reference.png"),rot=r.entity.getLocalEulerAngles(),scale=r.entity.getLocalScale();return{axis:r.components.reference.axis,width:r.components.reference.width,scale:[scale.x,scale.y,scale.z],rotation:[rot.x,rot.y,rot.z],panelCount:Number(document.querySelector("#referenceCount").textContent)}});
+  if(front.axis!=="front"||Math.abs(front.width-3.2)>0.001||Math.abs(front.scale[0]-3.2)>0.001||Math.abs(front.rotation[0]-90)>0.01||front.panelCount!==1)throw new Error("Front reference calibration failed: "+JSON.stringify(front));
+
+  // The same UI can recalibrate an image plane to side view, then restore front for the front outline.
   await page.locator("#referenceAxis").selectOption("side");await page.locator("#referenceWidth").fill("4.5");await page.locator('[data-command="apply-reference-setup"]').click();
-  const sideReference=await page.evaluate(()=>{const r=window.Forge.selected(),rot=r.entity.getLocalEulerAngles(),scale=r.entity.getLocalScale();return{axis:r.components.reference.axis,width:r.components.reference.width,rotY:rot.y,scaleX:scale.x}});
-  if(sideReference.axis!=="side"||Math.abs(sideReference.width-4.5)>0.001||Math.abs(sideReference.rotY-90)>0.01||Math.abs(sideReference.scaleX-4.5)>0.001)throw new Error("Side reference calibration failed: "+JSON.stringify(sideReference));
+  const sideAlignment=await page.evaluate(()=>{const r=window.Forge.selected(),rot=r.entity.getLocalEulerAngles(),scale=r.entity.getLocalScale();return{axis:r.components.reference.axis,width:r.components.reference.width,rotY:rot.y,scaleX:scale.x}});
+  if(sideAlignment.axis!=="side"||Math.abs(sideAlignment.width-4.5)>0.001||Math.abs(sideAlignment.rotY-90)>0.01||Math.abs(sideAlignment.scaleX-4.5)>0.001)throw new Error("Side reference alignment failed: "+JSON.stringify(sideAlignment));
   await page.locator('[data-command="toggle-reference-visibility"]').click();if(await page.evaluate(()=>window.Forge.selected().entity.enabled)!==false)throw new Error("Reference hide action failed.");
   await page.locator('[data-command="toggle-reference-visibility"]').click();if(await page.evaluate(()=>window.Forge.selected().entity.enabled)!==true)throw new Error("Reference show action failed.");
-  await page.screenshot({path:path.join(ARTIFACTS,"forge-next-reference-modeling.png"),fullPage:true});
+  await page.locator("#referenceAxis").selectOption("front");await page.locator("#referenceWidth").fill("3.2");await page.locator('[data-command="apply-reference-setup"]').click();
 
-
-
-  // Trace an outline over the imported image and verify that a real, serializable 3D mesh is generated.
   await page.locator("#traceSilhouette").click();
   await page.waitForFunction(()=>document.querySelector("#traceDialog").open,null,{timeout:5000});
   const traceRect=await page.locator("#traceCanvas").boundingBox();
-  if(!traceRect||traceRect.width<100||traceRect.height<100)throw new Error("Silhouette trace canvas did not scale to a usable size: "+JSON.stringify(traceRect));
+  if(!traceRect||traceRect.width<100||traceRect.height<100)throw new Error("Silhouette trace canvas is too small: "+JSON.stringify(traceRect));
   for(const [u,v] of [[0.2,0.2],[0.8,0.2],[0.8,0.8],[0.2,0.8]])await page.mouse.click(traceRect.x+traceRect.width*u,traceRect.y+traceRect.height*v);
-  const tracePoints=await page.locator("#tracePointCount").textContent();
-  if(!tracePoints?.includes("4 points"))throw new Error("Silhouette trace did not register four contour points: "+tracePoints);
-  await page.locator("#traceDepth").fill("0.5");
-  await page.locator("#traceBuild").click();
+  if(!(await page.locator("#tracePointCount").textContent())?.includes("4 points"))throw new Error("Trace editor did not register four points.");
+  await page.locator("#traceSaveOutline").click();
+  const savedFront=await page.evaluate(()=>{const r=[...window.Forge.entities.values()].find(o=>o.components?.reference?.name==="qa-front-reference.png");return{axis:r.components.reference.axis,count:r.components.reference.outline?.length||0}});
+  if(savedFront.axis!=="front"||savedFront.count!==4)throw new Error("Front contour was not saved to the reference component: "+JSON.stringify(savedFront));
+  await page.locator("#traceDepth").fill("0.5");await page.locator("#traceBuild").click();
   await page.waitForFunction(()=>window.Forge.selected()?.components?.geometry?.kind==="extruded-silhouette",null,{timeout:5000});
-  const builtMesh=await page.evaluate(()=>{const r=window.Forge.selected(),g=r.components.geometry,instances=r.entity.render?.meshInstances||[],saved=window.Forge.serialize().entities.find(e=>e.components?.geometry?.kind==="extruded-silhouette");return{kind:r.kind,name:r.name,axis:g.axis,depth:g.depth,points:g.contour.length,rendered:instances.length,triangles:instances[0]?.mesh?.primitive?.[0]?.count||0,saved:!!saved,savedPoints:saved?.components?.geometry?.contour?.length||0}});
-  if(builtMesh.kind!=="mesh"||builtMesh.axis!=="side"||Math.abs(builtMesh.depth-0.5)>0.001||builtMesh.points!==4||builtMesh.rendered!==1||builtMesh.triangles<12||!builtMesh.saved||builtMesh.savedPoints!==4)throw new Error("Silhouette extrusion/serialization failed: "+JSON.stringify(builtMesh));
+  const builtSlab=await page.evaluate(()=>{const r=window.Forge.selected(),g=r.components.geometry,instances=r.entity.render?.meshInstances||[],saved=window.Forge.serialize().entities.find(e=>e.components?.geometry?.kind==="extruded-silhouette");return{kind:r.kind,axis:g.axis,depth:g.depth,points:g.contour.length,rendered:instances.length,indices:instances[0]?.mesh?.primitive?.[0]?.count||0,saved:!!saved,savedPoints:saved?.components?.geometry?.contour?.length||0}});
+  if(builtSlab.kind!=="mesh"||builtSlab.axis!=="front"||Math.abs(builtSlab.depth-0.5)>0.001||builtSlab.points!==4||builtSlab.rendered!==1||builtSlab.indices<36||!builtSlab.saved||builtSlab.savedPoints!==4)throw new Error("Silhouette slab generation/persistence failed: "+JSON.stringify(builtSlab));
   await page.screenshot({path:path.join(ARTIFACTS,"forge-next-silhouette-mesh.png"),fullPage:true});
+
+  // Import a dimensionally aligned side reference and save its separate outline.
+  await page.locator('[data-workspace="references"]').click();
+  await page.locator("#referenceAxis").selectOption("side");await page.locator("#referenceWidth").fill("4.5");
+  const sidePng=Buffer.from(await page.evaluate(()=>{const c=document.createElement("canvas");c.width=45;c.height=32;const x=c.getContext("2d");x.fillStyle="#dedede";x.fillRect(0,0,c.width,c.height);return c.toDataURL("image/png").split(",")[1]),"base64");
+  await page.locator("#referenceInput").setInputFiles({name:"qa-side-reference.png",mimeType:"image/png",buffer:sidePng});
+  await page.waitForFunction(()=>[...window.Forge.entities.values()].some(r=>r.components?.reference?.name==="qa-side-reference.png"),null,{timeout:10000});
+  const side=await page.evaluate(()=>{const r=[...window.Forge.entities.values()].find(o=>o.components?.reference?.name==="qa-side-reference.png");return{axis:r.components.reference.axis,width:r.components.reference.width,height:r.components.reference.height}});
+  if(side.axis!=="side"||Math.abs(side.width-4.5)>0.001||Math.abs(side.height-3.2)>0.01)throw new Error("Side reference dimensions are inconsistent: "+JSON.stringify(side));
+  await page.locator("#traceSilhouette").click();await page.waitForFunction(()=>document.querySelector("#traceDialog").open,null,{timeout:5000});
+  const sideRect=await page.locator("#traceCanvas").boundingBox();
+  for(const [u,v] of [[0.2,0.2],[0.8,0.2],[0.8,0.8],[0.2,0.8]])await page.mouse.click(sideRect.x+sideRect.width*u,sideRect.y+sideRect.height*v);
+  await page.locator("#traceSaveOutline").click();
+  const savedSide=await page.evaluate(()=>{const r=[...window.Forge.entities.values()].find(o=>o.components?.reference?.name==="qa-side-reference.png");return{axis:r.components.reference.axis,count:r.components.reference.outline?.length||0}});
+  if(savedSide.axis!=="side"||savedSide.count!==4)throw new Error("Side contour was not saved: "+JSON.stringify(savedSide));
+  await page.locator("#traceClose").click();await page.waitForFunction(()=>!document.querySelector("#traceDialog").open,null,{timeout:5000});
+  await page.locator("#hullResolution").selectOption("20");await page.locator("#buildSilhouetteHull").click();
+  await page.waitForFunction(()=>window.Forge.selected()?.components?.geometry?.kind==="silhouette-visual-hull",null,{timeout:10000});
+  const hull=await page.evaluate(()=>{const r=window.Forge.selected(),g=r.components.geometry,d=r.components.diagnostics||{},instances=r.entity.render?.meshInstances||[],saved=window.Forge.serialize().entities.find(e=>e.components?.geometry?.kind==="silhouette-visual-hull");return{kind:r.kind,geoKind:g.kind,width:g.width,height:g.height,depth:g.depth,resolution:g.resolution,frontPoints:g.frontContour?.length||0,sidePoints:g.sideContour?.length||0,voxels:d.occupiedVoxels||0,rendered:instances.length,indices:instances[0]?.mesh?.primitive?.[0]?.count||0,saved:!!saved,savedFront:saved?.components?.geometry?.frontContour?.length||0,savedSide:saved?.components?.geometry?.sideContour?.length||0}});
+  if(hull.kind!=="mesh"||hull.geoKind!=="silhouette-visual-hull"||Math.abs(hull.width-3.2)>0.01||Math.abs(hull.height-3.2)>0.05||Math.abs(hull.depth-4.5)>0.01||hull.resolution!==20||hull.frontPoints!==4||hull.sidePoints!==4||hull.voxels<=0||hull.rendered!==1||hull.indices<36||!hull.saved||hull.savedFront!==4||hull.savedSide!==4)throw new Error("Two-view visual hull build/persistence failed: "+JSON.stringify(hull));
+  await page.screenshot({path:path.join(ARTIFACTS,"forge-next-two-view-hull.png"),fullPage:true});
 
   // Resizing docks must persist layout dimensions without pushing the main page horizontally.
   const leftBefore=await page.evaluate(()=>parseInt(getComputedStyle(document.documentElement).getPropertyValue("--left-dock-width"),10));
