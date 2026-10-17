@@ -157,6 +157,45 @@ try {
 
   // Actual Rust geometry, based on the bottle-profile workflow demonstrated in Blender.
   await page.locator('[data-workspace="spin"]').click();
+
+  // Bottle-style Spin workflow: reference overlay keeps its aspect ratio, controls opacity, and snaps endpoints to the rotation axis.
+  const profileReferenceData = await page.evaluate(() => {
+    const canvas = document.createElement("canvas"); canvas.width = 96; canvas.height = 64;
+    const context = canvas.getContext("2d"); context.fillStyle = "#d8e0e4"; context.fillRect(0, 0, 96, 64);
+    context.fillStyle = "#4f6675"; context.fillRect(30, 6, 36, 52);
+    context.fillStyle = "#8ac2d9"; context.fillRect(38, 4, 20, 9);
+    return canvas.toDataURL("image/png").split(",")[1];
+  });
+  await page.locator("#profileReferenceInput").setInputFiles({
+    name: "qa-bottle-side-reference.png", mimeType: "image/png", buffer: Buffer.from(profileReferenceData, "base64")
+  });
+  await page.waitForFunction(() => window.ForgeEyeState.profileImage?.naturalWidth === 96, null, { timeout: 10000 });
+  await setInput("#profileReferenceOpacity", "0.65");
+  await page.locator("#profileReferenceFit").selectOption("contain");
+  await page.locator("#profileAxisSnap").check();
+  const referenceFit = await page.evaluate(() => {
+    const image = window.ForgeEyeState.profileImage, rect = window.ForgeEyeState.profileImageRect;
+    return {
+      source: [image?.naturalWidth || 0, image?.naturalHeight || 0],
+      box: rect ? [rect.w, rect.h] : null,
+      opacity: window.ForgeEyeState.profileReferenceOpacity,
+      fit: window.ForgeEyeState.profileReferenceFit,
+      snap: window.ForgeEyeState.profileAxisSnap,
+      expectedAspect: (image?.naturalWidth || 0) / Math.max(1, image?.naturalHeight || 1),
+      actualAspect: rect ? rect.w / rect.h : 0
+    };
+  });
+  assert.ok(Math.abs(referenceFit.expectedAspect - referenceFit.actualAspect) < 0.01, "Contain reference fit must preserve source aspect ratio: " + JSON.stringify(referenceFit));
+  assert.ok(Math.abs(referenceFit.opacity - 0.65) < 0.01 && referenceFit.snap === true);
+  const profileRect = await page.locator("#profileCanvas").boundingBox();
+  const profileBeforeSnap = await page.evaluate(() => window.ForgeEyeState.profile.length);
+  await page.mouse.click(profileRect.x + profileRect.width * 0.508, profileRect.y + profileRect.height * 0.50);
+  const snappedProfile = await page.evaluate(() => ({ count: window.ForgeEyeState.profile.length, last: window.ForgeEyeState.profile.at(-1) }));
+  assert.equal(snappedProfile.count, profileBeforeSnap + 1);
+  assert.ok(Math.abs(snappedProfile.last[0] - 0.5) < 0.001, "A profile point near the axis should snap to x=0.5: " + JSON.stringify(snappedProfile));
+  await page.locator("#profileReset").click();
+  record("Spin reference aspect ratio, opacity and axis snapping", { referenceFit, snappedProfile });
+
   await page.locator("#spinSegments").fill("32");
   await setInput("#spinSubdivision", "2");
   await page.locator("#buildSpin").click();
@@ -238,10 +277,29 @@ try {
   assert.equal(packageData.format, "forge-eye-project");
   assert.ok(Object.values(packageData.scene.objects).some(o => o.mesh?.diagnostics?.triangle_count > 100));
   assert.ok(Object.values(packageData.references).every(ref => !ref || ref.outline?.length === 4));
+  assert.ok(packageData.spinProfileReference?.startsWith("data:image/"), "Spin image reference must be embedded in project JSON.");
+  assert.equal(packageData.spinReferenceOpacity, 0.65);
+  assert.equal(packageData.spinReferenceFit, "contain");
+  assert.equal(packageData.spinAxisSnap, true);
   await page.locator("#projectInput").setInputFiles({ name: download.suggestedFilename(), mimeType: "application/json", buffer: await fs.readFile(projectPath) });
   await page.waitForFunction(() => Object.values(window.ForgeEyeState.scene.objects).some(o => o.mesh?.diagnostics?.method === "three-view voxel visual hull"), null, { timeout: 20000 });
   await page.waitForFunction(() => window.ForgeEyeState.references.front?.outline?.length === 4 && window.ForgeEyeState.references.side?.outline?.length === 4 && window.ForgeEyeState.references.top?.outline?.length === 4, null, { timeout: 20000 });
-  record("project save / reload round trip", { filename: download.suggestedFilename(), savedReferences: Object.values(packageData.references).filter(Boolean).length, savedMeshes: Object.values(packageData.scene.objects).filter(o => o.mesh).length });
+  await page.waitForFunction(() => window.ForgeEyeState.profileImage?.naturalWidth === 96, null, { timeout: 10000 });
+  const restoredProfileReference = await page.evaluate(() => ({
+    present: !!window.ForgeEyeState.profileReference,
+    width: window.ForgeEyeState.profileImage?.naturalWidth || 0,
+    height: window.ForgeEyeState.profileImage?.naturalHeight || 0,
+    opacity: window.ForgeEyeState.profileReferenceOpacity,
+    fit: window.ForgeEyeState.profileReferenceFit,
+    axisSnap: window.ForgeEyeState.profileAxisSnap,
+    aspectRect: window.ForgeEyeState.profileImageRect ? window.ForgeEyeState.profileImageRect.w / window.ForgeEyeState.profileImageRect.h : 0
+  }));
+  assert.ok(restoredProfileReference.present && restoredProfileReference.width === 96 && restoredProfileReference.height === 64);
+  assert.equal(restoredProfileReference.opacity, 0.65);
+  assert.equal(restoredProfileReference.fit, "contain");
+  assert.equal(restoredProfileReference.axisSnap, true);
+  assert.ok(Math.abs(restoredProfileReference.aspectRect - 1.5) < 0.01);
+  record("project save / reload round trip", { filename: download.suggestedFilename(), savedReferences: Object.values(packageData.references).filter(Boolean).length, savedMeshes: Object.values(packageData.scene.objects).filter(o => o.mesh).length, restoredProfileReference });
 
   // Desktop and phone widths: no page-wide horizontal overflow; graph editor remains reachable.
   const mobileReports = [];
