@@ -162,3 +162,18 @@
 .trace-depth-field{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border:1px solid #2a3c49;border-radius:4px;background:#101a23;color:#a8bdcb;font-size:10px}
 .trace-depth-field input{width:132px;max-width:45%;height:30px;padding:0 8px;border:1px solid #354d5c;border-radius:4px;background:#080f15;color:#e2eef5;font:10px var(--font-mono)}
 .trace-depth-field input:focus{outline:none;border-color:#62a9cb}
+
+
+/* Two-view silhouette volume controls (front and side projections). */
+.visual-hull-tools{display:flex;flex-direction:column;gap:8px;margin:0 11px 10px;padding:10px;border:1px solid #2d4554;border-radius:5px;background:linear-gradient(155deg,#11202a,#0c151d)}
+.visual-hull-title{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.visual-hull-title strong{color:#d4e5ef;font-size:10px;font-weight:650}
+.visual-hull-title span{padding:3px 5px;border:1px solid #34576b;border-radius:3px;color:#83b6cf;font:8px var(--font-mono);letter-spacing:.5px;white-space:nowrap}
+.visual-hull-tools>label{display:flex;align-items:center;justify-content:space-between;gap:9px;color:#91a9b9;font-size:9px}
+.visual-hull-tools select{min-width:0;max-width:145px;height:27px;padding:0 5px;border:1px solid #354a58;border-radius:4px;background:#0a1118;color:#dbe7ef;font-size:9px}
+.visual-hull-tools>[data-command],.visual-hull-tools>.wide-secondary{width:100%;height:auto;min-height:32px;margin:0;padding:6px 8px;border-color:#41657b;background:#183140;color:#cbe7f5;font-size:9px}
+.visual-hull-tools>.wide-secondary:hover{border-color:#5c98b8;background:#203f51}
+.visual-hull-tools p{margin:0;color:#8298a8;font-size:9px;line-height:1.55}
+#hullStatus{padding-top:6px;border-top:1px solid #2b3c48;color:#8ca6b7}
+#hullStatus[data-state="error"]{color:#f1a1a4}
+#hullStatus[data-state="success"]{color:#9edcb8}
