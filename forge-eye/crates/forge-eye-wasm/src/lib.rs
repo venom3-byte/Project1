@@ -115,8 +115,7 @@ fn build_spin_profile_json_impl(request_json: &str) -> Result<String, String> {
     let request: SpinRequest = serde_json::from_str(request_json)
         .map_err(|error| format!("Invalid Spin Tool request: {error}"))?;
     let mesh = build_spin_profile(&request).map_err(|error| error.to_string())?;
-    serde_json::to_string(&mesh)
-        .map_err(|error| format!("Could not serialize spun mesh: {error}"))
+    serde_json::to_string(&mesh).map_err(|error| format!("Could not serialize spun mesh: {error}"))
 }
 
 #[wasm_bindgen]
@@ -187,7 +186,11 @@ mod tests {
     #[test]
     fn bridge_rejects_excessive_spin_subdivision() {
         let request = r#"{"name":"Bottle","profile":[[0.5,0.94],[0.78,0.94],[0.82,0.90],[0.78,0.84],[0.67,0.77],[0.62,0.69],[0.62,0.30],[0.59,0.23],[0.55,0.19],[0.5,0.18]],"diameter":0.08,"height":0.25,"segments":24,"subdivision_level":9}"#;
-        assert!(build_spin_profile_json_impl(request).unwrap_err().contains("subdivision"));
+        assert!(
+            build_spin_profile_json_impl(request)
+                .unwrap_err()
+                .contains("subdivision")
+        );
     }
 
     #[test]
