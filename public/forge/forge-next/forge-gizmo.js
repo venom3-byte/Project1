@@ -22,6 +22,9 @@ function attach(){
         window.dispatchEvent(new Event("forge-gizmo-transform"));
       });
       g.coordSpace=state.space;
+      // Keep the translate arrows readable beside small real-world assets (e.g. a 25 cm bottle).
+      // PlayCanvas scales gizmos in screen space, so this is an editor-scale choice, not model scaling.
+      g.size=.55;
       g.snap=Boolean(F.snapEnabled);
       g.snapIncrement=Number(F.snapSize||.25);
       g.enabled=false;
@@ -32,7 +35,7 @@ function attach(){
 function sync(){
   if(!state.ready||!state.nativeReady)return;
   const r=F.selected(),node=r?.entity||null;
-  for(const[name,g]of Object.entries(state.gizmos)){g.enabled=Boolean(node)&&name===state.mode;if(g.coordSpace!==state.space)g.coordSpace=state.space;g.snap=Boolean(F.snapEnabled);g.snapIncrement=Number(F.snapSize||.25);if(g.enabled)g.attach([node]);else g.detach()}
+  for(const[name,g]of Object.entries(state.gizmos)){g.enabled=Boolean(node)&&name===state.mode;g.size=.55;if(g.coordSpace!==state.space)g.coordSpace=state.space;g.snap=Boolean(F.snapEnabled);g.snapIncrement=Number(F.snapSize||.25);if(g.enabled)g.attach([node]);else g.detach()}
 }
 function setMode(mode){
   if(!["select","translate","rotate","scale"].includes(mode))return false;
