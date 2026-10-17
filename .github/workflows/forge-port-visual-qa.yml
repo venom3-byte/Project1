@@ -27,6 +27,14 @@ jobs:
           cache: npm
       - name: Install project dependencies
         run: npm ci
+      - name: Set up Rust and WebAssembly target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Test Forge Eye geometry kernel
+        run: cargo test --manifest-path crates/forge-eye-core/Cargo.toml
+      - name: Build Forge Eye geometry kernel for WebAssembly
+        run: cargo build --release --target wasm32-unknown-unknown --manifest-path crates/forge-eye-core/Cargo.toml
       - name: Run application unit tests
         run: npm test -- --reporter=dot
       - name: Build static host and Macaly Forge workbench
