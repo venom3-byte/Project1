@@ -310,7 +310,7 @@ function saveTraceOutline(){
   if(trace.points.length<3){$("#traceMessage").textContent="Add at least three points before saving an outline.";return}
   const meta=trace.record.components.reference;
   meta.outline=trace.points.map(point=>[Number(point[0]),Number(point[1])]);
-  meta.outlineSavedAt=new Date().toISOString();meta.outlineClosed=true;
+  meta.outlineSavedAt=new Date().toISOString();meta.outlineClosed=true;trace.editing=true;trace.closed=true;
   refreshReferences();refreshHierarchy();
   $("#traceMessage").textContent="Saved "+meta.axis+" outline · "+meta.outline.length+" points. This reference can now contribute to a two-view volume.";
   status("Reference outline saved","dirty");
@@ -428,8 +428,8 @@ function bindUI(){
   $("#addReferenceImages").addEventListener("click",()=>$("#referenceInput").click());
   $("#traceSilhouette").addEventListener("click",()=>void startSilhouetteTrace());
   $("#traceCanvas").addEventListener("pointerdown",handleTracePointerDown);
-  $("#traceUndo").addEventListener("click",()=>{if(state.trace){state.trace.points.pop();state.trace.closed=false;$("#traceMessage").textContent="Last point removed.";traceDraw()}});
-  $("#traceClear").addEventListener("click",()=>{if(state.trace){state.trace.points=[];state.trace.closed=false;$("#traceMessage").textContent="Outline cleared.";traceDraw()}});
+  $("#traceUndo").addEventListener("click",()=>{if(state.trace){state.trace.points.pop();state.trace.closed=false;$("#traceMessage").textContent="Last contour point removed.";traceDraw()}});
+  $("#traceClear").addEventListener("click",()=>{if(state.trace){state.trace.points=[];state.trace.closed=false;state.trace.editing=false;$("#traceMessage").textContent="Outline cleared. Trace a new contour in one direction.";traceDraw()}});
   $("#traceSaveOutline").addEventListener("click",saveTraceOutline);
   $("#traceBuild").addEventListener("click",buildTraceMesh);
   $("#buildSilhouetteHull").addEventListener("click",buildSilhouetteHull);
