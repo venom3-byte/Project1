@@ -85,6 +85,8 @@ try {
   }
   await page.screenshot({ path: path.join(ARTIFACTS, "forge-eye-rust-bottle.png"), fullPage: true });
 
+  await page.locator('[data-workspace="references"]').click();
+  await page.waitForFunction(() => !document.querySelector('[data-inspector-panel="references"]').hidden, null, { timeout: 5000 });
   await page.locator("#openLatheEditor").click();
   await page.waitForFunction(() => document.querySelector("#latheDialog").open, null, { timeout: 5000 });
   await page.locator("#lathePreset").selectOption("vase");
