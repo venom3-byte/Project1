@@ -1,7 +1,10 @@
 //! Minimal JSON ABI so the browser can call the same Rust code without generated glue.
 //! Wasm callers must pass valid (pointer, length) pairs allocated through forge_eye_alloc.
 
-use crate::{AnimationTrack, LatheOptions, LatheProfilePoint, Transform, generate_lathe_mesh};
+use crate::{
+    AnimationTrack, LatheOptions, LatheProfilePoint, Transform, VisualHullOptions,
+    generate_lathe_mesh, generate_visual_hull_mesh,
+};
 use serde::{Deserialize, Serialize};
 use std::slice;
 
@@ -10,6 +13,16 @@ struct LatheRequest {
     profile: Vec<LatheProfilePoint>,
     #[serde(default)]
     options: LatheOptions,
+}
+
+#[derive(Deserialize)]
+struct VisualHullRequest {
+    front_contour: Vec<[f32; 2]>,
+    side_contour: Vec<[f32; 2]>,
+    #[serde(default)]
+    top_contour: Option<Vec<[f32; 2]>>,
+    #[serde(default)]
+    options: VisualHullOptions,
 }
 
 #[derive(Deserialize)]
@@ -23,6 +36,16 @@ struct AnimationRequest {
 struct SuccessMesh<'a> {
     ok: bool,
     mesh: &'a crate::MeshData,
+    version: &'static str,
+}
+
+#[derive(Serialize)]
+struct SuccessVisualHull<'a> {
+    ok: bool,
+    mesh: &'a crate::MeshData,
+    occupied_voxels: usize,
+    view_count: u32,
+    resolution: u32,
     version: &'static str,
 }
 
@@ -107,6 +130,36 @@ pub unsafe extern "C" fn forge_eye_lathe_json(pointer: u32, length: u32) -> u64 
             }) {
                 Ok(json) => pack_output(json),
                 Err(error) => failure(format!("Could not serialize generated mesh: {error}")),
+            }
+        }
+        Err(error) => failure(error.to_string()),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn forge_eye_visual_hull_json(pointer: u32, length: u32) -> u64 {
+    let payload = unsafe { slice::from_raw_parts(pointer as *const u8, length as usize) };
+    let request: VisualHullRequest = match serde_json::from_slice(payload) {
+        Ok(value) => value,
+        Err(error) => return failure(format!("Invalid visual-hull request: {error}")),
+    };
+    match generate_visual_hull_mesh(
+        &request.front_contour,
+        &request.side_contour,
+        request.top_contour.as_deref(),
+        request.options,
+    ) {
+        Ok(result) => {
+            match serde_json::to_string(&SuccessVisualHull {
+                ok: true,
+                mesh: &result.mesh,
+                occupied_voxels: result.occupied_voxels,
+                view_count: result.view_count,
+                resolution: result.resolution,
+                version: env!("CARGO_PKG_VERSION"),
+            }) {
+                Ok(json) => pack_output(json),
+                Err(error) => failure(format!("Could not serialize visual-hull mesh: {error}")),
             }
         }
         Err(error) => failure(error.to_string()),
