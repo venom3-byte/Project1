@@ -846,9 +846,18 @@ mod tests {
         let request = LatheRequest {
             name: "Bottle".into(),
             profile: vec![
-                [0.80, 0.90], [0.80, 0.78], [0.70, 0.68], [0.61, 0.56],
-                [0.58, 0.43], [0.58, 0.18], [0.55, 0.11], [0.53, 0.18],
-                [0.53, 0.43], [0.56, 0.58], [0.67, 0.70], [0.76, 0.79],
+                [0.80, 0.90],
+                [0.80, 0.78],
+                [0.70, 0.68],
+                [0.61, 0.56],
+                [0.58, 0.43],
+                [0.58, 0.18],
+                [0.55, 0.11],
+                [0.53, 0.18],
+                [0.53, 0.43],
+                [0.56, 0.58],
+                [0.67, 0.70],
+                [0.76, 0.79],
                 [0.76, 0.88],
             ],
             diameter: 0.08,
@@ -856,7 +865,9 @@ mod tests {
             segments: 32,
             color: default_color(),
         };
-        let result = session.execute(EditorCommand::LatheProfile { request }).unwrap();
+        let result = session
+            .execute(EditorCommand::LatheProfile { request })
+            .unwrap();
         assert!(matches!(result, CommandResult::MeshCreated { .. }));
         assert_eq!(session.scene.objects.len(), 1);
         session.undo().unwrap();
