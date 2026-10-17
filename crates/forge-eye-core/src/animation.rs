@@ -11,11 +11,17 @@ pub struct Transform {
     pub scale: [f32; 3],
 }
 
-fn unit_scale() -> [f32; 3] { [1.0, 1.0, 1.0] }
+fn unit_scale() -> [f32; 3] {
+    [1.0, 1.0, 1.0]
+}
 
 impl Default for Transform {
     fn default() -> Self {
-        Self { location: [0.0; 3], rotation_euler_deg: [0.0; 3], scale: unit_scale() }
+        Self {
+            location: [0.0; 3],
+            rotation_euler_deg: [0.0; 3],
+            scale: unit_scale(),
+        }
     }
 }
 
@@ -92,16 +98,15 @@ pub fn blend_transform(a: Transform, b: Transform, t: f32) -> Transform {
     for i in 0..3 {
         result.location[i] = lerp(a.location[i], b.location[i], t);
         result.scale[i] = lerp(a.scale[i], b.scale[i], t);
-        result.rotation_euler_deg[i] = lerp_angle_degrees(
-            a.rotation_euler_deg[i],
-            b.rotation_euler_deg[i],
-            t,
-        );
+        result.rotation_euler_deg[i] =
+            lerp_angle_degrees(a.rotation_euler_deg[i], b.rotation_euler_deg[i], t);
     }
     result
 }
 
-fn lerp(a: f32, b: f32, t: f32) -> f32 { a + (b - a) * t }
+fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    a + (b - a) * t
+}
 
 /// Interpolate the shortest route around a 360-degree axis rather than spinning a full turn.
 fn lerp_angle_degrees(a: f32, b: f32, t: f32) -> f32 {
@@ -116,7 +121,11 @@ mod tests {
     fn key(frame: u32, x: f32, interpolation: KeyInterpolation) -> TransformKey {
         let mut transform = Transform::default();
         transform.location[0] = x;
-        TransformKey { frame, transform, interpolation }
+        TransformKey {
+            frame,
+            transform,
+            interpolation,
+        }
     }
 
     #[test]
@@ -162,11 +171,17 @@ mod tests {
         a.rotation_euler_deg[1] = 350.0;
         b.rotation_euler_deg[1] = 10.0;
         let result = blend_transform(a, b, 0.5);
-        assert!(result.rotation_euler_deg[1].abs() < 1e-4 || (result.rotation_euler_deg[1] - 360.0).abs() < 1e-4);
+        assert!(
+            result.rotation_euler_deg[1].abs() < 1e-4
+                || (result.rotation_euler_deg[1] - 360.0).abs() < 1e-4
+        );
     }
 
     #[test]
     fn empty_track_returns_identity_transform() {
-        assert_eq!(AnimationTrack::default().evaluate(10.0), Transform::default());
+        assert_eq!(
+            AnimationTrack::default().evaluate(10.0),
+            Transform::default()
+        );
     }
 }
