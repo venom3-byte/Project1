@@ -1,7 +1,8 @@
 //! Scene, command, history, and animation contracts shared by Forge Eye web/native hosts.
 use crate::{
     ExtrusionRequest, GeometryError, HullRequest, LatheRequest, MeshData, MeshDiagnostics,
-    SpinRequest, build_extruded_silhouette, build_lathed_profile, build_spin_profile, build_visual_hull,
+    SpinRequest, build_extruded_silhouette, build_lathed_profile, build_spin_profile,
+    build_visual_hull,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -505,19 +506,29 @@ impl EditorSession {
             }
             EditorCommand::SetMaterial { id, material } => {
                 material.validate()?;
-                let record = self.scene.objects.get_mut(&id)
+                let record = self
+                    .scene
+                    .objects
+                    .get_mut(&id)
                     .ok_or_else(|| GeometryError(format!("Object {id} does not exist.")))?;
                 record.material = material;
                 Ok(CommandResult::MaterialUpdated { id })
             }
             EditorCommand::SetVisibility { id, visible } => {
-                let record = self.scene.objects.get_mut(&id)
+                let record = self
+                    .scene
+                    .objects
+                    .get_mut(&id)
                     .ok_or_else(|| GeometryError(format!("Object {id} does not exist.")))?;
                 record.visible = visible;
                 Ok(CommandResult::VisibilityUpdated { id, visible })
             }
             EditorCommand::DuplicateObject { id } => {
-                let mut duplicate = self.scene.objects.get(&id).cloned()
+                let mut duplicate = self
+                    .scene
+                    .objects
+                    .get(&id)
+                    .cloned()
                     .ok_or_else(|| GeometryError(format!("Object {id} does not exist.")))?;
                 let new_id = self.scene.allocate_id()?;
                 duplicate.id = new_id;
@@ -898,9 +909,16 @@ mod tests {
         let request = SpinRequest {
             name: "Bottle from reference".into(),
             profile: vec![
-                [0.50, 0.94], [0.78, 0.94], [0.82, 0.90],
-                [0.78, 0.84], [0.67, 0.77], [0.62, 0.69],
-                [0.62, 0.30], [0.59, 0.23], [0.55, 0.19], [0.50, 0.18],
+                [0.50, 0.94],
+                [0.78, 0.94],
+                [0.82, 0.90],
+                [0.78, 0.84],
+                [0.67, 0.77],
+                [0.62, 0.69],
+                [0.62, 0.30],
+                [0.59, 0.23],
+                [0.55, 0.19],
+                [0.50, 0.18],
             ],
             diameter: 0.08,
             height: 0.25,
@@ -909,7 +927,9 @@ mod tests {
             smooth_shading: true,
             color: default_color(),
         };
-        let result = session.execute(EditorCommand::SpinProfile { request }).unwrap();
+        let result = session
+            .execute(EditorCommand::SpinProfile { request })
+            .unwrap();
         let CommandResult::MeshCreated { id, diagnostics } = result else {
             panic!("Spin profile should produce a mesh.");
         };
@@ -961,15 +981,34 @@ mod tests {
     #[test]
     fn material_validation_and_duplicate_object_are_deterministic() {
         let mut session = EditorSession::new();
-        let created = session.execute(EditorCommand::CreatePrimitive {
-            primitive: PrimitiveKind::Cube, name: Some("Block".into())
-        }).unwrap();
-        let CommandResult::Created { id } = created else { panic!("expected creation") };
-        let material = MaterialState { base_color: [0.8,0.2,0.1,1.0], metalness: 0.4, roughness: 0.3, opacity: 1.0 };
-        session.execute(EditorCommand::SetMaterial { id, material: material.clone() }).unwrap();
+        let created = session
+            .execute(EditorCommand::CreatePrimitive {
+                primitive: PrimitiveKind::Cube,
+                name: Some("Block".into()),
+            })
+            .unwrap();
+        let CommandResult::Created { id } = created else {
+            panic!("expected creation")
+        };
+        let material = MaterialState {
+            base_color: [0.8, 0.2, 0.1, 1.0],
+            metalness: 0.4,
+            roughness: 0.3,
+            opacity: 1.0,
+        };
+        session
+            .execute(EditorCommand::SetMaterial {
+                id,
+                material: material.clone(),
+            })
+            .unwrap();
         assert_eq!(session.scene.objects[&id].material, material);
-        let duplicate = session.execute(EditorCommand::DuplicateObject { id }).unwrap();
-        let CommandResult::Created { id: copy_id } = duplicate else { panic!("expected duplicate") };
+        let duplicate = session
+            .execute(EditorCommand::DuplicateObject { id })
+            .unwrap();
+        let CommandResult::Created { id: copy_id } = duplicate else {
+            panic!("expected duplicate")
+        };
         assert_eq!(session.scene.objects[&copy_id].name, "Block Copy");
         assert_eq!(session.scene.objects[&copy_id].material, material);
         assert_eq!(session.scene.objects[&copy_id].transform.position[0], 1.0);
@@ -981,13 +1020,23 @@ mod tests {
     #[test]
     fn invalid_material_does_not_mutate_scene() {
         let mut session = EditorSession::new();
-        session.execute(EditorCommand::CreatePrimitive {
-            primitive: PrimitiveKind::Cube, name: None
-        }).unwrap();
+        session
+            .execute(EditorCommand::CreatePrimitive {
+                primitive: PrimitiveKind::Cube,
+                name: None,
+            })
+            .unwrap();
         let before = session.scene.clone();
         let mut invalid = MaterialState::default();
         invalid.base_color[0] = f32::NAN;
-        assert!(session.execute(EditorCommand::SetMaterial { id: 1, material: invalid }).is_err());
+        assert!(
+            session
+                .execute(EditorCommand::SetMaterial {
+                    id: 1,
+                    material: invalid
+                })
+                .is_err()
+        );
         assert_eq!(before, session.scene);
     }
 
