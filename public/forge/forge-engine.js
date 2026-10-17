@@ -16,10 +16,46 @@ function rayTriangle(ro,rd,a,b,c){
   const v=q.cross(e1).dot(rd)*inv;if(v<0||u+v>1)return null;const t=e2.dot(q.cross(e1))*inv;return t>=0?t:null
 }
 
+
+function triangulateContour(points){
+  if(!Array.isArray(points)||points.length<3||points.length>256)throw new Error("A silhouette needs 3–256 contour points.");
+  const pts=points.map(p=>[Number(p[0]),Number(p[1])]);
+  if(pts.some(p=>!Number.isFinite(p[0])||!Number.isFinite(p[1])))throw new Error("Contour contains invalid points.");
+  let area=0;for(let i=0;i<pts.length;i++){const a=pts[i],b=pts[(i+1)%pts.length];area+=a[0]*b[1]-b[0]*a[1]}
+  if(Math.abs(area)<1e-6)throw new Error("Contour area is too small. Draw a wider outline.");
+  const ids=pts.map((_,i)=>i);if(area<0)ids.reverse();
+  const cross=(a,b,c)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
+  const inside=(p,a,b,c)=>{const x=cross(a,b,p),y=cross(b,c,p),z=cross(c,a,p);return x>=-1e-8&&y>=-1e-8&&z>=-1e-8};
+  const triangles=[];let guard=0;
+  while(ids.length>3&&guard++<points.length*points.length){
+    let clipped=false;
+    for(let i=0;i<ids.length;i++){
+      const ia=ids[(i+ids.length-1)%ids.length],ib=ids[i],ic=ids[(i+1)%ids.length],a=pts[ia],b=pts[ib],c=pts[ic];
+      if(cross(a,b,c)<=1e-8)continue;
+      let blocked=false;
+      for(const id of ids){if(id===ia||id===ib||id===ic)continue;if(inside(pts[id],a,b,c)){blocked=true;break}}
+      if(blocked)continue;
+      triangles.push([ia,ib,ic]);ids.splice(i,1);clipped=true;break;
+    }
+    if(!clipped)throw new Error("Cannot triangulate this outline. Remove crossing lines and duplicate points, then trace again.");
+  }
+  if(ids.length===3)triangles.push([ids[0],ids[1],ids[2]]);
+  return triangles;
+}
+
+function pointInContour(point,contour){
+  const x=point[0],y=point[1];let inside=false;
+  for(let i=0,j=contour.length-1;i<contour.length;j=i++){
+    const a=contour[i],b=contour[j];
+    if(((a[1]>y)!==(b[1]>y))&&(x<(b[0]-a[0])*(y-a[1])/(b[1]-a[1]+1e-15)+a[0]))inside=!inside;
+  }
+  return inside;
+}
+
 export class ForgeEngine{
   constructor(canvas,log=()=>{}){
     this.canvas=canvas;this.log=log;this.app=null;this.root=null;this.entities=new Map();this.selectedId=null;this.assets=new Map();
-    this.rapier=null;this.world=null;this.physics=new Map();this.keyframes=new Map();this.scripts=new Map();this.timelineTime=0;this.running=false;this.timelinePlaying=false;this.fps=0;this.frames=0;this.lastFPS=performance.now();this.frameMs=0;
+    this.rapier=null;this.world=null;this.physics=new Map();this.keyframes=new Map();this.scripts=new Map();this.timelineTime=0;this.timelineStart=0;this.timelineEnd=10;this.timelineLoop=true;this.running=false;this.timelinePlaying=false;this.autoKey=false;this.keyInterpolation='ease';this.fps=0;this.frames=0;this.lastFPS=performance.now();this.frameMs=0;
     this.physicsAccumulator=0;this.physicsFixedDt=1/60;this.physicsMaxSubsteps=5;this.prePhysicsSystems=new Set();this.postPhysicsSystems=new Set();this.collisionListeners=new Set();this.colliderEntityMap=new Map();this.eventQueue=null;
     this.triangleCache=new WeakMap();this.pickBudget=120000;this.unitSystem='meters';this.viewMode='perspective';this.gizmoSpace='world';this.snapEnabled=false;this.snapSize=.25;this.history=[];this.redoStack=[];this.historyLimit=100;
   }
@@ -69,7 +105,16 @@ export class ForgeEngine{
     this.frameMs=dt*1000;this.frames++;const now=performance.now();if(now-this.lastFPS>800){this.fps=this.frames*1000/(now-this.lastFPS);this.frames=0;this.lastFPS=now}
     const frameDt=Math.min(.1,Math.max(0,dt));
     if(this.world){this.physicsAccumulator=Math.min(this.physicsAccumulator+frameDt,this.physicsFixedDt*this.physicsMaxSubsteps);let steps=0;while(this.physicsAccumulator>=this.physicsFixedDt&&steps<this.physicsMaxSubsteps){for(const fn of this.prePhysicsSystems){try{fn(this.physicsFixedDt)}catch(e){this.log('Pre-physics error: '+e.message,'error')}}this.world.step(this.eventQueue);this.eventQueue?.drainCollisionEvents((h1,h2,started)=>this.emitCollision(h1,h2,started));for(const fn of this.postPhysicsSystems){try{fn(this.physicsFixedDt)}catch(e){this.log('Post-physics error: '+e.message,'error')}}this.physicsAccumulator-=this.physicsFixedDt;steps++}for(const[id,p]of this.physics){if(p.mode==='fixed')continue;const r=this.entities.get(id);if(!r)continue;const t=p.body.translation(),q=p.body.rotation();r.entity.setPosition(t.x,t.y,t.z);r.entity.setRotation(q.x,q.y,q.z,q.w)}}
-    if(this.timelinePlaying){this.timelineTime+=frameDt;this.evalAnimation(this.timelineTime)}if(this.running)this.runScripts(frameDt)
+    if(this.timelinePlaying){
+      const start=Math.max(0,Number(this.timelineStart)||0),end=Math.max(start+.01,Number(this.timelineEnd)||10);
+      this.timelineTime+=frameDt;
+      if(this.timelineTime>=end){
+        if(this.timelineLoop)this.timelineTime=start+(this.timelineTime-start)%(end-start);
+        else{this.timelineTime=end;this.timelinePlaying=false}
+      }
+      this.evalAnimation(this.timelineTime);
+    }
+    if(this.running)this.runScripts(frameDt)
   }
   worldBounds(){
     const b={min:V(Infinity,Infinity,Infinity),max:V(-Infinity,-Infinity,-Infinity)};let count=0;
@@ -102,15 +147,129 @@ export class ForgeEngine{
   recordTransformHistory(id,before,after){if(!id||!before||!after)return false;if(JSON.stringify(before)===JSON.stringify(after))return false;this.history.push({type:'transform',id,before,after});if(this.history.length>this.historyLimit)this.history.shift();this.redoStack.length=0;return true}
   transform(v,options={}){
     const r=this.selected();if(r?.components?.asset)r.components.asset.derivedDirty=true;if(!r)return null;const before=this._transformState(r),p=r.entity.getLocalPosition(),rot=r.entity.getLocalEulerAngles(),s=r.entity.getLocalScale(),snap=n=>{const v=this.snapEnabled?Math.round(Number(n)/this.snapSize)*this.snapSize:Number(n);return Object.is(v,-0)?0:v};
-    r.entity.setLocalPosition(Number.isFinite(v.x)?snap(v.x):p.x,Number.isFinite(v.y)?snap(v.y):p.y,Number.isFinite(v.z)?snap(v.z):p.z);r.entity.setLocalEulerAngles(Number.isFinite(v.rx)?v.rx:rot.x,Number.isFinite(v.ry)?v.ry:rot.y,Number.isFinite(v.rz)?v.rz:rot.z);r.entity.setLocalScale(Number.isFinite(v.sx)?Math.max(.0001,v.sx):s.x,Number.isFinite(v.sy)?Math.max(.0001,v.sy):s.y,Number.isFinite(v.sz)?Math.max(.0001,v.sz):s.z);if(options.history!==false)this.recordTransformHistory(r.id,before,this._transformState(r));return r
+    r.entity.setLocalPosition(Number.isFinite(v.x)?snap(v.x):p.x,Number.isFinite(v.y)?snap(v.y):p.y,Number.isFinite(v.z)?snap(v.z):p.z);r.entity.setLocalEulerAngles(Number.isFinite(v.rx)?v.rx:rot.x,Number.isFinite(v.ry)?v.ry:rot.y,Number.isFinite(v.rz)?v.rz:rot.z);r.entity.setLocalScale(Number.isFinite(v.sx)?Math.max(.0001,v.sx):s.x,Number.isFinite(v.sy)?Math.max(.0001,v.sy):s.y,Number.isFinite(v.sz)?Math.max(.0001,v.sz):s.z);if(options.history!==false)this.recordTransformHistory(r.id,before,this._transformState(r));if(this.autoKey&&options.autoKey!==false)this.key({interpolation:this.keyInterpolation});return r
   }
   undo(){const h=this.history.pop();if(!h)return false;const r=this.entities.get(h.id);if(!r){this.redoStack.push(h);return false}this._applyTransformState(r,h.before);this.redoStack.push(h);this.select(r.id);return true}
   redo(){const h=this.redoStack.pop();if(!h)return false;const r=this.entities.get(h.id);if(!r){this.history.push(h);return false}this._applyTransformState(r,h.after);this.history.push(h);this.select(r.id);return true}
   setWorldPosition(id,p){const r=this.entities.get(id);if(!r)return false;r.entity.setPosition(Number(p.x)||0,Number(p.y)||0,Number(p.z)||0);return true}
   duplicate(){const r=this.selected();if(!r)return null;const e=r.entity.clone();e.name=r.name+' Copy';this.root.addChild(e);const n=this.rec(e.name,r.kind,e);n.components=JSON.parse(JSON.stringify(r.components));const p=e.getLocalPosition();e.setLocalPosition(p.x+1,p.y,p.z);if(n.components.physics)this.setPhysics(n.id,n.components.physics.mode,n.components.physics.shape);this.select(n.id);return n}
   delete(){const r=this.selected();if(!r)return;this.removePhysics(r.id);r.entity.destroy();this.entities.delete(r.id);this.selectedId=null;window.dispatchEvent(new CustomEvent('forge-selection'))}
-  key(){const r=this.selected();if(!r)return;const p=r.entity.getLocalPosition(),q=r.entity.getLocalEulerAngles(),s=r.entity.getLocalScale(),a=this.keyframes.get(r.id)||[];a.push({time:this.timelineTime,p:[p.x,p.y,p.z],r:[q.x,q.y,q.z],s:[s.x,s.y,s.z]});a.sort((x,y)=>x.time-y.time);this.keyframes.set(r.id,a)}
-  evalAnimation(t){for(const[id,a]of this.keyframes){const r=this.entities.get(id);if(!r||!a.length)continue;let k=a[0];for(let i=0;i<a.length-1;i++)if(t>=a[i].time&&t<=a[i+1].time){const A=a[i],B=a[i+1],f=(t-A.time)/Math.max(.0001,B.time-A.time);k={p:A.p.map((v,j)=>v+(B.p[j]-v)*f),r:A.r.map((v,j)=>v+(B.r[j]-v)*f),s:A.s.map((v,j)=>v+(B.s[j]-v)*f)};break}r.entity.setLocalPosition(...k.p);r.entity.setLocalEulerAngles(...k.r);r.entity.setLocalScale(...k.s)}}
+  key({interpolation=this.keyInterpolation||'linear'}={}) {
+    const r=this.selected();if(!r)return null;
+    const p=r.entity.getLocalPosition(),q=r.entity.getLocalEulerAngles(),sc=r.entity.getLocalScale();
+    const a=this.keyframes.get(r.id)||[],time=Math.max(0,Number(this.timelineTime)||0);
+    const mode=['linear','ease','constant'].includes(interpolation)?interpolation:'linear';
+    const existing=a.find(k=>Math.abs(k.time-time)<1e-5);
+    const key={time,p:[p.x,p.y,p.z],r:[q.x,q.y,q.z],s:[sc.x,sc.y,sc.z],interpolation:mode};
+    if(existing)Object.assign(existing,key);else a.push(key);
+    a.sort((x,y)=>x.time-y.time);this.keyframes.set(r.id,a);
+    return{key:existing||key,updated:!!existing,count:a.length};
+  }
+  evalAnimation(t){
+    for(const[id,a]of this.keyframes){
+      const r=this.entities.get(id);if(!r||!a.length)continue;
+      let value=a[0];
+      if(t>=a[a.length-1].time)value=a[a.length-1];
+      else if(t>a[0].time){
+        for(let i=0;i<a.length-1;i++){
+          const A=a[i],B=a[i+1];if(t<A.time||t>B.time)continue;
+          let f=(t-A.time)/Math.max(.0001,B.time-A.time);
+          const mode=A.interpolation||'linear';
+          if(mode==='constant')f=0;else if(mode==='ease')f=f*f*(3-2*f);
+          const mix=(from,to)=>from.map((v,j)=>v+(to[j]-v)*f);
+          value={p:mix(A.p,B.p),r:mix(A.r,B.r),s:mix(A.s,B.s)};
+          break;
+        }
+      }
+      r.entity.setLocalPosition(...value.p);r.entity.setLocalEulerAngles(...value.r);r.entity.setLocalScale(...value.s);
+    }
+  }
+
+  createExtrudedSilhouette({name="Image Silhouette",contour=[],axis="front",width=3,height=2,depth=.25,color=[.34,.55,.72],record=null}={}){
+    const pts=contour.map(p=>[Number(p[0]),Number(p[1])]);
+    const tris=triangulateContour(pts),w=Math.max(.01,Math.min(10000,Number(width)||3)),h=Math.max(.01,Math.min(10000,Number(height)||2)),d=Math.max(.005,Math.min(10000,Number(depth)||.25));
+    const orient=["front","side","top"].includes(axis)?axis:"front",positions=[],indices=[];
+    const pos=(p,side)=>{
+      const x=(p[0]-.5)*w,y=(.5-p[1])*h,z=(p[1]-.5)*h,n=side*d/2;
+      if(orient==="side")return[n,y,(p[0]-.5)*w];
+      if(orient==="top")return[x,n,z];
+      return[x,y,n];
+    };
+    const tri=(a,b,c)=>{const base=positions.length/3;positions.push(...a,...b,...c);indices.push(base,base+1,base+2)};
+    for(const t of tris){
+      tri(pos(pts[t[0]],1),pos(pts[t[2]],1),pos(pts[t[1]],1));
+      tri(pos(pts[t[0]],-1),pos(pts[t[1]],-1),pos(pts[t[2]],-1));
+    }
+    for(let i=0;i<pts.length;i++){
+      const j=(i+1)%pts.length,fa=pos(pts[i],1),fb=pos(pts[j],1),ba=pos(pts[i],-1),bb=pos(pts[j],-1);
+      tri(fa,ba,bb);tri(fa,bb,fb);
+    }
+    const mesh=new pc.Mesh(this.app.graphicsDevice);mesh.setPositions(positions);mesh.setIndices(indices);mesh.setNormals(pc.calculateNormals(positions,indices));mesh.update();
+    const mat=this.material(color);mat.cull=pc.CULLFACE_NONE;mat.update();
+    const meshInstance=new pc.MeshInstance(mesh,mat);
+    let out=record;
+    if(!out){const entity=new pc.Entity(name);this.root.addChild(entity);out=this.rec(name,"mesh",entity)}
+    out.name=name;out.kind="mesh";out.entity.name=name;
+    if(out.entity.render)out.entity.removeComponent("render");
+    out.entity.addComponent("render",{meshInstances:[meshInstance]});out.entity.render.layers=[pc.LAYERID_WORLD];out.entity.render.frustumCulling=false;
+    if(orient==="front")out.entity.setLocalPosition(0,h/2,.05+d/2);
+    else if(orient==="side")out.entity.setLocalPosition(.05+d/2,h/2,0);
+    else out.entity.setLocalPosition(0,.03+d/2,0);
+    out.components.geometry={kind:"extruded-silhouette",version:1,contour:pts,axis:orient,width:w,height:h,depth:d,color:[...color],sourceName:String(name)};
+    out.components.material={color:[...color],metalness:0.05,roughness:0.65,opacity:1};
+    return out;
+  }
+  createSilhouetteVisualHull({name="Multi-view Silhouette Hull",frontContour=[],sideContour=[],topContour=[],width=3,height=2,depth=3,resolution=32,color=[.3,.62,.78],record=null}={}){
+    const front=frontContour.map(p=>[Number(p[0]),Number(p[1])]),side=sideContour.map(p=>[Number(p[0]),Number(p[1])]),top=topContour.map(p=>[Number(p[0]),Number(p[1])]);
+    triangulateContour(front);triangulateContour(side);if(top.length)triangulateContour(top);
+    const w=Math.max(.01,Math.min(10000,Number(width)||3)),h=Math.max(.01,Math.min(10000,Number(height)||2)),d=Math.max(.01,Math.min(10000,Number(depth)||3));
+    const r=Math.max(12,Math.min(48,Math.round(Number(resolution)||32))),slice=r*r;
+    const frontMask=new Uint8Array(slice),sideMask=new Uint8Array(slice),topMask=top.length?new Uint8Array(slice):null,occupied=new Uint8Array(slice*r);
+    for(let j=0;j<r;j++){
+      const v=(j+.5)/r;
+      for(let i=0;i<r;i++){
+        const u=(i+.5)/r;
+        frontMask[j*r+i]=pointInContour([u,v],front)?1:0;
+        sideMask[j*r+i]=pointInContour([u,v],side)?1:0;
+        if(topMask)topMask[j*r+i]=pointInContour([u,v],top)?1:0;
+      }
+    }
+    let filled=0;
+    for(let k=0;k<r;k++)for(let j=0;j<r;j++)for(let i=0;i<r;i++){
+      const at=i+r*(j+r*k);
+      if(frontMask[j*r+i]&&sideMask[j*r+k]&&(!topMask||topMask[k*r+i])){occupied[at]=1;filled++}
+    }
+    if(!filled)throw new Error("The front and side silhouettes do not intersect. Check view alignment and shared height.");
+    if(filled>slice*r*.92)throw new Error("The silhouettes fill nearly the entire volume. Check that both outlines closely follow the object.");
+    const positions=[],normals=[],indices=[];
+    const quad=(verts,n)=>{
+      const base=positions.length/3;
+      for(const v of verts){positions.push(v[0],v[1],v[2]);normals.push(n[0],n[1],n[2])}
+      indices.push(base,base+1,base+2,base,base+2,base+3);
+    };
+    const has=(i,j,k)=>i>=0&&j>=0&&k>=0&&i<r&&j<r&&k<r&&occupied[i+r*(j+r*k)]===1;
+    const dx=w/r,dy=h/r,dz=d/r;
+    for(let k=0;k<r;k++)for(let j=0;j<r;j++)for(let i=0;i<r;i++){
+      if(!has(i,j,k))continue;
+      const x0=-w/2+i*dx,x1=x0+dx,y0=h/2-j*dy,y1=y0-dy,z0=-d/2+k*dz,z1=z0+dz;
+      if(!has(i-1,j,k))quad([[x0,y0,z0],[x0,y0,z1],[x0,y1,z1],[x0,y1,z0]],[-1,0,0]);
+      if(!has(i+1,j,k))quad([[x1,y0,z1],[x1,y0,z0],[x1,y1,z0],[x1,y1,z1]],[1,0,0]);
+      if(!has(i,j-1,k))quad([[x0,y0,z1],[x0,y0,z0],[x1,y0,z0],[x1,y0,z1]],[0,1,0]);
+      if(!has(i,j+1,k))quad([[x0,y1,z0],[x0,y1,z1],[x1,y1,z1],[x1,y1,z0]],[0,-1,0]);
+      if(!has(i,j,k-1))quad([[x1,y0,z0],[x0,y0,z0],[x0,y1,z0],[x1,y1,z0]],[0,0,-1]);
+      if(!has(i,j,k+1))quad([[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]],[0,0,1]);
+    }
+    const mesh=new pc.Mesh(this.app.graphicsDevice);mesh.setPositions(positions);mesh.setNormals(normals);mesh.setIndices(indices);mesh.update();
+    const mat=this.material(color);mat.cull=pc.CULLFACE_NONE;mat.update();const meshInstance=new pc.MeshInstance(mesh,mat);
+    let out=record;if(!out){const entity=new pc.Entity(name);this.root.addChild(entity);out=this.rec(name,"mesh",entity)}
+    out.name=name;out.kind="mesh";out.entity.name=name;if(out.entity.render)out.entity.removeComponent("render");
+    out.entity.addComponent("render",{meshInstances:[meshInstance]});out.entity.render.layers=[pc.LAYERID_WORLD];out.entity.render.frustumCulling=false;
+    out.entity.setLocalPosition(0,h/2,0);out.entity.setLocalEulerAngles(0,0,0);out.entity.setLocalScale(1,1,1);
+    out.components.geometry={kind:"silhouette-visual-hull",version:2,frontContour:front,sideContour:side,topContour:top,width:w,height:h,depth:d,resolution:r,color:[...color],sourceName:String(name)};
+    out.components.material={color:[...color],metalness:.05,roughness:.68,opacity:1};
+    out.components.diagnostics={method:top.length?"three-view silhouette intersection":"two-view silhouette intersection",viewCount:top.length?3:2,occupiedVoxels:filled,resolution:r};
+    return out;
+  }
   attachScript(id,code){this.scripts.set(id,code)}
   runScripts(dt){for(const[id,code]of this.scripts){const r=this.entities.get(id);if(!r)continue;try{new Function('api',code)({entity:r.entity,time:this.timelineTime,dt,engine:this})}catch(e){this.log('Script error '+e.message,'error')}}}
   async importFile(file){
@@ -147,6 +306,8 @@ export class ForgeEngine{
       if(d.kind==='camera')r.entity.addComponent('camera',{clearColor:new pc.Color(.02,.05,.09)});
       if(d.kind==='light')r.entity.addComponent('light',{type:'directional',intensity:2,castShadows:true});
       r.components=d.components||{};
+      if(d.components?.geometry?.kind==="extruded-silhouette")this.createExtrudedSilhouette({record:r,name:d.name,...d.components.geometry});
+      else if(d.components?.geometry?.kind==="silhouette-visual-hull")this.createSilhouetteVisualHull({record:r,name:d.name,...d.components.geometry});
       if(d.components?.material){
         const previous=this.selectedId;
         this.selectedId=r.id; this.applyMaterial(d.components.material); this.selectedId=previous;
@@ -156,6 +317,19 @@ export class ForgeEngine{
       if(d.script)this.scripts.set(r.id,d.script);
 
       const asset=d.components?.asset;
+      const referenceData=d.components?.reference?.imageDataUrl;
+      if(asset?.name&&asset.type==='image'&&referenceData){
+        try{
+          const response=await fetch(referenceData);
+          if(!response.ok)throw new Error("Embedded reference image could not be read");
+          const file=await response.blob(),bitmap=await createImageBitmap(file),canvas=document.createElement('canvas');
+          canvas.width=bitmap.width;canvas.height=bitmap.height;canvas.getContext('2d').drawImage(bitmap,0,0);bitmap.close?.();
+          const texture=new pc.Texture(this.app.graphicsDevice,{width:canvas.width,height:canvas.height,format:pc.PIXELFORMAT_R8_G8_B8_A8});
+          texture.setSource(canvas);const material=this.material([1,1,1]);material.diffuseMap=texture;material.emissiveMap=texture;material.emissive=new pc.Color(1,1,1);material.cull=pc.CULLFACE_NONE;material.update();
+          for(const instance of(r.entity.render?.meshInstances||[]))instance.material=material;
+          this.assets.set(asset.name,{type:'image',file,url:referenceData,embedded:true});
+        }catch(error){this.log("Reference image restore failed: "+(error?.message||String(error)),"error")}
+      }
       if(asset?.name&&assetRoot&&asset.type==='model'){
         const a=new pc.Asset(asset.name,'container',{url:assetRoot+'assets/'+encodeURIComponent(asset.name)});
         this.app.assets.add(a);
