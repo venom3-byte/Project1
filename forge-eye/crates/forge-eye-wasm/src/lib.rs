@@ -1,5 +1,8 @@
 use forge_eye_core::EditorSession;
-use forge_eye_core::{LatheRequest, ExtrusionRequest, HullRequest, build_extruded_silhouette, build_lathed_profile, build_visual_hull};
+use forge_eye_core::{
+    ExtrusionRequest, HullRequest, LatheRequest, build_extruded_silhouette, build_lathed_profile,
+    build_visual_hull,
+};
 use wasm_bindgen::prelude::*;
 
 /// Stateful, deterministic command session shared by the browser and native hosts.
@@ -96,13 +99,11 @@ pub fn build_extruded_silhouette_json(request_json: &str) -> Result<String, JsVa
     build_extruded_silhouette_json_impl(request_json).map_err(|error| JsValue::from_str(&error))
 }
 
-
 fn build_lathed_profile_json_impl(request_json: &str) -> Result<String, String> {
     let request: LatheRequest = serde_json::from_str(request_json)
         .map_err(|error| format!("Invalid lathe-profile request: {error}"))?;
     let mesh = build_lathed_profile(&request).map_err(|error| error.to_string())?;
-    serde_json::to_string(&mesh)
-        .map_err(|error| format!("Could not serialize lathe mesh: {error}"))
+    serde_json::to_string(&mesh).map_err(|error| format!("Could not serialize lathe mesh: {error}"))
 }
 
 #[wasm_bindgen]
@@ -144,7 +145,6 @@ mod tests {
         assert!(value.contains("occupied_voxels"));
         assert!(value.contains("vertices"));
     }
-
 
     #[test]
     fn bridge_returns_a_lathed_bottle_mesh() {
