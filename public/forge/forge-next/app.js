@@ -184,6 +184,14 @@ function refreshReferences(){
   const chosen=selectedRecord();if(chosen?.components?.reference){const d=chosen.components.reference;$("#referenceAxis").value=d.axis||"front";$("#referenceWidth").value=String(d.width||3);$("#referenceOpacity").value=String(d.opacity??0.45);$("#referenceOpacityValue").textContent=Math.round((d.opacity??0.45)*100)+"%"}
 }
 function focusReferenceView(){const ref=selectedRecord()?.components?.reference;if(!ref){notice("Image Modeling","Select a calibrated reference plane first.");return}chooseView(ref.axis==="side"?"right":ref.axis||"front");state.engine.frame();status("Reference aligned in "+ref.axis+" view")}
+async function referenceImageDataUrl(file,maxSide=1536){
+  const bitmap=await createImageBitmap(file),scale=Math.min(1,maxSide/Math.max(bitmap.width,bitmap.height));
+  const canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+  const ctx=canvas.getContext("2d");if(!ctx){bitmap.close?.();throw new Error("Could not allocate reference-image canvas")}
+  ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();
+  const webp=canvas.toDataURL("image/webp",0.86);
+  return webp.startsWith("data:image/webp")?webp:canvas.toDataURL("image/png");
+}
 async function loadReferenceImages(files){
   let added=0;const axis=$("#referenceAxis").value,width=clamp($("#referenceWidth").value,0.01,10000,3),opacity=clamp($("#referenceOpacity").value,0.1,1,0.45);
   for(const file of files){
@@ -192,7 +200,8 @@ async function loadReferenceImages(files){
       status("Calibrating reference "+file.name+"…");const result=await state.engine.importFile(file),record=result?.record;
       if(!record||result.type!=="image")throw new Error("Image importer did not create a reference plane.");
       const asset=record.components.asset||{},aspect=Number(asset.width)>0&&Number(asset.height)>0?Number(asset.width)/Number(asset.height):1;
-      record.components.reference={name:file.name,axis,width,height:width/aspect,aspect,opacity,visible:true,locked:false};
+      const imageDataUrl=await referenceImageDataUrl(file);
+      record.components.reference={name:file.name,axis,width,height:width/aspect,aspect,opacity,visible:true,locked:false,imageDataUrl};
       applyReferenceSetup(record);state.engine.select(record.id);added++;
     }catch(error){reportError("Reference import failed: "+file.name,error)}
   }
