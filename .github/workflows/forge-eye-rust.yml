@@ -41,23 +41,21 @@ jobs:
         run: cargo test --workspace --locked
       - name: Lint Rust core without warnings
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - name: Build Rust/WebAssembly core and verify packaged artifact
+      - name: Build Rust/WebAssembly core and validate the shipped ABI
         shell: bash
         run: |
           set -euo pipefail
           cargo build -p forge-eye-core --release --locked --target wasm32-unknown-unknown
-          mkdir -p public/forge-eye
-          gzip -n -9 -c target/wasm32-unknown-unknown/release/forge_eye_core.wasm > /tmp/forge_eye_core.wasm.gz
           gzip -t public/forge-eye/forge_eye_core.wasm.gz
-          gzip -cd public/forge-eye/forge_eye_core.wasm.gz | cmp - target/wasm32-unknown-unknown/release/forge_eye_core.wasm
-          test -s /tmp/forge_eye_core.wasm.gz
-          printf 'Rust wasm: %s bytes; checked-in gzip: %s bytes\n' "$(wc -c < target/wasm32-unknown-unknown/release/forge_eye_core.wasm)" "$(wc -c < public/forge-eye/forge_eye_core.wasm.gz)"
+          node scripts/validate-forge-eye-wasm.mjs public/forge-eye/forge_eye_core.wasm.gz target/wasm32-unknown-unknown/release/forge_eye_core.wasm
+          printf 'Fresh Rust WASM: %s bytes; shipped gzip: %s bytes\n' "$(wc -c < target/wasm32-unknown-unknown/release/forge_eye_core.wasm)" "$(wc -c < public/forge-eye/forge_eye_core.wasm.gz)"
       - name: Validate Forge Eye browser modules
         shell: bash
         run: |
           set -euo pipefail
           while IFS= read -r -d '' file; do node --check "$file"; done < <(find public/forge-eye -type f -name '*.js' -print0)
           node --check mcp/forge-eye-smoke.mjs
+          node --check scripts/validate-forge-eye-wasm.mjs
       - name: Build static web editor
         env:
           DEV_BUILD: "1"
