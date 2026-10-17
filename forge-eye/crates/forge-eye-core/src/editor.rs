@@ -265,6 +265,17 @@ pub enum EditorCommand {
         #[serde(default)]
         auto_key: bool,
     },
+    SetMaterial {
+        id: u64,
+        material: MaterialState,
+    },
+    SetVisibility {
+        id: u64,
+        visible: bool,
+    },
+    DuplicateObject {
+        id: u64,
+    },
     InsertKeyframe {
         id: u64,
         frame: u32,
@@ -317,6 +328,13 @@ pub enum CommandResult {
     TransformUpdated {
         id: u64,
         keyed: bool,
+    },
+    MaterialUpdated {
+        id: u64,
+    },
+    VisibilityUpdated {
+        id: u64,
+        visible: bool,
     },
     KeyframeUpdated {
         id: u64,
@@ -484,6 +502,31 @@ impl EditorSession {
                     false
                 };
                 Ok(CommandResult::TransformUpdated { id, keyed })
+            }
+            EditorCommand::SetMaterial { id, material } => {
+                material.validate()?;
+                let record = self.scene.objects.get_mut(&id)
+                    .ok_or_else(|| GeometryError(format!("Object {id} does not exist.")))?;
+                record.material = material;
+                Ok(CommandResult::MaterialUpdated { id })
+            }
+            EditorCommand::SetVisibility { id, visible } => {
+                let record = self.scene.objects.get_mut(&id)
+                    .ok_or_else(|| GeometryError(format!("Object {id} does not exist.")))?;
+                record.visible = visible;
+                Ok(CommandResult::VisibilityUpdated { id, visible })
+            }
+            EditorCommand::DuplicateObject { id } => {
+                let mut duplicate = self.scene.objects.get(&id).cloned()
+                    .ok_or_else(|| GeometryError(format!("Object {id} does not exist.")))?;
+                let new_id = self.scene.allocate_id()?;
+                duplicate.id = new_id;
+                duplicate.name = format!("{} Copy", duplicate.name);
+                duplicate.transform.position[0] =
+                    (duplicate.transform.position[0] + 1.0).clamp(-10_000.0, 10_000.0);
+                self.scene.objects.insert(new_id, duplicate);
+                self.scene.selected_id = Some(new_id);
+                Ok(CommandResult::Created { id: new_id })
             }
             EditorCommand::InsertKeyframe {
                 id,
@@ -913,6 +956,39 @@ mod tests {
         assert_eq!(session.scene.objects.len(), 1);
         session.undo().unwrap();
         assert!(session.scene.objects.is_empty());
+    }
+
+    #[test]
+    fn material_validation_and_duplicate_object_are_deterministic() {
+        let mut session = EditorSession::new();
+        let created = session.execute(EditorCommand::CreatePrimitive {
+            primitive: PrimitiveKind::Cube, name: Some("Block".into())
+        }).unwrap();
+        let CommandResult::Created { id } = created else { panic!("expected creation") };
+        let material = MaterialState { base_color: [0.8,0.2,0.1,1.0], metalness: 0.4, roughness: 0.3, opacity: 1.0 };
+        session.execute(EditorCommand::SetMaterial { id, material: material.clone() }).unwrap();
+        assert_eq!(session.scene.objects[&id].material, material);
+        let duplicate = session.execute(EditorCommand::DuplicateObject { id }).unwrap();
+        let CommandResult::Created { id: copy_id } = duplicate else { panic!("expected duplicate") };
+        assert_eq!(session.scene.objects[&copy_id].name, "Block Copy");
+        assert_eq!(session.scene.objects[&copy_id].material, material);
+        assert_eq!(session.scene.objects[&copy_id].transform.position[0], 1.0);
+        assert!(session.can_undo());
+        session.undo().unwrap();
+        assert!(!session.scene.objects.contains_key(&copy_id));
+    }
+
+    #[test]
+    fn invalid_material_does_not_mutate_scene() {
+        let mut session = EditorSession::new();
+        session.execute(EditorCommand::CreatePrimitive {
+            primitive: PrimitiveKind::Cube, name: None
+        }).unwrap();
+        let before = session.scene.clone();
+        let mut invalid = MaterialState::default();
+        invalid.base_color[0] = f32::NAN;
+        assert!(session.execute(EditorCommand::SetMaterial { id: 1, material: invalid }).is_err());
+        assert_eq!(before, session.scene);
     }
 
     #[test]
