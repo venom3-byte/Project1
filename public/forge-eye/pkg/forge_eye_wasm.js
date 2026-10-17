@@ -474,22 +474,27 @@ async function __wbg_init(module_or_path) {
         }
     }
 
-    const useEmbeddedBase64 = module_or_path === undefined;
-    if (useEmbeddedBase64) {
-        // Git-backed static previews store WASM as base64 text because the GitHub
-        // contents API used by the preview publisher does not upload binary blobs.
-        const response = await fetch(new URL('forge_eye_wasm_bg.wasm.b64', import.meta.url), { cache: 'no-store' });
-        if (!response.ok) {
-            throw new Error(`Failed to fetch embedded Forge Eye WASM: ${response.status} ${response.statusText}`);
-        }
-        const encoded = (await response.text()).replace(/\s+/g, '');
-        if (!encoded || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) {
-            throw new Error('Embedded Forge Eye WASM is not valid base64 text.');
-        }
+    if (module_or_path === undefined) {
+        // Git-backed static previews store compressed WASM as four base64 shards.
+        const urls = Array.from({length: 4}, (_, i) =>
+            new URL('forge_eye_wasm_bg.wasm.gz.b64.' + String(i).padStart(2, '0'), import.meta.url));
+        const parts = await Promise.all(urls.map(async url => {
+            const response = await fetch(url, {cache: 'no-store'});
+            if (!response.ok) throw new Error(`Failed to fetch Forge Eye WASM shard: ${response.status} ${url}`);
+            const part = (await response.text()).trim();
+            if (!part || !/^[A-Za-z0-9+/]+={0,2}$/.test(part)) throw new Error(`Forge Eye WASM shard is invalid: ${url}`);
+            return part;
+        }));
+        const encoded = parts.join('');
         const binary = atob(encoded);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        module_or_path = bytes;
+        const compressed = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) compressed[i] = binary.charCodeAt(i);
+        if (typeof DecompressionStream !== 'function') throw new Error('This browser lacks gzip stream support for Forge Eye WASM.');
+        const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'));
+        module_or_path = new Uint8Array(await new Response(stream).arrayBuffer());
+        if (module_or_path.length < 1000 || module_or_path[0] !== 0 || module_or_path[1] !== 97 || module_or_path[2] !== 115 || module_or_path[3] !== 109) {
+            throw new Error('Decoded Forge Eye WASM failed its header check.');
+        }
     }
     const imports = __wbg_get_imports();
 
