@@ -208,12 +208,12 @@
             <p>For a clean cutout or measured orthographic view: trace the outer contour, then Forge builds and saves an editable 3D slab. This is a silhouette blockout, not full hidden-surface reconstruction.</p>
           </div>
           <div class="visual-hull-tools">
-            <div class="visual-hull-title"><strong>Two-view volume</strong><span>FRONT + SIDE</span></div>
+            <div class="visual-hull-title"><strong>Silhouette volume</strong><span>FRONT + SIDE + TOP*</span></div>
             <label>Blockout resolution
               <select id="hullResolution"><option value="20">Draft · 20</option><option value="32" selected>Balanced · 32</option><option value="40">High · 40</option><option value="48">Very high · 48</option></select>
             </label>
-            <button id="buildSilhouetteHull" class="wide-secondary">Build volume from 2 outlines</button>
-            <p id="hullStatus" role="status">Trace and save one front outline and one side outline first. This creates a coarse silhouette volume to refine in Modeling.</p>
+            <button id="buildSilhouetteHull" class="wide-secondary">Build volume from 2–3 outlines</button>
+            <p id="hullStatus" role="status">Required: saved front and side outlines. A top outline is optional and tightens the volume. Calibrate the widths before building; result is a blockout to refine.</p>
           </div>
           <div class="reference-settings">
             <label>Reference plane<select id="referenceAxis"><option value="front">Front / X-Y</option><option value="side">Side / Y-Z</option><option value="top">Top / X-Z</option></select></label>
