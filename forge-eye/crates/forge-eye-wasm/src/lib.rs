@@ -1,5 +1,49 @@
 use forge_eye_core::{build_extruded_silhouette, build_visual_hull, ExtrusionRequest, HullRequest};
 use wasm_bindgen::prelude::*;
+use forge_eye_core::EditorSession;
+
+/// Stateful, deterministic command session shared by the browser and native hosts.
+#[wasm_bindgen]
+pub struct ForgeEyeSession {
+    inner: EditorSession,
+}
+
+#[wasm_bindgen]
+impl ForgeEyeSession {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> ForgeEyeSession {
+        ForgeEyeSession { inner: EditorSession::new() }
+    }
+
+    /// Executes one validated JSON editor command and returns { result, scene, history }.
+    pub fn execute_json(&mut self, command_json: &str) -> Result<String, JsValue> {
+        self.inner.execute_json(command_json).map_err(|error| JsValue::from_str(&error.to_string()))
+    }
+
+    /// Returns the serializable current scene.
+    pub fn scene_json(&self) -> Result<String, JsValue> {
+        serde_json::to_string(&self.inner.scene).map_err(|error| JsValue::from_str(&error.to_string()))
+    }
+
+    /// Restores a versioned scene after validating IDs, transforms, materials, keys, and mesh indices.
+    pub fn load_scene_json(&mut self, scene_json: &str) -> Result<(), JsValue> {
+        self.inner.load_scene_json(scene_json).map_err(|error| JsValue::from_str(&error.to_string()))
+    }
+
+    pub fn undo_json(&mut self) -> Result<String, JsValue> {
+        self.inner.undo().map_err(|error| JsValue::from_str(&error.to_string()))?;
+        self.scene_json()
+    }
+
+    pub fn redo_json(&mut self) -> Result<String, JsValue> {
+        self.inner.redo().map_err(|error| JsValue::from_str(&error.to_string()))?;
+        self.scene_json()
+    }
+
+    pub fn can_undo(&self) -> bool { self.inner.can_undo() }
+    pub fn can_redo(&self) -> bool { self.inner.can_redo() }
+}
+
 
 #[wasm_bindgen]
 pub fn engine_version() -> String {
