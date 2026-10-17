@@ -62,10 +62,10 @@ try {
     throw new Error("Rust/WASM geometry contract failed: " + JSON.stringify(rustLathe));
   }
 
-  const evaluated = await page.evaluate(() => window.ForgeEyeRust.evaluateAnimation([
-    { frame: 0, transform: { location: [0, 0, 0], rotation_euler_deg: [0, 0, 0], scale: [1, 1, 1], interpolation: "linear" }, interpolation: "linear" },
-    { frame: 24, transform: { location: [3, 0, 0], rotation_euler_deg: [0, 0, 0], scale: [1, 1, 1], interpolation: "linear" }, interpolation: "linear" },
-  ], 12));
+  const evaluated = await page.evaluate(() => window.ForgeEyeRust.evaluateAnimation({ keys: [
+    { frame: 0, transform: { location: [0, 0, 0], rotation_euler_deg: [0, 0, 0], scale: [1, 1, 1] }, interpolation: "linear" },
+    { frame: 24, transform: { location: [3, 0, 0], rotation_euler_deg: [0, 0, 0], scale: [1, 1, 1] }, interpolation: "linear" },
+  ] }, 12));
   if (Math.abs(evaluated.location[0] - 1.5) > .001) throw new Error("Rust/WASM animation evaluation failed: " + JSON.stringify(evaluated));
 
   // Exercise the in-editor one-click action, then the editable profile workflow.
