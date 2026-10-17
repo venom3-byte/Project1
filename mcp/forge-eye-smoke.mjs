@@ -105,6 +105,76 @@ try {
   }
   await page.screenshot({ path: path.join(ARTIFACTS, "forge-eye-profile-to-mesh.png"), fullPage: true });
 
+  const rustVisualHull = await page.evaluate(() => {
+    const square = (a, b) => [[a,a],[b,a],[b,b],[a,b]];
+    const result = window.ForgeEyeRust.visualHullMesh(square(.1,.9), square(.1,.9), square(.25,.75), {
+      width: 3, height: 2, depth: 4, resolution: 16
+    });
+    const mesh = result.mesh;
+    return { viewCount: result.view_count, resolution: result.resolution, occupiedVoxels: result.occupied_voxels,
+      vertices: mesh.positions.length, normals: mesh.normals.length, indices: mesh.indices.length,
+      finite: mesh.positions.every(p => p.every(Number.isFinite)) && mesh.normals.every(n => n.every(Number.isFinite)),
+      validIndices: mesh.indices.every(i => Number.isInteger(i) && i >= 0 && i < mesh.positions.length) };
+  });
+  if (rustVisualHull.viewCount !== 3 || rustVisualHull.resolution !== 16 || rustVisualHull.occupiedVoxels < 1 ||
+      rustVisualHull.vertices < 100 || rustVisualHull.normals !== rustVisualHull.vertices || rustVisualHull.indices < 300 ||
+      !rustVisualHull.finite || !rustVisualHull.validIndices) {
+    throw new Error("Rust/WASM visual-hull ABI failed: " + JSON.stringify(rustVisualHull));
+  }
+
+  // Exercise the actual Image Model action with dimension-matched front, side and top reference metadata.
+  await page.locator('[data-workspace="references"]').click();
+  await page.waitForFunction(() => !document.querySelector('[data-inspector-panel="references"]').hidden, null, { timeout: 5000 });
+  await page.evaluate(() => {
+    const square = (a, b) => [[a,a],[b,a],[b,b],[a,b]];
+    const referenceSpecs = [
+      {axis:"front",name:"QA front view",width:3,height:2,aspect:1.5,outline:square(.1,.9)},
+      {axis:"side",name:"QA side view",width:4,height:2,aspect:2,outline:square(.1,.9)},
+      {axis:"top",name:"QA top view",width:3,height:4,aspect:.75,outline:square(.2,.8)}
+    ];
+    for (const spec of referenceSpecs) {
+      const record = window.Forge.primitive("plane", spec.name);
+      record.components.asset = {type:"image",name:spec.name+".png",width:900,height:Math.round(900/spec.aspect)};
+      record.components.reference = {...spec,opacity:.4,visible:true,locked:false};
+    }
+    window.dispatchEvent(new Event("forge-assets-changed"));
+  });
+  await page.locator("#hullResolution").selectOption("16");
+  await page.locator("#buildSilhouetteHull").click();
+  await page.waitForFunction(() => window.Forge.selected()?.components?.geometry?.kind === "rust-visual-hull", null, { timeout: 15000 });
+  const builtHull = await page.evaluate(() => {
+    const r=window.Forge.selected(),g=r.components.geometry,p=r.components.procedural,mesh=r.entity.render?.meshInstances?.[0]?.mesh;
+    return {name:r.name,kind:g.kind,authoredIn:p?.authoredIn,generator:p?.generator,viewCount:g.viewCount,occupiedVoxels:g.occupiedVoxels,
+      resolution:g.resolution,triangles:g.triangleCount,frontPoints:g.frontContour?.length||0,sidePoints:g.sideContour?.length||0,topPoints:g.topContour?.length||0,
+      rendered:!!mesh,indexCount:mesh?.primitive?.[0]?.count||0};
+  });
+  if (builtHull.kind!=="rust-visual-hull" || builtHull.authoredIn!=="Rust/WebAssembly" ||
+      builtHull.generator!=="forge-eye-core-visual-hull" || builtHull.viewCount!==3 || builtHull.occupiedVoxels<1 ||
+      builtHull.resolution!==16 || builtHull.frontPoints!==4 || builtHull.sidePoints!==4 || builtHull.topPoints!==4 ||
+      !builtHull.rendered || builtHull.triangles<100 || builtHull.indexCount<300) {
+    throw new Error("Three-view Rust visual-hull action failed: " + JSON.stringify(builtHull));
+  }
+  await page.screenshot({ path: path.join(ARTIFACTS, "forge-eye-rust-visual-hull.png"), fullPage: true });
+
+  const savedHullScene = await page.evaluate(() => window.Forge.serialize());
+  const hullRoundTrip = await page.evaluate(async scene => {
+    await window.Forge.load(scene);
+    const hull=[...window.Forge.entities.values()].find(r=>r.components?.geometry?.kind==="rust-visual-hull");
+    const lathe=[...window.Forge.entities.values()].find(r=>r.components?.geometry?.kind==="rust-lathe");
+    const refs=[...window.Forge.entities.values()].filter(r=>r.components?.reference?.outline?.length>=3);
+    return {hullRestored:!!hull&&!!hull.entity.render?.meshInstances?.[0]?.mesh,
+      hullKind:hull?.components.geometry.kind,views:hull?.components.geometry.viewCount,
+      frontPoints:hull?.components.geometry.frontContour?.length||0,sidePoints:hull?.components.geometry.sideContour?.length||0,
+      topPoints:hull?.components.geometry.topContour?.length||0,latheRestored:!!lathe&&!!lathe.entity.render?.meshInstances?.[0]?.mesh,
+      refCount:refs.length,refAxes:refs.map(r=>r.components.reference.axis).sort()};
+  }, savedHullScene);
+  if (!hullRoundTrip.hullRestored || hullRoundTrip.hullKind!=="rust-visual-hull" || hullRoundTrip.views!==3 ||
+      hullRoundTrip.frontPoints!==4 || hullRoundTrip.sidePoints!==4 || hullRoundTrip.topPoints!==4 ||
+      !hullRoundTrip.latheRestored || hullRoundTrip.refCount!==3 ||
+      JSON.stringify(hullRoundTrip.refAxes)!==JSON.stringify(["front","side","top"])) {
+    throw new Error("Rust geometry scene round-trip failed: " + JSON.stringify(hullRoundTrip));
+  }
+
   const downloadPromise = page.waitForEvent("download");
   await page.locator('[data-command="save"]').click();
   const download = await downloadPromise;
@@ -129,7 +199,7 @@ try {
     await page.screenshot({ path: path.join(ARTIFACTS, "forge-eye-mobile-" + width + ".png"), fullPage: true });
   }
 
-  report = { ok: true, url: URL_TO_TEST, httpStatus: response.status(), initial, rustLathe, evaluated, bottle, editedLathe, projectDownload: download.suggestedFilename(), mobileReports, pageErrors, consoleErrors, failedRequests };
+  report = { ok: true, url: URL_TO_TEST, httpStatus: response.status(), initial, rustLathe, evaluated, bottle, editedLathe, rustVisualHull, builtHull, hullRoundTrip, projectDownload: download.suggestedFilename(), mobileReports, pageErrors, consoleErrors, failedRequests };
   await fs.writeFile(path.join(ARTIFACTS, "forge-eye-report.json"), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   if (pageErrors.length || consoleErrors.length || failedRequests.length) throw new Error("Unexpected browser errors: " + JSON.stringify({ pageErrors, consoleErrors, failedRequests }));
