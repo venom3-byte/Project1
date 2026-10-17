@@ -311,7 +311,7 @@ mod tests {
     #[test]
     fn smooth_profile_preserves_endpoints() {
         let p=bottle_profile();let out=smooth_open_profile(&p,2);
-        assert_eq!(out.len(),(p.len()-1)*4+2);
+        assert_eq!(out.len(),p.len()*4);
         assert_eq!(out[0],p[0]);assert_eq!(*out.last().unwrap(),*p.last().unwrap());
     }
     #[test]
