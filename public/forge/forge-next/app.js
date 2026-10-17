@@ -476,6 +476,7 @@ function configureTraceDialog(mode){
   $("#traceDepthField").hidden=lathe;
   $("#traceBuild").hidden=lathe;
   $("#traceBuildLathe").hidden=!lathe;
+  $("#traceAutoDetect").textContent=lathe?"Auto-detect bottle profile":"Auto-detect outline";
   $("#traceSaveOutline").textContent=lathe?"Save profile":"Save outline";
   $("#traceCanvas").setAttribute("aria-label",lathe?"Trace a revolved bottle cross-section":"Trace the image silhouette");
 }
@@ -794,8 +795,11 @@ function bindUI(){
   $("#sceneSearch").addEventListener("input",refreshHierarchy);$("#assetSearch").addEventListener("input",refreshAssetList);
   $("#assetInput").addEventListener("change",e=>{const files=[...e.target.files];if(files.length)void loadAssets(files);e.target.value=""});
   $("#addReferenceImages").addEventListener("click",()=>$("#referenceInput").click());
+  $("#autoSilhouetteModel").addEventListener("click",()=>void autoBuildSilhouetteFromReference());
+  $("#autoSpinImage").addEventListener("click",()=>void autoBuildLatheFromReference());
   $("#traceSilhouette").addEventListener("click",()=>void startSilhouetteTrace());
   $("#traceLatheProfile").addEventListener("click",()=>void startLatheProfileTrace());
+  $("#traceAutoDetect").addEventListener("click",()=>void autoDetectTrace());
   $("#traceCanvas").addEventListener("pointerdown",handleTracePointerDown);
   $("#traceUndo").addEventListener("click",()=>{if(state.trace){state.trace.points.pop();state.trace.closed=false;$("#traceMessage").textContent="Last contour point removed.";traceDraw()}});
   $("#traceClear").addEventListener("click",()=>{if(state.trace){state.trace.points=[];state.trace.closed=false;state.trace.editing=false;$("#traceMessage").textContent="Outline cleared. Trace a new contour in one direction.";traceDraw()}});
