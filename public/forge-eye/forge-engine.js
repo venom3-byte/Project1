@@ -236,6 +236,28 @@ export class ForgeEngine{
     record.components.material={color:[...color],metalness:.05,roughness:.55,opacity:1};
     this.select(record.id);return record;
   }
+  createVisualHullMeshFromData({name="Rust Visual Hull",result,frontContour=[],sideContour=[],topContour=[],width=3,height=2,depth=3,resolution=24,color=[.3,.62,.78],record=null}={}){
+    const meshData=result?.mesh;
+    if(!meshData||!Array.isArray(meshData.positions)||!Array.isArray(meshData.indices)||meshData.indices.length<36)throw new Error("Rust did not return a usable multi-view visual-hull mesh.");
+    if(meshData.positions.length>1500000||meshData.indices.length>9000000)throw new Error("Rust visual hull exceeds the browser mesh safety budget.");
+    const positions=meshData.positions.flatMap(point=>point.map(Number));
+    const normals=Array.isArray(meshData.normals)&&meshData.normals.length===meshData.positions.length?meshData.normals.flatMap(point=>point.map(Number)):pc.calculateNormals(positions,meshData.indices);
+    const indices=meshData.indices.map(Number);
+    if(positions.some(value=>!Number.isFinite(value))||normals.some(value=>!Number.isFinite(value))||indices.some(value=>!Number.isInteger(value)||value<0||value>=meshData.positions.length))throw new Error("Rust visual-hull geometry failed validation.");
+    const mesh=new pc.Mesh(this.app.graphicsDevice);mesh.setPositions(positions);mesh.setNormals(normals);mesh.setIndices(indices);mesh.update();
+    const material=this.material(color);material.cull=pc.CULLFACE_NONE;material.update();const instance=new pc.MeshInstance(mesh,material);
+    let out=record;
+    if(!out){const entity=new pc.Entity(name);this.root.addChild(entity);out=this.rec(name,"mesh",entity)}
+    out.name=name;out.kind="mesh";out.entity.name=name;if(out.entity.render)out.entity.removeComponent("render");
+    out.entity.addComponent("render",{meshInstances:[instance]});out.entity.render.layers=[pc.LAYERID_WORLD];out.entity.render.frustumCulling=false;
+    out.entity.setLocalPosition(0,0,0);out.entity.setLocalEulerAngles(0,0,0);out.entity.setLocalScale(1,1,1);
+    const viewCount=Number(result.view_count)||((topContour?.length||0)>=3?3:2),occupiedVoxels=Number(result.occupied_voxels)||0,r=Number(result.resolution)||Number(resolution)||24;
+    out.components.geometry={kind:"rust-visual-hull",version:1,frontContour:frontContour.map(p=>[...p]),sideContour:sideContour.map(p=>[...p]),topContour:(topContour||[]).map(p=>[...p]),width:Number(width),height:Number(height),depth:Number(depth),resolution:r,color:[...color],viewCount,occupiedVoxels,sourceName:String(name),vertexCount:meshData.positions.length,triangleCount:Math.floor(indices.length/3)};
+    out.components.procedural={generator:"forge-eye-core-visual-hull",version:"0.1.0",options:{width:Number(width),height:Number(height),depth:Number(depth),resolution:r},authoredIn:"Rust/WebAssembly"};
+    out.components.diagnostics={method:viewCount===3?"three-view silhouette intersection":"two-view silhouette intersection",viewCount,occupiedVoxels,resolution:r};
+    out.components.material={color:[...color],metalness:.05,roughness:.68,opacity:1};
+    if(!record)this.select(out.id);return out;
+  }
   createSilhouetteVisualHull({name="Multi-view Silhouette Hull",frontContour=[],sideContour=[],topContour=[],width=3,height=2,depth=3,resolution=32,color=[.3,.62,.78],record=null}={}){
     const front=frontContour.map(p=>[Number(p[0]),Number(p[1])]),side=sideContour.map(p=>[Number(p[0]),Number(p[1])]),top=topContour.map(p=>[Number(p[0]),Number(p[1])]);
     triangulateContour(front);triangulateContour(side);if(top.length)triangulateContour(top);
