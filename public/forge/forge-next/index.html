@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en" data-forge-workspace="layout">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1016">
+  <meta name="color-scheme" content="dark">
+  <title>Forge Next — 3D Workspace</title>
+  <link rel="icon" href="./forge-icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles/tokens.css">
+  <link rel="stylesheet" href="./styles/shell.css">
+  <link rel="stylesheet" href="./styles/panels.css">
+  <link rel="stylesheet" href="./styles/mobile.css">
+</head>
+<body>
+  <div id="bootScreen" class="boot-screen" role="status" aria-live="polite">
+    <div class="boot-mark" aria-hidden="true">F</div>
+    <div class="boot-copy"><strong>Forge Next</strong><span id="bootMessage">Starting 3D engine…</span></div>
+    <div class="boot-meter"><span></span></div>
+  </div>
+
+  <div id="forgeApp" class="forge-app is-booting">
+    <header class="appbar">
+      <a class="brand" href="./index.html" aria-label="Forge Next home">
+        <span class="brand-mark" aria-hidden="true">F</span>
+        <span class="brand-wordmark"><b>FORGE</b><small>NEXT / 3D WORKSPACE</small></span>
+      </a>
+      <span class="bar-divider" aria-hidden="true"></span>
+      <label class="project-name"><span>PROJECT</span><input id="projectName" value="Untitled Project" spellcheck="false" aria-label="Project name" maxlength="80"></label>
+      <div class="save-state" id="saveState" aria-live="polite"><span class="save-led"></span><span>Ready</span></div>
+      <div class="bar-spacer"></div>
+      <div class="global-actions" role="toolbar" aria-label="Project commands">
+        <button class="bar-button" data-command="new" title="New scene">New</button>
+        <button class="bar-button" data-command="open" title="Open Forge project">Open</button>
+        <button class="bar-button" data-command="save" title="Save project (Ctrl+S)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 2.5h11l2 2v13h-13zM6 2.5v5h8v-5M6 17.5v-6h8v6"/></svg><span>Save</span></button>
+        <button class="bar-button import-command" data-command="import" title="Import 2D/3D assets"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 13V2.5M6.5 6 10 2.5 13.5 6M3 11.5v5h14v-5"/></svg><span>Import</span></button>
+        <button id="previewScene" class="preview-button" data-command="preview" aria-pressed="false" title="Run or stop scene preview"><span class="preview-symbol" aria-hidden="true">▷</span><span data-preview-label>Preview</span></button>
+      </div>
+    </header>
+
+    <nav class="workspace-bar" aria-label="Workspaces" role="tablist">
+      <button class="workspace-tab is-active" data-workspace="layout" role="tab" aria-selected="true"><span>01</span>Layout</button>
+      <button class="workspace-tab" data-workspace="modeling" role="tab" aria-selected="false"><span>02</span>Modeling</button>
+      <button class="workspace-tab" data-workspace="references" role="tab" aria-selected="false"><span>03</span>Image Model</button>
+      <button class="workspace-tab" data-workspace="materials" role="tab" aria-selected="false"><span>04</span>Materials</button>
+      <button class="workspace-tab" data-workspace="animation" role="tab" aria-selected="false"><span>05</span>Animation</button>
+      <button class="workspace-tab" data-workspace="assets" role="tab" aria-selected="false"><span>06</span>Assets</button>
+      <button class="workspace-tab" data-workspace="world" role="tab" aria-selected="false"><span>07</span>World</button>
+      <button class="workspace-tab" data-workspace="review" role="tab" aria-selected="false"><span>08</span>Review</button>
+      <div class="workspace-bar-spacer"></div>
+      <button class="icon-button layout-reset" data-command="reset-layout" title="Reset editor layout" aria-label="Reset editor layout">↺</button>
+    </nav>
+
+    <main id="editorLayout" class="editor-layout">
+      <aside id="leftDock" class="dock left-dock" aria-label="Scene and assets">
+        <div class="dock-topline">
+          <div class="dock-tabs" role="tablist" aria-label="Left panel">
+            <button class="dock-tab is-active" data-left-tab="scene" role="tab" aria-selected="true">Scene</button>
+            <button class="dock-tab" data-left-tab="assets" role="tab" aria-selected="false">Assets</button>
+          </div>
+          <button class="icon-button" data-command="collapse-left" title="Collapse scene panel" aria-label="Collapse scene panel">‹</button>
+        </div>
+        <section class="dock-panel scene-dock-panel" data-left-panel="scene">
+          <div class="panel-heading">
+            <div><strong>Hierarchy</strong><span id="entityCount">0 objects</span></div>
+            <button class="icon-button" data-command="scene-menu" aria-label="Scene options" title="Scene options">···</button>
+          </div>
+          <label class="search-field"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.25"/><path d="m12.5 12.5 4 4"/></svg><input id="sceneSearch" type="search" placeholder="Search scene…" autocomplete="off" aria-label="Search scene"></label>
+          <div class="quick-create" role="toolbar" aria-label="Create primitive">
+            <button data-create="box" title="Add box"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m10 2.5 7 3.8v7.4l-7 3.8-7-3.8V6.3zM3 6.3l7 3.8 7-3.8M10 10.1v7.4"/></svg></button>
+            <button data-create="sphere" title="Add sphere"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.2"/><path d="M2.8 10h14.4M10 2.8c4 4.2 4 10.2 0 14.4M10 2.8c-4 4.2-4 10.2 0 14.4"/></svg></button>
+            <button data-create="cylinder" title="Add cylinder"><svg viewBox="0 0 20 20" aria-hidden="true"><ellipse cx="10" cy="4.2" rx="6.5" ry="2.1"/><path d="M3.5 4.2v11.6c0 1.2 2.9 2.1 6.5 2.1s6.5-.9 6.5-2.1V4.2M3.5 10c0 1.2 2.9 2.1 6.5 2.1s6.5-.9 6.5-2.1"/></svg></button>
+            <button data-create="plane" title="Add plane"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m2.5 13 10.8-6 4.2 2.2-10.8 6z"/></svg></button>
+            <span></span>
+            <button data-create="camera" title="Add camera"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 6h4l1.3-2h4.4L13.5 6h4v10h-15z"/><circle cx="10" cy="11" r="3.1"/></svg></button>
+            <button data-create="light" title="Add light"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="8.5" r="4"/><path d="M8 13h4M8.5 15h3M10 1v1.5M3.5 3l1.2 1.2M1.5 8.5H3M16.5 8.5H18M15.3 4.2 16.5 3"/></svg></button>
+          </div>
+          <div class="list-header"><span>OBJECT</span><span>TYPE</span></div>
+          <div id="hierarchy" class="hierarchy-list" role="tree" aria-label="Scene hierarchy"></div>
+          <div id="emptyHierarchy" class="empty-state" hidden>No matching scene objects.</div>
+          <div class="dock-footer"><span class="footer-led"></span><span id="sceneFooter">Scene ready</span><button data-command="frame-all" title="Frame all objects">Frame all</button></div>
+        </section>
+        <section class="dock-panel assets-dock-panel" data-left-panel="assets" hidden>
+          <div class="panel-heading"><div><strong>Asset Browser</strong><span id="assetCount">0 imported</span></div><button class="icon-button" data-command="import" title="Import assets" aria-label="Import assets">＋</button></div>
+          <label class="search-field"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.25"/><path d="m12.5 12.5 4 4"/></svg><input id="assetSearch" type="search" placeholder="Search assets…" autocomplete="off" aria-label="Search assets"></label>
+          <button class="dropzone" data-command="import"><span class="dropzone-symbol">＋</span><b>Import assets</b><span>GLB · GLTF · FBX · OBJ · PNG · WAV</span></button>
+          <div id="assetList" class="asset-list"></div>
+          <div id="assetEmpty" class="empty-state">Import a model, image, audio file or Forge project to begin.</div>
+        </section>
+      </aside>
+
+      <div class="splitter vertical-splitter" data-splitter="left" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Resize scene panel"></div>
+
+      <section class="work-area" aria-label="3D workspace">
+        <div class="viewport-shell">
+          <div class="viewport-toolbar" role="toolbar" aria-label="Viewport tools">
+            <div class="tool-group transform-group" role="group" aria-label="Transform tools">
+              <button class="viewport-tool is-active" data-tool="select" title="Select (Q)" aria-label="Select tool"><span>↖</span><kbd>Q</kbd></button>
+              <button class="viewport-tool" data-tool="translate" title="Move (W)" aria-label="Move tool"><span>↕</span><kbd>W</kbd></button>
+              <button class="viewport-tool" data-tool="rotate" title="Rotate (E)" aria-label="Rotate tool"><span>⟳</span><kbd>E</kbd></button>
+              <button class="viewport-tool" data-tool="scale" title="Scale (R)" aria-label="Scale tool"><span>⤢</span><kbd>R</kbd></button>
+            </div>
+            <span class="toolbar-separator"></span>
+            <div class="tool-group view-group" role="group" aria-label="Camera views">
+              <button class="view-select is-active" data-view="perspective" aria-pressed="true">Perspective</button>
+              <button class="view-select" data-view="front" aria-pressed="false">Front</button>
+              <button class="view-select" data-view="right" aria-pressed="false">Side</button>
+              <button class="view-select" data-view="top" aria-pressed="false">Top</button>
+            </div>
+            <div class="toolbar-flex"></div>
+            <div class="tool-group viewport-options" role="group" aria-label="Viewport options">
+              <button class="viewport-tool compact-option" data-command="snap" aria-pressed="false" title="Toggle transform snap">Snap</button>
+              <button class="viewport-tool compact-option is-active" data-command="grid" aria-pressed="true" title="Toggle grid">Grid</button>
+              <button class="viewport-tool" data-command="frame-selected" title="Frame selection (F)">Focus</button>
+              <button class="icon-button fullscreen-tool" data-command="fullscreen" aria-label="Toggle viewport fullscreen" title="Toggle viewport fullscreen">⛶</button>
+            </div>
+          </div>
+          <div id="viewportStage" class="viewport-stage">
+            <canvas id="viewport" aria-label="3D scene viewport" tabindex="0"></canvas>
+            <div class="viewport-hud-top"><span id="workspaceContext">SCENE / LAYOUT</span><span id="projectionLabel">PERSPECTIVE</span></div>
+            <div id="selectionHud" class="selection-hud" hidden><span class="selection-led"></span><span id="selectedNameHud">No selection</span></div>
+            <div class="viewport-axis-note" aria-hidden="true">X <i>·</i> Y <i>·</i> Z</div>
+            <div class="viewport-help" id="viewportHelp">Orbit: drag · Pan: right-drag · Zoom: wheel</div>
+            <div class="viewport-empty-hint" id="viewportHint" hidden><b>Scene viewport</b><span>Create an object or import a model to begin.</span></div>
+          </div>
+        </div>
+
+        <section id="timelinePanel" class="timeline-panel" aria-label="Animation timeline" hidden>
+          <div class="timeline-head">
+            <div class="timeline-title"><strong>Timeline</strong><span>KEYFRAMES</span></div>
+            <div class="timeline-transport" role="toolbar" aria-label="Timeline transport">
+              <button class="transport-button" data-command="timeline-start" title="Go to start">|◀</button>
+              <button id="timelinePlay" class="transport-button primary-transport" data-command="timeline-play" aria-pressed="false" title="Play timeline">▶</button>
+              <button class="transport-button" data-command="timeline-end" title="Go to end">▶|</button>
+              <button class="transport-button key-button" data-command="keyframe" title="Insert or replace a transform key at this frame">◆ Key</button>
+              <button id="autoKeyButton" class="transport-button auto-key-button" data-command="toggle-auto-key" aria-pressed="false" title="Automatically insert or replace transform keys when transforms change">● Auto</button>
+              <button id="timelineLoop" class="transport-button timeline-loop-button is-active" data-command="timeline-loop" aria-label="Loop animation playback" aria-pressed="true" title="Loop timeline playback">↻</button>
+            </div>
+            <label class="interpolation-field">INTERPOLATION
+              <select id="keyInterpolation" aria-label="Keyframe interpolation"><option value="ease" selected>Ease</option><option value="linear">Linear</option><option value="constant">Hold</option></select>
+            </label>
+            <label class="frame-field">FRAME <input id="currentFrame" type="number" value="0" min="0" max="240" step="1"></label>
+            <button class="icon-button" data-command="close-timeline" aria-label="Close timeline" title="Close timeline">×</button>
+          </div>
+          <div class="timeline-view-switch" role="tablist" aria-label="Animation editor">
+            <button class="timeline-view-tab is-active" data-timeline-view="dopesheet" role="tab" aria-selected="true">Dope Sheet</button>
+            <button class="timeline-view-tab" data-timeline-view="graph" role="tab" aria-selected="false">Graph Editor</button>
+            <label class="graph-channel-field">CHANNEL
+              <select id="graphChannel" aria-label="Graph channel">
+                <option value="p0">Location X</option><option value="p1">Location Y</option><option value="p2">Location Z</option>
+                <option value="r0">Rotation X</option><option value="r1">Rotation Y</option><option value="r2">Rotation Z</option>
+                <option value="s0">Scale X</option><option value="s1">Scale Y</option><option value="s2">Scale Z</option>
+              </select>
+            </label>
+          </div>
+          <div id="timelineRuler" class="timeline-ruler"><span>00</span><span>24</span><span>48</span><span>72</span><span>96</span><span>120</span><span>144</span><span>168</span><span>192</span><span>216</span><span>240</span></div>
+          <div id="timelineDopeSheet" class="timeline-track-area">
+            <div class="timeline-track-label">
+              <div class="timeline-object-label"><span id="timelineTrackName">Selected Object</span><span id="keyCount">0 keys</span></div>
+              <div class="timeline-channel-label">Location</div><div class="timeline-channel-label">Rotation</div><div class="timeline-channel-label">Scale</div>
+            </div>
+            <div id="timelineTrack" class="timeline-track" role="slider" tabindex="0" aria-label="Animation timeline; click to scrub and drag a key to retime it">
+              <div class="timeline-channel-row timeline-meta-row" aria-hidden="true"></div>
+              <div class="timeline-channel-row"><div id="timelineKeyMarkers" class="timeline-key-markers" aria-label="Location keys"></div></div>
+              <div class="timeline-channel-row"><div id="timelineRotationMarkers" class="timeline-key-markers" aria-label="Rotation keys"></div></div>
+              <div class="timeline-channel-row"><div id="timelineScaleMarkers" class="timeline-key-markers" aria-label="Scale keys"></div></div>
+              <div id="timelinePlayhead" class="timeline-playhead"></div>
+            </div>
+          </div>
+          <div id="graphEditorPane" class="graph-editor-pane" hidden>
+            <canvas id="graphEditorCanvas" aria-label="Animation graph editor: drag a key vertically to edit the selected transform channel, click to scrub time"></canvas>
+            <div class="graph-editor-hint"><span id="graphChannelSummary">Location X</span><span>Drag a point to edit value · click to scrub</span></div>
+          </div>
+          <div class="timeline-status"><span id="timelineStatus">24 FPS</span><span id="timelineStatusHint">Key = transform at a frame · interpolation creates motion between keys</span></div>
+        </section>
+      </section>
+
+      <div class="splitter vertical-splitter" data-splitter="right" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Resize inspector panel"></div>
+
+      <aside id="rightDock" class="dock inspector-dock" aria-label="Inspector">
+        <div class="dock-topline">
+          <div class="dock-tabs" role="tablist" aria-label="Inspector tabs">
+            <button class="dock-tab is-active" data-inspector-tab="properties" role="tab" aria-selected="true">Properties</button>
+            <button class="dock-tab" data-inspector-tab="scene" role="tab" aria-selected="false">Scene</button>
+            <button class="dock-tab" data-inspector-tab="references" role="tab" aria-selected="false">Images</button>
+          </div>
+          <button class="icon-button" data-command="collapse-right" title="Collapse inspector" aria-label="Collapse inspector">›</button>
+        </div>
+        <section class="dock-panel inspector-properties" data-inspector-panel="properties">
+          <div class="panel-heading inspector-heading"><div><strong id="inspectorTitle">Inspector</strong><span id="inspectorType">No selection</span></div><button class="icon-button" data-command="inspector-menu" title="Inspector options" aria-label="Inspector options">···</button></div>
+          <div id="noSelection" class="inspector-empty"><span class="inspector-empty-mark">◇</span><b>No object selected</b><span>Select an item in the viewport or hierarchy to inspect its properties.</span></div>
+          <form id="transformForm" class="inspector-form" hidden>
+            <label class="property-name">Name<input id="objectName" autocomplete="off" maxlength="100"></label>
+            <section class="property-section is-open">
+              <button type="button" class="property-section-heading" aria-expanded="true"><span>▾</span><b>Transform</b><small>LOCAL</small></button>
+              <div class="property-section-body">
+                <div class="vector-row"><label><span class="axis-x">X</span><input id="positionX" type="number" step="0.01" aria-label="Position X"></label><label><span class="axis-y">Y</span><input id="positionY" type="number" step="0.01" aria-label="Position Y"></label><label><span class="axis-z">Z</span><input id="positionZ" type="number" step="0.01" aria-label="Position Z"></label></div>
+                <div class="vector-row"><label><span class="axis-x">X</span><input id="rotationX" type="number" step="0.5" aria-label="Rotation X"></label><label><span class="axis-y">Y</span><input id="rotationY" type="number" step="0.5" aria-label="Rotation Y"></label><label><span class="axis-z">Z</span><input id="rotationZ" type="number" step="0.5" aria-label="Rotation Z"></label></div>
+                <div class="vector-row"><label><span class="axis-x">X</span><input id="scaleX" type="number" step="0.01" aria-label="Scale X"></label><label><span class="axis-y">Y</span><input id="scaleY" type="number" step="0.01" aria-label="Scale Y"></label><label><span class="axis-z">Z</span><input id="scaleZ" type="number" step="0.01" aria-label="Scale Z"></label></div>
+              </div>
+            </section>
+            <section class="property-section is-open" id="materialSection">
+              <button type="button" class="property-section-heading" aria-expanded="true"><span>▾</span><b>Material</b><small>PREVIEW</small></button>
+              <div class="property-section-body">
+                <label class="property-name">Base color <span class="color-editor"><input id="materialColor" type="color" value="#389fe0"><output id="materialHex">#389FE0</output></span></label>
+                <label class="range-property"><span>Metalness <output id="metalnessValue">0.05</output></span><input id="metalness" type="range" min="0" max="1" step="0.01" value="0.05"></label>
+                <label class="range-property"><span>Roughness <output id="roughnessValue">0.50</output></span><input id="roughness" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+              </div>
+            </section>
+            <div class="inspector-actions"><button type="button" class="secondary-button" data-command="duplicate">Duplicate</button><button type="button" class="danger-button" data-command="delete">Delete</button></div>
+          </form>
+        </section>
+        <section class="dock-panel inspector-scene" data-inspector-panel="scene" hidden>
+          <div class="panel-heading"><div><strong>Scene settings</strong><span>WORLD</span></div></div>
+          <div class="settings-group"><label>Unit system<select id="unitSystem"><option value="meters">Meters</option><option value="centimeters">Centimeters</option></select></label><label>Grid size<select id="gridSize"><option value="1">1 m</option><option value="0.5">0.5 m</option><option value="0.25">0.25 m</option></select></label><label class="check-property"><input id="showGrid" type="checkbox" checked><span>Show world grid</span></label><label class="check-property"><input id="snapEnabled" type="checkbox"><span>Enable transform snapping</span></label></div>
+          <button class="wide-secondary" data-command="reset-layout">Reset editor layout</button>
+        </section>
+        <section class="dock-panel inspector-references" data-inspector-panel="references" hidden>
+          <div class="panel-heading"><div><strong>Image Modeling</strong><span>CALIBRATE · ALIGN · TRACE</span></div></div>
+          <button id="addReferenceImages" class="wide-secondary reference-add">＋ Add reference images</button>
+          <div class="silhouette-tools">
+            <label>Extrusion depth (m)<input id="silhouetteDepth" type="number" min="0.01" max="1000" step="0.05" value="0.35"></label>
+            <button id="autoSilhouetteModel" class="wide-secondary">Auto-detect silhouette → build 3D</button>
+            <button id="traceSilhouette" class="wide-secondary">Review / edit outline manually</button>
+            <p>Auto mode works best with a transparent or plain background and one clearly separated object. It creates a true extruded mesh from the visible outer contour; hidden depth still requires other views.</p>
+          </div>
+          <div class="lathe-tools">
+            <div class="lathe-title"><strong>Spin / Lathe Profile</strong><span>REVOLVE 360°</span></div>
+            <div class="lathe-dimensions">
+              <label>Max diameter (m)<input id="latheDiameter" type="number" min="0.001" max="1000" step="0.005" value="0.08"></label>
+              <label>Overall height (m)<input id="latheHeight" type="number" min="0.001" max="1000" step="0.01" value="0.25"></label>
+            </div>
+            <label class="lathe-segments">Radial segments
+              <select id="latheSegments"><option value="16">16 · Low-poly</option><option value="24">24 · Draft</option><option value="32" selected>32 · Smooth</option><option value="48">48 · Fine</option><option value="64">64 · High detail</option><option value="96">96 · Ultra</option></select>
+            </label>
+            <label class="lathe-smoothing">Profile subdivision
+              <select id="latheSmoothing"><option value="0">0 · Preserve sharp profile</option><option value="1" selected>1 · Subdivision Surface style</option><option value="2">2 · Smooth profile</option><option value="3">3 · Fine profile</option></select>
+            </label>
+            <div class="lathe-dimensions">
+              <label>Wall thickness (m)<input id="latheWallThickness" type="number" min="0.0001" max="1" step="0.0005" value="0.002"></label>
+              <label>Base thickness (m)<input id="latheBaseThickness" type="number" min="0.0001" max="1" step="0.0005" value="0.003"></label>
+            </div>
+            <button id="autoSpinImage" class="wide-secondary">Auto profile → Spin 360°</button>
+            <button id="traceLatheProfile" class="wide-secondary">Review / trace half-profile manually</button>
+            <p>Auto mode segments a single centered rotational object, estimates its outside profile and builds a hollow wall/base. Best for bottles, jars, cans, knobs, vases and turned parts on a plain background. Inspect the opening, wall thickness and symmetry before accepting the mesh.</p>
+          </div>
+          <div class="visual-hull-tools">
+            <div class="visual-hull-title"><strong>Silhouette volume</strong><span>FRONT + SIDE + TOP*</span></div>
+            <label>Blockout resolution
+              <select id="hullResolution"><option value="20">Draft · 20</option><option value="32" selected>Balanced · 32</option><option value="40">High · 40</option><option value="48">Very high · 48</option></select>
+            </label>
+            <button id="buildSilhouetteHull" class="wide-secondary">Build volume from 2–3 outlines</button>
+            <p id="hullStatus" role="status">Required: saved front and side outlines. A top outline is optional and tightens the volume. Calibrate the widths before building; result is a blockout to refine.</p>
+          </div>
+          <div class="reference-settings">
+            <label>Reference plane<select id="referenceAxis"><option value="front">Front / X-Y</option><option value="side">Side / Y-Z</option><option value="top">Top / X-Z</option></select></label>
+            <label>Known real-world width (m)<input id="referenceWidth" type="number" min="0.01" max="10000" step="0.01" value="3"></label>
+            <label class="range-property"><span>Image opacity <output id="referenceOpacityValue">45%</output></span><input id="referenceOpacity" type="range" min="0.1" max="1" step="0.05" value="0.45"></label>
+          </div>
+          <div class="reference-actions">
+            <button class="secondary-button" data-command="apply-reference-setup">Apply alignment</button>
+            <button class="secondary-button" data-command="focus-reference-view">Align view</button>
+            <button class="secondary-button" data-command="toggle-reference-visibility">Show / hide selected</button>
+          </div>
+          <div class="reference-list-heading"><b>Scene reference planes</b><span id="referenceCount">0</span></div>
+          <div id="referenceList" class="reference-list"></div>
+          <div class="reference-guide">
+            <b>Recommended reconstruction workflow</b>
+            <p>Use front, side and top views with a shared known measurement. Match the silhouette first, then refine cross-sections and details. Lower opacity to compare the mesh against the reference.</p>
+            <p class="reference-caveat">A single photo does not reveal hidden surfaces or true depth. This workspace calibrates and aligns reference images; it does not claim automatic, exact AI reconstruction of arbitrary objects.</p>
+          </div>
+        </section>
+        <div class="inspector-footer"><span id="selectedCount">0 selected</span><span id="unitLabel">METERS</span></div>
+      </aside>
+
+      <div id="drawerScrim" class="drawer-scrim" hidden></div>
+    </main>
+
+    <nav class="mobile-panel-bar" aria-label="Mobile panels">
+      <button data-mobile-panel="scene"><span aria-hidden="true">☷</span><b>Scene</b></button>
+      <button data-mobile-panel="assets"><span aria-hidden="true">▧</span><b>Assets</b></button>
+      <button data-mobile-panel="references"><span aria-hidden="true">▧</span><b>Images</b></button>
+      <button data-mobile-panel="timeline"><span aria-hidden="true">◷</span><b>Animation</b></button>
+      <button data-mobile-panel="properties"><span aria-hidden="true">◇</span><b>Inspect</b></button>
+    </nav>
+
+    <footer class="statusbar">
+      <div class="status-left"><span class="status-live"><i></i><span id="engineStatus">Engine ready</span></span><span class="status-divider"></span><span id="selectionStatus">No selection</span></div>
+      <div class="status-right"><span id="rendererStatus">WebGL</span><span class="status-divider"></span><span id="fpsStatus">— FPS</span><span class="status-divider"></span><span id="entityStatus">0 entities</span><span class="status-divider"></span><span id="diagnosticStatus">No errors</span></div>
+    </footer>
+  </div>
+
+  <input id="assetInput" type="file" hidden multiple accept=".glb,.gltf,.fbx,.obj,.stl,.ply,.dae,.3ds,.usdz,.png,.jpg,.jpeg,.webp,.avif,.mp3,.wav,.ogg,.json,.forge.json">
+  <input id="referenceInput" type="file" hidden multiple accept="image/png,image/jpeg,image/webp,image/avif">
+  <dialog id="traceDialog" class="trace-dialog" aria-labelledby="traceDialogTitle">
+    <div class="trace-dialog-shell">
+      <div class="trace-dialog-head"><div><strong id="traceDialogTitle">Trace image silhouette</strong><span id="traceModeLabel">OUTLINE · CLOSE · EXTRUDE</span></div><button id="traceClose" class="trace-close" aria-label="Close tracing editor">×</button></div>
+      <p id="traceInstructions" class="trace-instructions">Tap or click around the outside edge of the object. Use at least three points; tracing should not cross itself. The 3D blockout uses the reference width and height set in the Images panel.</p>
+      <label id="traceDepthField" class="trace-depth-field">Extrusion depth (m)<input id="traceDepth" type="number" min="0.01" max="1000" step="0.05" value="0.35"></label>
+      <div class="trace-preview-frame"><canvas id="traceCanvas" aria-label="Image silhouette tracing canvas"></canvas></div>
+      <div class="trace-toolbar"><span id="tracePointCount" role="status">0 points</span><button id="traceAutoDetect" class="secondary-button">Auto-detect</button><button id="traceUndo" class="secondary-button">Undo point</button><button id="traceClear" class="secondary-button">Clear outline</button><button id="traceSaveOutline" class="secondary-button">Save profile</button><button id="traceBuild" class="trace-build-button">Build 3D slab</button><button id="traceBuildLathe" class="trace-build-button" hidden>Spin 360° → Build mesh</button></div>
+      <p id="traceMessage" class="trace-message" role="status">Start at a recognizable corner and work around the silhouette.</p>
+    </div>
+  </dialog>
+  <input id="projectInput" type="file" hidden accept=".json,.forge.json">
+  <dialog id="noticeDialog" class="notice-dialog"><div class="dialog-heading"><b id="noticeTitle">Forge</b><button data-command="close-notice" aria-label="Close">×</button></div><p id="noticeBody"></p><div class="dialog-actions"><button class="primary-button" data-command="close-notice">OK</button></div></dialog>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

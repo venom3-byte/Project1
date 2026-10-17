@@ -27,6 +27,14 @@ jobs:
           cache: npm
       - name: Install project dependencies
         run: npm ci
+      - name: Set up Rust and WebAssembly target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Test Forge Eye geometry kernel
+        run: cargo test --manifest-path crates/forge-eye-core/Cargo.toml
+      - name: Build Forge Eye geometry kernel for WebAssembly
+        run: cargo build --release --target wasm32-unknown-unknown --manifest-path crates/forge-eye-core/Cargo.toml
       - name: Run application unit tests
         run: npm test -- --reporter=dot
       - name: Build static host and Macaly Forge workbench
@@ -50,6 +58,7 @@ jobs:
           node --check mcp/worker.js
           node --check mcp/forge-command-schema.mjs
           node --check mcp/forge-port-smoke.mjs
+          node --check mcp/forge-next-smoke.mjs
           node --check mcp/visual-agent-runner.mjs
       - name: Validate all imported Forge browser modules
         id: forge
@@ -114,6 +123,46 @@ jobs:
           FORGE_PORT_URL: http://127.0.0.1:4173/
           FORGE_PORT_ARTIFACTS: ${{ runner.temp }}/forge-port-qa
         run: node mcp/forge-port-smoke.mjs
+      - name: Test Forge Next workspace on desktop and mobile in real Chromium
+        env:
+          FORGE_NEXT_URL: http://127.0.0.1:4173/forge/forge-next/index.html
+          FORGE_NEXT_ARTIFACTS: ${{ runner.temp }}/forge-next-qa
+        run: node mcp/forge-next-smoke.mjs
+      - name: Verify the isolated public Forge Next preview route
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://forge-studio.forgemail-agent.workers.dev"
+          ok=0
+          for attempt in $(seq 1 8); do
+            if curl --fail --silent --show-error --max-time 20 "$base/forge-next/index.html" -o /tmp/forge-next-public.html; then
+              ok=1
+              break
+            fi
+            sleep 3
+          done
+          test "$ok" -eq 1
+          grep -q 'Forge Next' /tmp/forge-next-public.html
+          curl --fail --silent --show-error --max-time 20 "$base/forge-next/styles/shell.css" -o /tmp/forge-next-public.css
+          grep -q 'viewport-toolbar' /tmp/forge-next-public.css
+          curl --fail --silent --show-error --max-time 20 "$base/forge-next/app.js" -o /tmp/forge-next-public.js
+          grep -q 'function setWorkspace' /tmp/forge-next-public.js
+          grep -q 'function toggleTimeline' /tmp/forge-next-public.js
+          # All imports must resolve inside the isolated preview folder, not the legacy /forge/ route.
+          grep -q 'import("./forge-engine.js")' /tmp/forge-next-public.js
+          ! grep -q 'import("../forge-engine.js")' /tmp/forge-next-public.js
+          for asset in forge-engine.js forge-viewport.js forge-spatial.js forge-gizmo.js forge-project.js forge-export.js forge-icon.svg; do
+            curl --fail --silent --show-error --max-time 20 "$base/forge-next/$asset" -o "/tmp/forge-next-$asset"
+            test -s "/tmp/forge-next-$asset"
+          done
+          grep -q 'createSilhouetteVisualHull' /tmp/forge-next-forge-engine.js
+          grep -q 'createExtrudedSilhouette' /tmp/forge-next-forge-engine.js
+          grep -q 'createLathedProfileMesh' /tmp/forge-next-forge-engine.js
+          grep -q 'selectedRadius(record)' /tmp/forge-next-forge-engine.js
+          grep -q 'traceLatheProfile' /tmp/forge-next-public.js
+          grep -q 'timelineLoop' /tmp/forge-next-forge-engine.js
+          grep -q 'href="./forge-icon.svg"' /tmp/forge-next-public.html
+          echo "Public Forge Next route verified: HTML/CSS/JS and all isolated runtime dependencies returned HTTP 200; visual-hull and animation engine are served from this preview, not the legacy editor."
       - name: Upload screenshots, diagnostics and browser logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -122,4 +171,5 @@ jobs:
           if-no-files-found: warn
           path: |
             ${{ runner.temp }}/forge-port-qa/
+            ${{ runner.temp }}/forge-next-qa/
             /tmp/forge-preview.log

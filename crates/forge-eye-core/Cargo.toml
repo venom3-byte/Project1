@@ -1,0 +1,15 @@
+[package]
+name = "forge-eye-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Deterministic geometry kernel for Forge Eye image-guided reconstruction"
+
+[lib]
+name = "forge_eye_core"
+crate-type = ["rlib", "cdylib"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
