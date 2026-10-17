@@ -310,7 +310,7 @@ try {
     await page.screenshot({path:path.join(ARTIFACTS,"forge-next-mobile-"+viewport.width+".png"),fullPage:true});
   }
   await page.evaluate(()=>{window.Forge.timelinePlaying=false;window.Forge.running=false});
-  report={ok:true,url:URL_TO_TEST,httpStatus:response.status(),initial,created,transformed,front,moveTool,material,timelineOnly,previewOnly,saveDownload:download.suggestedFilename(),dockResize:{leftBefore,leftAfter,persisted},mobileReports,pageErrors,consoleErrors,failedRequests};
+  report={ok:true,url:URL_TO_TEST,httpStatus:response.status(),initial,created,transformed,front,moveTool,material,animation:{interpolated,graphEditor:{initial:graphInitial,edited:graphEdited}},timelineOnly,previewOnly,saveDownload:download.suggestedFilename(),dockResize:{leftBefore,leftAfter,persisted},mobileReports,pageErrors,consoleErrors,failedRequests};
   if(pageErrors.length)throw new Error("Uncaught browser errors: "+pageErrors.join("\n"));
   if(consoleErrors.length)throw new Error("Browser console errors: "+consoleErrors.join("\n"));
 } catch(error) {
