@@ -211,3 +211,27 @@
   .graph-channel-field select{max-width:none;flex:1}
   #graphEditorCanvas{height:120px;min-height:95px}
 }
+
+
+/* Blender-style Spin / Lathe profile workflow for bottles, cans, jars and turned parts. */
+.lathe-tools{display:flex;flex-direction:column;gap:8px;margin:0 11px 11px;padding:10px;border:1px solid #3a5363;border-radius:5px;background:linear-gradient(155deg,#12212b,#0b151d)}
+.lathe-title{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.lathe-title strong{color:#d9e8f1;font-size:10px;font-weight:650}
+.lathe-title span{padding:3px 5px;border:1px solid #42647a;border-radius:3px;color:#98cce5;font:8px var(--font-mono);letter-spacing:.5px;white-space:nowrap}
+.lathe-dimensions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.lathe-dimensions label{display:flex;min-width:0;flex-direction:column;gap:5px;color:#9bb0be;font-size:9px}
+.lathe-dimensions input{width:100%;min-width:0;height:29px;padding:0 7px;border:1px solid #304653;border-radius:4px;background:#09121a;color:#e0ebf2;font:10px var(--font-mono)}
+.lathe-segments{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#9bb0be;font-size:9px}
+.lathe-segments select{max-width:150px;min-width:0;height:27px;padding:0 6px;border:1px solid #304653;border-radius:4px;background:#09121a;color:#d4e2ec;font-size:9px}
+.lathe-tools>#traceLatheProfile{height:auto;min-height:34px;margin:0;border-color:#41677d;background:#193848;color:#d3eaf5;font-size:10px;font-weight:650}
+.lathe-tools>#traceLatheProfile:hover{border-color:#69a5c2;background:#214658}
+.lathe-tools>p{margin:0;color:#829aaa;font-size:9px;line-height:1.6}
+#traceBuildLathe{border-color:#41677d;background:#193f52;color:#d4effb}
+#traceBuildLathe:hover{border-color:#77badd;background:#23546c}
+#traceDepthField[hidden],#traceBuild[hidden],#traceBuildLathe[hidden]{display:none!important}
+@media(max-width:520px){
+  .lathe-dimensions{gap:5px}
+  .lathe-title strong{font-size:9px}
+  .lathe-title span{font-size:7px}
+  .lathe-tools>p{font-size:8px}
+}
