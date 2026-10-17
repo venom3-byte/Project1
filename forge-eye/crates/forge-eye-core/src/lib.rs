@@ -62,9 +62,150 @@ pub struct MeshDiagnostics {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct HullRequ
-…[1 chars truncated — re-run with head/grep/tail for full output]…
-tween {MIN_RESOLUTION} and {MAX_RESOLUTION}."
+pub struct HullRequest {
+    pub name: String,
+    pub front_contour: Vec<Point2>,
+    pub side_contour: Vec<Point2>,
+    #[serde(default)]
+    pub top_contour: Option<Vec<Point2>>,
+    pub width: f32,
+    pub height: f32,
+    pub depth: f32,
+    pub resolution: usize,
+    #[serde(default = "default_color")]
+    pub color: [f32; 4],
+}
+fn default_color() -> [f32; 4] {
+    [0.32, 0.62, 0.76, 1.0]
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectionAxis {
+    Front,
+    Side,
+    Top,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ExtrusionRequest {
+    pub name: String,
+    pub contour: Vec<Point2>,
+    pub axis: ProjectionAxis,
+    pub width: f32,
+    pub height: f32,
+    pub depth: f32,
+    #[serde(default = "default_color")]
+    pub color: [f32; 4],
+}
+
+/// Validates a normalized, simple polygon and returns a triangle index list.
+/// Ear clipping is deterministic and rejects self-intersections instead of
+/// silently producing corrupt geometry.
+pub fn triangulate_contour(contour: &[Point2]) -> Result<Vec<[u32; 3]>, GeometryError> {
+    validate_contour(contour)?;
+    let mut polygon: Vec<usize> = (0..contour.len()).collect();
+    if signed_area(contour) < 0.0 {
+        polygon.reverse();
+    }
+    let mut triangles = Vec::with_capacity(contour.len() - 2);
+    let mut guard = 0usize;
+
+    while polygon.len() > 3 && guard < contour.len() * contour.len() {
+        guard += 1;
+        let mut clipped = false;
+        for i in 0..polygon.len() {
+            let ia = polygon[(i + polygon.len() - 1) % polygon.len()];
+            let ib = polygon[i];
+            let ic = polygon[(i + 1) % polygon.len()];
+            let a = contour[ia];
+            let b = contour[ib];
+            let c = contour[ic];
+            if cross2(a, b, c) <= EPSILON {
+                continue;
+            }
+            if polygon.iter().copied().any(|id| {
+                id != ia && id != ib && id != ic && point_in_triangle(contour[id], a, b, c)
+            }) {
+                continue;
+            }
+            triangles.push([ia as u32, ib as u32, ic as u32]);
+            polygon.remove(i);
+            clipped = true;
+            break;
+        }
+        if !clipped {
+            return Err(error(
+                "Contour cannot be triangulated; remove crossing edges, duplicate points, or narrow spikes.",
+            ));
+        }
+    }
+    if polygon.len() != 3 {
+        return Err(error("Contour triangulation did not converge."));
+    }
+    triangles.push([polygon[0] as u32, polygon[1] as u32, polygon[2] as u32]);
+    Ok(triangles)
+}
+
+pub fn validate_contour(contour: &[Point2]) -> Result<(), GeometryError> {
+    if contour.len() < 3 {
+        return Err(error("A silhouette needs at least three contour points."));
+    }
+    if contour.len() > MAX_CONTOUR_POINTS {
+        return Err(error(format!(
+            "Contour has {} points; the supported maximum is {MAX_CONTOUR_POINTS}.",
+            contour.len()
+        )));
+    }
+    for (i, p) in contour.iter().enumerate() {
+        if !p[0].is_finite() || !p[1].is_finite() {
+            return Err(error(format!(
+                "Contour point {i} contains a non-finite coordinate."
+            )));
+        }
+        if p[0] < -EPSILON || p[0] > 1.0 + EPSILON || p[1] < -EPSILON || p[1] > 1.0 + EPSILON {
+            return Err(error(format!(
+                "Contour point {i} must be normalized to the [0, 1] image range."
+            )));
+        }
+        let next = contour[(i + 1) % contour.len()];
+        if distance_sq(*p, next) < EPSILON * EPSILON {
+            return Err(error(
+                "Contour contains duplicate or nearly duplicate adjacent points.",
+            ));
+        }
+    }
+    for i in 0..contour.len() {
+        let a = contour[i];
+        let b = contour[(i + 1) % contour.len()];
+        for j in (i + 1)..contour.len() {
+            let adjacent = j == i || j == (i + 1) % contour.len() || (j + 1) % contour.len() == i;
+            if adjacent {
+                continue;
+            }
+            let c = contour[j];
+            let d = contour[(j + 1) % contour.len()];
+            if segments_intersect(a, b, c, d) {
+                return Err(error(
+                    "Contour self-intersects. Use one continuous outer boundary; holes require a separate contour.",
+                ));
+            }
+        }
+    }
+    if signed_area(contour).abs() < EPSILON {
+        return Err(error("Contour area is effectively zero."));
+    }
+    Ok(())
+}
+
+/// Builds a coarse visual hull from front and side projections plus an optional
+/// top projection. This represents the intersection of silhouette extrusions;
+/// it cannot infer unseen concavities or internal cavities.
+pub fn build_visual_hull(request: &HullRequest) -> Result<MeshData, GeometryError> {
+    validate_dimensions(request.width, request.height, request.depth)?;
+    if !(MIN_RESOLUTION..=MAX_RESOLUTION).contains(&request.resolution) {
+        return Err(error(format!(
+            "Voxel resolution must be between {MIN_RESOLUTION} and {MAX_RESOLUTION}."
         )));
     }
     validate_contour(&request.front_contour)?;
