@@ -322,6 +322,11 @@ function traceDraw(){
   const trace=state.trace,canvas=$("#traceCanvas");if(!trace||!canvas)return;
   const ctx=canvas.getContext("2d"),w=canvas.width,h=canvas.height;
   ctx.clearRect(0,0,w,h);ctx.fillStyle="#0b1118";ctx.fillRect(0,0,w,h);ctx.drawImage(trace.bitmap,0,0,w,h);
+  if(trace.mode==="lathe-profile"){
+    ctx.save();ctx.setLineDash([Math.max(3,w*.008),Math.max(2,w*.004)]);ctx.strokeStyle="rgba(80,210,255,.9)";ctx.lineWidth=Math.max(1.5,w*.003);
+    ctx.beginPath();ctx.moveTo(w*.5,0);ctx.lineTo(w*.5,h);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle="#72d9ff";ctx.font="bold "+Math.max(9,Math.min(12,w*.025))+"px ui-monospace, monospace";ctx.textAlign="left";ctx.textBaseline="top";ctx.fillText("ROTATION AXIS · Y",w*.5+5,5);ctx.restore();
+  }
   if(trace.points.length){
     ctx.save();ctx.lineWidth=Math.max(2,Math.min(w,h)*.0035);ctx.strokeStyle="#54d6ff";ctx.fillStyle="#b0efff";ctx.lineJoin="round";ctx.lineCap="round";
     ctx.beginPath();trace.points.forEach((p,i)=>{const x=p[0]*w,y=p[1]*h;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)});
