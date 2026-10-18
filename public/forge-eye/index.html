@@ -316,7 +316,7 @@
       <p class="trace-instructions">Tap or click around the outside edge of the object. Use at least three points; tracing should not cross itself. The 3D blockout uses the reference width and height set in the Images panel.</p>
       <label class="trace-depth-field">Extrusion depth (m)<input id="traceDepth" type="number" min="0.01" max="1000" step="0.05" value="0.35"></label>
       <div class="trace-preview-frame"><canvas id="traceCanvas" aria-label="Image silhouette tracing canvas"></canvas></div>
-      <div class="trace-toolbar"><span id="tracePointCount" role="status">0 points</span><button id="traceUndo" class="secondary-button">Undo point</button><button id="traceClear" class="secondary-button">Clear outline</button><button id="traceSaveOutline" class="secondary-button">Save outline</button><button id="traceBuild" class="trace-build-button">Build 3D slab</button></div>
+      <div class="trace-toolbar"><span id="tracePointCount" role="status">0 points</span><button id="traceAutoDetect" class="secondary-button">Auto-detect silhouette</button><button id="traceUndo" class="secondary-button">Undo point</button><button id="traceClear" class="secondary-button">Clear outline</button><button id="traceSaveOutline" class="secondary-button">Save outline</button><button id="traceBuild" class="trace-build-button">Build 3D slab</button></div>
       <p id="traceMessage" class="trace-message" role="status">Start at a recognizable corner and work around the silhouette.</p>
     </div>
   </dialog>
