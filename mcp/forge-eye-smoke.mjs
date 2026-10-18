@@ -329,6 +329,42 @@ try {
     throw new Error("Original-resolution reference import regression failed: " + JSON.stringify(imageImport));
   }
 
+  // Image-to-shape: a transparent source should produce an editable traced
+  // contour and an actual triangle mesh without a remote model-generation API.
+  const cutoutDataUrl = await page.evaluate(() => {
+    const canvas=document.createElement("canvas");canvas.width=160;canvas.height=160;
+    const ctx=canvas.getContext("2d");ctx.clearRect(0,0,160,160);
+    ctx.fillStyle="#ed774f";ctx.beginPath();ctx.ellipse(80,80,48,58,0,0,Math.PI*2);ctx.fill();
+    return canvas.toDataURL("image/png");
+  });
+  const cutoutPng=Buffer.from(cutoutDataUrl.split(",")[1],"base64");
+  await page.locator("#referenceInput").setInputFiles({name:"qa-transparent-shape.png",mimeType:"image/png",buffer:cutoutPng});
+  await page.waitForFunction(() => [...window.Forge.entities.values()].some(
+    r=>r.components?.reference?.name==="qa-transparent-shape.png"&&r.components?.asset?.name==="qa-transparent-shape.png"
+  ),null,{timeout:15000});
+  await page.locator("#traceSilhouette").click();
+  await page.waitForFunction(()=>document.querySelector("#traceDialog").open,null,{timeout:5000});
+  await page.locator("#traceAutoDetect").click();
+  await page.waitForFunction(()=>document.querySelector("#traceMessage").textContent.includes("Auto-detected the largest foreground silhouette"),null,{timeout:10000});
+  const traceStats=await page.evaluate(()=>{
+    const label=document.querySelector("#tracePointCount")?.textContent||"";
+    return {label,pointCount:Number(label.match(/\d+/)?.[0]||0),closed:label.includes("closed"),canvasWidth:document.querySelector("#traceCanvas")?.width};
+  });
+  if(traceStats.pointCount<8||!traceStats.closed||traceStats.canvasWidth<100){
+    throw new Error("Transparent-image contour detection did not create a useful closed outline: "+JSON.stringify(traceStats));
+  }
+  await page.locator("#traceBuild").click();
+  await page.waitForFunction(()=>window.Forge.selected()?.components?.geometry?.kind==="extruded-silhouette",null,{timeout:10000});
+  const autoShape=await page.evaluate(()=>{
+    const r=window.Forge.selected(),g=r.components.geometry,mesh=r.entity.render?.meshInstances?.[0]?.mesh;
+    return {name:r.name,kind:g.kind,points:g.contour?.length||0,depth:g.depth,vertices:mesh?.vertexBuffer?.getNumVertices?.()||0,
+      indexCount:mesh?.primitive?.[0]?.count||0,rendered:!!mesh,material:r.components.material};
+  });
+  if(autoShape.kind!=="extruded-silhouette"||autoShape.points<8||!autoShape.rendered||autoShape.indexCount<24){
+    throw new Error("Image-derived 3D shape did not produce a real mesh: "+JSON.stringify(autoShape));
+  }
+  await page.screenshot({path:path.join(ARTIFACTS,"forge-eye-auto-image-shape.png"),fullPage:true});
+
   const downloadPromise = page.waitForEvent("download");
   await page.locator('[data-command="save"]').click();
   const download = await downloadPromise;
