@@ -970,41 +970,30 @@ function spawnBomb(plane, target) {
   bombs.push({ mesh: bomb, target, t: 0, duration: 1.1, from: bomb.position.clone(), to: new THREE.Vector3(target.group.position.x + (Math.sin(state.time) * 1.4), 0.8, target.group.position.z + (Math.cos(state.time * 1.3) * 1.2)) });
   addLog('Weapon release confirmed. Impact solution locked.', 'alert');
 }
-function explodeAt(position, target) {
-  const blast = new THREE.Group();
-  blast.position.copy(position);
-  scene.add(blast);
-  const core = new THREE.Mesh(new THREE.SphereGeometry(1.1, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffb94d, transparent: true, opacity: 0.92 }));
-  core.position.y = 1.1;
-  blast.add(core);
-  const smoke = new THREE.Mesh(new THREE.SphereGeometry(1.7, 12, 8), new THREE.MeshBasicMaterial({ color: 0x474b43, transparent: true, opacity: 0.55 }));
-  smoke.position.set(0.2, 2.2, -0.15);
-  blast.add(smoke);
-  const ring = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.65, 24), new THREE.MeshBasicMaterial({ color: 0xffd07e, transparent: true, opacity: 0.8, side: THREE.DoubleSide }));
-  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.2; blast.add(ring);
-  effects.push({ group: blast, t: 0, target });
-  if (target && target.alive) {
-    target.hp = Math.max(0, target.hp - (target.kind === 'depot' ? 70 : 60));
-    if (target.hp <= 0) destroyTarget(target);
-    addLog('Impact confirmed on ' + target.name + ' · ' + Math.round(target.hp) + '% integrity remaining.', target.hp === 0 ? 'alert' : 'normal');
-    if (state.selected === target) updateSelectionPanel();
+function explodeAt(position,target,payload={}){
+  const blast=new THREE.Group();blast.position.copy(position);scene.add(blast);
+  const core=new THREE.Mesh(new THREE.SphereGeometry(payload.aerial?1.9:1.1,14,10),new THREE.MeshBasicMaterial({color:0xffa43c,transparent:true,opacity:.94,depthWrite:false}));core.position.y=.85;blast.add(core);
+  const smoke=new THREE.Mesh(new THREE.SphereGeometry(payload.aerial?2.9:1.7,12,8),new THREE.MeshBasicMaterial({color:0x464a43,transparent:true,opacity:.56,depthWrite:false}));smoke.position.set(.2,1.9,-.15);blast.add(smoke);
+  const ring=new THREE.Mesh(new THREE.RingGeometry(.45,.78,32),new THREE.MeshBasicMaterial({color:0xffd07e,transparent:true,opacity:.82,side:THREE.DoubleSide,depthWrite:false}));ring.rotation.x=-Math.PI/2;ring.position.y=.18;blast.add(ring);
+  const flash=new THREE.Mesh(new THREE.SphereGeometry(.5,10,8),new THREE.MeshBasicMaterial({color:0xffe8ad,transparent:true,opacity:.8}));flash.position.y=.75;blast.add(flash);
+  effects.push({group:blast,t:0,duration:payload.aerial?1.85:1.25,target,explosion:true});
+  createDebris(position,payload.aerial?13:(payload.shell?5:8),payload.aerial?0x373b35:0x413c34);
+  const radius=payload.radius||8,damage=payload.damage||45,team=payload.team||'blue';
+  for(const entity of [...targets,...tanks,...soldiers]){
+    if(!entity.alive||(entity.team&&entity.team===team))continue;
+    const p=entity.group.position,dist=Math.hypot(p.x-position.x,p.z-position.z);if(dist>radius)continue;
+    const falloff=Math.max(.22,1-dist/radius),base=entity===target?damage:damage*(entity.type==='infantry'?.72:.48);
+    applyDamage(entity,base*falloff,team,position);
   }
+  if(target&&target.alive)addLog('Impact on '+target.name+' · '+Math.round(target.hp)+' HP remaining.','alert');
 }
-function destroyTarget(target) {
-  target.alive = false;
-  target.status = 'DESTROYED';
-  target.hp = 0;
-  target.group.traverse((o) => {
-    if (o.isMesh && o.material && !o.material.emissive) o.material = mats.destroyed;
-  });
-  target.ring.visible = false;
-  const smoke = new THREE.Mesh(new THREE.SphereGeometry(2.1, 14, 10), new THREE.MeshBasicMaterial({ color: 0x454a42, transparent: true, opacity: 0.62 }));
-  smoke.position.set(0, 5, 0);
-  target.group.add(smoke);
-  target.smoke = smoke;
-  addLog(target.name + ' destroyed. Objective status updated.', 'alert');
-  toast(target.name + ' destroyed');
-  updateObjectives();
+function destroyTarget(target){
+  if(!target||!target.alive)return;target.alive=false;target.status='DESTROYED';target.hp=0;
+  target.group.traverse((o)=>{if(o.isMesh&&o.material&&!o.material.emissive)o.material=mats.destroyed;});
+  target.ring.visible=false;
+  const smoke=new THREE.Mesh(new THREE.SphereGeometry(2.1,14,10),new THREE.MeshBasicMaterial({color:0x454a42,transparent:true,opacity:.62,depthWrite:false}));
+  smoke.position.set(0,5,0);target.group.add(smoke);target.smoke=smoke;
+  createDebris(target.group.position.clone(),9,0x393b37);addLog(target.name+' destroyed. Objective status updated.','alert');toast(target.name+' destroyed');updateObjectives();
 }
 function updateObjectives() {
   const depot = targets.find((t) => t.kind === 'depot');
@@ -1024,8 +1013,15 @@ function updateObjectives() {
     toast('MISSION COMPLETE · IRON HORIZON');
   }
 }
-function updatePlane(plane, dt) {
-  if (plane.mixer) plane.mixer.update(dt);
+function updatePlane(plane,dt){
+  if(plane.mixer)plane.mixer.update(dt);
+  if(plane.state==='crash'){
+    plane.crashAge=(plane.crashAge||0)+dt;plane.crashVelocity.y-=8.8*dt;plane.group.position.addScaledVector(plane.crashVelocity,dt);plane.group.rotation.x+=dt*1.15;plane.group.rotation.z+=dt*.95;
+    if(plane.crashSmoke){plane.crashSmoke.position.x=Math.sin(plane.crashAge*7)*.25;plane.crashSmoke.position.y=Math.sin(plane.crashAge*5)*.2;plane.crashSmoke.scale.setScalar(1.1+Math.sin(plane.crashAge*4)*.2);}
+    if(plane.group.position.y<=.55){plane.group.position.y=.35;plane.state='crashed';plane.status='WRECK · LOST';plane.alive=false;explodeAt(plane.group.position.clone(),null,{team:'blue',damage:18,radius:11,aerial:true});plane.visual.traverse((node)=>{if(node.isMesh)node.material=mats.destroyed;});addLog(plane.name+' impacted the terrain · aircraft lost.','alert');if(state.selected===plane)updateSelectionPanel();updateObjectives();}
+    return;
+  }
+  if(plane.state==='crashed')return;
   if (plane.state === 'ready') {
     plane.group.rotation.set(0, Math.PI, 0);
     plane.group.position.set(plane.initial.x, 0.16, plane.initial.z);
@@ -1089,6 +1085,76 @@ function updatePlane(plane, dt) {
   if (plane.state === 'taxi' && plane.routeIndex >= 2) plane.state = 'airborne';
   if (plane.routeIndex >= 6 && plane.state !== 'return' && plane.route[5] && plane.route[5].state === 'ATTACK RUN') plane.state = 'return';
 }
+function launchShell(unit,target){
+  if(!unit||!target||!target.alive)return;
+  const start=unit.group.localToWorld(new THREE.Vector3(0,2.15,2.7)),end=target.group.position.clone().add(new THREE.Vector3(0,target.type==='target'?1.3:1.05,0));
+  const duration=THREE.MathUtils.clamp(start.distanceTo(end)/48,.48,1.45),gravity=10.5;
+  const velocity=new THREE.Vector3((end.x-start.x)/duration,(end.y-start.y+.5*gravity*duration*duration)/duration,(end.z-start.z)/duration);
+  const shell=new THREE.Mesh(new THREE.SphereGeometry(.17,9,7),new THREE.MeshBasicMaterial({color:0xffd17a,transparent:true,opacity:.98}));shell.position.copy(start);scene.add(shell);
+  projectiles.push({mesh:shell,start,end,velocity,gravity,duration,age:0,target,team:unit.team,damage:target.type==='target'?25:29,radius:target.type==='target'?8.5:6.5});addLog(unit.name+' fired a ballistic shell.','normal');
+}
+function createDebris(position,amount=6,palette=0x373b37){
+  for(let i=0;i<amount;i++){
+    const mesh=new THREE.Mesh(new THREE.BoxGeometry(.22+Math.random()*.45,.15+Math.random()*.32,.22+Math.random()*.42),material(palette,.92,.04));
+    mesh.position.copy(position).add(new THREE.Vector3((Math.random()-.5)*2.5,.2+Math.random()*1.3,(Math.random()-.5)*2.5));mesh.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);scene.add(mesh);
+    debris.push({mesh,velocity:new THREE.Vector3((Math.random()-.5)*7,2.5+Math.random()*6,(Math.random()-.5)*7),spin:new THREE.Vector3(Math.random()*5,Math.random()*5,Math.random()*5),age:0,life:2.3+Math.random()*1.7});
+  }
+}
+function killInfantry(soldier){
+  if(!soldier||!soldier.alive)return;soldier.alive=false;soldier.hp=0;soldier.status='CASUALTY';soldier.moveTarget=null;soldier.attackTarget=null;soldier.fallProgress=0;if(soldier.ring)soldier.ring.visible=false;
+  addLog(soldier.name+' is down.','alert');if(state.selected===soldier)updateSelectionPanel();
+}
+function destroyTank(unit){
+  if(!unit||!unit.alive)return;unit.alive=false;unit.hp=0;unit.status='DESTROYED';unit.moveTarget=null;unit.attackTarget=null;if(unit.ring)unit.ring.visible=false;
+  unit.visual.traverse((node)=>{if(node.isMesh&&node.material&&node.userData.initialMaterial)node.material=mats.destroyed;});
+  const smoke=new THREE.Mesh(new THREE.SphereGeometry(1,12,8),new THREE.MeshBasicMaterial({color:0x343a36,transparent:true,opacity:.55,depthWrite:false}));
+  smoke.position.set(0,2.7,0);smoke.scale.set(1.3,1.8,1.3);unit.group.add(smoke);unit.wreckSmoke=smoke;
+  createDebris(unit.group.position.clone(),7,0x303532);addLog(unit.name+' destroyed · burning wreck remains.','alert');if(state.selected===unit)updateSelectionPanel();
+}
+function crashAircraft(plane){
+  if(!plane||plane.state==='crash'||plane.state==='crashed')return;plane.state='crash';plane.status='HIT · UNCONTROLLED DESCENT';plane.route=[];plane.routeIndex=0;
+  plane.crashVelocity=new THREE.Vector3((Math.random()-.5)*7,-2.8,-5+Math.random()*3);plane.crashAge=0;
+  plane.crashSmoke=new THREE.Mesh(new THREE.SphereGeometry(.55,9,7),new THREE.MeshBasicMaterial({color:0x3d403b,transparent:true,opacity:.62}));plane.crashSmoke.position.set(0,0,-2.7);plane.group.add(plane.crashSmoke);
+  if(plane.ring)plane.ring.visible=false;addLog(plane.name+' hit by air defence · crash sequence initiated.','alert');if(state.selected===plane)updateSelectionPanel();
+}
+function applyDamage(entity,amount,attackerTeam,impactPoint){
+  if(!entity||!entity.alive||(attackerTeam&&entity.team&&entity.team===attackerTeam))return;
+  entity.hp=Math.max(0,entity.hp-amount);if(entity.hp>0){if(state.selected===entity)updateSelectionPanel();return;}
+  if(entity.type==='target')destroyTarget(entity);else if(entity.type==='tank')destroyTank(entity);else if(entity.type==='infantry')killInfantry(entity);else if(entity.type==='aircraft')crashAircraft(entity);
+}
+function updateProjectiles(dt){
+  for(let i=projectiles.length-1;i>=0;i--){const p=projectiles[i];p.age+=dt;const t=Math.min(p.age,p.duration);
+    p.mesh.position.set(p.start.x+p.velocity.x*t,p.start.y+p.velocity.y*t-.5*p.gravity*t*t,p.start.z+p.velocity.z*t);
+    if(p.age>=p.duration){explodeAt(p.end,p.target,{team:p.team,damage:p.damage,radius:p.radius,shell:true});scene.remove(p.mesh);p.mesh.geometry.dispose();p.mesh.material.dispose();projectiles.splice(i,1);}
+  }
+}
+function updateDebris(dt){
+  for(let i=debris.length-1;i>=0;i--){const d=debris[i];d.age+=dt;d.velocity.y-=12*dt;d.mesh.position.addScaledVector(d.velocity,dt);d.mesh.rotation.x+=d.spin.x*dt;d.mesh.rotation.y+=d.spin.y*dt;d.mesh.rotation.z+=d.spin.z*dt;
+    if(d.mesh.position.y<.13){d.mesh.position.y=.13;d.velocity.y*=-.22;d.velocity.x*=.76;d.velocity.z*=.76;}
+    if(d.age>=d.life){scene.remove(d.mesh);d.mesh.geometry.dispose();d.mesh.material.dispose();debris.splice(i,1);}
+  }
+}
+function updateInfantry(dt){
+  for(const soldier of soldiers){
+    if(!soldier.alive){soldier.fallProgress=Math.min(1,soldier.fallProgress+dt*1.8);soldier.group.rotation.z=soldier.fallDirection*(Math.PI/2)*soldier.fallProgress;soldier.group.position.y=-.06*soldier.fallProgress;continue;}
+    if(soldier.moveTarget){const dx=soldier.moveTarget.x-soldier.group.position.x,dz=soldier.moveTarget.z-soldier.group.position.z,dist=Math.hypot(dx,dz);
+      if(dist<.7){soldier.moveTarget=null;soldier.status='HOLDING';}
+      else{const step=Math.min(dist,2.7*dt);soldier.group.position.x+=dx/dist*step;soldier.group.position.z+=dz/dist*step;const heading=Math.atan2(dx,dz);soldier.group.rotation.y+=((((heading-soldier.group.rotation.y+Math.PI*3)%(Math.PI*2))-Math.PI)*Math.min(1,dt*4));soldier.arms.forEach((arm,i)=>{arm.rotation.x=Math.sin(state.time*7+i*Math.PI)*.22;});soldier.legs.forEach((leg,i)=>{leg.rotation.x=Math.sin(state.time*7+i*Math.PI)*.35;});}
+    }
+    soldier.fireTimer-=dt;if(soldier.fireTimer<=0){
+      const enemies=[...tanks.filter((u)=>u.alive&&u.team!==soldier.team),...soldiers.filter((u)=>u.alive&&u.team!==soldier.team)];let closest=null,best=25;
+      for(const enemy of enemies){const dist=soldier.group.position.distanceTo(enemy.group.position);if(dist<best){best=dist;closest=enemy;}}
+      if(closest){soldier.fireTimer=2.4+(soldier.id.length%4)*.24;const from=soldier.group.position.clone().add(new THREE.Vector3(0,1.15,0)),to=closest.group.position.clone().add(new THREE.Vector3(0,closest.type==='tank'?1.3:.9,0));createTracer(from,to);applyDamage(closest,closest.type==='tank'?2.2:5.5,soldier.team,to);}else soldier.fireTimer=.5;
+    }
+  }
+  for(const unit of tanks)if(!unit.alive&&unit.wreckSmoke){unit.wreckSmoke.position.y=2.6+Math.sin(state.time*1.7)*.22;unit.wreckSmoke.scale.set(1.4+Math.sin(state.time)*.12,1.8+Math.sin(state.time*1.2)*.16,1.4);}
+}
+function updateAircraftDamage(plane,dt){
+  if(!plane||plane.state==='ready'||plane.state==='rearm'||plane.state==='crash'||plane.state==='crashed')return;
+  const sam=targets.find((t)=>t.kind==='sam'&&t.alive);if(!sam||plane.routeIndex>7)return;
+  if(plane.group.position.distanceTo(sam.group.position)>112||plane.group.position.y<2.5)return;
+  plane.aaTimer=(plane.aaTimer||0)-dt;if(plane.aaTimer<=0){plane.aaTimer=2.9;plane.hp=Math.max(0,plane.hp-14);createTracer(sam.group.position.clone().add(new THREE.Vector3(0,2,0)),plane.group.position.clone());addLog('SAM engagement · '+plane.name+' integrity '+plane.hp+'%','alert');if(plane.hp<=0)crashAircraft(plane);if(state.selected===plane)updateSelectionPanel();}
+}
 function updateTanks(dt) {
   for (const unit of tanks) {
     if (!unit.alive) continue;
@@ -1135,11 +1201,8 @@ function updateTanks(dt) {
       if (distance < 35) {
         unit.fireTimer -= dt;
         if (unit.fireTimer <= 0) {
-          unit.fireTimer = 2.7;
-          t.hp = Math.max(0, t.hp - 5);
-          createTracer(unit.group.position.clone().add(new THREE.Vector3(0, 1.6, 1.3)), t.group.position.clone().add(new THREE.Vector3(0, 2.5, 0)));
-          if (t.hp <= 0) destroyTarget(t);
-          if (state.selected === t) updateSelectionPanel();
+          unit.fireTimer = 3.0;
+          launchShell(unit,t);
         }
       } else {
         unit.moveTarget = new THREE.Vector3(t.group.position.x, 0, t.group.position.z + 9);
@@ -1165,7 +1228,7 @@ function updateBombs(dt) {
     bomb.mesh.position.y -= Math.sin(t * Math.PI) * 2.3;
     bomb.mesh.rotation.z += dt * 3;
     if (t >= 1) {
-      explodeAt(bomb.to, bomb.target);
+      explodeAt(bomb.to,bomb.target,{team:'blue',damage:bomb.target&&bomb.target.kind==='depot'?70:60,radius:20,aerial:true});
       scene.remove(bomb.mesh); bomb.mesh.geometry.dispose(); bombs.splice(i, 1);
     }
   }
@@ -1176,8 +1239,9 @@ function updateEffects(dt) {
     if (e.tracer) {
       if (e.t > 0.18) { scene.remove(e.group); e.group.geometry.dispose(); e.group.material.dispose(); effects.splice(i, 1); }
     } else {
-      const t = Math.min(1, e.t / 1.2);
-      e.group.scale.setScalar(1 + t * 1.5);
+      const duration=e.duration||1.3;
+      const t=Math.min(1,e.t/duration);
+      e.group.scale.setScalar(1+t*(e.explosion?2.9:1.5));
       e.group.children.forEach((child) => { if (child.material && child.material.transparent) child.material.opacity = Math.max(0, 0.9 - t * 0.9); });
       if (e.t > 1.3) { scene.remove(e.group); e.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); effects.splice(i, 1); }
     }
