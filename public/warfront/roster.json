@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "project": "Warfront RTS",
-  "sceneRevision": 8,
+  "sceneRevision": 14,
   "sceneProjectUrl": "https://higgsfield.ai/3d-jutsu/6a8b4f06-f85f-4cac-9897-35fab0bccfe3",
   "sourceEngine": "Blender 5.2 LTS",
   "coordinateNotes": {
@@ -13,10 +13,10 @@
   "integrationStatus": "full-scene-glb-available-root-preview-supported-individual-unit-packaging-and-gameplay-binding-pending",
   "balanceNote": "All balance numbers are abstract RTS game values, not real-world performance specifications.",
   "bundle": {
-    "fullSceneGLBBytes": 11131472,
+    "fullSceneGLBBytes": 13793416,
     "individualGLBAssets": "pending",
     "runtimeImport": "pending",
-    "fullSceneRevision": 8,
+    "fullSceneRevision": 14,
     "fullSceneGLBPath": "public/warfront/assets/combined-arms-r8.glb"
   },
   "summary": {
