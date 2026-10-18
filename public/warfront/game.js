@@ -248,10 +248,13 @@ function buildTree(x, z, scale) {
 // Tree cover is generated for each chosen battlefield.
 
 
+function clearImpactMarks(){
+  impactMarks.splice(0).forEach((mark)=>{if(mark.parent)mark.parent.remove(mark);mark.traverse((node)=>{if(node.geometry)node.geometry.dispose();if(node.material)(Array.isArray(node.material)?node.material:[node.material]).forEach((m)=>{if(m&&m.dispose)m.dispose();});});});
+}
 function clearMapFeatures() {
+  clearImpactMarks();
   const shared=new Set(Object.values(mats).flatMap((entry)=>Array.isArray(entry)?entry:[entry]));
   for(const child of [...mapFeatures.children]){const ownedMaterials=new Set();mapFeatures.remove(child);child.traverse((node)=>{if(node.geometry)node.geometry.dispose();if(node.material)(Array.isArray(node.material)?node.material:[node.material]).forEach((m)=>{if(m&&!shared.has(m))ownedMaterials.add(m);});});ownedMaterials.forEach((m)=>m.dispose());}
-  impactMarks.length=0;
 }
 function addRiverFeature(width,centreZ){
   const vertices=[],indices=[],steps=Math.ceil(width/12);
@@ -1034,7 +1037,7 @@ function spawnBomb(plane, target) {
 function createImpactMark(position,size=2.6){
   const mark=new THREE.Group();mark.position.set(position.x,.055,position.z);mark.name='persistent-impact-scorch';
   const soot=new THREE.Mesh(new THREE.CircleGeometry(size,20),new THREE.MeshStandardMaterial({color:0x33342f,roughness:1,transparent:true,opacity:.78,depthWrite:false}));soot.rotation.x=-Math.PI/2;soot.scale.set(1,.78,1);mark.add(soot);
-  const rim=new THREE.Mesh(new THREE.RingGeometry(size*.72,size,24),new THREE.MeshStandardMaterial({color:0x777266,roughness:1,transparent:true,opacity:.7,side:THREE.DoubleSide,depthWrite:false}));rim.rotation.x=-Math.PI/2;rim.position.y=.015;mark.add(rim);mapFeatures.add(mark);impactMarks.push(mark);
+  const rim=new THREE.Mesh(new THREE.RingGeometry(size*.72,size,24),new THREE.MeshStandardMaterial({color:0x777266,roughness:1,transparent:true,opacity:.7,side:THREE.DoubleSide,depthWrite:false}));rim.rotation.x=-Math.PI/2;rim.position.y=.015;mark.add(rim);(state.activeBlenderMap?state.activeBlenderMap.group:mapFeatures).add(mark);impactMarks.push(mark);
 }
 function explodeAt(position,target,payload={}){
   const blast=new THREE.Group();blast.position.copy(position);scene.add(blast);
@@ -1203,6 +1206,7 @@ function updateDebris(dt){
 }
 function updateInfantry(dt){
   for(const soldier of soldiers){
+    if(soldier.mixer)soldier.mixer.update(dt);
     if(!soldier.alive){soldier.fallProgress=Math.min(1,soldier.fallProgress+dt*1.8);soldier.group.rotation.z=soldier.fallDirection*(Math.PI/2)*soldier.fallProgress;soldier.group.position.y=-.06*soldier.fallProgress;continue;}
     if(soldier.moveTarget){const dx=soldier.moveTarget.x-soldier.group.position.x,dz=soldier.moveTarget.z-soldier.group.position.z,dist=Math.hypot(dx,dz);
       if(dist<.7){soldier.moveTarget=null;soldier.status='HOLDING';}
@@ -1230,6 +1234,7 @@ function updateAircraftDamage(plane,dt){
 }
 function updateTanks(dt) {
   for (const unit of tanks) {
+    if (unit.mixer) unit.mixer.update(dt);
     if (!unit.alive) continue;
     if(unit.attackTarget&&!unit.attackTarget.alive){unit.attackTarget=null;unit.moveTarget=null;unit.status=unit.team==='red'?'DEFENDING':'HOLDING POSITION';}
     if(unit.team==='red'&&!unit.attackTarget){
@@ -1387,8 +1392,9 @@ function resetMission() {
   for (const unit of tanks) {
     unit.hp = unit.maxHp; unit.alive = true; unit.status = unit.team === 'blue' ? 'HOLDING' : 'DEFENDING';
     unit.moveTarget = null; unit.attackTarget = null;
-    const seed=MAPS[state.mapId].tankStarts[tanks.indexOf(unit)]||MAPS[state.mapId].tankStarts[0];
-    unit.group.position.set(seed[0],0,seed[1]);unit.group.rotation.set(0,0,0);
+    const layoutSeed=state.mapLayout&&state.mapLayout.tanks&&state.mapLayout.tanks[tanks.indexOf(unit)];
+    const fallbackSeed=MAPS[state.mapId].tankStarts[tanks.indexOf(unit)]||MAPS[state.mapId].tankStarts[0];
+    unit.group.position.set(layoutSeed?layoutSeed.x:fallbackSeed[0],0,layoutSeed?layoutSeed.z:fallbackSeed[1]);unit.group.rotation.set(0,0,0);
     if(unit.wreckSmoke){unit.group.remove(unit.wreckSmoke);unit.wreckSmoke.geometry.dispose();unit.wreckSmoke.material.dispose();unit.wreckSmoke=null;}
     unit.visual.traverse((node)=>{if(node.isMesh&&node.userData.initialMaterial)node.material=node.userData.initialMaterial;});
     if (unit.visualData && unit.visualData.tracks) {
@@ -1396,8 +1402,9 @@ function resetMission() {
     }
   }
   for(const soldier of soldiers){
-    const seed=MAPS[state.mapId].soldierStarts[soldiers.indexOf(soldier)]||MAPS[state.mapId].soldierStarts[0];
-    soldier.hp=soldier.maxHp;soldier.alive=true;soldier.status='ADVANCING';soldier.moveTarget=null;soldier.attackTarget=null;soldier.fallProgress=0;soldier.group.position.set(seed[0],0,seed[1]);soldier.group.rotation.set(0,0,0);soldier.team=seed[2]||soldier.team;soldier.name=soldier.role+' · '+soldier.team.toUpperCase();
+    const layoutSeed=state.mapLayout&&state.mapLayout.soldiers&&state.mapLayout.soldiers[soldiers.indexOf(soldier)];
+    const fallbackSeed=MAPS[state.mapId].soldierStarts[soldiers.indexOf(soldier)]||MAPS[state.mapId].soldierStarts[0];
+    soldier.hp=soldier.maxHp;soldier.alive=true;soldier.status='ADVANCING';soldier.moveTarget=null;soldier.attackTarget=null;soldier.fallProgress=0;soldier.group.position.set(layoutSeed?layoutSeed.x:fallbackSeed[0],0,layoutSeed?layoutSeed.z:fallbackSeed[1]);soldier.group.rotation.set(0,0,0);soldier.team=layoutSeed?layoutSeed.team:(fallbackSeed[2]||soldier.team);soldier.name=soldier.role+' · '+soldier.team.toUpperCase();
     soldier.group.traverse((node)=>{if(node.isMesh&&node.userData.initialMaterial)node.material=node.userData.initialMaterial;});if(soldier.ring)soldier.ring.visible=false;
   }
   for(const plane of aircraft){
@@ -1410,7 +1417,7 @@ function resetMission() {
   projectiles.splice(0).forEach((p)=>{scene.remove(p.mesh);if(p.mesh.geometry)p.mesh.geometry.dispose();if(p.mesh.material)p.mesh.material.dispose();});
   debris.splice(0).forEach((d)=>{scene.remove(d.mesh);if(d.mesh.geometry)d.mesh.geometry.dispose();if(d.mesh.material)d.mesh.material.dispose();});
   effects.splice(0).forEach((e)=>{scene.remove(e.group);e.group.traverse((n)=>{if(n.geometry)n.geometry.dispose();if(n.material)n.material.dispose();});});
-  impactMarks.splice(0).forEach((mark)=>{if(mark.parent)mark.parent.remove(mark);mark.traverse((node)=>{if(node.geometry)node.geometry.dispose();if(node.material)(Array.isArray(node.material)?node.material:[node.material]).forEach((m)=>{if(m&&m.dispose)m.dispose();});});});
+  clearImpactMarks();
   selectEntity(null); setCommand('select'); updateObjectives(); updateHUD();
 }
 function panCamera(dx, dy) {
@@ -1842,29 +1849,35 @@ function setupCatalogDialog() {
 setupCatalogDialog();
 
 function initialiseAssets() {
-  setLoadProgress(78, 'Starting simulation; optional GLB assets load in the background…');
-  // Never block the first playable frame on external CDN/CORS availability.
-  state.started = true;
-  setTimeout(() => {
+  setLoadProgress(70,'Loading revisioned Blender scene assets in the background…');
+  state.started=true;
+  setTimeout(()=>{
     $('startOverlay').classList.add('hidden');
-    setLoadProgress(100, 'Ready');
-    addLog('Operation IRON HORIZON is ready for command.', 'normal');
-    toast('Theatre online · Select a unit to begin');
-    updateObjectives();
-  }, 300);
-  Promise.allSettled([loadRosterManifest(), loadTankAssets(), loadPlaneAssets()]).then((results) => {
-    const importedTank = results[1] && results[1].status === 'fulfilled' && results[1].value;
-    const importedPlane = results[2] && results[2].status === 'fulfilled' && results[2].value;
-    if (results[0] && results[0].status === 'rejected') {
-      console.warn('Roster manifest unavailable', results[0].reason);
-      addLog('Asset roster metadata is unavailable; battlefield simulation continues.', 'alert');
+    setLoadProgress(100,'Simulation ready · Blender assets may still be streaming');
+    addLog('Operation IRON HORIZON is running. Blender-authored assets are being bound by class.','normal');
+    toast('Theatre online · Select a unit to begin');updateObjectives();
+  },300);
+  Promise.allSettled([loadRosterManifest(),loadBlenderAssetBundle()]).then(async(results)=>{
+    if(results[0]&&results[0].status==='rejected'){
+      console.warn('Roster manifest unavailable',results[0].reason);
+      addLog('Roster metadata unavailable; Blender geometry may still load.','alert');
     }
-    if (!importedTank && !importedPlane) {
-      setAssetText('Remote GLB unavailable · local models active', false);
+    if(results[1]&&results[1].status==='fulfilled'&&state.blenderBundle){
+      try{
+        bindBlenderRuntimeAssets();
+        applyBattlefieldMap(state.mapId,true);
+        setAssetText('Blender r19 loaded · '+state.blenderBundle.roots.size+' named roots',true);
+        addLog('Blender revision-19 roots bound to separate land, fixed-wing, rotary-wing and infantry classes.','normal');
+      }catch(error){
+        console.error('Blender runtime binding failed',error);
+        addLog('Blender scene loaded but a class-specific runtime binding failed.','alert');
+      }
+    }else{
+      const reason=results[1]&&results[1].reason;
+      console.warn('Blender scene GLB unavailable',reason);
+      setAssetText('Blender bundle unavailable · fallback visuals active',false);
+      addLog('Blender GLB could not be loaded; fallback theatre stays available.','alert');
     }
-  }).catch((error) => {
-    console.warn('Optional asset loading failed', error);
-    setAssetText('Remote GLB unavailable · local models active', false);
   });
 }
 function animate() {
