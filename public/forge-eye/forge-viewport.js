@@ -226,10 +226,11 @@ function startGesture(e) {
   const gizmo=window.ForgeGizmo;
   if (e.pointerType==="touch") {
     if(state.touches.size===0&&gizmo&&!gizmo.state?.nativeReady&&gizmo.state?.mode!=="select"){
-      const selected=F.selected();
-      if(!selected||!["camera","light"].includes(selected.kind))F.pick(e);
-      const transform=gizmo.beginPointerGesture?.(e);
-      if(transform){state.touches.set(e.pointerId,{x:e.clientX,y:e.clientY});state.gesture={id:e.pointerId,mode:"transform",transform,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false};e.preventDefault();try{canvas.setPointerCapture(e.pointerId)}catch{}return}
+      const selected=F.selected(),componentSelection=selected&&["camera","light"].includes(selected.kind),picked=componentSelection?selected:F.pick(e);
+      if(picked){
+        const transform=gizmo.beginPointerGesture?.(e);
+        if(transform){state.touches.set(e.pointerId,{x:e.clientX,y:e.clientY});state.gesture={id:e.pointerId,mode:"transform",transform,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false};e.preventDefault();try{canvas.setPointerCapture(e.pointerId)}catch{}return}
+      }
     }
     state.touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
     try { canvas.setPointerCapture(e.pointerId); } catch {}
@@ -249,10 +250,11 @@ function startGesture(e) {
   if (e.button===1 || (e.button===0 && e.altKey)) mode=e.shiftKey?"pan":"orbit";
   else if (e.button===2) mode=e.shiftKey?"orbit":"pan";
   if(mode==="select"&&e.button===0&&gizmo&&!gizmo.state?.nativeReady&&gizmo.state?.mode!=="select"){
-    const selected=F.selected();
-    if(!selected||!["camera","light"].includes(selected.kind))F.pick(e);
-    const transform=gizmo.beginPointerGesture?.(e);
-    if(transform){state.gesture={id:e.pointerId,mode:"transform",transform,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false};e.preventDefault();try{canvas.setPointerCapture(e.pointerId)}catch{}return}
+    const selected=F.selected(),componentSelection=selected&&["camera","light"].includes(selected.kind),picked=componentSelection?selected:F.pick(e);
+    if(picked){
+      const transform=gizmo.beginPointerGesture?.(e);
+      if(transform){state.gesture={id:e.pointerId,mode:"transform",transform,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false};e.preventDefault();try{canvas.setPointerCapture(e.pointerId)}catch{}return}
+    }
   }
   state.gesture={id:e.pointerId,mode,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false};
   if (mode==="orbit" || mode==="pan") {
