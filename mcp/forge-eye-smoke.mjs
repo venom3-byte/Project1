@@ -68,6 +68,105 @@ try {
   ] }, 12));
   if (Math.abs(evaluated.location[0] - 1.5) > .001) throw new Error("Rust/WASM animation evaluation failed: " + JSON.stringify(evaluated));
 
+  // Regression coverage for transform drag fallback, PBR/glass, light/camera
+  // inspector edits, and persistence of component settings.
+  const editorSystems = await page.evaluate(() => {
+    const engine=window.Forge,gizmo=window.ForgeGizmo,originalNative=gizmo.state.nativeReady,originalMode=gizmo.state.mode;
+    const object=engine.primitive("box","QA transform and PBR");object.entity.setLocalPosition(0,1,0);engine.select(object.id);
+    gizmo.state.nativeReady=false;
+    const before=engine._transformState(object);
+    gizmo.setMode("translate");
+    const translation=gizmo.beginPointerGesture({pointerId:701,clientX:100,clientY:100});
+    if(!translation)throw new Error("Transform fallback could not begin");
+    gizmo.movePointerGesture({pointerId:701,clientX:132,clientY:119,shiftKey:false,altKey:false},translation);gizmo.endPointerGesture(translation);
+    const afterTranslate=engine._transformState(object);
+    gizmo.setMode("rotate");
+    const rotation=gizmo.beginPointerGesture({pointerId:702,clientX:100,clientY:100});
+    gizmo.movePointerGesture({pointerId:702,clientX:124,clientY:111,shiftKey:false,altKey:false},rotation);gizmo.endPointerGesture(rotation);
+    const afterRotate=engine._transformState(object);
+    gizmo.setMode("scale");
+    const scaling=gizmo.beginPointerGesture({pointerId:703,clientX:100,clientY:100});
+    gizmo.movePointerGesture({pointerId:703,clientX:120,clientY:100,shiftKey:false,altKey:false},scaling);gizmo.endPointerGesture(scaling);
+    const afterScale=engine._transformState(object);
+    gizmo.state.nativeReady=originalNative;gizmo.setMode(originalMode);if(originalNative)gizmo.sync();
+    engine.select(object.id);window.dispatchEvent(new Event("forge-selection"));
+    return {translateChanged:JSON.stringify(before.p)!==JSON.stringify(afterTranslate.p),
+      rotateChanged:JSON.stringify(afterTranslate.r)!==JSON.stringify(afterRotate.r),
+      scaleChanged:JSON.stringify(afterRotate.s)!==JSON.stringify(afterScale.s)};
+  });
+  if(!editorSystems.translateChanged||!editorSystems.rotateChanged||!editorSystems.scaleChanged){
+    throw new Error("Transform fallback did not change position, rotation, and scale: "+JSON.stringify(editorSystems));
+  }
+
+  await page.locator("#materialPreset").selectOption("glass");
+  await page.locator("#materialOpacity").evaluate(el=>{el.value="0.31";el.dispatchEvent(new Event("input",{bubbles:true}));el.dispatchEvent(new Event("change",{bubbles:true}));});
+  const pbr = await page.evaluate(() => {
+    const r=window.Forge.selected(),material=r?.entity.render?.meshInstances?.[0]?.material,meta=r?.components.material;
+    return {name:r?.name,preset:meta?.preset,opacity:meta?.opacity,metalness:meta?.metalness,roughness:meta?.roughness,
+      useLighting:material?.useLighting,useMetalness:material?.useMetalness,blendType:material?.blendType,
+      expectedBlendType:window.ForgePC.BLEND_NORMAL,depthWrite:material?.depthWrite};
+  });
+  if(pbr.preset!=="glass"||Math.abs(pbr.opacity-.31)>.001||pbr.useLighting!==true||pbr.useMetalness!==true||
+      pbr.blendType!==pbr.expectedBlendType||pbr.depthWrite!==false){
+    throw new Error("PBR/glass material inspector regression failed: "+JSON.stringify(pbr));
+  }
+
+  const lightRecord = await page.evaluate(() => {
+    const light=window.Forge.createLight("QA Spot Light");window.__qaLightId=light.id;
+    window.Forge.select(light.id);window.dispatchEvent(new Event("forge-selection"));
+    return {id:light.id,name:light.name,kind:light.kind};
+  });
+  await page.locator("#lightType").selectOption("spot");
+  await page.locator("#lightIntensity").evaluate(el=>{el.value="3.5";el.dispatchEvent(new Event("change",{bubbles:true}));});
+  await page.locator("#lightRange").evaluate(el=>{el.value="18";el.dispatchEvent(new Event("change",{bubbles:true}));});
+  const lightState = await page.evaluate(() => {
+    const r=window.Forge.entities.get(window.__qaLightId),light=r?.entity.light;
+    return {kind:r?.kind,type:light?.type,intensity:light?.intensity,range:light?.range,metadata:r?.components.light};
+  });
+  if(lightState.kind!=="light"||lightState.type!=="spot"||Math.abs(lightState.intensity-3.5)>.001||Math.abs(lightState.range-18)>.001){
+    throw new Error("Live light inspector controls failed: "+JSON.stringify(lightState));
+  }
+
+  const cameraRecord = await page.evaluate(() => {
+    const camera=window.Forge.createCamera("QA Orthographic Camera",{x:5,y:3,z:6});window.__qaCameraId=camera.id;
+    window.Forge.select(camera.id);window.dispatchEvent(new Event("forge-selection"));
+    return {id:camera.id,name:camera.name};
+  });
+  await page.locator("#cameraFov").evaluate(el=>{el.value="42";el.dispatchEvent(new Event("change",{bubbles:true}));});
+  await page.locator("#cameraProjection").selectOption("orthographic");
+  await page.locator("#cameraActive").check();
+  const cameraState = await page.evaluate(() => {
+    const r=window.Forge.entities.get(window.__qaCameraId),camera=r?.entity.camera;
+    return {kind:r?.kind,fov:camera?.fov,projection:camera?.projection,
+      expectedOrthographic:window.ForgePC.PROJECTION_ORTHOGRAPHIC,active:r?.components.camera?.active,
+      editorCamera:window.Forge.camera()?.name};
+  });
+  if(cameraState.kind!=="camera"||Math.abs(cameraState.fov-42)>.01||cameraState.projection!==cameraState.expectedOrthographic||
+      cameraState.active!==true||cameraState.editorCamera!=="QA Orthographic Camera"){
+    throw new Error("Camera inspector controls failed: "+JSON.stringify(cameraState));
+  }
+
+  const savedComponents=await page.evaluate(()=>window.Forge.serialize());
+  const componentRoundTrip=await page.evaluate(async data=>{
+    await window.Forge.load(data);
+    const entities=[...window.Forge.entities.values()];
+    const o=entities.find(r=>r.name==="QA transform and PBR"),light=entities.find(r=>r.name==="QA Spot Light"),camera=entities.find(r=>r.name==="QA Orthographic Camera");
+    return {objectRestored:!!o&&!!o.entity.render?.meshInstances?.length,material:o?.components.material,
+      renderMaterial:o?.entity.render?.meshInstances?.[0]?.material&&{opacity:o.entity.render.meshInstances[0].material.opacity,
+        useLighting:o.entity.render.meshInstances[0].material.useLighting,useMetalness:o.entity.render.meshInstances[0].material.useMetalness},
+      light:light&&{type:light.entity.light?.type,intensity:light.entity.light?.intensity,range:light.entity.light?.range,metadata:light.components.light},
+      camera:camera&&{fov:camera.entity.camera?.fov,projection:camera.entity.camera?.projection,active:camera.components.camera?.active},
+      activeCamera:window.Forge.camera()?.name};
+  },savedComponents);
+  if(!componentRoundTrip.objectRestored||Math.abs(componentRoundTrip.renderMaterial?.opacity-.31)>.001||
+      componentRoundTrip.renderMaterial?.useLighting!==true||componentRoundTrip.renderMaterial?.useMetalness!==true||
+      componentRoundTrip.light?.type!=="spot"||Math.abs(componentRoundTrip.light?.intensity-3.5)>.001||
+      Math.abs(componentRoundTrip.light?.range-18)>.001||Math.abs(componentRoundTrip.camera?.fov-42)>.01||
+      componentRoundTrip.camera?.projection!==cameraState.expectedOrthographic||componentRoundTrip.camera?.active!==true||
+      componentRoundTrip.activeCamera!=="QA Orthographic Camera"){
+    throw new Error("Material/light/camera project round-trip failed: "+JSON.stringify(componentRoundTrip));
+  }
+
   // Exercise the in-editor one-click action, then the editable profile workflow.
   await page.locator('[data-workspace="references"]').click();
   await page.waitForFunction(() => !document.querySelector('[data-inspector-panel="references"]').hidden, null, { timeout: 5000 });
