@@ -1720,10 +1720,12 @@ setLoadProgress(12, 'Loading battlefield geometry…');
 applyBattlefieldMap(state.mapId,true);
 addLog('Theatre loaded. Ground assets ready.', 'normal');
 animate();
-initialiseAssets().catch((err) => {
+try {
+  initialiseAssets();
+} catch (err) {
   console.error(err);
   setAssetText('Asset pipeline warning · local fallbacks active', false);
   $('startOverlay').classList.add('hidden');
   state.started = true;
   addLog('Asset pipeline warning. Local fallback visuals active.', 'alert');
-});
+}
