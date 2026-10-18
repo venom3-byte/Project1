@@ -264,10 +264,21 @@ function makeTrackSide(parent, x) {
     new THREE.Vector3(x, 0.3, -1.2)
   ];
   const curve = new THREE.CatmullRomCurve3(points, true, 'catmullrom', 0.18);
-  const belt = new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.15, 8, true), mats.track);
-  belt.name = x < 0 ? 'left-track' : 'right-track';
+  const belt = new THREE.Mesh(new THREE.TubeGeometry(curve, 48, 0.12, 8, true), mats.track);
+  belt.name = x < 0 ? 'left-track-belt' : 'right-track-belt';
   belt.castShadow = true;
   parent.add(belt);
+
+  // Separate tread pads travel around a closed belt path instead of remaining visually frozen.
+  const segments = [];
+  const segmentCount = 36;
+  for (let i = 0; i < segmentCount; i++) {
+    const pad = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.11, 0.17), mats.track);
+    pad.name = x < 0 ? 'left-track-pad' : 'right-track-pad';
+    pad.castShadow = true;
+    parent.add(pad);
+    segments.push(pad);
+  }
   const wheelPivots = [];
   for (let i = 0; i < 6; i++) {
     const z = -1.05 + i * 0.42;
@@ -280,9 +291,27 @@ function makeTrackSide(parent, x) {
     hub.rotation.z = Math.PI / 2;
     hub.position.copy(wheel.position);
     parent.add(hub);
-    wheelPivots.push(wheel);
+    wheelPivots.push(wheel, hub);
   }
-  return wheelPivots;
+  const track = { curve, segments, wheels: wheelPivots, phase: 0, length: curve.getLength() };
+  positionTrackSegments(track);
+  return track;
+}
+function positionTrackSegments(track) {
+  const count = track.segments.length;
+  for (let i = 0; i < count; i++) {
+    const t = (i / count + track.phase + 1) % 1;
+    const point = track.curve.getPointAt(t);
+    const tangent = track.curve.getTangentAt(t).normalize();
+    const segment = track.segments[i];
+    segment.position.copy(point);
+    segment.rotation.set(Math.atan2(-tangent.y, tangent.z), 0, 0);
+  }
+}
+function advanceTrack(track, distance) {
+  if (!track.length) return;
+  track.phase = (track.phase + distance / track.length + 1) % 1;
+  positionTrackSegments(track);
 }
 function makeTankVisual(team) {
   const g = new THREE.Group();
@@ -304,12 +333,12 @@ function makeTankVisual(team) {
   barrel.rotation.x = Math.PI / 2;
   addCylinder(turret, 'muzzle-ring', 0.145, 0.145, 0.18, [0, 0.22, 2.86], mats.track, 12).rotation.x = Math.PI / 2;
   addBox(turret, 'sight', [0.36, 0.18, 0.28], [0.45, 0.61, -0.25], mats.glass);
-  const wheelsL = makeTrackSide(g, -1.06);
-  const wheelsR = makeTrackSide(g, 1.06);
+  const trackL = makeTrackSide(g, -1.06);
+  const trackR = makeTrackSide(g, 1.06);
   for (let i = 0; i < 3; i++) {
     addBox(g, 'side-skirt', [0.13, 0.2, 0.92], [i % 2 ? 1.15 : -1.15, 1.1, -0.58 + i * 0.75], panelMat);
   }
-  return { root: g, turret, wheels: wheelsL.concat(wheelsR), barrel, imported: false };
+  return { root: g, turret, wheels: trackL.wheels.concat(trackR.wheels), tracks: [trackL, trackR], barrel, imported: false };
 }
 function createTank(x, z, team, name) {
   const root = new THREE.Group();
@@ -566,8 +595,21 @@ function replaceTankVisual(unit, gltf) {
   unit.group.remove(old);
   const clone = normaliseModel(cloneGLTFScene(gltf), 4.35);
   clone.rotation.y = 0;
+  let turret = null;
+  const wheels = [];
+  clone.traverse((node) => {
+    const name = (node.name || '').toLowerCase();
+    if (!turret && !node.isMesh && /turret/.test(name)) turret = node;
+    if (node.isMesh && /(road.?wheel|wheel|roller)/.test(name)) wheels.push(node);
+    if (node.isMesh && node.material && unit.team === 'red') {
+      const tinted = node.material.clone();
+      if (tinted.color) tinted.color.multiply(new THREE.Color(0x9d6e67));
+      node.material = tinted;
+    }
+  });
   unit.visual = clone;
-  unit.visualData = { imported: true, turret: null, wheels: [] };
+  unit.visualData = { imported: true, turret, wheels, tracks: [] };
+  unit.turret = turret;
   unit.group.add(clone);
   tagInteractive(clone, 'rtsUnit', unit);
 }
@@ -614,9 +656,9 @@ async function loadTankAssets() {
 }
 async function loadPlaneAssets() {
   const packUrl = await findModelUrl(PACKS.aircraft, /tandem[\s_-]*seat[\s_-]*jet[\s_-]*trainer|very[\s_-]*light[\s_-]*personal[\s_-]*jet/i);
-  const candidates = [];
+  const candidates = [DIRECT.f15];
   if (packUrl) candidates.push(packUrl);
-  candidates.push(DIRECT.f15, DIRECT.aircraftFallback);
+  candidates.push(DIRECT.aircraftFallback);
   for (const url of candidates) {
     try {
       const gltf = await loadGLTF(url, 15000);
@@ -986,14 +1028,33 @@ function updateTanks(dt) {
         let diff = ((heading - unit.group.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
         unit.group.rotation.y += diff * Math.min(1, dt * 3.1);
         if (unit.visualData && unit.visualData.wheels) {
-          unit.visualData.wheels.forEach((wheel) => { wheel.rotation.x += step * 0.8; });
+          unit.visualData.wheels.forEach((wheel) => {
+            if (wheel.rotateY) wheel.rotateY(step * 1.6);
+          });
         }
-        if (unit.visualData && unit.visualData.turret) unit.visualData.turret.rotation.y += (0 - unit.visualData.turret.rotation.y) * Math.min(1, dt);
+        if (unit.visualData && unit.visualData.tracks) {
+          unit.visualData.tracks.forEach((track) => advanceTrack(track, step));
+        }
+        if (unit.visualData && unit.visualData.turret && !unit.attackTarget) {
+          const current = unit.visualData.turret.rotation.y;
+          const delta = ((-current + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+          unit.visualData.turret.rotation.y += delta * Math.min(1, dt * 1.3);
+        }
       }
     }
     if (unit.attackTarget && unit.attackTarget.alive) {
       const t = unit.attackTarget;
       const distance = unit.group.position.distanceTo(t.group.position);
+      if (unit.visualData && unit.visualData.turret) {
+        const dx = t.group.position.x - unit.group.position.x;
+        const dz = t.group.position.z - unit.group.position.z;
+        const localX = dx * Math.cos(unit.group.rotation.y) - dz * Math.sin(unit.group.rotation.y);
+        const localZ = dx * Math.sin(unit.group.rotation.y) + dz * Math.cos(unit.group.rotation.y);
+        const desired = Math.atan2(localX, localZ);
+        const current = unit.visualData.turret.rotation.y;
+        const delta = ((desired - current + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+        unit.visualData.turret.rotation.y += delta * Math.min(1, dt * 2.3);
+      }
       if (distance < 35) {
         unit.fireTimer -= dt;
         if (unit.fireTimer <= 0) {
@@ -1103,6 +1164,9 @@ function resetMission() {
     unit.moveTarget = null; unit.attackTarget = null;
     const seed = unit.id === 'tank-1' ? [-18, 7] : unit.id === 'tank-2' ? [-12.8, 11.3] : unit.id === 'tank-3' ? [-24, 0.6] : unit.id === 'tank-4' ? [16, -17] : [23, -22];
     unit.group.position.set(seed[0], 0, seed[1]); unit.group.rotation.set(0, 0, 0);
+    if (unit.visualData && unit.visualData.tracks) {
+      unit.visualData.tracks.forEach((track) => { track.phase = 0; positionTrackSegments(track); });
+    }
   }
   for (const plane of aircraft) {
     plane.hp = 100; plane.state = 'ready'; plane.status = 'READY AT BASE'; plane.target = null;
