@@ -943,10 +943,10 @@ function bindUI(){
     if(e.target.matches("#cameraFov,#cameraProjection,#cameraActive"))safeRun("Apply camera settings",applyCameraSettings);
   });
   $("#materialPreset").addEventListener("change",()=>safeRun("Apply material preset",applyMaterialPreset));
-  $("#materialColor").addEventListener("input",()=>$("#materialHex").value=$("#materialColor").value.toUpperCase());
-  $("#metalness").addEventListener("input",()=>$("#metalnessValue").textContent=Number($("#metalness").value).toFixed(2));
-  $("#roughness").addEventListener("input",()=>$("#roughnessValue").textContent=Number($("#roughness").value).toFixed(2));
-  $("#materialOpacity").addEventListener("input",()=>$("#opacityValue").textContent=Math.round(Number($("#materialOpacity").value)*100)+"%");
+  $("#materialColor").addEventListener("input",()=>{$("#materialHex").value=$("#materialColor").value.toUpperCase();safeRun("Live base-color preview",applyMaterial)});
+  $("#metalness").addEventListener("input",()=>{$("#metalnessValue").textContent=Number($("#metalness").value).toFixed(2);safeRun("Live metalness preview",applyMaterial)});
+  $("#roughness").addEventListener("input",()=>{$("#roughnessValue").textContent=Number($("#roughness").value).toFixed(2);safeRun("Live roughness preview",applyMaterial)});
+  $("#materialOpacity").addEventListener("input",()=>{$("#opacityValue").textContent=Math.round(Number($("#materialOpacity").value)*100)+"%";safeRun("Live opacity preview",applyMaterial)});
   $("#lightColor").addEventListener("input",()=>$("#lightHex").value=$("#lightColor").value.toUpperCase());
   $("#lightIntensity").addEventListener("input",()=>$("#lightIntensityValue").textContent=Number($("#lightIntensity").value).toFixed(2));
   $("#lightRange").addEventListener("input",()=>$("#lightRangeValue").textContent=Number($("#lightRange").value).toFixed(0)+" m");
