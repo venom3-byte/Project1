@@ -223,7 +223,13 @@ function rectContainsEvent(e) {
   return e.clientX>=r.left && e.clientX<=r.right && e.clientY>=r.top && e.clientY<=r.bottom;
 }
 function startGesture(e) {
+  const gizmo=window.ForgeGizmo;
   if (e.pointerType==="touch") {
+    if(state.touches.size===0&&gizmo&&!gizmo.state?.nativeReady&&gizmo.state?.mode!=="select"){
+      F.pick(e);
+      const transform=gizmo.beginPointerGesture?.(e);
+      if(transform){state.touches.set(e.pointerId,{x:e.clientX,y:e.clientY});state.gesture={id:e.pointerId,mode:"transform",transform,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false};e.preventDefault();try{canvas.setPointerCapture(e.pointerId)}catch{}return}
+    }
     state.touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
     try { canvas.setPointerCapture(e.pointerId); } catch {}
     if (state.touches.size===1) {
@@ -241,6 +247,11 @@ function startGesture(e) {
   let mode="select";
   if (e.button===1 || (e.button===0 && e.altKey)) mode=e.shiftKey?"pan":"orbit";
   else if (e.button===2) mode=e.shiftKey?"orbit":"pan";
+  if(mode==="select"&&e.button===0&&gizmo&&!gizmo.state?.nativeReady&&gizmo.state?.mode!=="select"){
+    F.pick(e);
+    const transform=gizmo.beginPointerGesture?.(e);
+    if(transform){state.gesture={id:e.pointerId,mode:"transform",transform,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false};e.preventDefault();try{canvas.setPointerCapture(e.pointerId)}catch{}return}
+  }
   state.gesture={id:e.pointerId,mode,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false};
   if (mode==="orbit" || mode==="pan") {
     e.preventDefault();
@@ -251,6 +262,10 @@ function moveGesture(e) {
   if (e.pointerType==="touch") {
     if (!state.touches.has(e.pointerId)) return;
     state.touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(state.touches.size===1&&state.gesture?.mode==="transform"&&state.gesture.id===e.pointerId){
+      window.ForgeGizmo?.movePointerGesture?.(e,state.gesture.transform);
+      state.gesture.lastX=e.clientX;state.gesture.lastY=e.clientY;state.gesture.moved=true;return;
+    }
     if (state.touches.size>=2) {
       const a=[...state.touches.values()];
       const distance=Math.max(1,Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y));
@@ -272,6 +287,7 @@ function moveGesture(e) {
   }
   const g=state.gesture;
   if (!g || g.id!==e.pointerId) return;
+  if(g.mode==="transform"){window.ForgeGizmo?.movePointerGesture?.(e,g.transform);g.lastX=e.clientX;g.lastY=e.clientY;g.moved=true;return}
   const dx=e.clientX-g.lastX,dy=e.clientY-g.lastY;
   if (Math.hypot(e.clientX-g.x,e.clientY-g.y)>4) g.moved=true;
   if (g.mode==="orbit" && g.moved) orbit(dx,dy);
@@ -279,6 +295,10 @@ function moveGesture(e) {
   g.lastX=e.clientX;g.lastY=e.clientY;
 }
 function endGesture(e) {
+  if(state.gesture?.mode==="transform"&&state.gesture.id===e.pointerId){
+    window.ForgeGizmo?.endPointerGesture?.(state.gesture.transform);
+    state.touches.delete(e.pointerId);state.gesture=null;state.lastPinch=null;return;
+  }
   if (e.pointerType==="touch") {
     const g=state.gesture;
     const tap=state.touches.size===1 && g?.mode==="touch" && g.id===e.pointerId && !g.moved;
