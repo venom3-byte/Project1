@@ -334,6 +334,11 @@ export class ForgeEngine{
     return{key:existing||key,updated:!!existing,count:a.length};
   }
   evalAnimation(t){
+    // Use quaternion spherical interpolation for orientation, as in modern 3D animation
+    // systems, while preserving linear/eased interpolation for position, scale and components.
+    const toQuat=angles=>new pc.Quat().setFromEulerAngles(
+      Number(angles?.[0])||0,Number(angles?.[1])||0,Number(angles?.[2])||0
+    );
     for(const[id,a]of this.keyframes){
       const r=this.entities.get(id);if(!r||!a.length)continue;
       let value=a[0];
@@ -345,7 +350,8 @@ export class ForgeEngine{
           const mode=A.interpolation||'linear';
           if(mode==='constant')f=0;else if(mode==='ease')f=f*f*(3-2*f);
           const mix=(from,to)=>from.map((v,j)=>v+(to[j]-v)*f);
-          value={p:mix(A.p,B.p),r:mix(A.r,B.r),s:mix(A.s,B.s),
+          const orientation=new pc.Quat().slerp(toQuat(A.r),toQuat(B.r),f).getEulerAngles();
+          value={p:mix(A.p,B.p),r:[orientation.x,orientation.y,orientation.z],s:mix(A.s,B.s),
             components:this._mixAnimationComponents(A.components,B.components,f)};
           break;
         }
