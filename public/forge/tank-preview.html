@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#090e14">
+<title>Forge Asset Lab — MBT-07</title>
+<style>
+:root{color-scheme:dark;--bg:#090e14;--panel:#0f161f;--panel2:#121d28;--line:#253342;--muted:#8b9aaa;--text:#e7edf3;--accent:#b9d28a;--accent2:#7e9f66;--warn:#c9a96b}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font:13px/1.4 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+button,a{font:inherit}button{cursor:pointer;color:var(--text);background:#17222e;border:1px solid #2d3b4b;border-radius:7px;padding:8px 11px}button:hover{background:#22303e;border-color:#526477}button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}a{color:inherit;text-decoration:none}
+.topbar{height:58px;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid var(--line);background:#0b1118}
+.brand{display:flex;align-items:center;gap:9px;min-width:180px}.mark{height:31px;width:31px;display:grid;place-items:center;border-radius:8px;background:var(--accent);color:#1a2615;font-weight:900;font-size:19px}.brand b{font-size:13px;letter-spacing:.16em}.brand small{display:block;color:var(--muted);font-size:9px;letter-spacing:.17em;margin-top:1px}.divider{width:1px;height:26px;background:var(--line)}.project-title{min-width:0}.project-title strong{font-size:12px;letter-spacing:.08em}.project-title small{display:block;color:var(--muted);font-size:10px}.spacer{flex:1}.status{color:var(--accent);font-size:10px;letter-spacing:.1em;white-space:nowrap}.primary{background:var(--accent);color:#152014;border-color:var(--accent);font-weight:750}.primary:hover{background:#cbe3a0;color:#10180e}.ghost{background:transparent}
+.toolbar{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--line);height:49px;background:#0d141c;overflow-x:auto}.tool-label{font-size:9px;letter-spacing:.15em;color:var(--muted);padding:0 8px 0 3px;white-space:nowrap}.toolbar button{padding:6px 10px;white-space:nowrap;font-size:11px}.toolbar button.active{border-color:var(--accent2);color:var(--accent);background:#18221a}
+.layout{height:calc(100% - 107px);display:grid;grid-template-columns:220px minmax(0,1fr) 235px;min-height:0}.side{background:var(--panel);padding:16px 14px;overflow:auto}.left{border-right:1px solid var(--line)}.right{border-left:1px solid var(--line)}.eyebrow{font-size:9px;letter-spacing:.17em;color:var(--muted);font-weight:800;margin-bottom:10px}.title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:13px}.title-row strong{font-size:12px}.tag{border:1px solid #485847;border-radius:4px;color:var(--accent);font-size:9px;letter-spacing:.08em;padding:3px 5px;white-space:nowrap}.preview-card{border:1px solid var(--line);border-radius:9px;padding:12px;background:#0b1219;margin:0 0 20px}.preview-card strong{font-size:12px;display:block;margin-bottom:5px}.preview-card p{font-size:11px;line-height:1.55;color:#a7b5c1;margin:0}.section{border-top:1px solid var(--line);padding-top:14px;margin-top:15px}.feature-list{padding:0;margin:0;list-style:none}.feature-list li{display:flex;gap:9px;padding:7px 0;color:#bdc9d3;font-size:11px;border-bottom:1px solid #1e2a35}.feature-list li span{color:var(--accent);font-size:12px}
+.viewport{position:relative;min-width:0;min-height:0;background:radial-gradient(ellipse at 50% 42%,#18232e 0%,#0d151e 48%,#090e14 100%);overflow:hidden}#viewport{width:100%;height:100%;display:block;touch-action:none}.view-label{position:absolute;left:16px;top:15px;pointer-events:none}.view-label b{font-size:10px;letter-spacing:.16em}.view-label small{display:block;color:#94a6b7;font-size:10px;margin-top:3px}.axis-note{position:absolute;right:15px;top:15px;color:#728496;font-size:9px;letter-spacing:.12em;pointer-events:none}.bottom-stats{position:absolute;left:13px;right:13px;bottom:13px;display:flex;gap:7px;flex-wrap:wrap;pointer-events:none}.stat{background:rgba(10,16,23,.85);border:1px solid #293846;border-radius:6px;padding:7px 9px;min-width:76px;backdrop-filter:blur(8px)}.stat b{display:block;font-size:11px;font-variant-numeric:tabular-nums}.stat small{font-size:8px;color:var(--muted);letter-spacing:.1em}.loading{position:absolute;inset:0;display:grid;place-items:center;background:#0b1118;color:var(--muted);z-index:5}.loading.hidden{display:none}.spinner{width:22px;height:22px;border-radius:50%;border:2px solid #30404f;border-top-color:var(--accent);animation:spin .8s linear infinite;margin:0 auto 11px}@keyframes spin{to{transform:rotate(360deg)}}
+.inspector-grid{display:grid;grid-template-columns:1fr auto;gap:9px 10px;font-size:11px;margin-top:12px}.inspector-grid span{color:var(--muted)}.inspector-grid b{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}.swatch-row{display:flex;align-items:center;gap:8px;margin:9px 0;color:#b6c3ce;font-size:11px}.swatch{width:15px;height:15px;border-radius:4px;border:1px solid #71806b}.callout{border-left:2px solid var(--warn);padding:8px 9px;margin-top:18px;background:#1a1a16;color:#c6b99d;font-size:10px;line-height:1.5}.footer-note{font-size:10px;color:#718394;line-height:1.5;margin-top:14px}
+.toast{position:absolute;left:50%;bottom:70px;transform:translateX(-50%);padding:9px 13px;border-radius:8px;background:#1c2b21;border:1px solid #496347;color:#d6edc1;font-size:11px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:8;white-space:nowrap}.toast.show{opacity:1}
+@media(max-width:980px){.layout{grid-template-columns:180px minmax(0,1fr)}.right{display:none}.brand{min-width:150px}.status{display:none}}
+@media(max-width:650px){.topbar{height:54px;padding:0 9px;gap:8px}.brand{min-width:94px;gap:6px}.brand small{display:none}.brand b{font-size:11px}.mark{width:27px;height:27px}.divider{display:none}.project-title strong{font-size:10px}.project-title small{font-size:9px}.topbar button{padding:7px 8px;font-size:10px}.toolbar{height:45px;padding:6px}.layout{height:calc(100% - 99px);grid-template-columns:1fr}.left{display:none}.viewport{height:100%}.view-label{left:10px;top:10px}.axis-note{right:10px;top:11px}.bottom-stats{left:8px;right:8px;bottom:8px;gap:5px}.stat{padding:5px 7px;min-width:65px}.stat b{font-size:10px}.stat small{font-size:7px}.toolbar button{font-size:10px;padding:6px 8px}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="./index.html" aria-label="Return to Forge Studio"><span class="mark">F</span><span><b>FORGE</b><small>ASSET LAB / 3D WORKSPACE</small></span></a>
+  <span class="divider"></span>
+  <div class="project-title"><strong>MBT-07 / ARMORED VEHICLE</strong><small>RTS asset study · interactive 3D preview</small></div>
+  <span class="spacer"></span>
+  <span class="status" id="assetState">● PROCEDURAL MESH</span>
+  <button class="ghost" id="resetBtn" title="Reset camera">Reset</button>
+  <button class="primary" id="exportBtn">↓ Export GLB</button>
+</header>
+<nav class="toolbar" aria-label="Camera and display controls">
+  <span class="tool-label">VIEW</span>
+  <button data-view="three" class="active">3/4</button><button data-view="front">Front</button><button data-view="side">Side</button><button data-view="top">Top</button><span class="divider"></span>
+  <button id="wireBtn">Wireframe</button><button id="labelsBtn" class="active">Part labels</button>
+</nav>
+<div class="layout">
+  <aside class="side left">
+    <div class="title-row"><strong>ASSET OVERVIEW</strong><span class="tag">MBT-07</span></div>
+    <div class="preview-card"><strong>Western MBT · RTS class</strong><p>A stylized-realistic armored vehicle study with layered hull and turret geometry, continuous track loops, wheel assemblies, optics, engine deck details and painted-metal materials.</p></div>
+    <div class="eyebrow">MAJOR ASSEMBLIES</div>
+    <ul class="feature-list">
+      <li><span>●</span> Sloped armored hull</li>
+      <li><span>●</span> Rotating angular turret</li>
+      <li><span>●</span> Long main barrel assembly</li>
+      <li><span>●</span> Twin tracked running gear</li>
+      <li><span>●</span> Road wheels and hubs</li>
+      <li><span>●</span> Engine deck and exhausts</li>
+      <li><span>●</span> Optics, hatches and antennas</li>
+      <li><span>●</span> Side storage and markings</li>
+    </ul>
+    <div class="section"><div class="eyebrow">MATERIALS</div>
+      <div class="swatch-row"><i class="swatch" style="background:#626e50"></i> Matte olive armor</div>
+      <div class="swatch-row"><i class="swatch" style="background:#303638"></i> Rubber / track steel</div>
+      <div class="swatch-row"><i class="swatch" style="background:#8b8b7a"></i> Exposed metal</div>
+      <div class="swatch-row"><i class="swatch" style="background:#202a2c"></i> Optics / glass</div>
+    </div>
+    <div class="footer-note">Drag to orbit · pinch or wheel to zoom · use the view presets to inspect each side. Export GLB creates a standalone mesh asset without the preview ground or studio lights.</div>
+  </aside>
+  <main class="viewport" id="viewportShell">
+    <canvas id="viewport" aria-label="Interactive 3D tank model viewport"></canvas>
+    <div class="view-label"><b>FORGE / VEHICLE PREVIEW</b><small id="viewSub">Orbit · zoom · inspect</small></div>
+    <div class="axis-note">Y UP · FORWARD +Z</div>
+    <div class="bottom-stats">
+      <div class="stat"><b>5.6 m</b><small>LENGTH*</small></div>
+      <div class="stat"><b>3.2 m</b><small>WIDTH*</small></div>
+      <div class="stat"><b>2.3 m</b><small>HULL HEIGHT*</small></div>
+      <div class="stat"><b id="partCount">—</b><small>MESH PARTS</small></div>
+      <div class="stat"><b>PBR</b><small>MATERIALS</small></div>
+    </div>
+    <div class="loading" id="loading"><div><div class="spinner"></div><b>Building MBT-07 mesh…</b></div></div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </main>
+  <aside class="side right">
+    <div class="title-row"><strong>INSPECTOR</strong><span class="tag">READ ONLY</span></div>
+    <div class="eyebrow">TRANSFORM</div>
+    <div class="inspector-grid"><span>Position</span><b>0, 0, 0</b><span>Orientation</span><b>Forward +Z</b><span>Scale</span><b>1.00 ×</b><span>Origin</span><b>Ground center</b></div>
+    <div class="section"><div class="eyebrow">GEOMETRY</div><div class="inspector-grid"><span>Construction</span><b>Mesh assembly</b><span>Symmetry</span><b>Left / right</b><span>Wheel sets</span><b>2 × 8</b><span>Export</span><b>Binary GLB</b></div></div>
+    <div class="section"><div class="eyebrow">SURFACE</div><div class="inspector-grid"><span>Armor</span><b>Painted metal</b><span>Track</span><b>Dark steel / rubber</b><span>Optics</span><b>Tinted glass</b><span>Lighting</span><b>Studio HDR-style</b></div></div>
+    <div class="callout">Prototype status: the remote generator refused this tank prompt, so this preview uses a locally constructed procedural model. It is an editable starting asset, not a claim of exact dimensions or a finished production vehicle.</div>
+    <div class="footer-note">*Dimensions are approximate scene dimensions for this prototype, not engineering specifications.</div>
+  </aside>
+</div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
+import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/controls/OrbitControls.js';
+import { GLTFExporter } from 'https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/exporters/GLTFExporter.js';
+
+const canvas = document.getElementById('viewport');
+const shell = document.getElementById('viewportShell');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#0b121a');
+scene.fog = new THREE.Fog('#0b121a', 15, 36);
+const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false, powerPreference:'high-performance', preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.18;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.065;
+controls.minDistance = 3.7;
+controls.maxDistance = 18;
+controls.maxPolarAngle = Math.PI * 0.485;
+controls.target.set(0, 1.0, 0);
+
+scene.add(new THREE.HemisphereLight(0xc9d8e3, 0x25291f, 2.05));
+const key = new THREE.DirectionalLight(0xffe5be, 3.1); key.position.set(5, 8, 5); key.castShadow=true;
+key.shadow.mapSize.set(2048,2048); key.shadow.camera.left=-7; key.shadow.camera.right=7; key.shadow.camera.top=7; key.shadow.camera.bottom=-7; key.shadow.bias=-0.00035; scene.add(key);
+const fill = new THREE.DirectionalLight(0x9ab9dc, 1.6); fill.position.set(-6,4,-4); scene.add(fill);
+const rim = new THREE.DirectionalLight(0xe0e9d6, 2.0); rim.position.set(-2,5,7); scene.add(rim);
+const floorMat = new THREE.MeshStandardMaterial({color:'#171e24', roughness:.9, metalness:.05});
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(80,80), floorMat); floor.rotation.x=-Math.PI/2; floor.position.y=-.035; floor.receiveShadow=true; scene.add(floor);
+const grid = new THREE.GridHelper(30,60,0x536575,0x263442); grid.position.y=-.018;
+grid.material.transparent=true; grid.material.opacity=.28; scene.add(grid);
+const originRing = new THREE.Mesh(new THREE.RingGeometry(3.1,3.12,96), new THREE.MeshBasicMaterial({color:0x7d9673,transparent:true,opacity:.28,side:THREE.DoubleSide}));
+originRing.rotation.x=-Math.PI/2; originRing.position.y=-.01; scene.add(originRing);
+
+const tankRoot = new THREE.Group(); tankRoot.name='MBT-07 Western MBT Study';
+scene.add(tankRoot);
+let meshCount=0;
+const materials = {
+ armor: new THREE.MeshStandardMaterial({color:'#667153', roughness:.82, metalness:.25}),
+ armorLight: new THREE.MeshStandardMaterial({color:'#788464', roughness:.8, metalness:.22}),
+ armorDark: new THREE.MeshStandardMaterial({color:'#4f5b42', roughness:.85, metalness:.2}),
+ armorPanel: new THREE.MeshStandardMaterial({color:'#59664a', roughness:.83, metalness:.26}),
+ edge: new THREE.MeshStandardMaterial({color:'#424b38', roughness:.78, metalness:.36}),
+ rubber: new THREE.MeshStandardMaterial({color:'#222628', roughness:.96, metalness:.04}),
+ track: new THREE.MeshStandardMaterial({color:'#424747', roughness:.8, metalness:.62}),
+ trackHigh: new THREE.MeshStandardMaterial({color:'#626763', roughness:.72, metalness:.68}),
+ steel: new THREE.MeshStandardMaterial({color:'#7c827a', roughness:.48, metalness:.82}),
+ dark: new THREE.MeshStandardMaterial({color:'#202629', roughness:.8, metalness:.3}),
+ glass: new THREE.MeshStandardMaterial({color:'#263d43', roughness:.22, metalness:.45, emissive:'#0c1b1c', emissiveIntensity:.16}),
+ lens: new THREE.MeshStandardMaterial({color:'#4a786e', roughness:.16, metalness:.38, emissive:'#1c4540', emissiveIntensity:.45}),
+ light: new THREE.MeshStandardMaterial({color:'#ddca8c', roughness:.23, metalness:.1, emissive:'#a67f32', emissiveIntensity:.7}),
+ marking: new THREE.MeshStandardMaterial({color:'#c5c4ab', roughness:.72, metalness:.16}),
+ black: new THREE.MeshStandardMaterial({color:'#101517', roughness:.96, metalness:.04})
+};
+function addMesh(geometry, material, pos, rot, scale, name){
+  const m=new THREE.Mesh(geometry,material);
+  if(pos)m.position.set(pos[0],pos[1],pos[2]);
+  if(rot)m.rotation.set(rot[0],rot[1],rot[2]);
+  if(scale)m.scale.set(scale[0],scale[1],scale[2]);
+  m.name=name||'Tank part '+(++meshCount); m.castShadow=true; m.receiveShadow=true;
+  tankRoot.add(m); meshCount++; return m;
+}
+function box(w,h,d,mat,pos,rot,name){return addMesh(new THREE.BoxGeometry(w,h,d),mat,pos,rot,null,name)}
+function cylinder(rt,rb,h,mat,pos,rot,name,segments){
+  return addMesh(new THREE.CylinderGeometry(rt,rb,h,segments||24),mat,pos,rot,null,name);
+}
+function sphere(rx,ry,rz,mat,pos,name){
+  return addMesh(new THREE.SphereGeometry(1,16,12),mat,pos,null,[rx,ry,rz],name);
+}
+function profile(points,width,mat,name){
+  const s=new THREE.Shape(); s.moveTo(points[0][0],points[0][1]);
+  for(let i=1;i<points.length;i++)s.lineTo(points[i][0],points[i][1]);
+  s.closePath();
+  const g=new THREE.ExtrudeGeometry(s,{depth:width,bevelEnabled:false,curveSegments:8});
+  g.rotateY(-Math.PI/2); g.computeVertexNormals();
+  const m=addMesh(g,mat,[width/2,0,0],null,null,name);
+  m.material.side=THREE.DoubleSide; return m;
+}
+function makeTrackShape(){
+  const s=new THREE.Shape();
+  s.moveTo(-1.92,.21); s.lineTo(1.92,.21);
+  s.quadraticCurveTo(2.43,.21,2.43,.69); s.quadraticCurveTo(2.43,1.16,1.92,1.16);
+  s.lineTo(-1.92,1.16); s.quadraticCurveTo(-2.43,1.16,-2.43,.69);
+  s.quadraticCurveTo(-2.43,.21,-1.92,.21);
+  const h=new THREE.Path();
+  h.moveTo(1.72,.42); h.lineTo(-1.72,.42);
+  h.quadraticCurveTo(-2.10,.42,-2.10,.69); h.quadraticCurveTo(-2.10,.94,-1.72,.94);
+  h.lineTo(1.72,.94); h.quadraticCurveTo(2.10,.94,2.10,.69);
+  h.quadraticCurveTo(2.10,.42,1.72,.42);
+  s.holes.push(h); return s;
+}
+function markTexture(){
+  const c=document.createElement('canvas'); c.width=256;c.height=128;
+  const g=c.getContext('2d');
+  g.fillStyle='#59664a';g.fillRect(0,0,256,128);
+  g.strokeStyle='#b7bea2';g.lineWidth=4;g.strokeRect(7,7,242,114);
+  g.fillStyle='#e1e0cb';g.font='bold 61px sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('07',128,60);
+  g.font='bold 17px sans-serif';g.fillText('MBT / FORGE',128,101);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace;return t;
+}
+function buildTank(){
+  const hullPts=[[-2.42,.54],[2.05,.54],[2.28,.88],[1.78,1.34],[1.12,1.52],[-1.72,1.52],[-2.18,1.28],[-2.43,.91]];
+  profile(hullPts,2.42,materials.armor,'Sloped armored hull');
+  box(2.15,.20,3.25,materials.armorDark,[0,1.31,-.06],[0,0,0],'Upper hull deck');
+  box(1.68,.16,1.08,materials.armorPanel,[0,1.53,-1.50],null,'Engine deck');
+  box(1.82,.07,.82,materials.dark,[0,1.63,-1.55],null,'Engine vent recess');
+  for(let i=0;i<13;i++){
+    box(.055,.025,.72,materials.trackHigh,[-.77+i*.128,1.68,-1.55],null,'Engine cooling louvre');
+  }
+  for(let s of [-1,1]){
+    box(.19,.13,3.65,materials.armorDark,[s*1.27,1.20,-.15],[0,0,s*.012],'Side fender');
+    box(.16,.08,2.95,materials.armorLight,[s*1.28,1.29,-.22],null,'Fender upper trim');
+    for(let z of [-1.70,-1.05,-.40,.25,.90,1.52]){
+      box(.20,.34,.55,materials.armorPanel,[s*1.27,.98,z],[0,s*.025,0],'Side armor skirt panel');
+      box(.025,.27,.39,materials.edge,[s*1.385,.98,z],[0,s*.025,0],'Skirt panel seam');
+      for(let y of [.89,1.06]){
+        sphere(.025,.025,.025,materials.steel,[s*1.403,y,z-.18],'Panel fastener');
+        sphere(.025,.025,.025,materials.steel,[s*1.403,y,z+.18],'Panel fastener');
+      }
+    }
+    const trGeom=new THREE.ExtrudeGeometry(makeTrackShape(),{depth:.18,bevelEnabled:true,bevelSegments:2,steps:1,bevelSize:.025,bevelThickness:.025});
+    trGeom.rotateY(-Math.PI/2);trGeom.computeVertexNormals();
+    const track=addMesh(trGeom,materials.rubber,[s>0?1.62:-1.44,0,0],null,null,s>0?'Right continuous track':'Left continuous track');
+    track.material.side=THREE.DoubleSide;
+    // Main wheel train: drive sprocket, six road wheels, front idler.
+    const wheelZ=[-2.04,-1.48,-.88,-.28,.32,.92,1.48,2.04];
+    wheelZ.forEach((z,i)=>{
+      const end=(i===0||i===wheelZ.length-1),r=end?.365:.315;
+      cylinder(r,r,.23,materials.rubber,[s*1.39,.70,z],[0,0,Math.PI/2],end?(i===0?'Rear drive wheel':'Front idler'):'Road wheel '+i,32);
+      cylinder(r*.70,r*.70,.245,materials.track,[s*1.405,.70,z],[0,0,Math.PI/2],'Wheel steel rim',32);
+      cylinder(r*.39,r*.39,.255,materials.steel,[s*1.415,.70,z],[0,0,Math.PI/2],'Wheel hub',24);
+      cylinder(r*.18,r*.18,.265,materials.edge,[s*1.425,.70,z],[0,0,Math.PI/2],'Hub cap',20);
+      for(let bolt=0;bolt<8;bolt++){
+        const a=bolt*Math.PI/4;
+        sphere(.023,.023,.023,materials.steel,[s*1.431,.70+Math.sin(a)*r*.55,z+Math.cos(a)*r*.55],'Wheel hub bolt');
+      }
+      if(end){
+        for(let tooth=0;tooth<16;tooth++){
+          const a=tooth*Math.PI/8;
+          const y=.70+Math.sin(a)*(r+.015),zz=z+Math.cos(a)*(r+.015);
+          box(.11,.085,.09,materials.track,[s*1.398,y,zz],[a,0,0],'Sprocket tooth');
+        }
+      }
+    });
+    // Individual track shoes along the straight runs and around both end curves.
+    for(let i=0;i<13;i++){
+      const z=-1.83+i*.305;
+      box(.205,.055,.105,materials.trackHigh,[s*1.515,1.15,z],null,'Upper track shoe');
+      box(.205,.055,.105,materials.track,[s*1.515,.22,z],null,'Lower track shoe');
+    }
+    for(let end of [-1,1]){
+      for(let i=0;i<5;i++){
+        const a=(-Math.PI/2)+(Math.PI*i/4);
+        const y=.69+Math.sin(a)*.43;
+        const z=end*(2.02+Math.cos(a)*.43);
+        box(.205,.062,.10,materials.trackHigh,[s*1.515,y,z],[end*a*.35,0,0],'Curved track shoe');
+      }
+    }
+    // External storage, side handles, spare links, and exhaust housings.
+    box(.18,.31,.62,materials.armorDark,[s*1.29,1.36,-1.18],null,'Side storage bin');
+    box(.19,.07,.67,materials.armorLight,[s*1.29,1.54,-1.18],null,'Storage lid');
+    for(let i=0;i<4;i++)box(.13,.18,.10,materials.track,[s*1.405,1.18,-.80+i*.20],[0,0,.04],'Spare track link');
+    cylinder(.095,.095,.23,materials.dark,[s*1.08,1.31,-2.10],[0,0,Math.PI/2],'Rear exhaust port',20);
+    cylinder(.075,.075,.25,materials.steel,[s*1.18,1.31,-2.10],[0,0,Math.PI/2],'Exhaust rim',20);
+    for(let i=0;i<3;i++)box(.035,.025,.38,materials.edge,[s*1.22,.79,-1.55+i*.11],null,'Side step grip');
+  }
+  // Nose armor, lights, tow points and front glacis panels.
+  box(1.70,.10,.10,materials.armorLight,[0,1.11,2.16],[-.28,0,0],'Glacis armor lip');
+  box(.95,.10,.08,materials.edge,[0,1.00,2.25],[-.22,0,0],'Front seam');
+  for(let s of [-1,1]){
+    box(.22,.13,.12,materials.dark,[s*.86,1.03,2.19],null,'Headlamp housing');
+    box(.15,.08,.03,materials.light,[s*.86,1.04,2.255],null,'Headlamp lens');
+    cylinder(.08,.08,.09,materials.edge,[s*.62,.66,2.26],[Math.PI/2,0,0],'Front tow eye mount',16);
+    const hook=addMesh(new THREE.TorusGeometry(.095,.025,8,18),materials.steel,[s*.62,.63,2.31],[0,0,0],null,'Front tow hook');
+    box(.28,.15,.12,materials.armorDark,[s*.95,.66,2.16],[0,0,s*.05],'Front corner armor');
+    box(.11,.07,.12,materials.dark,[s*1.03,.67,-2.37],null,'Rear lamp housing');
+    box(.065,.055,.025,materials.light,[s*1.03,.67,-2.435],null,'Rear lamp lens');
+  }
+  // Turret ring and angular turret body.
+  cylinder(.83,.83,.14,materials.edge,[0,1.59,0],null,'Turret traverse ring',48);
+  cylinder(.77,.77,.12,materials.armorDark,[0,1.67,0],null,'Turret ring armor',48);
+  profile([[-1.35,1.65],[.78,1.65],[1.24,1.91],[.86,2.16],[.23,2.25],[-.83,2.20],[-1.40,1.96]],1.70,materials.armorLight,'Angular main turret');
+  box(1.38,.10,1.10,materials.armor,[0,2.14,-.10],[0,0,0],'Turret roof armor');
+  // Main forward barrel assembly (visual game asset geometry, not dimensionally exact).
+  cylinder(.15,.135,.53,materials.armorDark,[0,2.00,1.29],[Math.PI/2,0,0],'Barrel thermal sleeve',32);
+  cylinder(.105,.085,1.72,materials.armorLight,[0,2.00,2.30],[Math.PI/2,0,0],'Long main barrel',32);
+  cylinder(.15,.15,.14,materials.edge,[0,2.00,1.63],[Math.PI/2,0,0],'Barrel collar',32);
+  cylinder(.12,.12,.13,materials.steel,[0,2.00,3.14],[Math.PI/2,0,0],'Muzzle ring',32);
+  addMesh(new THREE.TorusGeometry(.092,.016,10,32),materials.dark,[0,2.00,3.212],null,null,'Muzzle bore rim');
+  cylinder(.077,.077,.015,materials.black,[0,2.00,3.205],null,'Muzzle dark bore',32);
+  // Commander's cupola and access hatches.
+  cylinder(.38,.42,.16,materials.armorDark,[0,2.28,-.50],null,'Commander cupola base',32);
+  cylinder(.31,.34,.22,materials.armor,[0,2.42,-.50],null,'Commander cupola',32);
+  cylinder(.24,.24,.05,materials.edge,[0,2.555,-.50],null,'Cupola hatch rim',32);
+  cylinder(.19,.19,.035,materials.armorLight,[0,2.59,-.50],null,'Cupola hatch',32);
+  cylinder(.13,.13,.06,materials.dark,[0,2.62,-.50],null,'Hatch handle',24);
+  box(.48,.06,.47,materials.armorDark,[0,2.29,-1.02],[0,0,0],'Rear turret hatch rim');
+  box(.39,.04,.38,materials.armorLight,[0,2.335,-1.02],[0,0,0],'Rear turret hatch');
+  for(let s of [-1,1]){
+    // Vision blocks and optical sensor housings.
+    box(.28,.17,.26,materials.edge,[s*.52,2.30,-.29],[0,0,s*.08],'Turret optic housing');
+    box(.20,.10,.11,materials.glass,[s*.52,2.31,-.12],[0,s*.05,0],'Turret optic glass');
+    box(.20,.09,.13,materials.armorDark,[s*.33,2.31,.20],[0,0,s*.04],'Periscope block');
+    box(.14,.06,.06,materials.lens,[s*.33,2.325,.275],null,'Periscope lens');
+    // Four smoke-free utility canisters / launch-like tubes, grouped at turret rear corners.
+    for(let i=0;i<4;i++){
+      const z=-.95+i*.15;
+      cylinder(.065,.065,.20,materials.edge,[s*.83,2.10,z],[0,0,Math.PI/2+s*.15],'Turret utility canister',12);
+      cylinder(.048,.048,.018,materials.dark,[s*.94,2.12,z],[0,0,Math.PI/2+s*.15],'Canister cap',12);
+    }
+    box(.15,.22,.35,materials.armorDark,[s*.78,1.88,-.27],[0,0,s*.08],'Turret side storage');
+    box(.08,.05,.24,materials.armorLight,[s*.84,2.02,-.27],null,'Storage edge');
+    for(let i=0;i<3;i++){
+      box(.035,.03,.25,materials.edge,[s*.86,1.79,-.55+i*.09],null,'Turret side vent');
+    }
+  }
+  // Secondary observation post, protective rails, and antenna.
+  cylinder(.10,.10,.14,materials.edge,[.47,2.30,.48],null,'Roof sensor base',20);
+  box(.22,.16,.22,materials.dark,[.47,2.42,.48],null,'Roof sensor housing');
+  box(.13,.08,.13,materials.lens,[.47,2.43,.60],null,'Sensor glass');
+  cylinder(.018,.018,.40,materials.edge,[-.63,2.45,-.64],null,'Radio antenna',8);
+  cylinder(.012,.012,.34,materials.edge,[-.82,2.41,-.25],[0,0,.08],'Short antenna',8);
+  // Rear deck details and protected handles.
+  for(let s of [-1,1]){
+    box(.36,.12,.45,materials.armorDark,[s*.72,1.65,-2.02],[0,0,0],'Rear deck equipment box');
+    box(.30,.025,.32,materials.edge,[s*.72,1.72,-2.02],null,'Rear equipment lid');
+    for(let i=0;i<5;i++)box(.055,.025,.48,materials.trackHigh,[s*.35+i*.15-0.30,1.72,-1.92],null,'Rear cooling grill');
+    for(let i=0;i<3;i++){
+      const z=-1.72+i*.18;
+      box(.025,.07,.12,materials.steel,[s*1.25,1.46,z],[0,0,s*.15],'Lifting loop');
+    }
+  }
+  // Simple hull and turret fasteners, bolt heads and panel seams.
+  for(let s of [-1,1]){
+    for(let z of [-1.75,-1.28,-.81,-.34,.13,.60,1.07]){
+      cylinder(.028,.028,.018,materials.steel,[s*1.32,1.31,z],[0,0,Math.PI/2],'Fender fastener',12);
+    }
+  }
+  // Painted tactical identifier plate on both vehicle sides.
+  const decalMat=new THREE.MeshStandardMaterial({map:markTexture(),roughness:.8,metalness:.12,side:THREE.DoubleSide});
+  for(let s of [-1,1]){
+    addMesh(new THREE.PlaneGeometry(.37,.185),decalMat,[s*1.395,1.10,.78],[0,s*Math.PI/2,0],null,'MBT-07 side ID');
+  }
+  // Front-facing small identification plates and tie-downs.
+  box(.39,.16,.035,materials.armorDark,[0,1.30,2.16],[-.12,0,0],'Front identification plate');
+  for(let s of [-1,1]){
+    box(.10,.05,.02,materials.marking,[s*.10,1.31,2.185],null,'Front plate marking');
+    cylinder(.035,.035,.03,materials.steel,[s*.42,1.39,1.85],[Math.PI/2,0,0],'Front deck bolt',12);
+  }
+  tankRoot.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+}
+buildTank();
+document.getElementById('partCount').textContent=String(tankRoot.children.length);
+document.getElementById('loading').classList.add('hidden');
+
+const defaultPose={position:new THREE.Vector3(7.0,4.2,7.1),target:new THREE.Vector3(0,1.0,.15)};
+function setView(view){
+  if(view==='front'){camera.position.set(0,2.6,9.5);controls.target.set(0,1.1,.15);document.getElementById('viewSub').textContent='Front orthographic-style view';}
+  else if(view==='side'){camera.position.set(9.5,2.8,0);controls.target.set(0,1.05,0);document.getElementById('viewSub').textContent='Right side profile';}
+  else if(view==='top'){camera.position.set(.01,12,.01);controls.target.set(0,.4,0);document.getElementById('viewSub').textContent='Top plan view';}
+  else {camera.position.copy(defaultPose.position);controls.target.copy(defaultPose.target);document.getElementById('viewSub').textContent='Orbit · zoom · inspect';}
+  camera.lookAt(controls.target);controls.update();
+  document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
+}
+setView('three');
+document.getElementById('resetBtn').addEventListener('click',()=>setView('three'));
+document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
+let wire=false, showLabels=true;
+document.getElementById('wireBtn').addEventListener('click',()=>{
+  wire=!wire;
+  tankRoot.traverse(o=>{if(o.isMesh){const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>{if(m.userData.originalWire===undefined)m.userData.originalWire=!!m.wireframe;m.wireframe=wire;});}});
+  document.getElementById('wireBtn').classList.toggle('active',wire);
+  document.getElementById('viewSub').textContent=wire?'Topology inspection':'Orbit · zoom · inspect';
+});
+document.getElementById('labelsBtn').addEventListener('click',()=>{
+  showLabels=!showLabels;
+  grid.visible=showLabels; originRing.visible=showLabels;
+  document.getElementById('labelsBtn').classList.toggle('active',showLabels);
+});
+
+const exporter=new GLTFExporter();
+document.getElementById('exportBtn').addEventListener('click',()=>{
+  const btn=document.getElementById('exportBtn');btn.disabled=true;btn.textContent='Preparing GLB…';
+  const outScene=new THREE.Scene();
+  const exported=tankRoot.clone(true);
+  outScene.add(exported);
+  exporter.parse(outScene,result=>{
+    const blob=new Blob([result],{type:'model/gltf-binary'});
+    const url=URL.createObjectURL(blob);const a=document.createElement('a');
+    a.href=url;a.download='MBT-07-RTS-tank.glb';document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),15000);
+    btn.disabled=false;btn.textContent='↓ Export GLB';
+    notify('GLB exported · '+(blob.size/1024).toFixed(0)+' KB');
+  },err=>{
+    console.error(err);btn.disabled=false;btn.textContent='↓ Export GLB';notify('Export failed — see browser console');
+  },{binary:true,onlyVisible:true,truncateDrawRange:true});
+});
+let toastTimer=0;
+function notify(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2800);}
+function resize(){
+  const w=Math.max(1,shell.clientWidth),h=Math.max(1,shell.clientHeight);
+  renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(shell);resize();
+renderer.setAnimationLoop(()=>{controls.update();renderer.render(scene,camera);});
+</script>
+</body>
+</html>
