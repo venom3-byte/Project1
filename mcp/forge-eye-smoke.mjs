@@ -167,6 +167,49 @@ try {
     throw new Error("Material/light/camera project round-trip failed: "+JSON.stringify(componentRoundTrip));
   }
 
+  const componentAnimation=await page.evaluate(()=>{
+    const engine=window.Forge,records=[...engine.entities.values()];
+    const light=records.find(r=>r.name==="QA Spot Light"),camera=records.find(r=>r.name==="QA Orthographic Camera");
+    if(!light?.entity.light||!camera?.entity.camera)throw new Error("Round-tripped light/camera missing");
+    engine.timelineTime=0;engine.keyframes.delete(light.id);engine.select(light.id);
+    light.entity.light.intensity=3.5;light.entity.light.color=new window.ForgePC.Color(1,0,0);
+    light.components.light={...light.components.light,intensity:3.5,color:[1,0,0]};
+    engine.key({interpolation:"linear"});
+    engine.timelineTime=2;light.entity.light.intensity=7.5;light.entity.light.color=new window.ForgePC.Color(0,0,1);
+    light.components.light={...light.components.light,intensity:7.5,color:[0,0,1]};
+    engine.key({interpolation:"linear"});engine.evalAnimation(1);
+    const midLight={intensity:light.entity.light.intensity,color:[light.entity.light.color.r,light.entity.light.color.g,light.entity.light.color.b],
+      keyCount:engine.keyframes.get(light.id)?.length||0};
+    engine.timelineTime=0;engine.keyframes.delete(camera.id);engine.select(camera.id);
+    camera.entity.camera.fov=42;camera.components.camera={...camera.components.camera,fov:42};
+    engine.key({interpolation:"linear"});
+    engine.timelineTime=2;camera.entity.camera.fov=82;camera.components.camera={...camera.components.camera,fov:82};
+    engine.key({interpolation:"linear"});engine.evalAnimation(1);
+    const midCamera={fov:camera.entity.camera.fov,keyCount:engine.keyframes.get(camera.id)?.length||0};
+    engine.timelineTime=1;engine.select(light.id);window.dispatchEvent(new Event("forge-selection"));
+    return {midLight,midCamera};
+  });
+  if(Math.abs(componentAnimation.midLight.intensity-5.5)>.02||
+      Math.abs(componentAnimation.midLight.color[0]-.5)>.02||Math.abs(componentAnimation.midLight.color[1])>.02||
+      Math.abs(componentAnimation.midLight.color[2]-.5)>.02||componentAnimation.midLight.keyCount!==2||
+      Math.abs(componentAnimation.midCamera.fov-62)>.02||componentAnimation.midCamera.keyCount!==2){
+    throw new Error("Light/camera component keyframes did not interpolate: "+JSON.stringify(componentAnimation));
+  }
+  await page.locator('[data-workspace="animation"]').click();
+  await page.locator('[data-timeline-view="graph"]').click();
+  await page.locator("#graphChannel").selectOption("light.intensity");
+  await page.waitForFunction(()=>document.querySelector("#graphEditorCanvas").__graphMetrics?.max>7,null,{timeout:5000});
+  const componentGraph=await page.evaluate(()=>{
+    const canvas=document.querySelector("#graphEditorCanvas"),m=canvas.__graphMetrics;
+    return {channel:document.querySelector("#graphChannel").value,min:m?.min,max:m?.max,
+      keys:[...(window.Forge.keyframes.get(window.Forge.selectedId)||[])].map(k=>({time:k.time,value:k.components?.light?.intensity}))};
+  });
+  if(componentGraph.channel!=="light.intensity"||componentGraph.max<7||componentGraph.keys.length!==2||
+      componentGraph.keys.some(k=>!Number.isFinite(k.value))){
+    throw new Error("Graph Editor failed to display the light intensity property track: "+JSON.stringify(componentGraph));
+  }
+  await page.locator("#graphChannel").selectOption("p0");
+
   // Exercise the in-editor one-click action, then the editable profile workflow.
   await page.locator('[data-workspace="references"]').click();
   await page.waitForFunction(() => !document.querySelector('[data-inspector-panel="references"]').hidden, null, { timeout: 5000 });
