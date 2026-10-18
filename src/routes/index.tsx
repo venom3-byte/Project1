@@ -10,7 +10,7 @@ function ForgeHost() {
     <main className="h-screen w-screen overflow-hidden bg-black">
       <iframe
         title="Forge Eye — Rust / WebAssembly 3D Workspace"
-        src="/forge-eye/index.html"
+        src="forge-eye/index.html"
         className="h-full w-full border-0"
         allow="fullscreen; clipboard-read; clipboard-write"
       />
