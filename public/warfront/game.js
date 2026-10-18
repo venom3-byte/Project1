@@ -963,76 +963,94 @@ function pointerCommand(hit) {
     selectEntity(null);
   }
 }
-function buildRouteFor(target) {
-  const x = target.group.position.x, z = target.group.position.z;
-  return [
-    { p: new THREE.Vector3(0, 0.22, 45), state: 'TAXI-OUT' },
-    { p: new THREE.Vector3(0, 0.22, 25), state: 'LINE-UP' },
-    { p: new THREE.Vector3(0, 1.3, 10), state: 'TAKEOFF' },
-    { p: new THREE.Vector3(x * 0.3, 7, z + 25), state: 'CLIMB' },
-    { p: new THREE.Vector3(x * 0.78, 13, z + 14), state: 'INGRESS' },
-    { p: new THREE.Vector3(x, 8, z + 5), state: 'ATTACK RUN' },
-    { p: new THREE.Vector3(x + (x > 0 ? -10 : 10), 14, z - 12), state: 'EGRESS' },
-    { p: new THREE.Vector3(x * 0.45, 19, -6), state: 'RETURN' },
-    { p: new THREE.Vector3(4, 12, 17), state: 'APPROACH' },
-    { p: new THREE.Vector3(1.5, 0.5, 42), state: 'LANDING' },
-    { p: new THREE.Vector3(1.5, 0.22, 51), state: 'TAXI-IN' },
-    { p: new THREE.Vector3(3.1, 0.16, 53), state: 'REARM' }
-  ];
-}
-function launchAirstrike(target) {
-  if (!target || !target.alive) { toast('Choose a live hostile objective'); return; }
-  const plane = state.selected && state.selected.type === 'aircraft' && state.selected.state === 'ready'
-    ? state.selected : aircraft.find((p) => p.state === 'ready');
-  if (!plane) { toast('No aircraft ready — wait for rearm'); addLog('Airstrike denied: no aircraft ready.', 'alert'); return; }
-  selectEntity(plane);
-  plane.target = target;
-  plane.route = buildRouteFor(target);
-  plane.routeIndex = 0;
-  plane.state = 'taxi';
-  plane.status = 'TAXI-OUT';
-  plane.attackDone = false;
-  plane.hasLanded = false;
-  plane.group.position.set(plane.initial.x, 0.16, plane.initial.z);
-  plane.flightHeight = 0.16;
-  if (plane.mixer && plane.actions) {
-    Object.keys(plane.actions).forEach((key) => {
-      if (/wheel-roll/.test(key)) plane.actions[key].reset().play();
-      if (/gear.*retract|retract.*gear/.test(key)) plane.actions[key].reset().play();
-    });
+function buildRouteFor(target,plane){
+  const x=target.group.position.x,z=target.group.position.z,bx=plane.initial.x,bz=plane.initial.z;
+  if(plane.flightClass==='rotary-wing'){
+    return [
+      {p:new THREE.Vector3(bx,.22,bz),state:'VERTICAL LIFT'},
+      {p:new THREE.Vector3(bx,7,bz+6),state:'HOVER CLIMB'},
+      {p:new THREE.Vector3(bx+(x-bx)*.35,12,bz+(z-bz)*.35),state:'INGRESS'},
+      {p:new THREE.Vector3(x,8,z+18),state:'ATTACK RUN'},
+      {p:new THREE.Vector3(x+(x>bx?-3:3),5,z+8),state:'HOVER ATTACK'},
+      {p:new THREE.Vector3(x+(x>bx?-16:16),9,z-15),state:'EGRESS'},
+      {p:new THREE.Vector3(bx+(x-bx)*.38,11,bz+(z-bz)*.38),state:'RETURN'},
+      {p:new THREE.Vector3(bx,7,bz+18),state:'APPROACH'},
+      {p:new THREE.Vector3(bx,1.1,bz+5),state:'LANDING'},
+      {p:new THREE.Vector3(bx,.22,bz),state:'REARM'}
+    ];
   }
-  addLog('Strike flight launched against ' + target.name + '.', 'alert');
-  toast('Air tasking accepted · ' + target.name);
-  setCommand('select');
-}
-function returnAircraft(plane) {
-  if (!plane || plane.type !== 'aircraft') { toast('Select an aircraft first'); return; }
-  if (plane.state === 'ready' || plane.state === 'rearm' || plane.state === 'taxi-home') { toast('Aircraft is already at base'); return; }
-  plane.target = null;
-  plane.route = [
-    { p: new THREE.Vector3(plane.group.position.x * 0.7, Math.max(12, plane.group.position.y), plane.group.position.z + 14), state: 'RTB / EGRESS' },
-    { p: new THREE.Vector3(10, 16, -4), state: 'RETURN' },
-    { p: new THREE.Vector3(4, 10, 17), state: 'APPROACH' },
-    { p: new THREE.Vector3(1.5, 0.5, 42), state: 'LANDING' },
-    { p: new THREE.Vector3(1.5, 0.22, 51), state: 'TAXI-IN' },
-    { p: new THREE.Vector3(plane.initial.x, 0.16, plane.initial.z), state: 'REARM' }
+  return [
+    {p:new THREE.Vector3(bx,.22,bz),state:'TAXI-OUT'},
+    {p:new THREE.Vector3(bx,.22,bz-22),state:'LINE-UP'},
+    {p:new THREE.Vector3(bx,1.3,bz-42),state:'TAKEOFF'},
+    {p:new THREE.Vector3(bx+(x-bx)*.34,7,z+25),state:'CLIMB'},
+    {p:new THREE.Vector3(bx+(x-bx)*.78,13,z+14),state:'INGRESS'},
+    {p:new THREE.Vector3(x,8,z+5),state:'ATTACK RUN'},
+    {p:new THREE.Vector3(x+(x>bx?-10:10),14,z-12),state:'EGRESS'},
+    {p:new THREE.Vector3(bx+(x-bx)*.48,19,bz-42),state:'RETURN'},
+    {p:new THREE.Vector3(bx,12,bz-22),state:'APPROACH'},
+    {p:new THREE.Vector3(bx,.5,bz-8),state:'LANDING'},
+    {p:new THREE.Vector3(bx,.22,bz-3),state:'TAXI-IN'},
+    {p:new THREE.Vector3(bx,.16,bz),state:'REARM'}
   ];
-  plane.routeIndex = 0;
-  plane.state = 'return';
-  plane.status = 'RETURNING TO BASE';
-  addLog('Return-to-base order issued to ' + plane.name + '.', 'normal');
-  setCommand('select');
 }
-function spawnBomb(plane, target) {
-  if (plane.attackDone || !target || !target.alive) return;
-  plane.attackDone = true;
-  const bomb = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.16, 0.72, 10), material(0x28302e, 0.4, 0.5));
-  bomb.rotation.x = Math.PI / 2;
-  bomb.position.copy(plane.group.position);
-  bomb.position.y = Math.max(7, plane.group.position.y - 0.5);
-  scene.add(bomb);
-  bombs.push({ mesh: bomb, target, t: 0, duration: 1.1, from: bomb.position.clone(), to: new THREE.Vector3(target.group.position.x + (Math.sin(state.time) * 1.4), 0.8, target.group.position.z + (Math.cos(state.time * 1.3) * 1.2)) });
-  addLog('Weapon release confirmed. Impact solution locked.', 'alert');
+function launchAirstrike(target){
+  if(!target||!target.alive){toast('Choose a live hostile objective');return;}
+  if(state.selected&&state.selected.type==='aircraft'&&state.selected.isTransport){toast('Transport helicopter cannot attack; return it to base or select a combat unit.');return;}
+  const plane=state.selected&&state.selected.type==='aircraft'&&state.selected.state==='ready'&&!state.selected.isTransport
+    ?state.selected:aircraft.find((p)=>p.state==='ready'&&!p.isTransport);
+  if(!plane){toast('No combat aircraft ready — wait for rearm');addLog('Airstrike denied: no combat aircraft ready.','alert');return;}
+  selectEntity(plane);plane.target=target;plane.route=buildRouteFor(target,plane);plane.routeIndex=0;plane.state='taxi';plane.status=plane.flightClass==='rotary-wing'?'VERTICAL LIFT':'TAXI-OUT';
+  plane.attackDone=false;plane.hasLanded=false;plane.group.position.set(plane.initial.x,.16,plane.initial.z);plane.flightHeight=.16;
+  if(plane.mixer&&plane.actions)Object.keys(plane.actions).forEach((key)=>{if(/afterburner/i.test(key)&&plane.flightClass!=='rotary-wing')plane.actions[key].reset().play();});
+  addLog(plane.name+' launched against '+target.name+'.','alert');toast('Air tasking accepted · '+target.name);setCommand('select');
+}
+function returnAircraft(plane){
+  if(!plane||plane.type!=='aircraft'){toast('Select an aircraft first');return;}
+  if(plane.state==='ready'||plane.state==='rearm'||plane.state==='taxi-home'){toast('Aircraft is already at base');return;}
+  const bx=plane.initial.x,bz=plane.initial.z;
+  plane.target=null;
+  plane.route=plane.flightClass==='rotary-wing'
+    ?[
+      {p:new THREE.Vector3(plane.group.position.x,Math.max(plane.group.position.y,8),plane.group.position.z+10),state:'RTB / EGRESS'},
+      {p:new THREE.Vector3(bx+(plane.group.position.x-bx)*.45,10,bz+(plane.group.position.z-bz)*.45),state:'RETURN'},
+      {p:new THREE.Vector3(bx,6,bz+16),state:'APPROACH'},
+      {p:new THREE.Vector3(bx,1,bz+4),state:'LANDING'},
+      {p:new THREE.Vector3(bx,.16,bz),state:'REARM'}
+    ]
+    :[
+      {p:new THREE.Vector3(plane.group.position.x*.45+bx*.55,Math.max(12,plane.group.position.y),plane.group.position.z+14),state:'RTB / EGRESS'},
+      {p:new THREE.Vector3(bx,16,bz-42),state:'RETURN'},
+      {p:new THREE.Vector3(bx,10,bz-22),state:'APPROACH'},
+      {p:new THREE.Vector3(bx,.5,bz-8),state:'LANDING'},
+      {p:new THREE.Vector3(bx,.22,bz-3),state:'TAXI-IN'},
+      {p:new THREE.Vector3(bx,.16,bz),state:'REARM'}
+    ];
+  plane.routeIndex=0;plane.state='return';plane.status='RETURNING TO BASE';addLog('Return-to-base order issued to '+plane.name+'.','normal');setCommand('select');
+}
+function spawnGuidedMissile(plane,target){
+  const start=plane.group.localToWorld(new THREE.Vector3(plane.flightClass==='rotary-wing'?.9:1.0,.05,1.5));
+  const aim=target.group.position.clone().add(new THREE.Vector3((Math.sin(state.time)*.45),1.05,Math.cos(state.time*1.3)*.4));
+  const mesh=new THREE.Group();mesh.name='guided-air-to-ground-missile';
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(.055,.115,.68,9),material(0xc5c6b8,.4,.28));
+  const nose=new THREE.Mesh(new THREE.ConeGeometry(.075,.24,9),material(0x373e3e,.36,.4));nose.position.y=.44;mesh.add(body,nose);
+  for(const side of [-1,1]){const fin=new THREE.Mesh(new THREE.BoxGeometry(.16,.11,.025),material(0x6e7772,.56,.25));fin.position.set(side*.09,-.2,0);mesh.add(fin);}
+  const direction=aim.clone().sub(start);mesh.position.copy(start);mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction.clone().normalize());scene.add(mesh);
+  const duration=THREE.MathUtils.clamp(start.distanceTo(aim)/32,.8,2.8);
+  bombs.push({mesh,target,t:0,duration,from:start.clone(),to:aim.clone(),guided:true,team:plane.team||'blue',lastTrailAt:0});
+  addLog(plane.name+' launched a guided missile.','alert');
+}
+function spawnBomb(plane,target){
+  if(plane.attackDone||!target||!target.alive)return;
+  plane.attackDone=true;
+  if(plane.flightClass==='rotary-wing'){spawnGuidedMissile(plane,target);return;}
+  const from=plane.group.position.clone();from.y=Math.max(5,plane.group.position.y-.25);
+  const to=new THREE.Vector3(target.group.position.x+Math.sin(state.time)*.8,.8,target.group.position.z+Math.cos(state.time*1.3)*.7);
+  const bomb=new THREE.Mesh(new THREE.CylinderGeometry(.12,.16,.72,10),material(0x28302e,.4,.5));bomb.position.copy(from);scene.add(bomb);
+  const gravity=9.81,duration=THREE.MathUtils.clamp(Math.sqrt(Math.max(.5,2*(from.y-to.y)/gravity)),.45,1.8);
+  const velocity=new THREE.Vector3((to.x-from.x)/duration,(to.y-from.y+.5*gravity*duration*duration)/duration,(to.z-from.z)/duration);
+  bombs.push({mesh:bomb,target,t:0,duration,from,to,velocity,gravity,ballistic:true,team:plane.team||'blue'});
+  addLog('Bomb release · ballistic trajectory calculated from release height.','alert');
 }
 function createImpactMark(position,size=2.6){
   const mark=new THREE.Group();mark.position.set(position.x,.055,position.z);mark.name='persistent-impact-scorch';
@@ -1305,17 +1323,32 @@ function createTracer(start, end) {
   scene.add(mesh);
   effects.push({ group: mesh, t: 0, tracer: true });
 }
-function updateBombs(dt) {
-  for (let i = bombs.length - 1; i >= 0; i--) {
-    const bomb = bombs[i];
-    bomb.t += dt;
-    const t = Math.min(1, bomb.t / bomb.duration);
-    bomb.mesh.position.lerpVectors(bomb.from, bomb.to, t);
-    bomb.mesh.position.y -= Math.sin(t * Math.PI) * 2.3;
-    bomb.mesh.rotation.z += dt * 3;
-    if (t >= 1) {
-      explodeAt(bomb.to,bomb.target,{team:'blue',damage:bomb.target&&bomb.target.kind==='depot'?70:60,radius:20,aerial:true});
-      scene.remove(bomb.mesh); bomb.mesh.geometry.dispose(); bombs.splice(i, 1);
+function updateBombs(dt){
+  for(let i=bombs.length-1;i>=0;i--){
+    const bomb=bombs[i];bomb.t+=dt;const t=Math.min(1,bomb.t/bomb.duration);
+    if(bomb.guided){
+      const from=bomb.from,previous=bomb.mesh.position.clone();
+      if(bomb.target&&bomb.target.alive)bomb.to.copy(bomb.target.group.position).add(new THREE.Vector3(0,1.05,0));
+      bomb.mesh.position.lerpVectors(from,bomb.to,t);bomb.mesh.position.y+=Math.sin(t*Math.PI)*Math.min(3.5,from.distanceTo(bomb.to)*.035);
+      const dir=bomb.to.clone().sub(previous);if(dir.lengthSq()>.001)bomb.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir.normalize());
+      if(bomb.t-(bomb.lastTrailAt||0)>.18){createTracer(previous,bomb.mesh.position.clone());bomb.lastTrailAt=bomb.t;}
+    }else if(bomb.ballistic){
+      const elapsed=Math.min(bomb.t,bomb.duration),v=bomb.velocity;
+      bomb.mesh.position.set(bomb.from.x+v.x*elapsed,bomb.from.y+v.y*elapsed-.5*bomb.gravity*elapsed*elapsed,bomb.from.z+v.z*elapsed);
+      const velocityNow=new THREE.Vector3(v.x,v.y-bomb.gravity*elapsed,v.z);
+      if(velocityNow.lengthSq()>.001)bomb.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),velocityNow.normalize());
+    }else{
+      bomb.mesh.position.lerpVectors(bomb.from,bomb.to,t);bomb.mesh.position.y-=Math.sin(t*Math.PI)*2.3;bomb.mesh.rotation.z+=dt*3;
+    }
+    if(t>=1){
+      const payload=bomb.guided
+        ?{team:bomb.team||'blue',damage:42,radius:12,aerial:true,missile:true}
+        :bomb.ballistic
+          ?{team:bomb.team||'blue',damage:bomb.target&&bomb.target.kind==='depot'?70:60,radius:20,aerial:true}
+          :{team:'blue',damage:60,radius:20,aerial:true};
+      explodeAt(bomb.to,bomb.target,payload);scene.remove(bomb.mesh);
+      bomb.mesh.traverse((node)=>{if(node.geometry)node.geometry.dispose();if(node.material)(Array.isArray(node.material)?node.material:[node.material]).forEach((m)=>m&&m.dispose&&m.dispose());});
+      bombs.splice(i,1);
     }
   }
 }
