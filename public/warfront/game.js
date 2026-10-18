@@ -377,6 +377,7 @@ function createTank(x, z, team, name) {
   scene.add(root);
   const visualData = makeTankVisual(team);
   root.add(visualData.root);
+  visualData.root.traverse((node)=>{if(node.isMesh)node.userData.initialMaterial=node.material;});
   const unit = {
     id: 'tank-' + (tanks.length + 1), type: 'tank', name, team, group: root, visual: visualData.root,
     visualData, ring: addSelectionRing(root, team === 'blue' ? TEAM.blue : TEAM.red),
