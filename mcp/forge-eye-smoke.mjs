@@ -210,6 +210,44 @@ try {
   }
   await page.locator("#graphChannel").selectOption("p0");
 
+  // Rigid-part FK pivot regression: world-transform preservation, multi-part
+  // attachment, pivot-driven movement, save/reopen hierarchy, detach.
+  const rigRoundTrip=await page.evaluate(async()=>{
+    const engine=window.Forge;
+    const body=engine.primitive("box","QA rig body");
+    body.entity.setLocalPosition(2,1.5,-1);body.entity.setLocalEulerAngles(0,35,0);
+    const worldPosition=entity=>{const p=entity.getPosition();return[p.x,p.y,p.z]};
+    const beforeBody=worldPosition(body.entity);engine.select(body.id);
+    const pivot=engine.createRigPivotForSelected("QA body pivot");
+    const afterBody=worldPosition(body.entity);
+    const wing=engine.primitive("box","QA rig wing");wing.entity.setLocalPosition(4,1.5,-1);
+    const beforeWing=worldPosition(wing.entity);engine.select(wing.id);
+    const attached=engine.attachSelectedToRigControl(pivot.id),afterAttachWing=worldPosition(wing.entity);
+    const samePosition=(a,b)=>a.every((v,i)=>Math.abs(v-b[i])<1e-4);
+    const beforeRotation=worldPosition(wing.entity);
+    pivot.entity.setLocalEulerAngles(0,45,0);
+    const afterRotation=worldPosition(wing.entity);
+    const data=engine.serialize();
+    await engine.load(data);
+    const records=[...engine.entities.values()],loadedPivot=records.find(r=>r.name==="QA body pivot"),
+      loadedBody=records.find(r=>r.name==="QA rig body"),loadedWing=records.find(r=>r.name==="QA rig wing");
+    const hierarchyRestored=!!loadedPivot&&!!loadedBody&&!!loadedWing&&
+      loadedBody.entity.parent===loadedPivot.entity&&loadedWing.entity.parent===loadedPivot.entity&&
+      loadedBody.components.rigParentId===loadedPivot.id&&loadedWing.components.rigParentId===loadedPivot.id&&
+      loadedPivot.components.rigControl?.children?.includes(loadedBody.id)&&
+      loadedPivot.components.rigControl?.children?.includes(loadedWing.id);
+    engine.select(loadedWing?.id);const detachResult=engine.detachSelectedFromRigControl();
+    const detached=loadedWing?.entity.parent===engine.root&&!loadedWing.components.rigParentId;
+    return {beforeBody,afterBody,beforeWing,afterAttachWing,beforeRotation,afterRotation,attached,
+      worldBodyPreserved:samePosition(beforeBody,afterBody),worldWingPreservedOnAttach:samePosition(beforeWing,afterAttachWing),
+      pivotAffectsWing:!samePosition(beforeRotation,afterRotation),hierarchyRestored,detachResult,detached,
+      childrenAfterDetach:loadedPivot?.components.rigControl?.children?.length};
+  });
+  if(!rigRoundTrip.attached||!rigRoundTrip.worldBodyPreserved||!rigRoundTrip.worldWingPreservedOnAttach||
+     !rigRoundTrip.pivotAffectsWing||!rigRoundTrip.hierarchyRestored||!rigRoundTrip.detachResult||!rigRoundTrip.detached){
+    throw new Error("Rigid-part FK rig hierarchy regression failed: "+JSON.stringify(rigRoundTrip));
+  }
+
   // Exercise the in-editor one-click action, then the editable profile workflow.
   await page.locator('[data-workspace="references"]').click();
   await page.waitForFunction(() => !document.querySelector('[data-inspector-panel="references"]').hidden, null, { timeout: 5000 });
