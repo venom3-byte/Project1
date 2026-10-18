@@ -453,6 +453,204 @@ function buildSilhouetteHull(){
     setRustStatus("Rust/WASM visual-hull build failed",false);status("Multi-view volume could not be built","error");
   }
 }
+const LATHE_PRESETS = {
+  bottle:[[0,0],[.19,0],[.25,.04],[.29,.12],[.29,.38],[.23,.49],[.15,.59],[.135,.8],[.105,.88],[0,.92]],
+  vase:[[0,0],[.22,0],[.29,.07],[.24,.2],[.17,.37],[.21,.53],[.31,.7],[.32,.83],[.24,.94],[0,.97]],
+  cup:[[0,0],[.23,0],[.29,.035],[.31,.16],[.32,.65],[.30,.69],[0,.69]],
+  flask:[[0,0],[.16,0],[.23,.05],[.27,.2],[.32,.38],[.31,.6],[.22,.78],[.17,.87],[.17,.94],[0,.96]]
+};
+function latheProfileBounds(profile=state.latheProfile){
+  return {
+    maxRadius:Math.max(.55,...profile.map(point=>Number(point.radius)||0))*1.16,
+    maxHeight:Math.max(1,...profile.map(point=>Number(point.height)||0))*1.08
+  };
+}
+function latheChart(canvas,profile=state.latheProfile){
+  const w=canvas.width||720,h=canvas.height||600,bounds=latheProfileBounds(profile);
+  return {w,h,x0:68,x1:w-28,y0:28,y1:h-44,...bounds};
+}
+function latheCanvasPoint(event,canvas,chart){
+  const rect=canvas.getBoundingClientRect();
+  return {
+    x:clamp((event.clientX-rect.left)*chart.w/Math.max(1,rect.width),chart.x0,chart.x1,chart.x0),
+    y:clamp((event.clientY-rect.top)*chart.h/Math.max(1,rect.height),chart.y0,chart.y1,chart.y1)
+  };
+}
+function latheProfilePointFromCanvas(point,chart){
+  return {
+    radius:clamp((point.x-chart.x0)/(chart.x1-chart.x0)*chart.maxRadius,0,100,0),
+    height:clamp((chart.y1-point.y)/(chart.y1-chart.y0)*chart.maxHeight,0,100,0)
+  };
+}
+function drawLatheProfile(){
+  const canvas=$("#latheProfileCanvas");if(!canvas)return;
+  const ctx=canvas.getContext("2d");if(!ctx)return;
+  const profile=state.latheProfile,chart=latheChart(canvas,profile);
+  ctx.clearRect(0,0,chart.w,chart.h);ctx.fillStyle="#0a1118";ctx.fillRect(0,0,chart.w,chart.h);
+  ctx.font="11px ui-monospace,monospace";ctx.textBaseline="middle";
+  const xFor=radius=>chart.x0+Number(radius)/chart.maxRadius*(chart.x1-chart.x0);
+  const yFor=height=>chart.y1-Number(height)/chart.maxHeight*(chart.y1-chart.y0);
+  for(let i=0;i<=4;i++){
+    const f=i/4,x=chart.x0+f*(chart.x1-chart.x0),y=chart.y1-f*(chart.y1-chart.y0);
+    ctx.strokeStyle=i===0?"#536678":"#22313e";ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(x,chart.y0);ctx.lineTo(x,chart.y1);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(chart.x0,y);ctx.lineTo(chart.x1,y);ctx.stroke();
+    ctx.fillStyle="#6f8496";ctx.fillText((f*chart.maxRadius).toFixed(2),x-12,chart.y1+17);
+    if(i>0)ctx.fillText((f*chart.maxHeight).toFixed(2),8,y);
+  }
+  ctx.strokeStyle="#647d91";ctx.lineWidth=1.25;ctx.beginPath();ctx.moveTo(chart.x0,chart.y0);ctx.lineTo(chart.x0,chart.y1);ctx.stroke();
+  ctx.fillStyle="#9aafbf";ctx.fillText("RADIUS (m)",chart.x0+8,chart.y0-12);
+  ctx.fillText("HEIGHT",chart.x1-52,chart.y0-12);
+  if(profile.length<2){
+    ctx.fillStyle="#91a4b3";ctx.fillText("Choose a preset or add profile points",chart.x0+18,(chart.y0+chart.y1)/2);
+    return;
+  }
+  ctx.beginPath();
+  profile.forEach((point,index)=>{
+    const x=xFor(point.radius),y=yFor(point.height);
+    if(index===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+  });
+  ctx.strokeStyle="#4fd1c5";ctx.lineWidth=2.5;ctx.lineJoin="round";ctx.stroke();
+  for(let i=0;i<profile.length;i++){
+    const point=profile[i],x=xFor(point.radius),y=yFor(point.height),selected=i===state.latheSelectedPoint;
+    ctx.beginPath();ctx.arc(x,y,selected?7:5,0,Math.PI*2);
+    ctx.fillStyle=selected?"#f4c66a":"#dceaf3";ctx.fill();
+    ctx.strokeStyle=selected?"#fff0bf":"#31566c";ctx.lineWidth=selected?2:1.5;ctx.stroke();
+  }
+}
+function setLathePreset(name){
+  const preset=name||$("#lathePreset")?.value||"bottle";
+  if(preset==="custom"){
+    if(!state.latheProfile.length)state.latheProfile=LATHE_PRESETS.bottle.map(([radius,height])=>({radius,height}));
+  }else{
+    state.latheProfile=(LATHE_PRESETS[preset]||LATHE_PRESETS.bottle).map(([radius,height])=>({radius,height}));
+  }
+  if($("#lathePreset"))$("#lathePreset").value=preset;
+  state.latheSelectedPoint=Math.min(state.latheSelectedPoint,state.latheProfile.length-1);
+  drawLatheProfile();
+  const label=$("#latheStatus");
+  if(label)label.textContent="Editable "+preset+" profile · drag points or tap the curve to add a point.";
+}
+function openLatheEditor(){
+  if(!state.latheProfile.length)setLathePreset($("#lathePreset").value||"bottle");
+  const dialog=$("#latheDialog");
+  if(dialog&&!dialog.open)dialog.showModal();
+  drawLatheProfile();
+  status("Profile editor ready · edit the curve, then generate a Rust mesh");
+}
+function lathePointerDown(event){
+  const canvas=$("#latheProfileCanvas");if(!canvas)return;
+  if(!state.latheProfile.length)setLathePreset($("#lathePreset").value||"bottle");
+  event.preventDefault();
+  const chart=latheChart(canvas),point=latheCanvasPoint(event,canvas,chart);
+  let best=-1,bestDistance=Infinity;
+  state.latheProfile.forEach((p,index)=>{
+    const x=chart.x0+p.radius/chart.maxRadius*(chart.x1-chart.x0),y=chart.y1-p.height/chart.maxHeight*(chart.y1-chart.y0);
+    const distance=Math.hypot(x-point.x,y-point.y);if(distance<bestDistance){bestDistance=distance;best=index}
+  });
+  if(best>=0&&bestDistance<22){
+    state.latheSelectedPoint=best;
+    state.latheDrag={point:state.latheProfile[best],maxRadius:chart.maxRadius,maxHeight:chart.maxHeight};
+  }else{
+    const value=latheProfilePointFromCanvas(point,chart),added={radius:value.radius,height:value.height};
+    state.latheProfile.push(added);state.latheProfile.sort((a,b)=>a.height-b.height);
+    state.latheSelectedPoint=state.latheProfile.indexOf(added);
+    if($("#lathePreset"))$("#lathePreset").value="custom";
+    state.latheDrag={point:added,maxRadius:chart.maxRadius,maxHeight:chart.maxHeight};
+  }
+  try{canvas.setPointerCapture(event.pointerId)}catch{}
+  drawLatheProfile();
+}
+function lathePointerMove(event){
+  const drag=state.latheDrag,canvas=$("#latheProfileCanvas");if(!drag||!canvas)return;
+  const chart=latheChart(canvas),point=latheCanvasPoint(event,canvas,chart);
+  drag.point.radius=clamp((point.x-chart.x0)/(chart.x1-chart.x0)*drag.maxRadius,0,100,drag.point.radius);
+  drag.point.height=clamp((chart.y1-point.y)/(chart.y1-chart.y0)*drag.maxHeight,0,100,drag.point.height);
+  if($("#lathePreset"))$("#lathePreset").value="custom";
+  drawLatheProfile();
+}
+function lathePointerUp(){
+  if(!state.latheDrag)return;
+  const selected=state.latheDrag.point;
+  state.latheProfile.sort((a,b)=>a.height-b.height);
+  state.latheSelectedPoint=Math.max(0,state.latheProfile.indexOf(selected));
+  state.latheDrag=null;drawLatheProfile();
+}
+function addLatheProfilePoint(){
+  if(!state.latheProfile.length)setLathePreset($("#lathePreset").value||"bottle");
+  if(state.latheProfile.length>=128){notice("Profile editor","A profile is limited to 128 points for responsive interactive editing.");return}
+  const profile=state.latheProfile,index=clamp(state.latheSelectedPoint,0,profile.length-1,0);
+  const current=profile[index],next=profile[Math.min(index+1,profile.length-1)],previous=profile[Math.max(index-1,0)];
+  let height,radius;
+  if(index<profile.length-1){height=(current.height+next.height)/2;radius=(current.radius+next.radius)/2}
+  else{height=current.height+Math.max(.025,(current.height-previous.height)*.5);radius=(current.radius+previous.radius)/2}
+  const point={radius:Math.max(0,radius),height:Math.max(0,height)};
+  profile.push(point);profile.sort((a,b)=>a.height-b.height);state.latheSelectedPoint=profile.indexOf(point);
+  if($("#lathePreset"))$("#lathePreset").value="custom";drawLatheProfile();
+  $("#latheStatus").textContent="Point added · drag it to refine radius and height.";
+}
+function removeLatheProfilePoint(){
+  if(state.latheProfile.length<=3){$("#latheStatus").textContent="Keep at least three points to define a valid surface.";return}
+  const index=clamp(state.latheSelectedPoint,0,state.latheProfile.length-1,0);
+  state.latheProfile.splice(index,1);state.latheSelectedPoint=Math.max(0,Math.min(index,state.latheProfile.length-1));
+  if($("#lathePreset"))$("#lathePreset").value="custom";drawLatheProfile();
+  $("#latheStatus").textContent="Point removed · profile retained as editable geometry.";
+}
+function buildLatheMesh(name,{closeDialog=false}={}){
+  if(!state.engine||!state.rustCore?.latheMesh)throw new Error("Rust/WASM lathe core is unavailable. Reload the editor and wait for the geometry core.");
+  const profile=state.latheProfile.map(point=>({radius:Number(point.radius),height:Number(point.height)})).sort((a,b)=>a.height-b.height);
+  if(profile.length<3||profile.some(point=>!Number.isFinite(point.radius)||!Number.isFinite(point.height)||point.radius<0||point.height<0))throw new Error("A valid profile needs at least three points with non-negative radius and height.");
+  const options={
+    radial_segments:clamp($("#latheSegments").value,12,128,64),
+    profile_subdivisions:clamp($("#latheSmoothing").value,0,3,1),
+    cap_ends:$("#latheCaps").checked,
+    axis:$("#latheAxis").value==="z"?"z":"y"
+  };
+  $("#latheStatus").textContent="Rust/WASM is revolving "+profile.length+" profile points…";
+  const meshData=state.rustCore.latheMesh(profile,options);
+  const record=state.engine.createLatheMeshFromData({name,meshData,profile,options,color:[.34,.62,.78]});
+  state.engine.select(record.id);state.engine.frame();refreshAll();
+  const geometry=record.components.geometry;
+  $("#latheMeshStats").textContent=geometry.vertexCount.toLocaleString()+" vertices · "+geometry.triangleCount.toLocaleString()+" triangles";
+  $("#latheStatus").textContent="Real indexed mesh created by Rust/WebAssembly · source profile remains editable.";
+  status("Rust lathe mesh generated · "+geometry.triangleCount.toLocaleString()+" triangles","dirty");
+  if(closeDialog&&$("#latheDialog").open)$("#latheDialog").close();
+  return record;
+}
+function quickCreateBottle(){
+  setLathePreset("bottle");
+  return buildLatheMesh("Bottle — Rust Lathe Mesh");
+}
+function generateLatheFromProfile(){
+  const preset=$("#lathePreset").value||"custom";
+  const record=buildLatheMesh(projectLabel()+" — "+preset.charAt(0).toUpperCase()+preset.slice(1)+" Mesh",{closeDialog:true});
+  setWorkspace("modeling");return record;
+}
+function useReferenceOutlineForLathe(){
+  const record=selectedRecord(),meta=record?.components?.reference;
+  if(!meta||!Array.isArray(meta.outline)||meta.outline.length<3){
+    notice("Profile from reference","Select an image reference with a saved outline first. Open Image Model, trace the silhouette and tap Save outline.");return;
+  }
+  const outline=meta.outline.map(point=>[clamp(point[0],0,1,0),clamp(point[1],0,1,0)]);
+  const left=Math.min(...outline.map(point=>point[0])),right=Math.max(...outline.map(point=>point[0]));
+  const center=(left+right)/2,width=Number(meta.width)||3,height=Number(meta.height)||(width/(Number(meta.aspect)||1));
+  const levels=outline.map(([x,y])=>({radius:Math.abs(x-center)*width,height:(1-y)*height}))
+    .sort((a,b)=>a.height-b.height);
+  const profile=[];
+  for(const point of levels){
+    const previous=profile[profile.length-1];
+    if(previous&&Math.abs(previous.height-point.height)<Math.max(.001,height*.006))previous.radius=Math.max(previous.radius,point.radius);
+    else profile.push(point);
+  }
+  if(profile.length<3){notice("Profile from reference","The outline has too few distinct height levels. Add more tracing points and save it again.");return}
+  if(profile[0].height>.001)profile.unshift({radius:0,height:0});
+  if(profile[profile.length-1].height<height*.999)profile.push({radius:0,height});
+  state.latheProfile=profile;state.latheSelectedPoint=Math.min(1,profile.length-1);
+  if($("#lathePreset"))$("#lathePreset").value="custom";
+  drawLatheProfile();openLatheEditor();
+  $("#latheStatus").textContent="Profile extracted from "+record.name+" · approximate rotational interpretation; inspect before generating.";
+}
+
 function refreshDiagnostics(){
   const engine=state.engine;if(!engine)return;const d=engine.diagnostics();$("#rendererStatus").textContent=d.renderer||"WebGL";$("#fpsStatus").textContent=(Number(d.fps)||0).toFixed(0)+" FPS · "+(Number(d.frameMs)||0).toFixed(1)+" ms";$("#entityStatus").textContent=d.entities+" entities";$("#unitLabel").textContent=String(d.unitSystem||"meters").toUpperCase();$("#unitSystem").value=d.unitSystem==="centimeters"?"centimeters":"meters";$("#snapEnabled").checked=engine.snapEnabled===true;$("#showGrid").checked=state.grid;$("#engineStatus").textContent=state.preview?"Scene preview active":"Engine ready";$("#diagnosticStatus").textContent=state.lastError?"1 error":"No errors";$("#diagnosticStatus").classList.toggle("diagnostic-error",!!state.lastError);if(state.timelinePlaying)refreshTimeline();
 }
