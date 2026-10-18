@@ -34,9 +34,14 @@ jobs:
           const htmlPath = 'public/warfront/index.html';
           const jsPath = 'public/warfront/game.js';
           const rosterPath = 'public/warfront/roster.json';
+          const bundlePath = 'public/warfront/assets/combined-arms-r8.glb';
           const html = readFileSync(htmlPath, 'utf8');
           const js = readFileSync(jsPath, 'utf8');
           const roster = JSON.parse(readFileSync(rosterPath, 'utf8'));
+          const bundleBytes = statSync(bundlePath).size;
+          if (bundleBytes < 8000000) throw new Error('Combined-arms GLB missing or too small: ' + bundleBytes + ' bytes');
+          if (roster.bundle.fullSceneGLBPath !== bundlePath) throw new Error('Roster does not point to the repository GLB bundle');
+          if (roster.bundle.fullSceneGLBBytes !== bundleBytes) throw new Error('Roster GLB byte count does not match committed file');
           if (roster.schemaVersion !== 1) throw new Error('Unexpected roster schema');
           if (!Array.isArray(roster.vehicles) || roster.vehicles.length !== 28) throw new Error('Expected 28 Blender vehicle/aircraft roots');
           if (!roster.infantry || !Array.isArray(roster.infantry.instances) || roster.infantry.instances.length !== 24) throw new Error('Expected 24 infantry scene prototypes');
@@ -62,6 +67,9 @@ jobs:
             'function resetMission(',
             'async function loadRosterManifest(',
             'function populateRosterCatalog(',
+            'async function loadBlenderAssetBundle(',
+            'async function previewBlenderAsset(',
+            'function clearAssetPreview(',
             'setupCatalogDialog();',
             'AnimationMixer',
             'GLTFLoader'
@@ -72,7 +80,7 @@ jobs:
           for (const item of requiredGame) {
             if (!js.includes(item)) throw new Error('Missing gameplay contract: ' + item);
           }
-          for (const path of [htmlPath, jsPath, rosterPath]) {
+          for (const path of [htmlPath, jsPath, rosterPath, bundlePath]) {
             if (statSync(path).size < 5000) throw new Error('Unexpectedly small file: ' + path);
           }
           console.log('Warfront standalone shell and M0 feature contracts are present.');
