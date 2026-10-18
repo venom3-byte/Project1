@@ -78,6 +78,7 @@ const mats = {
   red: material(0x803e39, 0.75, 0.08),
   target: material(0x706b58, 0.9, 0.06),
   targetRoof: material(0x555a51, 0.9, 0.08),
+  destroyed: material(0x343936, 1, 0),
   emissive: material(0xffcc7d, 0.4, 0.04, { emissive: 0xe79a45, emissiveIntensity: 1.5 }),
   blueGlow: new THREE.MeshBasicMaterial({ color: 0x9fca9c, transparent: true, opacity: 0.17, side: THREE.DoubleSide }),
   redGlow: new THREE.MeshBasicMaterial({ color: 0xdc7265, transparent: true, opacity: 0.17, side: THREE.DoubleSide })
@@ -376,6 +377,7 @@ function createBuildingTarget(name, x, z, kind) {
     addBox(root, 'radar-van', [2.8, 1.6, 2.2], [5.5, 0.9, -2.4], mats.roof);
     main = root;
   }
+  root.traverse((o) => { if (o.isMesh) o.userData.initialMaterial = o.material; });
   const target = { id: 'target-' + (targets.length + 1), type: 'target', name, kind, group: root, main, hp: kind === 'depot' ? 100 : 80, maxHp: kind === 'depot' ? 100 : 80, selected: false, alive: true, ring: addSelectionRing(root, TEAM.amber) };
   target.ring.scale.setScalar(kind === 'depot' ? 4.4 : 3.2);
   target.ring.material.color.setHex(TEAM.amber);
@@ -486,6 +488,8 @@ function makeJetVisual() {
     wheel.rotation.z = Math.PI / 2; wheel.position.set(x, 0.2, z); wheel.name = 'gear-wheel'; gear.add(wheel);
   }
   root.userData.fallbackGear = gear;
+  // Match the glTF +Z-forward convention (the procedural fuselage nose was built at -Z).
+  root.rotation.y = Math.PI;
   return root;
 }
 function setAssetText(text, loaded) {
@@ -498,9 +502,16 @@ function safeUrl(url) {
 }
 async function findModelUrl(manifestUrl, pattern) {
   try {
-    const response = await fetch(manifestUrl, { mode: 'cors', cache: 'force-cache' });
-    if (!response.ok) throw new Error('Manifest status ' + response.status);
-    const data = await response.json();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    let data;
+    try {
+      const response = await fetch(manifestUrl, { mode: 'cors', cache: 'force-cache', signal: controller.signal });
+      if (!response.ok) throw new Error('Manifest status ' + response.status);
+      data = await response.json();
+    } finally {
+      clearTimeout(timer);
+    }
     let found = '';
     const visited = new Set();
     function walk(node) {
@@ -564,7 +575,8 @@ function replacePlaneVisual(plane, gltf) {
   if (plane.visual) plane.group.remove(plane.visual);
   const clone = normaliseModel(cloneGLTFScene(gltf), 11.5);
   plane.visual = clone;
-  clone.rotation.y = Math.PI;
+  // Pack models are exported with their nose along local +Z; the aircraft root owns heading.
+  clone.rotation.y = 0;
   plane.group.add(clone);
   tagInteractive(clone, 'rtsUnit', plane);
   if (gltf.animations && gltf.animations.length) {
@@ -864,9 +876,7 @@ function destroyTarget(target) {
   target.status = 'DESTROYED';
   target.hp = 0;
   target.group.traverse((o) => {
-    if (o.isMesh && o.material && !o.material.emissive) {
-      o.material = new THREE.MeshStandardMaterial({ color: 0x343936, roughness: 1 });
-    }
+    if (o.isMesh && o.material && !o.material.emissive) o.material = mats.destroyed;
   });
   target.ring.visible = false;
   const smoke = new THREE.Mesh(new THREE.SphereGeometry(2.1, 14, 10), new THREE.MeshBasicMaterial({ color: 0x454a42, transparent: true, opacity: 0.62 }));
@@ -1083,11 +1093,7 @@ function resetMission() {
   for (const t of targets) {
     t.alive = true; t.hp = t.maxHp; t.status = 'ACTIVE';
     t.group.traverse((o) => {
-      if (o.isMesh && o.material && o.userData.rtsTarget) return;
-      if (o.isMesh && o.material) {
-        // Restore the initial target material family on reset.
-        if (/radar|antenna|sam|launcher|missile|mast/i.test(o.name)) o.material = mats.steel;
-      }
+      if (o.isMesh && o.userData.initialMaterial) o.material = o.userData.initialMaterial;
     });
     if (t.smoke) { t.group.remove(t.smoke); t.smoke.geometry.dispose(); t.smoke.material.dispose(); t.smoke = null; }
     if (t.ring) t.ring.visible = false;
