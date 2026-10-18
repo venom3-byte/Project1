@@ -239,6 +239,13 @@ try {
   for (const width of [390, 360]) {
     await page.setViewportSize({ width, height: 844 });
     await page.waitForTimeout(150);
+    // The mobile references drawer intentionally blocks the editor behind its
+    // scrim; dismiss it with the same outside-tap a user would perform.
+    const scrim = page.locator("#drawerScrim");
+    if (await scrim.isVisible()) {
+      await scrim.click({ position: { x: 20, y: 300 } });
+      await page.waitForFunction(() => document.querySelector("#drawerScrim").hidden, null, { timeout: 5000 });
+    }
     await page.locator('[data-workspace="animation"]').click();
     await page.locator('[data-timeline-view="graph"]').click();
     await page.waitForFunction(() => !document.querySelector("#graphEditorPane").hidden && !!document.querySelector("#graphEditorCanvas").__graphMetrics, null, { timeout: 5000 });
