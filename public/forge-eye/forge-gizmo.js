@@ -50,23 +50,24 @@ function beginPointerGesture(event){
   if(state.nativeReady||state.mode==="select")return null;
   const r=F?.selected?.(),camera=F?.camera?.();
   if(!r||!camera?.camera)return null;
-  const p=F._transformState?.(r);if(!p)return null;
-  const h=Math.max(1,F.canvas?.clientHeight||F.canvas?.height||600),distance=Math.max(.05,r.entity.getPosition().distance(camera.getPosition())||1);
+  const before=F._transformState?.(r);if(!before)return null;
+  const worldPosition=r.entity.getPosition(),h=Math.max(1,F.canvas?.clientHeight||F.canvas?.height||600);
+  const distance=Math.max(.05,worldPosition.distance(camera.getPosition())||1);
   const span=camera.camera.projection===pc.PROJECTION_ORTHOGRAPHIC?2*camera.camera.orthoHeight:2*distance*Math.tan((camera.camera.fov||60)*Math.PI/360);
-  return{id:event.pointerId,recordId:r.id,mode:state.mode,startX:event.clientX,startY:event.clientY,before:JSON.parse(JSON.stringify(p)),unitsPerPixel:span/h,space:state.space};
+  return{id:event.pointerId,recordId:r.id,mode:state.mode,startX:event.clientX,startY:event.clientY,before:JSON.parse(JSON.stringify(before)),worldPosition:[worldPosition.x,worldPosition.y,worldPosition.z],unitsPerPixel:span/h,space:state.space};
 }
 function movePointerGesture(event,drag){
   if(!drag||drag.id!==event.pointerId)return false;
   const r=F?.entities?.get(drag.recordId);if(!r)return false;
-  const dx=event.clientX-drag.startX,dy=event.clientY-drag.startY,b=drag.before,p=r.entity.getLocalPosition(),rot=b.r,sc=b.s;
+  const dx=event.clientX-drag.startX,dy=event.clientY-drag.startY,b=drag.before,rot=b.r,sc=b.s;
   if(drag.mode==="translate"){
-    const cam=F.camera(),right=cam?.right,up=cam?.up,unit=drag.unitsPerPixel;
-    if(!right||!up)return false;
-    let x=b.p[0]+right.x*dx*unit-up.x*dy*unit;
-    let y=b.p[1]+right.y*dx*unit-up.y*dy*unit;
-    let z=b.p[2]+right.z*dx*unit-up.z*dy*unit;
+    const cam=F.camera(),right=cam?.right,up=cam?.up,unit=drag.unitsPerPixel,origin=drag.worldPosition;
+    if(!right||!up||!origin)return false;
+    let x=origin[0]+right.x*dx*unit-up.x*dy*unit;
+    let y=origin[1]+right.y*dx*unit-up.y*dy*unit;
+    let z=origin[2]+right.z*dx*unit-up.z*dy*unit;
     if(F.snapEnabled){const step=Math.max(.0001,Number(F.snapSize)||.25);x=Math.round(x/step)*step;y=Math.round(y/step)*step;z=Math.round(z/step)*step}
-    r.entity.setLocalPosition(x,y,z);
+    r.entity.setPosition(x,y,z);
   }else if(drag.mode==="rotate"){
     const amount=event.shiftKey ? 0.1 : 0.5;
     r.entity.setLocalEulerAngles(rot[0]+dy*amount,rot[1]+dx*amount,rot[2]+(event.altKey?dx*amount:0));
