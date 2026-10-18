@@ -93,7 +93,8 @@ export class ForgeEngine{
     const opacity=clamp(params.opacity??prior.opacity??1,0,1,1),mats=[];
     const walk=e=>{
       for(const mi of(e.render?.meshInstances||[])){
-        const m=mi.material?.clone?.()||this.material(color);
+        const current=mi.material,m=current?.__forgeOwnerId===r.id?current:(current?.clone?.()||this.material(color));
+        m.__forgeOwnerId=r.id;
         m.diffuse=new pc.Color(...color);m.useLighting=true;m.useMetalness=true;m.useTonemap=true;
         m.metalness=metalness;m.gloss=1-roughness;m.opacity=opacity;
         m.blendType=opacity<.999?pc.BLEND_NORMAL:pc.BLEND_NONE;m.depthWrite=opacity>=.999;m.alphaTest=0;
