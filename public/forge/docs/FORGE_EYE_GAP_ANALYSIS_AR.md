@@ -70,6 +70,8 @@
 
 ### Blender 5.2 Manual
 - [Principled BSDF: Metalness, Roughness, Alpha, IOR, Transmission](https://docs.blender.org/manual/en/latest/render/shader_nodes/shader/principled.html)
+- [Viewport Gizmos: محور X/Y/Z والتحويل الحر والمقيّد](https://docs.blender.org/manual/en/latest/editors/3dview/display/gizmo.html)
+- [Armature Skinning: parenting مقابل تشويه الشبكة بالأوزان](https://docs.blender.org/manual/en/5.0/animation/armatures/skinning/introduction.html)
 - [Extrude](https://docs.blender.org/manual/en/latest/modeling/meshes/editing/mesh/extrude.html)
 - [Loop Cut](https://docs.blender.org/manual/en/latest/modeling/meshes/tools/loop.html)
 - [Bone Constraints / IK](https://docs.blender.org/manual/en/latest/animation/armatures/posing/bone_constraints/introduction.html)
@@ -78,9 +80,10 @@
 ### Unreal Engine 5.8 Documentation
 - [Modeling Tools: Select, Transform, Deform, Mesh, Voxel, UVs](https://dev.epicgames.com/documentation/en-us/unreal-engine/modeling-tools-in-unreal-engine)
 - [Modeling Mode Quick Start](https://dev.epicgames.com/documentation/en-us/unreal-engine/modeling-mode-quick-start-in-unreal-engine)
-- [PBR Materials](https://dev.epicgames.com/documentation/en-us/unreal-engine/5-16-materials)
+- [Physically Based Materials: Metallic/Roughness/Base Color](https://dev.epicgames.com/documentation/en-us/unreal-engine/physically-based-materials-in-unreal-engine)
 - [Transparency in Materials](https://dev.epicgames.com/documentation/en-us/unreal-engine/using-transparency-in-unreal-engine-materials)
 - [Control Rig](https://dev.epicgames.com/documentation/en-us/unreal-engine/rigging-with-control-rig-in-unreal-engine)
+- [Control Rig Elements: Controls, Bones and Nulls](https://dev.epicgames.com/documentation/en-us/unreal-engine/controls-bones-and-nulls-in-control-rig-in-unreal-engine)
 - [Create camera animation in Sequencer](https://dev.epicgames.com/documentation/en-us/unreal-engine/how-to-animate-cinematic-cameras-in-unreal-engine)
 - [Animate light intensity and color in Sequencer](https://dev.epicgames.com/documentation/en-us/unreal-engine/how-to-animate-lights-in-unreal-engine)
 
