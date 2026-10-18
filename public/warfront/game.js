@@ -1193,21 +1193,27 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) clock.stop(); else clock.start();
 });
 
-async function initialiseAssets() {
-  setLoadProgress(26, 'Constructing unit database…');
-  const tankTask = loadTankAssets();
-  setLoadProgress(39, 'Resolving aircraft GLB source…');
-  const planeTask = loadPlaneAssets();
-  await Promise.allSettled([tankTask, planeTask]);
-  setLoadProgress(94, 'Finalising input, camera and mission state…');
+function initialiseAssets() {
+  setLoadProgress(78, 'Starting simulation; optional GLB assets load in the background…');
+  // Never block the first playable frame on external CDN/CORS availability.
+  state.started = true;
   setTimeout(() => {
     $('startOverlay').classList.add('hidden');
     setLoadProgress(100, 'Ready');
     addLog('Operation IRON HORIZON is ready for command.', 'normal');
     toast('Theatre online · Select a unit to begin');
-    state.started = true;
     updateObjectives();
   }, 300);
+  Promise.allSettled([loadTankAssets(), loadPlaneAssets()]).then((results) => {
+    const importedTank = results[0] && results[0].status === 'fulfilled' && results[0].value;
+    const importedPlane = results[1] && results[1].status === 'fulfilled' && results[1].value;
+    if (!importedTank && !importedPlane) {
+      setAssetText('Remote GLB unavailable · local models active', false);
+    }
+  }).catch((error) => {
+    console.warn('Optional asset loading failed', error);
+    setAssetText('Remote GLB unavailable · local models active', false);
+  });
 }
 function animate() {
   requestAnimationFrame(animate);
