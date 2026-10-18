@@ -1260,27 +1260,6 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) clock.stop(); else clock.start();
 });
 
-async function loadRosterManifest() {
-  const response = await fetch('./roster.json', { cache: 'no-store' });
-  if (!response.ok) throw new Error('Roster manifest status ' + response.status);
-  const roster = await response.json();
-  if (!Array.isArray(roster.vehicles) || !roster.infantry || !Array.isArray(roster.infantry.archetypes)) {
-    throw new Error('Roster manifest has an invalid schema');
-  }
-  state.rosterManifest = roster;
-  const groundVehicles = roster.vehicles.filter((unit) => unit.category !== 'fixed_wing_aircraft').length;
-  const airAssets = roster.vehicles.filter((unit) => unit.category === 'fixed_wing_aircraft').length;
-  const roles = roster.infantry.archetypes.length;
-  const instances = roster.infantry.instances ? roster.infantry.instances.length : 0;
-  addLog(
-    'Blender asset catalog indexed: ' + groundVehicles + ' ground vehicle classes, ' +
-    airAssets + ' aircraft asset, ' + roles + ' infantry roles (' + instances +
-    ' scene prototypes). Individual GLB unit imports remain pending.',
-    'normal'
-  );
-  return roster;
-}
-
 function catalogStatText(balance) {
   if (!balance) return 'Gameplay balance: pending';
   return 'HP ' + balance.hp + ' · Mobility ' + balance.speed + ' · Range ' + balance.range + ' · Cost ' + balance.cost;
