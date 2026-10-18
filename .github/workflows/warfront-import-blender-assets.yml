@@ -23,18 +23,18 @@ jobs:
           set -euo pipefail
           SOURCE_URL="$(node -e "process.stdout.write(require('./public/warfront/assets/glb-import-source.json').url)")"
           mkdir -p public/warfront/assets
-          curl --fail --location --retry 2 --connect-timeout 15 --max-time 180 "$SOURCE_URL" --output public/warfront/assets/combined-arms-r8.glb
-          BYTES="$(stat -c '%s' public/warfront/assets/combined-arms-r8.glb)"
+          curl --fail --location --retry 2 --connect-timeout 15 --max-time 180 "$SOURCE_URL" --output public/warfront/assets/combined-arms-r19.glb
+          BYTES="$(stat -c '%s' public/warfront/assets/combined-arms-r19.glb)"
           echo "Downloaded Blender GLB bytes: $BYTES"
           test "$BYTES" -ge 8000000
       - name: Commit the generated asset to the repository
-        if: ${{ hashFiles('public/warfront/assets/glb-import-source.json') != '' && hashFiles('public/warfront/assets/combined-arms-r8.glb') != '' }}
+        if: ${{ hashFiles('public/warfront/assets/glb-import-source.json') != '' && hashFiles('public/warfront/assets/combined-arms-r19.glb') != '' }}
         shell: bash
         run: |
           set -euo pipefail
           rm -f public/warfront/assets/glb-import-source.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/warfront/assets/combined-arms-r8.glb public/warfront/assets/glb-import-source.json
-          git commit -m "assets: add Blender combined-arms scene GLB r8"
+          git add -A public/warfront/assets/combined-arms-r19.glb public/warfront/assets/glb-import-source.json
+          git commit -m "assets: import Blender combined-arms scene r19"
           git push origin HEAD:main
