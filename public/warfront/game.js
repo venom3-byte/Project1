@@ -14,6 +14,7 @@ const units = [];
 const tanks = [];
 const soldiers = [];
 const aircraft = [];
+const serviceVehicles = [];
 const targets = [];
 const mixers = [];
 const bombs = [];
@@ -541,6 +542,7 @@ function applyBattlefieldMap(mapId,initial=false){
   tanks.forEach((unit,i)=>{const p=layout.tanks[i]||{x:config.tankStarts[i][0],z:config.tankStarts[i][1]};unit.group.position.set(p.x,0,p.z);});
   soldiers.forEach((unit,i)=>{const p=layout.soldiers[i]||{x:config.soldierStarts[i][0],z:config.soldierStarts[i][1],team:unit.team};unit.group.position.set(p.x,0,p.z);unit.team=p.team||unit.team;unit.name=unit.role+' · '+unit.team.toUpperCase();});
   aircraft.forEach((plane,i)=>{const p=layout.aircraft[i];if(!p)return;plane.initial.x=p.x;plane.initial.z=p.z;plane.group.position.set(p.x,.16,p.z);});
+  ensureServiceVehicles();
   cameraTarget.set(0,0,0);camera.position.set(0,config.depth*.42,config.depth*.47);camera.lookAt(cameraTarget);
   const selector=$('mapSelector');if(selector&&selector.value!==state.mapId)selector.value=state.mapId;
   resetMission();addLog((usingBlender?'Blender-authored theatre loaded: ':'Fallback theatre loaded: ')+config.label,'normal');
@@ -1118,11 +1120,15 @@ function updatePlane(plane,dt){
   if (plane.state === 'rearm') {
     plane.rearmTimer += dt;
     plane.status = 'REARM / SERVICE ' + Math.max(0, Math.ceil(7 - plane.rearmTimer)) + 's';
-    if (plane.rearmTimer >= 7) {
+    if(!plane.rearmServiceStarted&&!plane.rearmServiceComplete)dispatchRearmConvoy(plane);
+    plane.status=plane.rearmServiceComplete?'REARM / FINAL SAFETY CHECK':'REARM / SERVICE CONVOY ACTIVE';
+    if (plane.rearmTimer >= 7 && plane.rearmServiceComplete) {
+      restoreAircraftWeaponStores(plane);
       plane.rearmTimer = 0; plane.state = 'ready'; plane.status = 'READY AT BASE'; plane.target = null; plane.route = []; plane.hasLanded = true;
+      plane.rearmServiceStarted=false;plane.rearmServiceComplete=false;plane.rearmCargoServiced=false;plane.rearmFuelServiced=false;
       plane.group.position.set(plane.initial.x, 0.16, plane.initial.z);
       plane.group.rotation.set(0, Math.PI, 0);
-      addLog(plane.name + ' rearmed and available.', 'normal');
+      addLog(plane.name + ' rearmed and available after physical truck service.', 'normal');
       if (state.selected === plane) updateSelectionPanel();
       updateObjectives();
     }
@@ -1154,9 +1160,9 @@ function updatePlane(plane,dt){
       if (plane.mixer && plane.actions) Object.keys(plane.actions).forEach((key) => { if (/gear.*retract|retract.*gear/.test(key)) plane.actions[key].stop(); });
     }
     if (waypoint.state === 'REARM') {
-      plane.state = 'rearm'; plane.rearmTimer = 0; plane.status = 'REARM / SERVICE';
-      plane.route = []; plane.group.position.y = 0.16;
-      addLog(plane.name + ' landed safely. Turnaround started.', 'normal');
+      plane.state = 'rearm';plane.rearmTimer=0;plane.status='REARM / SERVICE CONVOY';plane.rearmServiceStarted=false;plane.rearmServiceComplete=false;plane.rearmCargoServiced=false;plane.rearmFuelServiced=false;
+      plane.route=[];plane.group.position.y=.16;dispatchRearmConvoy(plane);
+      addLog(plane.name+' landed safely. Ground service convoy requested.','normal');
       updateObjectives();
     }
   } else {
@@ -1250,7 +1256,7 @@ function updateProjectiles(dt){
   }
 }
 function updateDebris(dt){
-  for(let i=debris.length-1;i>=0;i--){const d=debris[i];d.age+=dt;d.velocity.y-=12*dt;d.mesh.position.addScaledVector(d.velocity,dt);d.mesh.rotation.x+=d.spin.x*dt;d.mesh.rotation.y+=d.spin.y*dt;d.mesh.rotation.z+=d.spin.z*dt;
+  for(let i=debris.length-1;i>=0;i--){const d=debris[i];d.age+=dt;if(d.dust&&d.mesh.material)d.mesh.material.opacity=Math.max(0,d.initialOpacity*(1-d.age/d.life));d.velocity.y-=(d.dust?4.5:12)*dt;d.mesh.position.addScaledVector(d.velocity,dt);d.mesh.rotation.x+=d.spin.x*dt;d.mesh.rotation.y+=d.spin.y*dt;d.mesh.rotation.z+=d.spin.z*dt;
     if(d.mesh.position.y<.13){d.mesh.position.y=.13;d.velocity.y*=-.22;d.velocity.x*=.76;d.velocity.z*=.76;}
     if(d.age>=d.life){scene.remove(d.mesh);d.mesh.geometry.dispose();d.mesh.material.dispose();debris.splice(i,1);}
   }
@@ -1763,6 +1769,126 @@ function bindBlenderRuntimeAssets(){
   }
   return true;
 }
+function resetServiceVehiclesAtBase(){
+  const airbase=state.mapLayout&&state.mapLayout.airbase?state.mapLayout.airbase:{x:0,z:45};
+  for(const truck of serviceVehicles){
+    if(truck.job&&truck.job.plane){
+      truck.job.plane.rearmServiceStarted=false;
+      truck.job.plane.rearmServiceComplete=false;
+      truck.job.plane.rearmCargoServiced=false;
+      truck.job.plane.rearmFuelServiced=false;
+    }
+    truck.job=null;truck.status='IDLE AT AIRBASE';truck.mapId=state.mapId;
+    const off=truck.role==='munitions'?[-9,10]:[-14,13];
+    truck.basePosition.set(airbase.x+off[0],0.12,airbase.z+off[1]);
+    truck.group.position.copy(truck.basePosition);truck.group.rotation.set(0,Math.PI,0);
+  }
+}
+function ensureServiceVehicles(){
+  if(!state.blenderBundle)return false;
+  const specs=[
+    {id:'rearm-munitions-truck',root:'UNIT_CARGO_ROOT',name:'MUNITIONS RELOAD TRUCK',role:'munitions',offset:[-9,10]},
+    {id:'aircraft-fuel-truck',root:'UNIT_FUEL_ROOT',name:'AIRCRAFT FUEL SERVICE',role:'fuel',offset:[-14,13]}
+  ];
+  const airbase=state.mapLayout&&state.mapLayout.airbase?state.mapLayout.airbase:{x:0,z:45};
+  for(const spec of specs){
+    let truck=serviceVehicles.find((v)=>v.id===spec.id);
+    const source=state.blenderBundle.roots.get(spec.root);
+    if(!truck&&source){
+      const group=new THREE.Group();group.name='RUNTIME_'+spec.root+'_SERVICE';
+      const visual=normaliseNamedRoot(source,5.4,true);visual.name='SERVICE_MODEL_'+spec.root;group.add(visual);
+      const off=spec.offset;group.position.set(airbase.x+off[0],.12,airbase.z+off[1]);group.rotation.set(0,Math.PI,0);scene.add(group);
+      truck={id:spec.id,type:'service_vehicle',name:spec.name,role:spec.role,sourceRoot:spec.root,group,visual,basePosition:new THREE.Vector3(airbase.x+off[0],.12,airbase.z+off[1]),job:null,state:'idle',status:'IDLE AT AIRBASE',speed:9.5,dustTimer:0,mapId:state.mapId,mixer:null,actions:{}};
+      tagInteractive(group,'serviceVehicle',truck);attachMatchingAnimations(visual,truck,/driveloop|wheel.*spin|track.*loop/i);serviceVehicles.push(truck);
+    }
+  }
+  for(const truck of serviceVehicles){
+    if(truck.mapId!==state.mapId){
+      if(truck.job&&truck.job.plane){truck.job.plane.rearmServiceStarted=false;truck.job.plane.rearmServiceComplete=false;}
+      truck.job=null;truck.mapId=state.mapId;truck.state='idle';truck.status='IDLE AT AIRBASE';
+      const off=truck.role==='munitions'?[-9,10]:[-14,13];
+      truck.basePosition.set(airbase.x+off[0],.12,airbase.z+off[1]);
+      truck.group.position.copy(truck.basePosition);truck.group.rotation.set(0,Math.PI,0);
+    }
+  }
+  return serviceVehicles.length>0;
+}
+function dispatchRearmConvoy(plane){
+  if(!plane||plane.state!=='rearm')return false;
+  if(plane.rearmServiceStarted||plane.rearmServiceComplete)return true;
+  if(!serviceVehicles.length){
+    plane.rearmServiceStarted=true;plane.rearmServiceComplete=true;
+    plane.rearmCargoServiced=true;plane.rearmFuelServiced=true;
+    addLog('Service vehicle assets unavailable; fallback turnaround used for '+plane.name+'.','alert');return true;
+  }
+  const cargo=serviceVehicles.find((v)=>v.role==='munitions'&&!v.job);
+  if(!cargo){plane.status='REARM / WAITING FOR MUNITIONS TRUCK';return false;}
+  const fuel=serviceVehicles.find((v)=>v.role==='fuel'&&!v.job);
+  plane.rearmServiceStarted=true;plane.rearmServiceComplete=false;
+  plane.rearmCargoServiced=false;plane.rearmFuelServiced=!fuel;
+  const target=plane.group.position;
+  cargo.job={plane,stage:'to-plane',timer:0,destination:new THREE.Vector3(target.x-4.5,0.12,target.z+1.6)};
+  cargo.status='DRIVING TO AIRCRAFT';cargo.state='driving';
+  if(fuel){fuel.job={plane,stage:'to-plane',timer:0,destination:new THREE.Vector3(target.x+4.5,0.12,target.z+1.6)};fuel.status='DRIVING TO AIRCRAFT';fuel.state='driving';}
+  addLog('Airbase service convoy dispatched: munitions truck'+(fuel?' + fuel truck':'')+' to '+plane.name+'.','normal');
+  plane.status='REARM / SERVICE CONVOY EN ROUTE';
+  return true;
+}
+function updateServiceVehicles(dt){
+  for(const truck of serviceVehicles){
+    if(truck.mixer)truck.mixer.update(dt);
+    if(!truck.job){continue;}
+    const job=truck.job,plane=job.plane;
+    if(!plane||plane.state!=='rearm'){
+      job.stage='returning';job.destination=truck.basePosition.clone();
+    }
+    const pos=truck.group.position,dest=job.destination||truck.basePosition;
+    if(job.stage==='servicing'){
+      job.timer+=dt;
+      truck.status=truck.role==='munitions'?'RELOADING WEAPON STORES':'FUEL / HYDRAULIC SERVICE';
+      if(job.timer>=2.6){
+        if(plane){
+          if(truck.role==='munitions')plane.rearmCargoServiced=true;
+          if(truck.role==='fuel')plane.rearmFuelServiced=true;
+          plane.rearmServiceComplete=!!plane.rearmCargoServiced&&!!plane.rearmFuelServiced;
+          if(plane.rearmServiceComplete)plane.status='REARM / FINAL SAFETY CHECK';
+        }
+        job.stage='returning';job.timer=0;job.destination=truck.basePosition.clone();
+        truck.status='RETURNING TO AIRBASE';truck.state='returning';
+        addLog(truck.name+' completed its service pass and is returning to the airbase.','normal');
+      }
+      continue;
+    }
+    const dx=dest.x-pos.x,dz=dest.z-pos.z,dist=Math.hypot(dx,dz);
+    if(dist<.85){
+      pos.x=dest.x;pos.z=dest.z;
+      if(job.stage==='to-plane'){
+        job.stage='servicing';job.timer=0;truck.state='servicing';
+        truck.status=truck.role==='munitions'?'RELOADING WEAPON STORES':'FUEL / HYDRAULIC SERVICE';
+        addLog(truck.name+' reached '+(plane?plane.name:'the aircraft parking bay')+'.','normal');
+      }else{
+        truck.job=null;truck.state='idle';truck.status='IDLE AT AIRBASE';truck.group.rotation.set(0,Math.PI,0);
+      }
+      continue;
+    }
+    const step=Math.min(dist,truck.speed*dt);
+    pos.x+=dx/dist*step;pos.z+=dz/dist*step;
+    const heading=Math.atan2(dx,dz);let yawDiff=((heading-truck.group.rotation.y+Math.PI*3)%(Math.PI*2))-Math.PI;
+    truck.group.rotation.y+=yawDiff*Math.min(1,dt*3.2);
+    truck.dustTimer-=dt;
+    if(truck.dustTimer<=0){truck.dustTimer=.28;createDustBurst(new THREE.Vector3(pos.x,.16,pos.z-1.5),3,1.0);}
+  }
+}
+function restoreAircraftWeaponStores(plane){
+  if(!plane||!plane.visual)return;
+  let count=0;
+  plane.visual.traverse((node)=>{
+    if(!node.isMesh)return;
+    if(/GUIDED_STORE|WINGTIP_MISSILE|TRAINING_STORE|ROCKET_POD|ATGM_STORE/i.test(node.name)){node.visible=true;count++;}
+  });
+  plane.storesRemaining=count;
+  if(count)addLog(plane.name+' weapon stores replenished by the service convoy.','normal');
+}
 function clearAssetPreview() {
   const active = state.activeAssetPreview;
   if (!active) return;
@@ -1954,6 +2080,7 @@ window.__WARFRONT_DIAGNOSTICS__=()=>({
   fallbackGroundVisible:ground.visible,
   tankModels:tanks.map((unit)=>({name:unit.name,root:unit.visual&&unit.visual.name,imported:!!(unit.visualData&&unit.visualData.imported)})),
   infantryModels:soldiers.filter((unit)=>!!unit.modelRootName).length,
+  serviceVehicles:serviceVehicles.map((truck)=>({name:truck.name,root:truck.sourceRoot,state:truck.state,status:truck.status,job:truck.job?truck.job.stage:null})),
   aircraft:aircraft.map((plane)=>({name:plane.name,root:plane.modelRootName||null,flightClass:plane.flightClass||'unbound',transport:!!plane.isTransport,ready:plane.state==='ready'}))
 });
 function animate() {
@@ -1964,6 +2091,7 @@ function animate() {
     if (state.activeAssetPreview && state.activeAssetPreview.mixer) state.activeAssetPreview.mixer.update(dt);
     updateTanks(dt);
     updateInfantry(dt);
+    updateServiceVehicles(dt);
     aircraft.forEach((p) => { updatePlane(p, dt); updateAircraftDamage(p, dt); updateAircraftRigMotion(p,dt); });
     updateBombs(dt);
     updateProjectiles(dt);
