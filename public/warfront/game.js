@@ -19,6 +19,7 @@ const mixers = [];
 const bombs = [];
 const projectiles = [];
 const debris = [];
+const impactMarks = [];
 const effects = [];
 const assets = { tank: null, plane: null, tankSource: '', planeSource: '' };
 const state = { command: 'select', selected: null, time: 0, missionComplete: false, paused: false, started: false, mapId: 'pine-valley', pointerDown: null, dragging: false, touchPoints: new Map(), lastPinch: 0, blenderBundle: null, blenderBundlePromise: null, activeAssetPreview: null, assetPreviewCounter: 0 };
@@ -250,6 +251,7 @@ function buildTree(x, z, scale) {
 function clearMapFeatures() {
   const shared=new Set(Object.values(mats).flatMap((entry)=>Array.isArray(entry)?entry:[entry]));
   for(const child of [...mapFeatures.children]){const ownedMaterials=new Set();mapFeatures.remove(child);child.traverse((node)=>{if(node.geometry)node.geometry.dispose();if(node.material)(Array.isArray(node.material)?node.material:[node.material]).forEach((m)=>{if(m&&!shared.has(m))ownedMaterials.add(m);});});ownedMaterials.forEach((m)=>m.dispose());}
+  impactMarks.length=0;
 }
 function addRiverFeature(width,centreZ){
   const vertices=[],indices=[],steps=Math.ceil(width/12);
@@ -978,7 +980,7 @@ function spawnBomb(plane, target) {
 function createImpactMark(position,size=2.6){
   const mark=new THREE.Group();mark.position.set(position.x,.055,position.z);mark.name='persistent-impact-scorch';
   const soot=new THREE.Mesh(new THREE.CircleGeometry(size,20),new THREE.MeshStandardMaterial({color:0x33342f,roughness:1,transparent:true,opacity:.78,depthWrite:false}));soot.rotation.x=-Math.PI/2;soot.scale.set(1,.78,1);mark.add(soot);
-  const rim=new THREE.Mesh(new THREE.RingGeometry(size*.72,size,24),new THREE.MeshStandardMaterial({color:0x777266,roughness:1,transparent:true,opacity:.7,side:THREE.DoubleSide,depthWrite:false}));rim.rotation.x=-Math.PI/2;rim.position.y=.015;mark.add(rim);mapFeatures.add(mark);
+  const rim=new THREE.Mesh(new THREE.RingGeometry(size*.72,size,24),new THREE.MeshStandardMaterial({color:0x777266,roughness:1,transparent:true,opacity:.7,side:THREE.DoubleSide,depthWrite:false}));rim.rotation.x=-Math.PI/2;rim.position.y=.015;mark.add(rim);mapFeatures.add(mark);impactMarks.push(mark);
 }
 function explodeAt(position,target,payload={}){
   const blast=new THREE.Group();blast.position.copy(position);scene.add(blast);
@@ -1354,6 +1356,7 @@ function resetMission() {
   projectiles.splice(0).forEach((p)=>{scene.remove(p.mesh);if(p.mesh.geometry)p.mesh.geometry.dispose();if(p.mesh.material)p.mesh.material.dispose();});
   debris.splice(0).forEach((d)=>{scene.remove(d.mesh);if(d.mesh.geometry)d.mesh.geometry.dispose();if(d.mesh.material)d.mesh.material.dispose();});
   effects.splice(0).forEach((e)=>{scene.remove(e.group);e.group.traverse((n)=>{if(n.geometry)n.geometry.dispose();if(n.material)n.material.dispose();});});
+  impactMarks.splice(0).forEach((mark)=>{if(mark.parent)mark.parent.remove(mark);mark.traverse((node)=>{if(node.geometry)node.geometry.dispose();if(node.material)(Array.isArray(node.material)?node.material:[node.material]).forEach((m)=>{if(m&&m.dispose)m.dispose();});});});
   selectEntity(null); setCommand('select'); updateObjectives(); updateHUD();
 }
 function panCamera(dx, dy) {
