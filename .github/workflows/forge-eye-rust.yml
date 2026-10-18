@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - agent/forge-eye-rust-rebuild-2026-10-17
+      - agent/forge-eye-image-quality-2026-10-18
   pull_request:
     branches:
       - main
