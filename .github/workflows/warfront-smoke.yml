@@ -48,6 +48,15 @@ jobs:
           if (!Array.isArray(roster.infantry.archetypes) || roster.infantry.archetypes.length !== 18) throw new Error('Expected 18 infantry archetypes');
           const roots = [...roster.vehicles.map((u) => u.root), ...roster.infantry.instances.map((u) => u.sourceRoot)];
           if (new Set(roots).size !== roots.length) throw new Error('Duplicate asset root identifiers');
+          const glb = readFileSync(bundlePath);
+          if (glb.readUInt32LE(0) !== 0x46546c67) throw new Error('Combined asset bundle is not a GLB file');
+          if (glb.readUInt32LE(4) !== 2) throw new Error('Unexpected glTF binary version');
+          const jsonChunkLength = glb.readUInt32LE(12);
+          const gltf = JSON.parse(glb.toString('utf8', 20, 20 + jsonChunkLength).trim());
+          const nodeNames = new Set((gltf.nodes || []).map((node) => node.name).filter(Boolean));
+          const missingRoots = roots.filter((name) => !nodeNames.has(name));
+          if (missingRoots.length) throw new Error('Missing named roots in GLB: ' + missingRoots.slice(0, 12).join(', '));
+          console.log('Validated GLB magic/version and ' + roots.length + ' named roster roots.');
           if (roster.integrationStatus !== 'full-scene-glb-available-root-preview-supported-individual-unit-packaging-and-gameplay-binding-pending') throw new Error('Roster integration status must stay explicit');
           if (roster.vehicles.some((u) => u.status !== 'blender_prototype' || !u.root)) throw new Error('Every vehicle must have an explicit prototype status and Blender root');
           if (roster.infantry.instances.some((u) => u.status !== 'blender_prototype' || !u.sourceRoot)) throw new Error('Every infantry instance must have an explicit prototype status and Blender root');
