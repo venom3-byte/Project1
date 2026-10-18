@@ -1772,7 +1772,7 @@ function replaceAircraftWithBlenderRoot(plane,rootName,displayName,targetExtent,
   const old=plane.visual;if(old){plane.group.remove(old);old.traverse((node)=>{if(node.geometry)node.geometry.dispose();});}
   const model=normaliseNamedRoot(source,targetExtent,true);model.name='RUNTIME_'+rootName;
   plane.visual=model;plane.group.add(model);plane.modelRootName=rootName;plane.name=displayName;plane.flightClass=flightClass;plane.isTransport=isTransport;
-  plane.airUnitKey=rootName;plane.group.rotation.order='YXZ';tagInteractive(model,'rtsUnit',plane);
+  plane.modelRootName=rootName;plane.group.rotation.order='YXZ';tagInteractive(model,'rtsUnit',plane);
   attachMatchingAnimations(model,plane,flightClass==='rotary-wing'?/rotor.*spin|tail.?rotor|main.?rotor/i:/never-play-auto/);
   plane.status='READY AT BASE';return true;
 }
@@ -1790,8 +1790,8 @@ function bindBlenderRuntimeAssets(){
     replaceAircraftWithBlenderRoot(plane,item.root,item.name,item.extent,'fixed-wing',false);
   });
   const rotorSpecs=[
-    {key:'attack-helicopter',root:'UNIT_ATTACK_HELICOPTER_ROOT',name:'ATTACK HELICOPTER',extent:12.5,transport:false},
-    {key:'transport-helicopter',root:'UNIT_TRANSPORT_HELICOPTER_ROOT',name:'TRANSPORT HELICOPTER',extent:13.5,transport:true}
+    {key:'attack-helicopter',root:'UNIT_ATTACK_HELICOPTER_ROOT',name:'ATTACK HELICOPTER',extent:14.01,transport:false},
+    {key:'transport-helicopter',root:'UNIT_TRANSPORT_HELICOPTER_ROOT',name:'TRANSPORT HELICOPTER',extent:17.4,transport:true}
   ];
   for(const item of rotorSpecs){
     let plane=aircraft.find((p)=>p.airUnitKey===item.key);
