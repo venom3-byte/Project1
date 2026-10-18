@@ -1260,6 +1260,27 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) clock.stop(); else clock.start();
 });
 
+async function loadRosterManifest() {
+  const response = await fetch('./roster.json', { cache: 'no-store' });
+  if (!response.ok) throw new Error('Roster manifest status ' + response.status);
+  const roster = await response.json();
+  if (!Array.isArray(roster.vehicles) || !roster.infantry || !Array.isArray(roster.infantry.archetypes)) {
+    throw new Error('Roster manifest has an invalid schema');
+  }
+  state.rosterManifest = roster;
+  const groundVehicles = roster.vehicles.filter((unit) => unit.category !== 'fixed_wing_aircraft').length;
+  const airAssets = roster.vehicles.filter((unit) => unit.category === 'fixed_wing_aircraft').length;
+  const roles = roster.infantry.archetypes.length;
+  const instances = roster.infantry.instances ? roster.infantry.instances.length : 0;
+  addLog(
+    'Blender asset catalog indexed: ' + groundVehicles + ' ground vehicle classes, ' +
+    airAssets + ' aircraft asset, ' + roles + ' infantry roles (' + instances +
+    ' scene prototypes). Individual GLB unit imports remain pending.',
+    'normal'
+  );
+  return roster;
+}
+
 function initialiseAssets() {
   setLoadProgress(78, 'Starting simulation; optional GLB assets load in the background…');
   // Never block the first playable frame on external CDN/CORS availability.
@@ -1271,9 +1292,13 @@ function initialiseAssets() {
     toast('Theatre online · Select a unit to begin');
     updateObjectives();
   }, 300);
-  Promise.allSettled([loadTankAssets(), loadPlaneAssets()]).then((results) => {
-    const importedTank = results[0] && results[0].status === 'fulfilled' && results[0].value;
-    const importedPlane = results[1] && results[1].status === 'fulfilled' && results[1].value;
+  Promise.allSettled([loadRosterManifest(), loadTankAssets(), loadPlaneAssets()]).then((results) => {
+    const importedTank = results[1] && results[1].status === 'fulfilled' && results[1].value;
+    const importedPlane = results[2] && results[2].status === 'fulfilled' && results[2].value;
+    if (results[0] && results[0].status === 'rejected') {
+      console.warn('Roster manifest unavailable', results[0].reason);
+      addLog('Asset roster metadata is unavailable; battlefield simulation continues.', 'alert');
+    }
     if (!importedTank && !importedPlane) {
       setAssetText('Remote GLB unavailable · local models active', false);
     }
