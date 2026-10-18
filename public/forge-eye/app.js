@@ -237,16 +237,39 @@ function refreshTimeline(){
   $$("[data-timeline-view]").forEach(button=>{const active=button.dataset.timelineView===state.timelineView;button.classList.toggle("is-active",active);button.setAttribute("aria-selected",String(active))});
   $("#graphChannel").value=state.graphChannel;
   $("#graphChannelSummary").textContent=graphChannelLabel(state.graphChannel);
-  $("#timelineStatusHint").textContent=state.timelineView==="graph"?"Graph Editor · drag a key vertically to edit its value":"Dope Sheet · key = transform at a frame; interpolation creates motion between keys";
+  $("#timelineStatusHint").textContent=state.timelineView==="graph"?"Graph Editor · transform curves plus light/camera component channels":"Dope Sheet · keys store transforms and supported light/camera settings";
   if(state.timelineView==="graph")drawGraphEditor();
 }
 function graphChannelLabel(channel){
-  const labels={p0:"Location X",p1:"Location Y",p2:"Location Z",r0:"Rotation X",r1:"Rotation Y",r2:"Rotation Z",s0:"Scale X",s1:"Scale Y",s2:"Scale Z"};
+  const labels={p0:"Location X",p1:"Location Y",p2:"Location Z",r0:"Rotation X",r1:"Rotation Y",r2:"Rotation Z",s0:"Scale X",s1:"Scale Y",s2:"Scale Z",
+    "light.intensity":"Light Intensity","light.range":"Light Range","light.color.0":"Light Color Red","light.color.1":"Light Color Green","light.color.2":"Light Color Blue",
+    "camera.fov":"Camera Field of View","camera.orthoHeight":"Camera Orthographic Scale"};
   return labels[channel]||"Location X";
 }
 function graphValues(keys,channel){
+  if(channel.startsWith("light.")||channel.startsWith("camera.")){
+    const parts=channel.split("."),type=parts[0],field=parts[1],axis=parts.length>2?Number(parts[2]):null;
+    return keys.flatMap(key=>{
+      let value=key.components?.[type]?.[field];
+      if(axis!==null)value=Array.isArray(value)?value[axis]:undefined;
+      return Number.isFinite(Number(value))&&value!==undefined?[{time:Number(key.time)||0,value:Number(value),key,component:true}]:[];
+    });
+  }
   const group=channel[0],axis=Number(channel[1]);
   return keys.map(key=>({time:Number(key.time)||0,value:Number((key[group]||[0,0,0])[axis])||0,key}));
+}
+function setGraphKeyValue(key,channel,value){
+  if(channel.startsWith("light.")||channel.startsWith("camera.")){
+    const parts=channel.split("."),type=parts[0],field=parts[1];
+    key.components=key.components||{};key.components[type]=key.components[type]||{};
+    if(parts.length>2){
+      const axis=Number(parts[2]),array=Array.isArray(key.components[type][field])?[...key.components[type][field]]:[0,0,0];
+      array[axis]=value;key.components[type][field]=array;
+    }else key.components[type][field]=value;
+    return;
+  }
+  const group=channel[0],axis=Number(channel[1]);
+  key[group][axis]=value;
 }
 function graphCurveValue(a,b,t){
   const duration=Math.max(0.0001,b.time-a.time);let f=clamp((t-a.time)/duration,0,1,0);
@@ -302,8 +325,8 @@ function graphPointerDown(event){
   if(nearest){
     event.preventDefault();event.stopPropagation();const selected=nearest;
     const move=e=>{
-      const y=e.clientY-rect.top,ratio=clamp(1-(y-metrics.pad.top)/metrics.plotH,0,1,.5),value=metrics.min+ratio*(metrics.max-metrics.min),group=state.graphChannel[0],axis=Number(state.graphChannel[1]);
-      selected.key[group][axis]=value;
+      const y=e.clientY-rect.top,ratio=clamp(1-(y-metrics.pad.top)/metrics.plotH,0,1,.5),value=metrics.min+ratio*(metrics.max-metrics.min);
+      setGraphKeyValue(selected.key,state.graphChannel,value);
       state.engine.evalAnimation(state.engine.timelineTime);
       refreshInspector();drawGraphEditor();
     };
