@@ -90,12 +90,35 @@ function refreshHierarchy(){
   tree.append(frag);$("#entityCount").textContent=engine.entities.size+(engine.entities.size===1?" object":" objects");$("#sceneFooter").textContent=engine.selected()?"Selected: "+engine.selected().name:"Scene ready";$("#emptyHierarchy").hidden=items.length!==0;$("#entityStatus").textContent=engine.entities.size+" entities";$("#viewportHint").hidden=engine.entities.size>0;refreshAssetList();
 }
 function refreshInspector(){
-  const record=selectedRecord();$("#noSelection").hidden=!!record;$("#transformForm").hidden=!record;$("#inspectorTitle").textContent=record?.name||"Inspector";$("#inspectorType").textContent=record?String(record.kind).toUpperCase():"No selection";$("#selectedCount").textContent=record?"1 selected":"0 selected";$("#selectionStatus").textContent=record?.name||"No selection";$("#selectionHud").hidden=!record;$("#selectedNameHud").textContent=record?.name||"";
+  const record=selectedRecord();
+  $("#noSelection").hidden=!!record;$("#transformForm").hidden=!record;
+  $("#inspectorTitle").textContent=record?.name||"Inspector";$("#inspectorType").textContent=record?String(record.kind).toUpperCase():"No selection";
+  $("#selectedCount").textContent=record?"1 selected":"0 selected";$("#selectionStatus").textContent=record?.name||"No selection";
+  $("#selectionHud").hidden=!record;$("#selectedNameHud").textContent=record?.name||"";
+  $("#lightSection").hidden=record?.kind!=="light";$("#cameraSection").hidden=record?.kind!=="camera";
   if(!record){$("#timelineTrackName").textContent="No object selected";$("#keyCount").textContent="0 keys";return}
   const e=record.entity,p=e.getLocalPosition(),r=e.getLocalEulerAngles(),s=e.getLocalScale(),values={objectName:record.name,positionX:p.x,positionY:p.y,positionZ:p.z,rotationX:r.x,rotationY:r.y,rotationZ:r.z,scaleX:s.x,scaleY:s.y,scaleZ:s.z};
   for(const [id,value] of Object.entries(values)){const input=$("#"+id);if(input&&document.activeElement!==input)input.value=id==="objectName"?value:Number(value).toFixed(3).replace(/\.?0+$/,"")}
-  const mat=record.components?.material||{},color=mat.color||[.22,.62,.9],hex="#"+color.map(v=>Math.round(clamp(v*255,0,255,0)).toString(16).padStart(2,"0")).join("").toUpperCase();
-  $("#materialColor").value=hex;$("#materialHex").value=hex;$("#metalness").value=String(mat.metalness??.05);$("#roughness").value=String(mat.roughness??.5);$("#metalnessValue").textContent=Number(mat.metalness??.05).toFixed(2);$("#roughnessValue").textContent=Number(mat.roughness??.5).toFixed(2);
+  const mat=record.components?.material||{},color=mat.color||[.22,.62,.9],toHex=rgb=>"#"+rgb.map(v=>Math.round(clamp(v*255,0,255,0)).toString(16).padStart(2,"0")).join("").toUpperCase(),hex=toHex(color);
+  $("#materialColor").value=hex;$("#materialHex").value=hex;
+  $("#metalness").value=String(mat.metalness??0);$("#roughness").value=String(mat.roughness??.55);$("#materialOpacity").value=String(mat.opacity??1);
+  $("#metalnessValue").textContent=Number(mat.metalness??0).toFixed(2);$("#roughnessValue").textContent=Number(mat.roughness??.55).toFixed(2);$("#opacityValue").textContent=Math.round(clamp(mat.opacity??1,0,1,1)*100)+"%";
+  $("#materialPreset").value=mat.preset||"custom";
+  const light=e.light,lightMeta=record.components?.light||{};
+  if(light){
+    const lc=lightMeta.color||[light.color.r,light.color.g,light.color.b];
+    $("#lightType").value=light.type||lightMeta.type||"directional";$("#lightColor").value=toHex(lc);$("#lightHex").value=toHex(lc);
+    $("#lightIntensity").value=String(light.intensity??lightMeta.intensity??2.5);$("#lightIntensityValue").textContent=Number(light.intensity??lightMeta.intensity??2.5).toFixed(2);
+    $("#lightRange").value=String(light.range??lightMeta.range??12);$("#lightRangeValue").textContent=Number(light.range??lightMeta.range??12).toFixed(0)+" m";
+    $("#lightCone").value=String(light.outerConeAngle??lightMeta.outerConeAngle??45);$("#lightConeValue").textContent=Number(light.outerConeAngle??lightMeta.outerConeAngle??45).toFixed(0)+"°";
+    $("#lightShadows").checked=light.castShadows===true;
+  }
+  const camera=e.camera,cameraMeta=record.components?.camera||{};
+  if(camera){
+    $("#cameraFov").value=String(camera.fov??cameraMeta.fov??60);$("#cameraFovValue").textContent=Number(camera.fov??cameraMeta.fov??60).toFixed(0)+"°";
+    $("#cameraProjection").value=camera.projection===window.ForgePC?.PROJECTION_ORTHOGRAPHIC?"orthographic":(cameraMeta.projection||"perspective");
+    $("#cameraActive").checked=cameraMeta.active===true;
+  }
   $("#timelineTrackName").textContent=record.name;refreshTimeline();
 }
 function applyTransform(){
@@ -104,10 +127,54 @@ function applyTransform(){
   engine.transform({x:Number($("#positionX").value),y:Number($("#positionY").value),z:Number($("#positionZ").value),rx:Number($("#rotationX").value),ry:Number($("#rotationY").value),rz:Number($("#rotationZ").value),sx:Number($("#scaleX").value),sy:Number($("#scaleY").value),sz:Number($("#scaleZ").value)});
   refreshHierarchy();refreshInspector();refreshTimeline();status(state.autoKey?"Transform changed · auto-key recorded":"Changes applied","dirty");
 }
+const MATERIAL_PRESETS={
+  plastic:{color:[.12,.46,.82],metalness:0,roughness:.32,opacity:1},
+  paint:{color:[.08,.28,.78],metalness:.22,roughness:.28,opacity:1},
+  metal:{color:[.62,.68,.76],metalness:1,roughness:.24,opacity:1},
+  rubber:{color:[.035,.045,.055],metalness:0,roughness:.9,opacity:1},
+  ceramic:{color:[.82,.85,.88],metalness:0,roughness:.16,opacity:1},
+  glass:{color:[.35,.78,.95],metalness:0,roughness:.08,opacity:.22}
+};
 function applyMaterial(){
-  const engine=state.engine;if(!engine||!selectedRecord())return;const hex=$("#materialColor").value,color=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255);
-  const params={color,metalness:Number($("#metalness").value),roughness:Number($("#roughness").value),opacity:1};
-  if(engine.applyMaterial(params)){ $("#materialHex").value=hex.toUpperCase();$("#metalnessValue").textContent=params.metalness.toFixed(2);$("#roughnessValue").textContent=params.roughness.toFixed(2);status("Material updated","dirty");refreshInspector()}
+  const engine=state.engine,record=selectedRecord();if(!engine||!record)return;
+  const hex=$("#materialColor").value,color=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255);
+  const params={color,metalness:Number($("#metalness").value),roughness:Number($("#roughness").value),opacity:Number($("#materialOpacity").value),preset:$("#materialPreset").value};
+  const count=engine.applyMaterial(params);
+  $("#materialHex").value=hex.toUpperCase();$("#metalnessValue").textContent=params.metalness.toFixed(2);$("#roughnessValue").textContent=params.roughness.toFixed(2);$("#opacityValue").textContent=Math.round(params.opacity*100)+"%";
+  if(count>0){status("PBR material updated","dirty");refreshInspector()}else status("Material settings stored; this object has no renderable surface","warn");
+}
+function applyMaterialPreset(){
+  const preset=$("#materialPreset").value,values=MATERIAL_PRESETS[preset];if(!values){applyMaterial();return}
+  const hex="#"+values.color.map(v=>Math.round(v*255).toString(16).padStart(2,"0")).join("").toUpperCase();
+  $("#materialColor").value=hex;$("#materialHex").value=hex;$("#metalness").value=String(values.metalness);$("#roughness").value=String(values.roughness);$("#materialOpacity").value=String(values.opacity);
+  applyMaterial();
+}
+function applyLightSettings(){
+  const record=selectedRecord(),light=record?.entity?.light;if(!record||record.kind!=="light"||!light)return;
+  const hex=$("#lightColor").value,color=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255),type=$("#lightType").value,intensity=clamp($("#lightIntensity").value,0,10,2.5),range=clamp($("#lightRange").value,1,100,12),cone=clamp($("#lightCone").value,5,85,45),shadows=$("#lightShadows").checked;
+  light.type=type;light.color=new window.ForgePC.Color(...color);light.intensity=intensity;light.range=range;light.outerConeAngle=cone;light.innerConeAngle=Math.min(cone*.6,clamp(cone*.55,1,84,25));light.castShadows=shadows;
+  record.components.light={...record.components.light,type,color,intensity,range,outerConeAngle:cone,innerConeAngle:light.innerConeAngle,castShadows:shadows};
+  $("#lightHex").value=hex.toUpperCase();$("#lightIntensityValue").textContent=intensity.toFixed(2);$("#lightRangeValue").textContent=range.toFixed(0)+" m";$("#lightConeValue").textContent=cone.toFixed(0)+"°";
+  status("Light component updated","dirty");refreshInspector();
+}
+function activateCamera(record){
+  for(const candidate of state.engine.entities.values()){
+    if(candidate.kind!=="camera")continue;
+    const active=candidate.id===record.id;
+    candidate.components.camera={...candidate.components.camera,active};
+    if(candidate.entity.camera)candidate.entity.camera.enabled=active;
+  }
+  window.ForgeViewport?.syncCamera?.();
+}
+function applyCameraSettings(){
+  const record=selectedRecord(),camera=record?.entity?.camera;if(!record||record.kind!=="camera"||!camera)return;
+  const fov=clamp($("#cameraFov").value,20,110,60),projection=$("#cameraProjection").value,active=$("#cameraActive").checked;
+  camera.fov=fov;camera.projection=projection==="orthographic"?window.ForgePC.PROJECTION_ORTHOGRAPHIC:window.ForgePC.PROJECTION_PERSPECTIVE;
+  if(projection==="orthographic")camera.orthoHeight=Math.max(.5,camera.orthoHeight||5);
+  record.components.camera={...record.components.camera,fov,projection,active};
+  if(active)activateCamera(record);
+  $("#cameraFovValue").textContent=fov.toFixed(0)+"°";
+  window.ForgeViewport?.syncCamera?.();status("Camera component updated","dirty");refreshInspector();
 }
 function refreshAssetList(){
   const list=$("#assetList");if(!list||!state.engine)return;const all=[...(state.engine.assets?.entries?.()||[])].map(([name,a])=>({name,type:a.type||"asset"})),q=($("#assetSearch")?.value||"").trim().toLowerCase(),assets=all.filter(a=>a.name.toLowerCase().includes(q));
@@ -667,7 +734,7 @@ async function loadAssets(files){
 function createObject(kind){
   const e=state.engine,n=e.entities.size+1;let record;
   if(kind==="camera")record=e.createCamera("Camera "+n,{x:6,y:4,z:8});else if(kind==="light")record=e.createLight("Light "+n);else record=e.primitive(kind,kind[0].toUpperCase()+kind.slice(1)+" "+n);
-  if(record){e.select(record.id);changed();e.frame();status(record.name+" created","dirty")}
+  if(record){e.select(record.id);changed();if(!["camera","light"].includes(record.kind))e.frame();status(record.name+" created","dirty")}
 }
 function toggleGrid(value=!state.grid){state.grid=!!value;window.ForgeViewport?.setGridVisible?.(state.grid);$$('[data-command="grid"]').forEach(b=>{b.classList.toggle("is-active",state.grid);b.setAttribute("aria-pressed",String(state.grid))});$("#showGrid").checked=state.grid;persistPrefs()}
 function toggleSnap(value=!state.snap){state.snap=!!value;state.engine.snapEnabled=state.snap;state.engine.snapSize=Number($("#gridSize").value||.25);$("#snapEnabled").checked=state.snap;$$('[data-command="snap"]').forEach(b=>{b.classList.toggle("is-active",state.snap);b.setAttribute("aria-pressed",String(state.snap))});window.dispatchEvent(new Event("forge-gizmo-config"))}
@@ -759,8 +826,22 @@ function bindUI(){
   $("#viewportStage").addEventListener("dragover",e=>{e.preventDefault();$("#viewportStage").classList.add("is-dragover")});
   $("#viewportStage").addEventListener("dragleave",e=>{if(!$("#viewportStage").contains(e.relatedTarget))$("#viewportStage").classList.remove("is-dragover")});
   $("#viewportStage").addEventListener("drop",e=>{e.preventDefault();$("#viewportStage").classList.remove("is-dragover");if(e.dataTransfer?.files?.length)void loadAssets([...e.dataTransfer.files])});
-  $("#transformForm").addEventListener("change",e=>{if(e.target.matches("#objectName,#positionX,#positionY,#positionZ,#rotationX,#rotationY,#rotationZ,#scaleX,#scaleY,#scaleZ"))safeRun("Apply transform",applyTransform);if(e.target.matches("#materialColor,#metalness,#roughness"))safeRun("Apply material",applyMaterial)});
-  $("#materialColor").addEventListener("input",()=>$("#materialHex").value=$("#materialColor").value.toUpperCase());$("#metalness").addEventListener("input",()=>$("#metalnessValue").textContent=Number($("#metalness").value).toFixed(2));$("#roughness").addEventListener("input",()=>$("#roughnessValue").textContent=Number($("#roughness").value).toFixed(2));
+  $("#transformForm").addEventListener("change",e=>{
+    if(e.target.matches("#objectName,#positionX,#positionY,#positionZ,#rotationX,#rotationY,#rotationZ,#scaleX,#scaleY,#scaleZ"))safeRun("Apply transform",applyTransform);
+    if(e.target.matches("#materialColor,#metalness,#roughness,#materialOpacity"))safeRun("Apply material",applyMaterial);
+    if(e.target.matches("#lightType,#lightColor,#lightIntensity,#lightRange,#lightCone,#lightShadows"))safeRun("Apply light settings",applyLightSettings);
+    if(e.target.matches("#cameraFov,#cameraProjection,#cameraActive"))safeRun("Apply camera settings",applyCameraSettings);
+  });
+  $("#materialPreset").addEventListener("change",()=>safeRun("Apply material preset",applyMaterialPreset));
+  $("#materialColor").addEventListener("input",()=>$("#materialHex").value=$("#materialColor").value.toUpperCase());
+  $("#metalness").addEventListener("input",()=>$("#metalnessValue").textContent=Number($("#metalness").value).toFixed(2));
+  $("#roughness").addEventListener("input",()=>$("#roughnessValue").textContent=Number($("#roughness").value).toFixed(2));
+  $("#materialOpacity").addEventListener("input",()=>$("#opacityValue").textContent=Math.round(Number($("#materialOpacity").value)*100)+"%");
+  $("#lightColor").addEventListener("input",()=>$("#lightHex").value=$("#lightColor").value.toUpperCase());
+  $("#lightIntensity").addEventListener("input",()=>$("#lightIntensityValue").textContent=Number($("#lightIntensity").value).toFixed(2));
+  $("#lightRange").addEventListener("input",()=>$("#lightRangeValue").textContent=Number($("#lightRange").value).toFixed(0)+" m");
+  $("#lightCone").addEventListener("input",()=>$("#lightConeValue").textContent=Number($("#lightCone").value).toFixed(0)+"°");
+  $("#cameraFov").addEventListener("input",()=>$("#cameraFovValue").textContent=Number($("#cameraFov").value).toFixed(0)+"°");
   $("#currentFrame").addEventListener("change",e=>setTimelineFrame(e.target.value));$("#unitSystem").addEventListener("change",e=>{state.engine.unitSystem=e.target.value;refreshDiagnostics();persistPrefs()});$("#gridSize").addEventListener("change",e=>{state.engine.snapSize=Number(e.target.value)||.25;persistPrefs()});$("#showGrid").addEventListener("change",e=>toggleGrid(e.target.checked));$("#snapEnabled").addEventListener("change",e=>toggleSnap(e.target.checked));
   $$(".property-section-heading").forEach(b=>b.addEventListener("click",()=>{const section=b.closest(".property-section");section.classList.toggle("is-open");b.setAttribute("aria-expanded",String(section.classList.contains("is-open")))}));
   $$("[data-splitter]").forEach(handle=>{handle.addEventListener("pointerdown",e=>setSplitter(handle,e));handle.addEventListener("keydown",e=>{if(!["ArrowLeft","ArrowRight"].includes(e.key))return;e.preventDefault();const side=handle.dataset.splitter,property=side==="left"?"--left-dock-width":"--right-dock-width",root=document.documentElement,old=parseInt(getComputedStyle(root).getPropertyValue(property),10)||260;root.style.setProperty(property,clamp(old+(e.key==="ArrowRight"?10:-10)*(side==="left"?1:-1),side==="left"?200:230,side==="left"?420:460,old)+"px");persistPrefs()})});
