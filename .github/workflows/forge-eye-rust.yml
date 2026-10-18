@@ -108,8 +108,17 @@ jobs:
             test -s "/tmp/forge-eye-public-$asset"
           done
           grep -q 'import("./forge-eye-wasm.js")' /tmp/forge-eye-public-app.js
+          grep -q 'function autoDetectTraceSilhouette' /tmp/forge-eye-public-app.js
+          grep -q 'createRigPivotForSelected' /tmp/forge-eye-public-forge-engine.js
+          grep -q 'const clamp=' /tmp/forge-eye-public-forge-engine.js
+          grep -q 'light.intensity' /tmp/forge-eye-public-index.html
           gzip -t /tmp/forge-eye-public-forge_eye_core.wasm.gz
-          echo "Forge Eye preview assets and Rust WASM gzip artifact are publicly available."
+          echo "Forge Eye public route serves PBR/rig/image-model improvements and the Rust WASM artifact."
+      - name: Exercise the deployed Forge Eye in real Chromium
+        env:
+          FORGE_EYE_URL: https://forge-studio.forgemail-agent.workers.dev/forge-eye/index.html
+          FORGE_EYE_ARTIFACTS: ${{ runner.temp }}/forge-eye-public-qa
+        run: node mcp/forge-eye-smoke.mjs
       - name: Upload browser reports and screenshots
         if: always()
         uses: actions/upload-artifact@v4
