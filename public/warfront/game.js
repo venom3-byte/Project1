@@ -1135,7 +1135,7 @@ function updatePlane(plane,dt){
   const horizontal = Math.hypot(next.x - pos.x, next.z - pos.z);
   const dist = pos.distanceTo(next);
   const speed = plane.flightClass==='rotary-wing'
-    ? (/LANDING|APPROACH/.test(waypoint.state)?4.8:(/HOVER/.test(waypoint.state)?3.8:plane.speed))
+    ? (/LANDING|APPROACH/.test(waypoint.state)?4.8:(/VERTICAL LIFT|HOVER CLIMB/.test(waypoint.state)?3.8:plane.speed))
     : (waypoint.state === 'TAXI-OUT' || waypoint.state === 'TAXI-IN' || waypoint.state === 'LINE-UP' ? 5.2 : (waypoint.state === 'LANDING' ? 8.3 : plane.speed));
   const step = Math.max(0.001, speed * dt);
   if (dist <= Math.max(0.55, step)) {
@@ -1180,7 +1180,7 @@ function updatePlane(plane,dt){
   }
   plane.status = waypoint.state;
   if (plane.state === 'taxi' && plane.routeIndex >= 2) plane.state = 'airborne';
-  if (plane.routeIndex >= 6 && plane.state !== 'return' && plane.route[5] && plane.route[5].state === 'ATTACK RUN') plane.state = 'return';
+  if(plane.routeIndex>=6&&plane.state!=='return'&&plane.route.some((w)=>w.state==='ATTACK RUN'))plane.state='return';
 }
 function updateAircraftRigMotion(plane,dt){
   const visual=plane&&plane.visual;if(!visual||plane.flightClass==='rotary-wing')return;
@@ -1735,7 +1735,7 @@ function bindBlenderRuntimeAssets(){
   ];
   fixed.forEach((item,i)=>{
     const plane=aircraft[i];if(!plane)return;
-    plane.airUnitKey=item.key;plane.flightClass='fixed-wing';plane.speed=15;
+    plane.airUnitKey=item.key;plane.flightClass='fixed-wing';plane.speed=item.key==='f16c-block50'?28:24;
     replaceAircraftWithBlenderRoot(plane,item.root,item.name,item.extent,'fixed-wing',false);
   });
   const rotorSpecs=[
@@ -1746,10 +1746,9 @@ function bindBlenderRuntimeAssets(){
     let plane=aircraft.find((p)=>p.airUnitKey===item.key);
     if(!plane&&state.blenderBundle.roots.has(item.root)){
       plane=createPlane(0,0,aircraft.length+1);plane.airUnitKey=item.key;plane.flightClass='rotary-wing';plane.isTransport=item.transport;
-      aircraft.push&&null;
     }
     if(plane){
-      plane.flightClass='rotary-wing';plane.speed=8;plane.airUnitKey=item.key;
+      plane.flightClass='rotary-wing';plane.speed=16;plane.airUnitKey=item.key;
       replaceAircraftWithBlenderRoot(plane,item.root,item.name,item.extent,'rotary-wing',item.transport);
     }
   }
@@ -1946,6 +1945,17 @@ function initialiseAssets() {
     }
   });
 }
+window.__WARFRONT_DIAGNOSTICS__=()=>({
+  bundleLoaded:!!state.blenderBundle,
+  rootCount:state.blenderBundle?state.blenderBundle.roots.size:0,
+  roots:state.blenderBundle?['UNIT_F16C_BLOCK50_ROOT','UNIT_HEAVY_STRIKE_ROOT','UNIT_ATTACK_HELICOPTER_ROOT','UNIT_TRANSPORT_HELICOPTER_ROOT','MAP_PINE_VALLEY_ROOT','MAP_RED_BASIN_ROOT','MAP_RIVER_CROSSING_ROOT','MAP_ALPINE_PASS_ROOT'].filter((name)=>state.blenderBundle.roots.has(name)):[],
+  mapId:state.mapId,
+  activeBlenderMap:state.activeBlenderMap?state.activeBlenderMap.sourceRoot:null,
+  fallbackGroundVisible:ground.visible,
+  tankModels:tanks.map((unit)=>({name:unit.name,root:unit.visual&&unit.visual.name,imported:!!(unit.visualData&&unit.visualData.imported)})),
+  infantryModels:soldiers.filter((unit)=>!!unit.modelRootName).length,
+  aircraft:aircraft.map((plane)=>({name:plane.name,root:plane.modelRootName||null,flightClass:plane.flightClass||'unbound',transport:!!plane.isTransport,ready:plane.state==='ready'}))
+});
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(0.05, clock.getDelta() || 0);
