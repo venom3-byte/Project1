@@ -102,7 +102,7 @@ export class ForgeEngine{
     const control=this.add("rig",name||child.name+" Pivot");
     control.entity.setPosition(position);control.entity.setRotation(rotation);
     const size=Math.max(.65,Math.abs(localScale.y)*.6+.15);
-    control.components.rigControl={role:"pivot",visual:"sphere-control",children:[child.id],notes:"Rigid-part forward-kinematics pivot; does not skin-deform vertices."};
+    control.components.rigControl={role:"pivot",visual:"sphere-control",markerOffset:size,children:[child.id],notes:"Rigid-part forward-kinematics pivot; does not skin-deform vertices."};
     this._buildRigMarker(control,size);
     control.entity.addChild(child.entity);
     child.entity.setPosition(position);child.entity.setRotation(rotation);child.entity.setLocalScale(localScale.x,localScale.y,localScale.z);
