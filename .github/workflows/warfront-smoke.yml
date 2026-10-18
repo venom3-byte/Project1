@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - "public/warfront/**"
+      - "mcp/warfront-browser-smoke.mjs"
       - ".github/workflows/warfront-smoke.yml"
   pull_request:
     paths:
       - "public/warfront/**"
+      - "mcp/warfront-browser-smoke.mjs"
       - ".github/workflows/warfront-smoke.yml"
   workflow_dispatch:
 
