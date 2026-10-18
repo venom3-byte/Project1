@@ -12,16 +12,17 @@ await fs.mkdir(OUT, { recursive: true });
 const browser = await chromium.launch({
   headless: true,
   executablePath: await Chromium.executablePath(),
-  args: [...Chromium.args, "--enable-webgl", "--ignore-gpu-blocklist", "--use-gl=angle", "--use-angle=swiftshader"],
+  args: Chromium.args,
   timeout: 60000
 });
 const report = { url: BASE_URL, runs: [], failures: [], startedAt: new Date().toISOString() };
 try {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
   for (const profile of [
     { name: "desktop", viewport: { width: 1440, height: 900 }, map: "desert-basin" },
     { name: "mobile", viewport: { width: 390, height: 844 }, map: "river-crossing" }
   ]) {
-    const page = await browser.newPage({ viewport: profile.viewport, deviceScaleFactor: 1 });
+    await page.setViewportSize(profile.viewport);
     const pageErrors = [];
     const failedRequests = [];
     page.on("pageerror", error => pageErrors.push(String(error?.stack || error)));
@@ -52,7 +53,6 @@ try {
     if (metrics.map !== profile.map) throw new Error(profile.name + ": selected theatre was not applied.");
     if (pageErrors.length) throw new Error(profile.name + ": browser JavaScript errors: " + pageErrors.join("\n"));
     report.runs.push({ ...profile, ...metrics, pageErrors, failedRequests });
-    await page.close();
   }
 } catch (error) {
   report.failures.push(String(error?.stack || error));
