@@ -1046,13 +1046,15 @@ function spawnBomb(plane,target){
   if(plane.attackDone||!target||!target.alive)return;
   plane.attackDone=true;
   if(plane.flightClass==='rotary-wing'){spawnGuidedMissile(plane,target);return;}
-  const from=plane.group.position.clone();from.y=Math.max(5,plane.group.position.y-.25);
   const to=new THREE.Vector3(target.group.position.x+Math.sin(state.time)*.8,.8,target.group.position.z+Math.cos(state.time*1.3)*.7);
-  const bomb=new THREE.Mesh(new THREE.CylinderGeometry(.12,.16,.72,10),material(0x28302e,.4,.5));bomb.position.copy(from);scene.add(bomb);
+  let bomb=detachAircraftWeaponStore(plane);
+  let from;
+  if(bomb){from=bomb.position.clone();}
+  else{from=plane.group.position.clone();from.y=Math.max(5,plane.group.position.y-.25);bomb=new THREE.Mesh(new THREE.CylinderGeometry(.12,.16,.72,10),material(0x28302e,.4,.5));bomb.position.copy(from);scene.add(bomb);}
   const gravity=9.81,duration=THREE.MathUtils.clamp(Math.sqrt(Math.max(.5,2*(from.y-to.y)/gravity)),.45,1.8);
   const velocity=new THREE.Vector3((to.x-from.x)/duration,(to.y-from.y+.5*gravity*duration*duration)/duration,(to.z-from.z)/duration);
   bombs.push({mesh:bomb,target,t:0,duration,from,to,velocity,gravity,ballistic:true,team:plane.team||'blue'});
-  addLog('Bomb release · ballistic trajectory calculated from release height.','alert');
+  addLog(plane.name+' released an external store on a computed ballistic trajectory.','alert');
 }
 function createImpactMark(position,size=2.6){
   const mark=new THREE.Group();mark.position.set(position.x,.055,position.z);mark.name='persistent-impact-scorch';
@@ -1215,10 +1217,51 @@ function updateAircraftRigMotion(plane,dt){
 function launchShell(unit,target){
   if(!unit||!target||!target.alive)return;
   const start=unit.group.localToWorld(new THREE.Vector3(0,2.15,2.7)),end=target.group.position.clone().add(new THREE.Vector3(0,target.type==='target'?1.3:1.05,0));
+  createMuzzleFlash(start);
+  createDustBurst(unit.group.position.clone().add(new THREE.Vector3(0,.12,-1.6)),8,2.4);
   const duration=THREE.MathUtils.clamp(start.distanceTo(end)/48,.48,1.45),gravity=10.5;
   const velocity=new THREE.Vector3((end.x-start.x)/duration,(end.y-start.y+.5*gravity*duration*duration)/duration,(end.z-start.z)/duration);
   const shell=new THREE.Mesh(new THREE.SphereGeometry(.17,9,7),new THREE.MeshBasicMaterial({color:0xffd17a,transparent:true,opacity:.98}));shell.position.copy(start);scene.add(shell);
-  projectiles.push({mesh:shell,start,end,velocity,gravity,duration,age:0,target,team:unit.team,damage:target.type==='target'?25:29,radius:target.type==='target'?8.5:6.5});addLog(unit.name+' fired a ballistic shell.','normal');
+  projectiles.push({mesh:shell,start,end,velocity,gravity,duration,age:0,target,team:unit.team,damage:target.type==='target'?25:29,radius:target.type==='target'?8.5:6.5});
+  addLog(unit.name+' fired a ballistic shell with muzzle flash and track dust.','normal');
+}
+function createDustBurst(position,amount=7,spread=1.6){
+  for(let i=0;i<amount;i++){
+    const opacity=.2+Math.random()*.17;
+    const mat=new THREE.MeshBasicMaterial({color:0xb4a18b,transparent:true,opacity,depthWrite:false});
+    const mesh=new THREE.Mesh(new THREE.SphereGeometry(.23+Math.random()*.25,7,5),mat);
+    mesh.position.copy(position).add(new THREE.Vector3((Math.random()-.5)*spread,.1+Math.random()*.6,(Math.random()-.5)*spread));
+    const scale=.55+Math.random()*1.25;mesh.scale.set(scale,.55*scale,scale);scene.add(mesh);
+    debris.push({mesh,velocity:new THREE.Vector3((Math.random()-.5)*spread*1.7,.7+Math.random()*1.8,(Math.random()-.5)*spread*1.7),spin:new THREE.Vector3(.4+Math.random(),Math.random(),.4+Math.random()),age:0,life:.55+Math.random()*.55,dust:true,initialOpacity:opacity});
+  }
+}
+function createMuzzleFlash(position){
+  const group=new THREE.Group();group.name='short-lived-weapon-muzzle-flash';group.position.copy(position);
+  const core=new THREE.Mesh(new THREE.SphereGeometry(.28,8,6),new THREE.MeshBasicMaterial({color:0xffc56a,transparent:true,opacity:.9,depthWrite:false}));
+  const hot=new THREE.Mesh(new THREE.SphereGeometry(.12,7,5),new THREE.MeshBasicMaterial({color:0xfff2c2,transparent:true,opacity:.95,depthWrite:false}));
+  group.add(core,hot);scene.add(group);effects.push({group,t:0,duration:.13,muzzle:true});
+}
+function detachAircraftWeaponStore(plane){
+  if(!plane||!plane.visual)return null;
+  const candidates=[];
+  plane.visual.traverse((node)=>{if(node.isMesh&&node.visible&&/(GUIDED_STORE|WINGTIP_MISSILE|TRAINING_STORE)/i.test(node.name))candidates.push(node);});
+  if(!candidates.length)return null;
+  candidates.sort((a,b)=>{const rank=(n)=>/GUIDED_STORE/i.test(n)?0:/WINGTIP_MISSILE/i.test(n)?1:2;return rank(a.name)-rank(b.name);});
+  const source=candidates[0];source.updateWorldMatrix(true,false);
+  const dropped=source.clone(false);dropped.geometry=source.geometry.clone();
+  if(Array.isArray(source.material))dropped.material=source.material.map((m)=>m.clone());else if(source.material)dropped.material=source.material.clone();
+  dropped.name='RELEASED_'+source.name;dropped.position.copy(source.getWorldPosition(new THREE.Vector3()));
+  dropped.quaternion.copy(source.getWorldQuaternion(new THREE.Quaternion()));dropped.scale.copy(source.getWorldScale(new THREE.Vector3()));
+  source.visible=false;scene.add(dropped);
+  plane.storesRemaining=candidates.filter((node)=>node.visible).length;
+  return dropped;
+}
+function restoreAircraftWeaponStores(plane){
+  if(!plane||!plane.visual)return;
+  let count=0;
+  plane.visual.traverse((node)=>{if(node.isMesh&&/(GUIDED_STORE|WINGTIP_MISSILE|TRAINING_STORE)/i.test(node.name)){node.visible=true;count++;}});
+  plane.storesRemaining=count;
+  if(count)addLog(plane.name+' weapon stores replenished by the service convoy.','normal');
 }
 function createDebris(position,amount=6,palette=0x373b37){
   for(let i=0;i<amount;i++){
@@ -1258,7 +1301,7 @@ function updateProjectiles(dt){
 function updateDebris(dt){
   for(let i=debris.length-1;i>=0;i--){const d=debris[i];d.age+=dt;if(d.dust&&d.mesh.material)d.mesh.material.opacity=Math.max(0,d.initialOpacity*(1-d.age/d.life));d.velocity.y-=(d.dust?4.5:12)*dt;d.mesh.position.addScaledVector(d.velocity,dt);d.mesh.rotation.x+=d.spin.x*dt;d.mesh.rotation.y+=d.spin.y*dt;d.mesh.rotation.z+=d.spin.z*dt;
     if(d.mesh.position.y<.13){d.mesh.position.y=.13;d.velocity.y*=-.22;d.velocity.x*=.76;d.velocity.z*=.76;}
-    if(d.age>=d.life){scene.remove(d.mesh);d.mesh.geometry.dispose();d.mesh.material.dispose();debris.splice(i,1);}
+    if(d.age>=d.life){scene.remove(d.mesh);d.mesh.geometry.dispose();if(Array.isArray(d.mesh.material))d.mesh.material.forEach((m)=>m.dispose());else if(d.mesh.material)d.mesh.material.dispose();debris.splice(i,1);}
   }
 }
 function updateInfantry(dt){
