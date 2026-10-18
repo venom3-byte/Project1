@@ -1,0 +1,72 @@
+name: Sync Blender-authored Warfront scene assets
+on:
+  push:
+    branches:
+      - 'agent/blender-sync-*'
+    paths:
+      - 'public/warfront/assets/blender-sync.json'
+permissions:
+  contents: write
+concurrency:
+  group: blender-sync-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  replace-scene-bundle:
+    if: startsWith(github.event.head_commit.message, '[blender-sync-request]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the asset-sync branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+      - name: Download the Blender-exported GLB
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s public/warfront/assets/blender-sync.json
+          url="$(node -e "const fs=require('node:fs');const m=JSON.parse(fs.readFileSync('public/warfront/assets/blender-sync.json','utf8'));if(!m.download_url||!m.revision)process.exit(2);process.stdout.write(m.download_url)")"
+          node -e "const m=require('./public/warfront/assets/blender-sync.json');console.log('Requested Blender scene revision:',m.revision)"
+          curl --fail --location --silent --show-error --retry 3 --retry-delay 2 --max-time 240 "$url" --output public/warfront/assets/combined-arms-r8.glb
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const file='public/warfront/assets/combined-arms-r8.glb';
+          const buf=fs.readFileSync(file);
+          if(buf.length < 12000000) throw new Error('Blender GLB seems incomplete: '+buf.length+' bytes');
+          if(buf.readUInt32LE(0)!==0x46546c67 || buf.readUInt32LE(4)!==2) throw new Error('Downloaded file is not a glTF 2.0 binary');
+          const jsonBytes=buf.readUInt32LE(12);
+          const gltf=JSON.parse(buf.toString('utf8',20,20+jsonBytes).trim());
+          const names=new Set((gltf.nodes||[]).map(n=>n.name).filter(Boolean));
+          const mandatory=[
+            'MAP_PINE_VALLEY_ROOT','MAP_RED_BASIN_ROOT','MAP_RIVER_CROSSING_ROOT','MAP_ALPINE_PASS_ROOT',
+            'FX_BALLISTIC_ROUND_ROOT','FX_ROCKET_ROOT','FX_BULLET_TRACER_ROOT','FX_EXPLOSION_ROOT',
+            'FX_WRECK_SMOKE_ROOT','FX_AIRCRAFT_CRASH_ROOT','FX_CRATER_SCORCH_ROOT','FX_DEBRIS_BURST_ROOT',
+            'SPAWN_BLUE_ARMOUR_PINE_VALLEY','SPAWN_RED_ARMOUR_PINE_VALLEY','OBJECTIVE_DEPOT_PINE_VALLEY'
+          ];
+          const missing=mandatory.filter(n=>!names.has(n));
+          if(missing.length) throw new Error('Missing Blender-exported roots/markers: '+missing.join(', '));
+          const clips=gltf.animations||[];
+          const fxClips=clips.filter(a=>/^(FX_|ANIM_DRIVE_WHEEL_)/.test(a.name||''));
+          if(clips.length<200 || fxClips.length<100) throw new Error('Expected exported projectile/VFX/wheel motion clips; clips='+clips.length+' FX+wheels='+fxClips.length);
+          console.log(JSON.stringify({bytes:buf.length,nodes:names.size,clips:clips.length,fxAndWheelClips:fxClips.length,mandatoryRoots:mandatory.length},null,2));
+          const manifest=JSON.parse(fs.readFileSync('public/warfront/assets/blender-sync.json','utf8'));
+          const rosterPath='public/warfront/roster.json';
+          const roster=JSON.parse(fs.readFileSync(rosterPath,'utf8'));
+          roster.sceneRevision=manifest.revision;
+          roster.bundle.fullSceneGLBBytes=buf.length;
+          roster.bundle.fullSceneRevision=manifest.revision;
+          roster.bundle.individualGLBAssets='pending';
+          fs.writeFileSync(rosterPath,JSON.stringify(roster,null,2)+'\n');
+          NODE
+      - name: Remove the short-lived download manifest
+        run: rm public/warfront/assets/blender-sync.json
+      - name: Commit the verified Blender bundle to this branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/warfront/assets/combined-arms-r8.glb public/warfront/roster.json public/warfront/assets/blender-sync.json
+          git commit -m "chore(warfront): sync Blender-exported scene revision"
+          git push origin "${{ github.ref_name }}"
