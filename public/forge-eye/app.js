@@ -899,7 +899,7 @@ function toggleGrid(value=!state.grid){state.grid=!!value;window.ForgeViewport?.
 function toggleSnap(value=!state.snap){state.snap=!!value;state.engine.snapEnabled=state.snap;state.engine.snapSize=Number($("#gridSize").value||.25);$("#snapEnabled").checked=state.snap;$$('[data-command="snap"]').forEach(b=>{b.classList.toggle("is-active",state.snap);b.setAttribute("aria-pressed",String(state.snap))});window.dispatchEvent(new Event("forge-gizmo-config"))}
 function chooseTool(mode){
   if(!["select","translate","rotate","scale"].includes(mode))return;state.tool=mode;window.ForgeGizmo?.setMode?.(mode);
-  $("[data-tool]").forEach(b=>{const active=b.dataset.tool===mode;b.classList.toggle("is-active",active);b.setAttribute("aria-pressed",String(active))});
+  $$("[data-tool]").forEach(b=>{const active=b.dataset.tool===mode;b.classList.toggle("is-active",active);b.setAttribute("aria-pressed",String(active))});
   const guidance={
     select:"Select: tap an object · Orbit: drag · Pan: right-drag · Zoom: wheel",
     translate:"Move: drag the selected object or use Position X/Y/Z in Inspector",
