@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0a1017"><title>Forge Asset Lab — Civil Airliner</title>
+<style>
+:root{color-scheme:dark;--bg:#0a1017;--panel:#101923;--line:#283747;--muted:#90a0b0;--text:#e8eef5;--accent:#b9d28a}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font:13px/1.4 Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+button,a{font:inherit}button{cursor:pointer;color:var(--text);background:#172431;border:1px solid #314254;border-radius:7px;padding:8px 11px}button:hover{background:#223343}a{color:inherit;text-decoration:none}.primary{background:var(--accent);border-color:var(--accent);color:#182216;font-weight:800}.top{height:58px;display:flex;align-items:center;gap:12px;padding:0 15px;background:#0c131b;border-bottom:1px solid var(--line)}.brand{display:flex;align-items:center;gap:9px;min-width:180px}.mark{display:grid;place-items:center;width:31px;height:31px;background:var(--accent);color:#182216;border-radius:8px;font-size:19px;font-weight:900}.brand b{font-size:13px;letter-spacing:.16em}.brand small{display:block;color:var(--muted);font-size:9px;letter-spacing:.12em}.divider{height:27px;width:1px;background:var(--line)}.heading strong{font-size:12px;letter-spacing:.07em}.heading small{display:block;color:var(--muted);font-size:10px}.space{flex:1}.status{font-size:9px;letter-spacing:.12em;color:var(--accent)}.toolbar{height:45px;display:flex;align-items:center;gap:6px;padding:6px 12px;background:#0e161f;border-bottom:1px solid var(--line);overflow:auto}.label{font-size:9px;letter-spacing:.15em;color:var(--muted);padding:0 5px;white-space:nowrap}.toolbar button{font-size:11px;padding:6px 10px;white-space:nowrap}.toolbar button.active{border-color:#80966e;color:var(--accent);background:#1b251d}.layout{height:calc(100% - 103px);display:grid;grid-template-columns:215px minmax(0,1fr) 225px}.side{background:var(--panel);padding:15px 13px;overflow:auto}.left{border-right:1px solid var(--line)}.right{border-left:1px solid var(--line)}.eyebrow{font-size:9px;letter-spacing:.16em;color:var(--muted);font-weight:800;margin-bottom:10px}.card{border:1px solid var(--line);border-radius:8px;background:#0c141c;padding:11px;margin-bottom:19px}.card b{font-size:12px;display:block;margin-bottom:5px}.card p{font-size:11px;line-height:1.55;color:#aab8c5;margin:0}.list{list-style:none;padding:0;margin:0}.list li{font-size:11px;color:#c2ccd4;padding:7px 0;border-bottom:1px solid #202d39}.list li:before{content:"◆";color:var(--accent);font-size:8px;margin-right:9px}.section{border-top:1px solid var(--line);margin-top:15px;padding-top:14px}.swatchrow{display:flex;gap:8px;align-items:center;font-size:11px;color:#bdc7cf;margin:9px 0}.swatch{width:15px;height:15px;border-radius:4px;border:1px solid #708091}.viewport{position:relative;min-width:0;overflow:hidden;background:radial-gradient(ellipse at 50% 40%,#1b2936 0%,#101923 52%,#090f15 100%)}canvas{display:block;width:100%;height:100%;touch-action:none}.vlabel{position:absolute;top:14px;left:15px;pointer-events:none}.vlabel b{font-size:10px;letter-spacing:.14em}.vlabel small{display:block;color:var(--muted);font-size:10px;margin-top:4px}.axes{position:absolute;top:15px;right:15px;color:#8295a7;font-size:9px;letter-spacing:.1em;pointer-events:none}.stats{position:absolute;bottom:12px;left:12px;right:12px;display:flex;gap:6px;flex-wrap:wrap;pointer-events:none}.stat{background:#0a1119dc;border:1px solid #2b3947;border-radius:6px;padding:6px 8px;min-width:76px}.stat b{font-size:11px;display:block}.stat small{font-size:8px;color:var(--muted);letter-spacing:.1em}.info{display:grid;grid-template-columns:1fr auto;gap:9px 7px;margin:12px 0;font-size:11px}.info span{color:var(--muted)}.info b{text-align:right;font-weight:600}.notice{border-left:2px solid #c8ab73;background:#201e18;color:#c7ba9d;padding:9px;font-size:10px;line-height:1.5;margin-top:18px}.foot{font-size:10px;line-height:1.55;color:#718496;margin-top:15px}.toast{position:absolute;bottom:70px;left:50%;transform:translateX(-50%);padding:9px 12px;background:#17251b;border:1px solid #4c6648;border-radius:7px;color:#d6edc2;font-size:11px;z-index:5;opacity:0;pointer-events:none;transition:opacity .2s}.toast.show{opacity:1}
+@media(max-width:960px){.layout{grid-template-columns:175px minmax(0,1fr)}.right{display:none}.brand{min-width:155px}.status{display:none}}
+@media(max-width:650px){.top{height:54px;padding:0 8px;gap:8px}.brand{min-width:98px;gap:6px}.brand small{display:none}.brand b{font-size:11px}.mark{width:27px;height:27px}.divider{display:none}.heading strong{font-size:10px}.heading small{font-size:9px}.top button{font-size:10px;padding:7px 8px}.toolbar{height:45px;padding:5px}.layout{height:calc(100% - 99px);grid-template-columns:1fr}.left{display:none}.vlabel{top:10px;left:10px}.axes{top:11px;right:10px}.stats{bottom:7px;left:7px;right:7px;gap:4px}.stat{min-width:62px;padding:5px 6px}.stat b{font-size:10px}.stat small{font-size:7px}.toolbar button{font-size:10px;padding:6px 8px}}
+</style>
+</head>
+<body>
+<header class="top">
+<a class="brand" href="./index.html" aria-label="Back to Forge Studio"><span class="mark">F</span><span><b>FORGE</b><small>ASSET LAB / 3D WORKSPACE</small></span></a><span class="divider"></span>
+<div class="heading"><strong>CJ-90 / CIVIL PASSENGER JET</strong><small>Interactive aircraft asset study · all-angle inspection</small></div><span class="space"></span>
+<span class="status" id="status">● PROCEDURAL PROTOTYPE</span><button id="reset">Reset</button><button class="primary" id="export">↓ Export GLB</button>
+</header>
+<nav class="toolbar" aria-label="Camera controls"><span class="label">VIEW</span><button class="active" data-view="three">3/4</button><button data-view="front">Front</button><button data-view="side">Side</button><button data-view="top">Top</button><span class="divider"></span><button id="wire">Wireframe</button><button id="labels" class="active">Studio grid</button></nav>
+<div class="layout">
+<aside class="side left">
+<div class="eyebrow">ASSET OVERVIEW</div><div class="card"><b>Civil narrow-body airliner</b><p>A procedural passenger jet prototype with swept wings, twin underwing turbofans, cockpit glazing, cabin windows, landing gear and a blue-white civilian livery.</p></div>
+<div class="eyebrow">MAJOR ASSEMBLIES</div><ul class="list"><li>Long tapered fuselage</li><li>Glazed cockpit and cabin windows</li><li>Swept main wings and winglets</li><li>Twin turbofan engine nacelles</li><li>Vertical fin and tail stabilizers</li><li>Nose gear and dual main bogies</li><li>Flaps, slats and control surfaces</li><li>Doors, lights and livery accents</li></ul>
+<div class="section"><div class="eyebrow">SURFACE MATERIALS</div><div class="swatchrow"><i class="swatch" style="background:#e1e4df"></i> Painted fuselage</div><div class="swatchrow"><i class="swatch" style="background:#285378"></i> Navy blue livery</div><div class="swatchrow"><i class="swatch" style="background:#252a30"></i> Engine / rubber</div><div class="swatchrow"><i class="swatch" style="background:#364b61"></i> Tinted glass</div></div>
+<div class="foot">Drag to orbit · pinch or wheel to zoom. Presets help inspect front, side and top. Use Export GLB to save the standalone model for import to Forge, Blender or a game engine.</div>
+</aside>
+<main class="viewport" id="viewport">
+<canvas id="canvas" aria-label="Rotatable 3D civilian airplane model"></canvas>
+<div class="vlabel"><b>FORGE / AIRCRAFT PREVIEW</b><small id="sub">Orbit · zoom · inspect</small></div><div class="axes">Y UP · NOSE +Z</div>
+<div class="stats"><div class="stat"><b>37.5 m*</b><small>LENGTH</small></div><div class="stat"><b>34.2 m*</b><small>WINGSPAN</small></div><div class="stat"><b id="parts">—</b><small>MESH PARTS</small></div><div class="stat"><b>PBR</b><small>MATERIAL SET</small></div></div><div class="toast" id="toast" role="status" aria-live="polite"></div>
+</main>
+<aside class="side right"><div class="eyebrow">INSPECTOR</div><div class="card"><b>CJ-90 / Prototype</b><p>Generic fictional civilian airliner. No real airline branding. The proportions are approximate visual targets, not CAD-certified specifications.</p></div>
+<div class="eyebrow">SCENE TRANSFORM</div><div class="info"><span>Origin</span><b>Fuselage center</b><span>Forward axis</span><b>+Z</b><span>Vertical axis</span><b>+Y</b><span>Wing assembly</span><b>Swept · symmetric</b><span>Propulsion</span><b>2 turbofans</b><span>Landing gear</span><b>3 assemblies</b></div>
+<div class="section"><div class="eyebrow">SURFACE</div><div class="info"><span>Fuselage</span><b>Painted composite / metal</b><span>Windows</span><b>Tinted glazing</b><span>Fan blades</span><b>Metallic</b><span>Wheels</span><b>Rubber / steel</b></div></div>
+<div class="notice">Generation status: three.ws accepted the civilian-aircraft prompt but failed twice at its mesh-generation stage and returned no GLB. This page is a locally constructed procedural fallback, not a generated three.ws asset.</div><div class="foot">*Approximate design-study dimensions for a generic medium-sized passenger aircraft. This is not a manufacturer-accurate model.</div></aside>
+</div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
+import {OrbitControls} from 'https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/controls/OrbitControls.js';
+import {GLTFExporter} from 'https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/exporters/GLTFExporter.js';
+const canvas=document.getElementById('canvas'),viewport=document.getElementById('viewport');
+const scene=new THREE.Scene();scene.background=new THREE.Color('#101923');scene.fog=new THREE.Fog('#101923',27,70);
+const camera=new THREE.PerspectiveCamera(34,1,.1,160);
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(2,devicePixelRatio||1));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.13;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.dampingFactor=.07;controls.minDistance=7;controls.maxDistance=32;controls.maxPolarAngle=Math.PI*.49;controls.target.set(0,1.5,0);
+scene.add(new THREE.HemisphereLight(0xd9e8f4,0x4a4b46,2));
+const key=new THREE.DirectionalLight(0xffead1,3.2);key.position.set(10,15,12);key.castShadow=true;key.shadow.mapSize.set(2048,2048);key.shadow.camera.left=-24;key.shadow.camera.right=24;key.shadow.camera.top=24;key.shadow.camera.bottom=-24;key.shadow.bias=-.0003;scene.add(key);
+const fill=new THREE.DirectionalLight(0x8ab7e2,2.1);fill.position.set(-14,7,-8);scene.add(fill);
+const rim=new THREE.DirectionalLight(0xe5edf6,1.6);rim.position.set(-6,10,16);scene.add(rim);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(150,150),new THREE.MeshStandardMaterial({color:'#18222b',roughness:.92}));ground.rotation.x=-Math.PI/2;ground.position.y=-.08;ground.receiveShadow=true;scene.add(ground);
+const grid=new THREE.GridHelper(70,70,0x52697d,0x2d3d4b);grid.position.y=-.06;grid.material.transparent=true;grid.material.opacity=.29;scene.add(grid);
+const aircraft=new THREE.Group();aircraft.name='CJ-90 Generic Civil Passenger Jet';scene.add(aircraft);
+const M={
+white:new THREE.MeshStandardMaterial({color:'#e0e3df',roughness:.62,metalness:.2}),
+white2:new THREE.MeshStandardMaterial({color:'#f0f1ed',roughness:.5,metalness:.14}),
+blue:new THREE.MeshStandardMaterial({color:'#23577e',roughness:.45,metalness:.24}),
+blueLight:new THREE.MeshStandardMaterial({color:'#3b7fa7',roughness:.42,metalness:.2}),
+darkBlue:new THREE.MeshStandardMaterial({color:'#142f45',roughness:.42,metalness:.38}),
+glass:new THREE.MeshPhysicalMaterial({color:'#203b50',roughness:.18,metalness:.28,clearcoat:.8,clearcoatRoughness:.12}),
+rubber:new THREE.MeshStandardMaterial({color:'#22272b',roughness:.97,metalness:.02}),
+steel:new THREE.MeshStandardMaterial({color:'#868e91',roughness:.38,metalness:.82}),
+steelDark:new THREE.MeshStandardMaterial({color:'#444e53',roughness:.55,metalness:.72}),
+black:new THREE.MeshStandardMaterial({color:'#0d1216',roughness:.74,metalness:.14}),
+red:new THREE.MeshStandardMaterial({color:'#bd5148',roughness:.36,metalness:.15,emissive:'#4c120c',emissiveIntensity:.18}),
+green:new THREE.MeshStandardMaterial({color:'#67bb88',roughness:.3,metalness:.15,emissive:'#184c2c',emissiveIntensity:.25}),
+window:new THREE.MeshStandardMaterial({color:'#182c3d',roughness:.2,metalness:.22,clearcoat:.75})
+};
+let count=0;
+function mesh(g,m,p=[0,0,0],r=[0,0,0],s=null,n='Part'){const o=new THREE.Mesh(g,m);o.position.set(...p);o.rotation.set(...r);if(s)o.scale.set(...s);o.name=n;o.castShadow=true;o.receiveShadow=true;aircraft.add(o);count++;return o;}
+function box(w,h,d,m,p,r=[0,0,0],n='Panel'){return mesh(new THREE.BoxGeometry(w,h,d),m,p,r,null,n);}
+function cyl(rt,rb,len,m,p,r=[0,0,0],n='Cylinder',segs=24){return mesh(new THREE.CylinderGeometry(rt,rb,len,segs),m,p,r,null,n);}
+function sphere(rx,ry,rz,m,p,n='Detail'){return mesh(new THREE.SphereGeometry(1,18,12),m,p,[0,0,0],[rx,ry,rz],n);}
+function lathe(profile,m,p=[0,0,0],n='Lathed body',segs=40){const g=new THREE.LatheGeometry(profile.map(v=>new THREE.Vector2(v[0],v[1])),segs);return mesh(g,m,p,[Math.PI/2,0,0],null,n);}
+function shapeExtrude(points,depth,m,p=[0,0,0],rot=[0,0,0],n='Wing'){const s=new THREE.Shape();s.moveTo(points[0][0],points[0][1]);for(let i=1;i<points.length;i++)s.lineTo(points[i][0],points[i][1]);s.closePath();const g=new THREE.ExtrudeGeometry(s,{depth,bevelEnabled:true,bevelSegments:2,steps:1,bevelSize:.035,bevelThickness:.025});g.computeVertexNormals();return mesh(g,m,p,rot,null,n);}
+function makeProfile(parts,m,p,name){return lathe(parts,m,p,name,48);}
+function makeAircraft(){
+  // Fuselage profile is authored tail-to-nose along the positive Z axis.
+  makeProfile([[.02,-6.25],[.12,-6.12],[.30,-5.80],[.50,-5.15],[.61,-4.30],[.65,-3.1],[.67,-1.3],[.68,1.0],[.65,2.75],[.57,3.8],[.43,4.55],[.25,5.05],[.08,5.27],[.015,5.30]],M.white,[0,1.85,0],'Tapered passenger fuselage',48);
+  // Belly keel, tail cone seams and forward radome detail.
+  lathe([[.02,4.74],[.10,4.69],[.13,4.54],[.14,4.20],[.17,3.78]],M.white2,[0,1.84,0],'Forward radome seam',36);
+  // Livery bands run along both sides as slim accent strips.
+  for(const side of [-1,1]){
+    const trim=box(.014,.055,8.2,M.blue,[side*.625,1.76,-.25],[0,0,side*.0],'Blue fuselage cheatline');
+    for(let z=2.70;z>=-3.45;z-=.39){
+      const radius=.646-(Math.max(0,z-1.0)*.006);
+      sphere(.035,.071,.025,M.window,[side*radius,2.02,z],'Passenger cabin window');
+    }
+    // Passenger entry doors and cabin service panel seams.
+    for(const z of [2.55,-2.55]){
+      box(.012,.53,.36,M.blue,[side*.655,2.10,z],[0,0,0],'Passenger door outline');
+      box(.014,.46,.30,M.white2,[side*.662,2.10,z],[0,0,0],'Passenger door inset');
+      box(.018,.105,.105,M.glass,[side*.674,2.25,z+.02],null,'Door window');
+      box(.025,.07,.024,M.steel,[side*.68,1.90,z-.10],null,'Door handle');
+    }
+    for(const z of [-4.5,-4.15,-3.8,3.5,4.0]){
+      box(.025,.10,.12,M.white2,[side*.42,1.65,z],null,'Service access hatch');
+    }
+  }
+  // Cockpit glazing and eyebrow windows.
+  const wind=box(.72,.30,.08,M.glass,[0,2.19,4.63],[-.17,0,0],'Cockpit wraparound windshield');
+  box(.54,.06,.09,M.darkBlue,[0,2.31,4.58],[-.12,0,0],'Cockpit brow');
+  for(const side of [-1,1]){
+    box(.21,.16,.075,M.glass,[side*.22,2.17,4.65],[-.12,0,side*.16],'Cockpit side pane');
+  }
+  // Main swept wing planform; outline coordinates are (span X, fore/aft Z).
+  const wingPts=[[-.49,.92],[-.92,.78],[-4.86,-.73],[-5.00,-1.05],[-4.36,-.94],[-1.02,.10],[-.63,-.57],[.63,-.57],[1.02,.10],[4.36,-.94],[5.00,-1.05],[4.86,-.73],[.92,.78],[.49,.92]];
+  shapeExtrude(wingPts,.17,M.white,[0,1.48,0],[Math.PI/2,0,0],'Swept main wing pair');
+  // Wing underside blue panels, flap tracks, ailerons, and winglets.
+  for(const side of [-1,1]){
+    box(2.8,.025,.15,M.blue,[side*2.25,1.54,-.52],[0,0,0],'Wing lower livery strip');
+    for(let j=0;j<4;j++){
+      const x=side*(1.48+j*.76);
+      box(.075,.10,1.05,M.white2,[x,1.37,-.48],[0,0,side*.08],'Flap track fairing');
+    }
+    box(2.45,.085,.24,M.blueLight,[side*2.5,1.42,-.78],[0,0,side*.02],'Trailing flap panel');
+    box(.14,.42,.09,M.blue,[side*4.82,1.70,-.82],[0,0,side*.10],'Winglet');
+    box(.10,.18,.22,M.blueLight,[side*4.83,1.84,-.78],[0,0,side*.10],'Winglet cap');
+    // Red/green wingtip nav lights.
+    sphere(.075,.055,.09,side<0?M.red:M.green,[side*4.91,1.59,-.82],'Navigation light');
+  }
+  // Twin turbofan nacelles: fan face, intake lip, spinner and radial blades.
+  for(const side of [-1,1]){
+    const x=side*2.15, y=.97;
+    makeProfile([[.40,-1.20],[.45,-1.08],[.46,-.72],[.43,-.30],[.40,.12],[.36,.40],[.30,.55],[.25,.64],[.18,.68],[.04,.70]],M.white2,[x,y,.03],side<0?'Port turbofan nacelle':'Starboard turbofan nacelle',36);
+    cyl(.405,.405,.07,M.steel,[x,y,.72],[Math.PI/2,0,0],'Turbofan intake lip',40);
+    cyl(.34,.34,.05,M.darkBlue,[x,y,.78],[Math.PI/2,0,0],'Dark engine intake throat',40);
+    cyl(.095,.095,.07,M.steel,[x,y,.805],[Math.PI/2,0,0],'Fan spinner',24);
+    for(let b=0;b<18;b++){
+      const a=b*2*Math.PI/18;
+      const blade=box(.035,.245,.035,M.steelDark,[x+Math.sin(a)*.22,y+Math.cos(a)*.22,.804],[0,0,-a*.35],'Turbofan fan blade');
+      blade.rotation.y=a;
+    }
+    // Exhaust cone / nozzle.
+    makeProfile([[.08,-1.47],[.18,-1.40],[.29,-1.30],[.34,-1.16],[.32,-.98],[.28,-.91]],M.steelDark,[x,y,.03],'Turbofan exhaust core',30);
+    cyl(.285,.285,.09,M.black,[x,y,-1.02],[Math.PI/2,0,0],'Exhaust rim',32);
+    cyl(.21,.21,.07,M.steelDark,[x,y,-1.08],[Math.PI/2,0,0],'Exhaust inner sleeve',32);
+    box(.12,.10,.95,M.white,[x,y+.22,-.20],null,'Engine pylon');
+  }
+  // Horizontal tailplanes and vertical fin, with blue rear livery.
+  const tailPts=[[-.28,-4.30],[-.65,-4.38],[-2.02,-5.18],[-2.16,-5.38],[-1.78,-5.30],[-.43,-4.78],[.43,-4.78],[1.78,-5.30],[2.16,-5.38],[2.02,-5.18],[.65,-4.38],[.28,-4.30]];
+  shapeExtrude(tailPts,.11,M.white,[0,2.05,0],[Math.PI/2,0,0],'Horizontal tail stabilizers');
+  for(const side of [-1,1])box(1.08,.055,.12,M.blue,[side*.98,2.02,-5.12],[0,0,0],'Tailplane blue tip');
+  const finPts=[[-5.42,2.07],[-4.66,2.10],[-4.12,3.34],[-3.58,3.50],[-3.80,3.09],[-4.48,2.58],[-4.55,2.07]];
+  shapeExtrude(finPts,.16,M.white,[-.08,0,0],[0,-Math.PI/2,0],'Vertical tail fin');
+  // Since fin outline is extruded then rotated into YZ, add colored fin panel on both sides.
+  for(const side of [-1,1]){
+    const p=shapeExtrude([[-5.15,2.28],[-4.67,2.31],[-4.18,3.22],[-3.92,3.27],[-4.05,3.00],[-4.62,2.55]],.018,M.blue,[side*.10,0,0],[0,-Math.PI/2,0],'Blue vertical-tail panel');
+  }
+  // Landing gear fairing bays and three retractable strut assemblies.
+  box(.36,.15,.88,M.white2,[0,.94,2.02],[0,0,0],'Nose gear bay doors');
+  for(const side of [-1,1]){
+    // Main landing bogies below the wing root, two wheels each.
+    const x=side*.95,z=-.62;
+    cyl(.055,.065,.62,M.steel,[x,.79,z],[0,0,side*.05],'Main landing strut',16);
+    box(.12,.46,.18,M.white2,[x,.64,z],[0,0,side*.02],'Main gear fairing');
+    for(const zz of [z-.16,z+.16]){
+      cyl(.22,.22,.13,M.rubber,[x,.27,zz],[0,0,Math.PI/2],'Main gear tire',24);
+      cyl(.12,.12,.142,M.steel,[x,.27,zz],[0,0,Math.PI/2],'Main wheel hub',20);
+    }
+    box(.08,.10,.65,M.steelDark,[x,.20,z],[0,0,0],'Main bogie axle');
+  }
+  cyl(.045,.05,.48,M.steel,[0,.76,2.7],[0,0,0],'Nose landing strut',16);
+  for(const x of [-.10,.10]){
+    cyl(.14,.14,.09,M.rubber,[x,.24,2.72],[0,0,Math.PI/2],'Nose wheel tire',20);
+    cyl(.075,.075,.10,M.steel,[x,.24,2.72],[0,0,Math.PI/2],'Nose wheel hub',16);
+  }
+  // Belly antennae, beacon lights and fuselage markings.
+  box(.16,.05,.32,M.white2,[0,1.21,-1.18],[0,0,0],'Belly antenna fairing');
+  sphere(.08,.06,.08,M.red,[0,2.53,-.15],'Red anti-collision beacon');
+  sphere(.055,.045,.07,M.green,[0,2.52,-3.48],'Tail beacon');
+  // Cabin doors and service panel hardware, mirrored side detail.
+  for(const side of [-1,1]){
+    for(const z of [-3.6,-2.85,-2.05,-1.25,-.45,.35,1.15,1.95,2.75]){
+      sphere(.018,.018,.018,M.steel,[side*.657,1.88,z],'Fuselage fastener');
+    }
+  }
+  aircraft.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+}
+makeAircraft();document.getElementById('parts').textContent=String(aircraft.children.length);
+const original={position:new THREE.Vector3(9,6.0,11.5),target:new THREE.Vector3(0,1.5,-.15)};
+function setView(v){
+  if(v==='front'){camera.position.set(0,3.2,17);controls.target.set(0,1.4,.1);document.getElementById('sub').textContent='Nose-on view';}
+  else if(v==='side'){camera.position.set(18,3.3,0);controls.target.set(0,1.4,0);document.getElementById('sub').textContent='Starboard side elevation';}
+  else if(v==='top'){camera.position.set(0,26,.1);controls.target.set(0,0,0);document.getElementById('sub').textContent='Plan view · wing geometry';}
+  else{camera.position.copy(original.position);controls.target.copy(original.target);document.getElementById('sub').textContent='Orbit · zoom · inspect';}
+  camera.lookAt(controls.target);controls.update();document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
+}
+setView('three');document.getElementById('reset').onclick=()=>setView('three');document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
+let wireframe=false,showGrid=true;
+document.getElementById('wire').onclick=()=>{wireframe=!wireframe;aircraft.traverse(o=>{if(o.isMesh){const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m.wireframe=wireframe);}});document.getElementById('wire').classList.toggle('active',wireframe);notify(wireframe?'Wireframe inspection enabled':'Solid material view');};
+document.getElementById('labels').onclick=()=>{showGrid=!showGrid;grid.visible=showGrid;document.getElementById('labels').classList.toggle('active',showGrid);};
+function notify(s){const t=document.getElementById('toast');t.textContent=s;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2400);}
+document.getElementById('export').onclick=()=>{const b=document.getElementById('export');b.disabled=true;b.textContent='Preparing GLB…';const exp=new GLTFExporter();const out=new THREE.Scene();out.add(aircraft.clone(true));exp.parse(out,data=>{const blob=new Blob([data],{type:'model/gltf-binary'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='CJ-90-civil-airliner.glb';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);b.disabled=false;b.textContent='↓ Export GLB';notify('GLB exported · '+Math.round(blob.size/1024)+' KB');},err=>{console.error(err);b.disabled=false;b.textContent='↓ Export GLB';notify('GLB export failed');},{binary:true,onlyVisible:true});};
+const resize=()=>{const w=Math.max(1,viewport.clientWidth),h=Math.max(1,viewport.clientHeight);renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();};new ResizeObserver(resize).observe(viewport);resize();renderer.setAnimationLoop(()=>{controls.update();renderer.render(scene,camera);});
+</script>
+</body></html>
