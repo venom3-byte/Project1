@@ -177,6 +177,59 @@ try {
     throw new Error("Rust geometry scene round-trip failed: " + JSON.stringify(hullRoundTrip));
   }
 
+  // High-resolution import regression: the embedded reference must be byte-identical
+  // to the uploaded PNG, even when its 4096x2048 dimensions exceed preview-size defaults.
+  await page.locator('[data-workspace="references"]').click();
+  const sourceDataUrl = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 4096;
+    canvas.height = 2048;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#101820";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (let x = 0; x < canvas.width; x += 64) {
+      ctx.fillStyle = x % 128 === 0 ? "#f0d264" : "#21c4b8";
+      ctx.fillRect(x, 0, 2, canvas.height);
+    }
+    for (let y = 0; y < canvas.height; y += 64) {
+      ctx.fillStyle = y % 128 === 0 ? "#dceaf3" : "#52758a";
+      ctx.fillRect(0, y, canvas.width, 2);
+    }
+    return canvas.toDataURL("image/png");
+  });
+  const sourcePng = Buffer.from(sourceDataUrl.split(",")[1], "base64");
+  await page.locator("#referenceInput").setInputFiles({
+    name: "qa-original-4k.png", mimeType: "image/png", buffer: sourcePng
+  });
+  await page.waitForFunction(() => [...window.Forge.entities.values()].some(
+    r => r.name === "qa-original-4k.png" && r.components?.reference?.imageDataUrl
+  ), null, { timeout: 20000 });
+  const imageImportRaw = await page.evaluate(() => {
+    const r = [...window.Forge.entities.values()].find(
+      item => item.name === "qa-original-4k.png" && item.components?.reference?.imageDataUrl
+    );
+    return {
+      width: r?.components?.asset?.width,
+      height: r?.components?.asset?.height,
+      sourceBytes: r?.components?.asset?.sourceBytes,
+      renderWidth: r?.components?.asset?.renderWidth,
+      renderHeight: r?.components?.asset?.renderHeight,
+      embeddedDataUrl: r?.components?.reference?.imageDataUrl
+    };
+  });
+  const imageImport = {
+    width: imageImportRaw.width, height: imageImportRaw.height,
+    sourceBytes: imageImportRaw.sourceBytes,
+    renderWidth: imageImportRaw.renderWidth, renderHeight: imageImportRaw.renderHeight,
+    exactSourcePreserved: imageImportRaw.embeddedDataUrl === sourceDataUrl
+  };
+  if (imageImport.width !== 4096 || imageImport.height !== 2048 ||
+      imageImport.sourceBytes !== sourcePng.length ||
+      imageImport.renderWidth < 1 || imageImport.renderHeight < 1 ||
+      !imageImport.exactSourcePreserved) {
+    throw new Error("Original-resolution reference import regression failed: " + JSON.stringify(imageImport));
+  }
+
   const downloadPromise = page.waitForEvent("download");
   await page.locator('[data-command="save"]').click();
   const download = await downloadPromise;
@@ -201,7 +254,7 @@ try {
     await page.screenshot({ path: path.join(ARTIFACTS, "forge-eye-mobile-" + width + ".png"), fullPage: true });
   }
 
-  report = { ok: true, url: URL_TO_TEST, httpStatus: response.status(), initial, rustLathe, evaluated, bottle, editedLathe, rustVisualHull, builtHull, hullRoundTrip, projectDownload: download.suggestedFilename(), mobileReports, pageErrors, consoleErrors, failedRequests };
+  report = { ok: true, url: URL_TO_TEST, httpStatus: response.status(), initial, rustLathe, evaluated, bottle, editedLathe, rustVisualHull, builtHull, hullRoundTrip, imageImport, projectDownload: download.suggestedFilename(), mobileReports, pageErrors, consoleErrors, failedRequests };
   await fs.writeFile(path.join(ARTIFACTS, "forge-eye-report.json"), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   if (pageErrors.length || consoleErrors.length || failedRequests.length) throw new Error("Unexpected browser errors: " + JSON.stringify({ pageErrors, consoleErrors, failedRequests }));
