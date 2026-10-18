@@ -99,7 +99,7 @@ function refreshRigControls(){
   const placeholder=document.createElement("option");placeholder.value="";placeholder.textContent=controls.length?"Choose a rig pivot":"No rig pivots yet";select.append(placeholder);
   for(const control of controls){const option=document.createElement("option");option.value=control.id;option.textContent=control.name;select.append(option)}
   const parentId=record?.components?.rigParentId||((record?.entity?.parent?.__forge?.kind==="rig")?record.entity.parent.__forge.id:"");
-  select.value=controls.some(control=>control.id===parentId)?parentId:(controls.some(control=>control.id===current)?current:"");
+  select.value=controls.some(control=>control.id===parentId)?parentId:(record?.kind==="rig"&&controls.some(control=>control.id===record.id)?record.id:(controls.some(control=>control.id===current)?current:""));
   const canCreate=!!record&&record.kind!=="rig"&&record.name!=="Ground";
   $("#createRigPivot").disabled=!canCreate;
   const canAttach=!!record&&record.kind!=="rig"&&!!select.value&&select.value!==record.id;
