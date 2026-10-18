@@ -174,13 +174,66 @@ export class ForgeEngine{
   setWorldPosition(id,p){const r=this.entities.get(id);if(!r)return false;r.entity.setPosition(Number(p.x)||0,Number(p.y)||0,Number(p.z)||0);return true}
   duplicate(){const r=this.selected();if(!r)return null;const e=r.entity.clone();e.name=r.name+' Copy';this.root.addChild(e);const n=this.rec(e.name,r.kind,e);n.components=JSON.parse(JSON.stringify(r.components));const p=e.getLocalPosition();e.setLocalPosition(p.x+1,p.y,p.z);if(n.components.physics)this.setPhysics(n.id,n.components.physics.mode,n.components.physics.shape);this.select(n.id);return n}
   delete(){const r=this.selected();if(!r)return;this.removePhysics(r.id);r.entity.destroy();this.entities.delete(r.id);this.selectedId=null;window.dispatchEvent(new CustomEvent('forge-selection'))}
+  _componentAnimationState(r){
+    const state={},light=r?.entity?.light,camera=r?.entity?.camera;
+    if(r?.kind==='light'&&light){
+      state.light={type:light.type||'directional',intensity:Number(light.intensity)||0,range:Number(light.range)||12,
+        innerConeAngle:Number(light.innerConeAngle)||0,outerConeAngle:Number(light.outerConeAngle)||45,
+        color:[light.color.r,light.color.g,light.color.b],castShadows:light.castShadows===true};
+    }
+    if(r?.kind==='camera'&&camera){
+      state.camera={fov:Number(camera.fov)||60,orthoHeight:Number(camera.orthoHeight)||5,
+        projection:camera.projection===pc.PROJECTION_ORTHOGRAPHIC?'orthographic':'perspective'};
+    }
+    return state;
+  }
+  _applyAnimatedComponents(r,components){
+    if(!r||!components)return;
+    const lightData=components.light,light=r.entity.light;
+    if(r.kind==='light'&&light&&lightData){
+      if(['directional','omni','spot'].includes(lightData.type))light.type=lightData.type;
+      if(Array.isArray(lightData.color)&&lightData.color.length>=3)light.color=new pc.Color(...lightData.color.map(v=>Math.max(0,Math.min(1,Number(v)||0))));
+      if(Number.isFinite(lightData.intensity))light.intensity=Math.max(0,Math.min(100000,lightData.intensity));
+      if(Number.isFinite(lightData.range))light.range=Math.max(.01,Math.min(100000,lightData.range));
+      if(Number.isFinite(lightData.innerConeAngle))light.innerConeAngle=Math.max(0,Math.min(89,lightData.innerConeAngle));
+      if(Number.isFinite(lightData.outerConeAngle))light.outerConeAngle=Math.max(1,Math.min(89,lightData.outerConeAngle));
+      if(typeof lightData.castShadows==='boolean')light.castShadows=lightData.castShadows;
+      r.components.light={...r.components.light,...lightData};
+    }
+    const cameraData=components.camera,camera=r.entity.camera;
+    if(r.kind==='camera'&&camera&&cameraData){
+      if(Number.isFinite(cameraData.fov))camera.fov=Math.max(20,Math.min(110,cameraData.fov));
+      if(Number.isFinite(cameraData.orthoHeight))camera.orthoHeight=Math.max(.01,Math.min(100000,cameraData.orthoHeight));
+      if(cameraData.projection==='orthographic')camera.projection=pc.PROJECTION_ORTHOGRAPHIC;
+      else if(cameraData.projection==='perspective')camera.projection=pc.PROJECTION_PERSPECTIVE;
+      r.components.camera={...r.components.camera,...cameraData};
+    }
+  }
+  _mixAnimationComponents(a={},b={},f=0){
+    const result={};
+    for(const type of ['light','camera']){
+      const from=a?.[type],to=b?.[type];
+      if(!from&&!to)continue;
+      if(!from||!to){result[type]=from||to;continue}
+      const mixed={};
+      for(const key of new Set([...Object.keys(from),...Object.keys(to)])){
+        const x=from[key],y=to[key];
+        if(Array.isArray(x)&&Array.isArray(y)&&x.length===y.length)mixed[key]=x.map((v,i)=>(Number(v)||0)+((Number(y[i])||0)-(Number(v)||0))*f);
+        else if(typeof x==='number'&&typeof y==='number')mixed[key]=x+(y-x)*f;
+        else mixed[key]=f<.5?x:y;
+      }
+      result[type]=mixed;
+    }
+    return result;
+  }
   key({interpolation=this.keyInterpolation||'linear'}={}) {
     const r=this.selected();if(!r)return null;
     const p=r.entity.getLocalPosition(),q=r.entity.getLocalEulerAngles(),sc=r.entity.getLocalScale();
     const a=this.keyframes.get(r.id)||[],time=Math.max(0,Number(this.timelineTime)||0);
     const mode=['linear','ease','constant'].includes(interpolation)?interpolation:'linear';
     const existing=a.find(k=>Math.abs(k.time-time)<1e-5);
-    const key={time,p:[p.x,p.y,p.z],r:[q.x,q.y,q.z],s:[sc.x,sc.y,sc.z],interpolation:mode};
+    const key={time,p:[p.x,p.y,p.z],r:[q.x,q.y,q.z],s:[sc.x,sc.y,sc.z],
+      components:this._componentAnimationState(r),interpolation:mode};
     if(existing)Object.assign(existing,key);else a.push(key);
     a.sort((x,y)=>x.time-y.time);this.keyframes.set(r.id,a);
     return{key:existing||key,updated:!!existing,count:a.length};
@@ -197,11 +250,13 @@ export class ForgeEngine{
           const mode=A.interpolation||'linear';
           if(mode==='constant')f=0;else if(mode==='ease')f=f*f*(3-2*f);
           const mix=(from,to)=>from.map((v,j)=>v+(to[j]-v)*f);
-          value={p:mix(A.p,B.p),r:mix(A.r,B.r),s:mix(A.s,B.s)};
+          value={p:mix(A.p,B.p),r:mix(A.r,B.r),s:mix(A.s,B.s),
+            components:this._mixAnimationComponents(A.components,B.components,f)};
           break;
         }
       }
       r.entity.setLocalPosition(...value.p);r.entity.setLocalEulerAngles(...value.r);r.entity.setLocalScale(...value.s);
+      this._applyAnimatedComponents(r,value.components);
     }
   }
 
