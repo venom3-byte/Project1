@@ -10,13 +10,14 @@
     "authoredVehicleForward": "+Y",
     "exportFormat": "GLB/glTF converts coordinates for consumers"
   },
-  "integrationStatus": "blender-prototypes-not-yet-packaged-as-individual-runtime-models",
+  "integrationStatus": "full-scene-glb-available-root-preview-supported-individual-unit-packaging-and-gameplay-binding-pending",
   "balanceNote": "All balance numbers are abstract RTS game values, not real-world performance specifications.",
   "bundle": {
     "fullSceneGLBBytes": 11131472,
     "individualGLBAssets": "pending",
     "runtimeImport": "pending",
-    "fullSceneRevision": 8
+    "fullSceneRevision": 8,
+    "fullSceneGLBPath": "public/warfront/assets/combined-arms-r8.glb"
   },
   "summary": {
     "vehicleAndAircraftRoots": 28,
