@@ -1,0 +1,39 @@
+name: Import Blender combined-arms GLB
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/warfront-import-blender-assets.yml"
+      - "public/warfront/assets/glb-import-source.json"
+permissions:
+  contents: write
+jobs:
+  import-glb:
+    if: hashFiles('public/warfront/assets/glb-import-source.json') != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Download the current Blender scene export
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_URL="$(node -e "process.stdout.write(require('./public/warfront/assets/glb-import-source.json').url)")"
+          mkdir -p public/warfront/assets
+          curl --fail --location --retry 2 --connect-timeout 15 --max-time 180 "$SOURCE_URL" --output public/warfront/assets/combined-arms-r8.glb
+          BYTES="$(stat -c '%s' public/warfront/assets/combined-arms-r8.glb)"
+          echo "Downloaded Blender GLB bytes: $BYTES"
+          test "$BYTES" -ge 8000000
+      - name: Commit the generated asset to the repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f public/warfront/assets/glb-import-source.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/warfront/assets/combined-arms-r8.glb public/warfront/assets/glb-import-source.json
+          git commit -m "assets: add Blender combined-arms scene GLB r8"
+          git push origin HEAD:main
