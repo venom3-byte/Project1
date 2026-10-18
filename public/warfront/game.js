@@ -481,6 +481,7 @@ function applyBattlefieldMap(mapId,initial=false){
   ground.scale.set(config.width/220,1,config.depth/190);ground.material.color.setHex(config.groundTint);scene.background.setHex(config.background);scene.fog.color.setHex(config.fog);scene.fog.density=config.fogDensity;
   sun.shadow.camera.left=-config.width*.46;sun.shadow.camera.right=config.width*.46;sun.shadow.camera.top=config.depth*.44;sun.shadow.camera.bottom=-config.depth*.44;sun.shadow.camera.updateProjectionMatrix();buildMapFeatures(config);
   targets.forEach((target,i)=>{const p=config.targetPositions[i]||config.targetPositions[0];target.group.position.set(p[0],0,p[1]);});tanks.forEach((unit,i)=>{const p=config.tankStarts[i]||config.tankStarts[0];unit.group.position.set(p[0],0,p[1]);});
+  soldiers.forEach((unit,i)=>{const p=config.soldierStarts[i]||config.soldierStarts[0];unit.group.position.set(p[0],0,p[1]);unit.team=p[2]||unit.team;unit.name=unit.role+' · '+unit.team.toUpperCase();});
   cameraTarget.set(0,0,0);camera.position.set(0,config.depth*.42,config.depth*.47);camera.lookAt(cameraTarget);const selector=$('mapSelector');if(selector&&selector.value!==state.mapId)selector.value=state.mapId;resetMission();addLog('Theatre loaded: '+config.label+'. Operational area expanded.','normal');if(!initial)toast(config.label+' · scenario ready');
 }
 
@@ -1243,7 +1244,7 @@ function updateEffects(dt) {
       const t=Math.min(1,e.t/duration);
       e.group.scale.setScalar(1+t*(e.explosion?2.9:1.5));
       e.group.children.forEach((child) => { if (child.material && child.material.transparent) child.material.opacity = Math.max(0, 0.9 - t * 0.9); });
-      if (e.t > 1.3) { scene.remove(e.group); e.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); effects.splice(i, 1); }
+      if (e.t > (e.duration || 1.3)) { scene.remove(e.group); e.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); effects.splice(i, 1); }
     }
   }
 }
@@ -1285,7 +1286,8 @@ function drawMinimap() {
     ctx.fillStyle = u.team === 'blue' ? '#b5d99f' : '#dc7265';
     ctx.fillRect(px(u.group.position.x) - 2.5, py(u.group.position.z) - 2.5, 5, 5);
   });
-  aircraft.forEach((p) => {
+  soldiers.filter((u)=>u.alive).forEach((u)=>{ctx.fillStyle=u.team==='blue'?'#c5e1a0':'#ed907d';ctx.fillRect(px(u.group.position.x)-1.2,py(u.group.position.z)-1.2,2.4,2.4);});
+  aircraft.filter((p)=>p.state!=='crashed').forEach((p) => {
     ctx.fillStyle = '#9bd5ef'; ctx.beginPath(); ctx.arc(px(p.group.position.x), py(p.group.position.z), 3.5, 0, Math.PI * 2); ctx.fill();
   });
   ctx.strokeStyle = 'rgba(200,226,155,.15)'; ctx.strokeRect(1, 1, w - 2, h - 2);
@@ -1307,17 +1309,27 @@ function resetMission() {
     unit.moveTarget = null; unit.attackTarget = null;
     const seed=MAPS[state.mapId].tankStarts[tanks.indexOf(unit)]||MAPS[state.mapId].tankStarts[0];
     unit.group.position.set(seed[0],0,seed[1]);unit.group.rotation.set(0,0,0);
+    if(unit.wreckSmoke){unit.group.remove(unit.wreckSmoke);unit.wreckSmoke.geometry.dispose();unit.wreckSmoke.material.dispose();unit.wreckSmoke=null;}
+    unit.visual.traverse((node)=>{if(node.isMesh&&node.userData.initialMaterial)node.material=node.userData.initialMaterial;});
     if (unit.visualData && unit.visualData.tracks) {
       unit.visualData.tracks.forEach((track) => { track.phase = 0; positionTrackSegments(track); });
     }
   }
-  for (const plane of aircraft) {
-    plane.hp = 100; plane.state = 'ready'; plane.status = 'READY AT BASE'; plane.target = null;
-    plane.route = []; plane.routeIndex = 0; plane.attackDone = false; plane.hasLanded = false; plane.rearmTimer = 0;
-    plane.group.position.set(plane.initial.x, 0.16, plane.initial.z); plane.group.rotation.set(0, Math.PI, 0);
+  for(const soldier of soldiers){
+    const seed=MAPS[state.mapId].soldierStarts[soldiers.indexOf(soldier)]||MAPS[state.mapId].soldierStarts[0];
+    soldier.hp=soldier.maxHp;soldier.alive=true;soldier.status='ADVANCING';soldier.moveTarget=null;soldier.attackTarget=null;soldier.fallProgress=0;soldier.group.position.set(seed[0],0,seed[1]);soldier.group.rotation.set(0,0,0);soldier.team=seed[2]||soldier.team;soldier.name=soldier.role+' · '+soldier.team.toUpperCase();
+    soldier.group.traverse((node)=>{if(node.isMesh&&node.userData.initialMaterial)node.material=node.userData.initialMaterial;});if(soldier.ring)soldier.ring.visible=false;
   }
-  bombs.splice(0).forEach((b) => scene.remove(b.mesh));
-  effects.splice(0).forEach((e) => scene.remove(e.group));
+  for(const plane of aircraft){
+    plane.hp=100;plane.alive=true;plane.state='ready';plane.status='READY AT BASE';plane.target=null;plane.route=[];plane.routeIndex=0;plane.attackDone=false;plane.hasLanded=false;plane.rearmTimer=0;plane.aaTimer=2.6;plane.crashVelocity=null;plane.group.visible=true;
+    if(plane.crashSmoke){plane.group.remove(plane.crashSmoke);plane.crashSmoke.geometry.dispose();plane.crashSmoke.material.dispose();plane.crashSmoke=null;}
+    plane.group.position.set(plane.initial.x,0.16,plane.initial.z);plane.group.rotation.set(0,Math.PI,0);
+    plane.visual.traverse((node)=>{if(node.isMesh&&node.userData.initialMaterial)node.material=node.userData.initialMaterial;});
+  }
+  bombs.splice(0).forEach((b)=>{scene.remove(b.mesh);if(b.mesh.geometry)b.mesh.geometry.dispose();if(b.mesh.material)b.mesh.material.dispose();});
+  projectiles.splice(0).forEach((p)=>{scene.remove(p.mesh);if(p.mesh.geometry)p.mesh.geometry.dispose();if(p.mesh.material)p.mesh.material.dispose();});
+  debris.splice(0).forEach((d)=>{scene.remove(d.mesh);if(d.mesh.geometry)d.mesh.geometry.dispose();if(d.mesh.material)d.mesh.material.dispose();});
+  effects.splice(0).forEach((e)=>{scene.remove(e.group);e.group.traverse((n)=>{if(n.geometry)n.geometry.dispose();if(n.material)n.material.dispose();});});
   selectEntity(null); setCommand('select'); updateObjectives(); updateHUD();
 }
 function panCamera(dx, dy) {
