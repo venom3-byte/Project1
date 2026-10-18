@@ -390,6 +390,31 @@ createTank(-24, 0.6, 'blue', 'MOBILE GUN PLATFORM');
 createTank(16, -17, 'red', 'HOSTILE ARMOUR');
 createTank(23, -22, 'red', 'HOSTILE ARMOUR');
 
+function createInfantry(x,z,team,role,index){
+  const root=new THREE.Group();root.name='INFANTRY_'+team.toUpperCase()+'_'+index;root.position.set(x,0,z);
+  const uniform=material(team==='blue'?0x53694e:0x855244,.92,.01),helmetMat=material(team==='blue'?0x394938:0x574338,.82,.02),skin=material(0x9c795d,.88,0);
+  const body=new THREE.Mesh(new THREE.CapsuleGeometry(.19,.48,3,7),uniform);body.position.y=.88;body.castShadow=true;root.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.16,10,8),skin);head.position.set(0,1.31,.02);head.castShadow=true;root.add(head);
+  const helmet=new THREE.Mesh(new THREE.SphereGeometry(.19,10,7),helmetMat);helmet.scale.set(1.05,.65,1.05);helmet.position.set(0,1.4,.02);root.add(helmet);
+  const arms=[],legs=[];
+  for(const side of [-1,1]){
+    const arm=new THREE.Group();arm.position.set(side*.22,1.02,.02);root.add(arm);
+    const upper=new THREE.Mesh(new THREE.CapsuleGeometry(.075,.31,3,6),uniform);upper.rotation.z=side*-.28;upper.position.y=-.14;upper.castShadow=true;arm.add(upper);arms.push(arm);
+    const leg=new THREE.Group();leg.position.set(side*.105,.55,0);root.add(leg);
+    const lower=new THREE.Mesh(new THREE.CapsuleGeometry(.085,.32,3,6),uniform);lower.position.y=-.12;lower.castShadow=true;leg.add(lower);legs.push(leg);
+  }
+  const rifle=new THREE.Mesh(new THREE.BoxGeometry(.12,.12,.72),material(0x252b29,.54,.38));rifle.position.set(.13,1.02,.45);rifle.rotation.x=-.12;root.add(rifle);
+  root.traverse((node)=>{if(node.isMesh)node.userData.initialMaterial=node.material;});scene.add(root);
+  const soldier={id:'infantry-'+index,type:'infantry',name:role+' · '+team.toUpperCase(),team,role,group:root,hp:32,maxHp:32,status:'ADVANCING',alive:true,selected:false,moveTarget:null,attackTarget:null,fireTimer:1.2+(index%4)*.6,fallProgress:0,fallDirection:team==='blue'?-1:1,ring:addSelectionRing(root,team==='blue'?TEAM.blue:TEAM.red),arms,legs};
+  tagInteractive(root,'rtsUnit',soldier);soldiers.push(soldier);units.push(soldier);interactables.push(root);return soldier;
+}
+[
+  [-21,15,'blue','RIFLE SQUAD'],[-17,16,'blue','RIFLE SQUAD'],[-13,18,'blue','SQUAD LEADER'],
+  [-30,8,'blue','MACHINE GUNNER'],[-27,12,'blue','COMBAT MEDIC'],[-20,3,'blue','ANTI-ARMOUR'],
+  [14,-12,'red','RIFLE SQUAD'],[18,-13,'red','RIFLE SQUAD'],[24,-19,'red','SQUAD LEADER'],
+  [28,-24,'red','MACHINE GUNNER'],[10,-22,'red','ANTI-ARMOUR'],[19,-28,'red','COMBAT MEDIC']
+].forEach(([x,z,team,role],i)=>createInfantry(x,z,team,role,i+1));
+
 function createBuildingTarget(name, x, z, kind) {
   const root = new THREE.Group();
   root.position.set(x, 0, z);
@@ -653,6 +678,7 @@ function replaceTankVisual(unit, gltf) {
 function replacePlaneVisual(plane, gltf) {
   if (plane.visual) plane.group.remove(plane.visual);
   const clone = normaliseModel(cloneGLTFScene(gltf), 11.5);
+  clone.traverse((node)=>{if(node.isMesh)node.userData.initialMaterial=node.material;});
   plane.visual = clone;
   // Pack models are exported with their nose along local +Z; the aircraft root owns heading.
   clone.rotation.y = 0;
@@ -727,12 +753,13 @@ function createPlane(x, z, index) {
   const visual = makeJetVisual();
   visual.scale.setScalar(0.92);
   group.add(visual);
+  visual.traverse((node)=>{if(node.isMesh)node.userData.initialMaterial=node.material;});
   const plane = {
     id: 'aircraft-' + index, type: 'aircraft', name: 'STRIKE FLIGHT ' + String(index).padStart(2, '0'),
     team: 'blue', group, visual, ring: addSelectionRing(group, TEAM.blue),
     hp: 100, maxHp: 100, status: 'READY AT BASE', state: 'ready', target: null,
     route: [], routeIndex: 0, speed: 11.5, flightHeight: 0, attackDone: false, hasLanded: true,
-    selected: false, alive: true, rearmTimer: 0, mixer: null, actions: {}, initial: { x, z },
+    selected: false, alive: true, rearmTimer: 0, aaTimer: 2.6, crashVelocity: null, crashSmoke: null, mixer: null, actions: {}, initial: { x, z },
     gear: visual.userData.fallbackGear || null, fallback: true
   };
   tagInteractive(group, 'rtsUnit', plane);
@@ -838,7 +865,7 @@ function pointerCommand(hit) {
       if (state.command === 'airstrike') {
         launchAirstrike(entity);
       } else if (state.command === 'attack') {
-        const attackers = state.selected && state.selected.type === 'tank' ? [state.selected] : tanks.filter((t) => t.team === 'blue' && t.alive);
+        const attackers = state.selected && ['tank','infantry'].includes(state.selected.type) ? [state.selected] : tanks.filter((t) => t.team === 'blue' && t.alive);
         attackers.forEach((u) => { u.attackTarget = entity; u.moveTarget = null; u.status = 'ENGAGING ' + entity.kind.toUpperCase(); });
         addLog('Ground group assigned to attack ' + entity.name + '.', 'normal');
       } else {
@@ -852,7 +879,7 @@ function pointerCommand(hit) {
       return;
     }
     if (state.command === 'attack' && entity.type === 'tank') {
-      const attackers = state.selected && state.selected.team === 'blue' ? [state.selected] : tanks.filter((t) => t.team === 'blue' && t.alive);
+      const attackers = state.selected && state.selected.team === 'blue' && ['tank','infantry'].includes(state.selected.type) ? [state.selected] : tanks.filter((t) => t.team === 'blue' && t.alive);
       attackers.forEach((u) => { u.attackTarget = entity; u.status = 'ENGAGING HOSTILE ARMOUR'; });
       addLog('Hostile armour engaged.', 'alert');
       return;
@@ -860,7 +887,7 @@ function pointerCommand(hit) {
   }
   if (!hit.point) return;
   if (state.command === 'move') {
-    const movers = state.selected && state.selected.team === 'blue' && state.selected.type === 'tank' ? [state.selected] : tanks.filter((t) => t.team === 'blue' && t.alive);
+    const movers = state.selected && state.selected.team === 'blue' && ['tank','infantry'].includes(state.selected.type) ? [state.selected] : tanks.filter((t) => t.team === 'blue' && t.alive);
     movers.forEach((u, i) => {
       u.moveTarget = new THREE.Vector3(hit.point.x + (i - (movers.length - 1) / 2) * 2.7, 0, hit.point.z + (i % 2) * 2.4);
       u.attackTarget = null; u.status = 'MOVING TO WAYPOINT';
