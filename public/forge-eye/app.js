@@ -168,11 +168,16 @@ function activateCamera(record){
 }
 function applyCameraSettings(){
   const record=selectedRecord(),camera=record?.entity?.camera;if(!record||record.kind!=="camera"||!camera)return;
-  const fov=clamp($("#cameraFov").value,20,110,60),projection=$("#cameraProjection").value,active=$("#cameraActive").checked;
+  const wasActive=record.components.camera?.active===true,fov=clamp($("#cameraFov").value,20,110,60),projection=$("#cameraProjection").value,wantsActive=$("#cameraActive").checked;
   camera.fov=fov;camera.projection=projection==="orthographic"?window.ForgePC.PROJECTION_ORTHOGRAPHIC:window.ForgePC.PROJECTION_PERSPECTIVE;
   if(projection==="orthographic")camera.orthoHeight=Math.max(.5,camera.orthoHeight||5);
-  record.components.camera={...record.components.camera,fov,projection,active};
-  if(active)activateCamera(record);
+  if(wantsActive)activateCamera(record);
+  else if(wasActive){
+    $("#cameraActive").checked=true;
+    record.components.camera={...record.components.camera,fov,projection,active:true};
+    camera.enabled=true;
+    notice("Active camera","At least one editor camera must remain active. Activate another camera before switching this one off.");
+  }else record.components.camera={...record.components.camera,fov,projection,active:false};
   $("#cameraFovValue").textContent=fov.toFixed(0)+"°";
   window.ForgeViewport?.syncCamera?.();status("Camera component updated","dirty");refreshInspector();
 }
