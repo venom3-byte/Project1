@@ -44,9 +44,13 @@ jobs:
           const roots = [...roster.vehicles.map((u) => u.root), ...roster.infantry.instances.map((u) => u.sourceRoot)];
           if (new Set(roots).size !== roots.length) throw new Error('Duplicate asset root identifiers');
           if (roster.integrationStatus !== 'blender-prototypes-not-yet-packaged-as-individual-runtime-models') throw new Error('Roster integration status must stay explicit');
+          if (roster.vehicles.some((u) => u.status !== 'blender_prototype' || !u.root)) throw new Error('Every vehicle must have an explicit prototype status and Blender root');
+          if (roster.infantry.instances.some((u) => u.status !== 'blender_prototype' || !u.sourceRoot)) throw new Error('Every infantry instance must have an explicit prototype status and Blender root');
           const requiredHtml = [
             '<div id="stage"',
             '<canvas id="minimap"',
+            'id="catalogToggle"',
+            'id="catalogOverlay"',
             'src="./game.js"',
             'three/addons/'
           ];
@@ -56,6 +60,9 @@ jobs:
             'function updatePlane(',
             'function updateTanks(',
             'function resetMission(',
+            'async function loadRosterManifest(',
+            'function populateRosterCatalog(',
+            'setupCatalogDialog();',
             'AnimationMixer',
             'GLTFLoader'
           ];
