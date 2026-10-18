@@ -11,6 +11,11 @@ function status(message,kind="ready"){
   const el=$("#saveState");if(el){el.classList.toggle("is-dirty",kind==="dirty");el.classList.toggle("is-error",kind==="error");const text=el.querySelector("span:last-child");if(text)text.textContent=message;el.title=message}
   const e=$("#engineStatus");if(e){e.textContent=message;e.classList.toggle("diagnostic-error",kind==="error");e.classList.toggle("diagnostic-warn",kind==="warn")}
 }
+function setRustStatus(message,ready){
+  const label=$("#rustCoreStatus"),led=$("#rustCoreLed");
+  if(label)label.textContent=message;
+  if(led)led.dataset.ready=String(ready===true);
+}
 function reportError(label,error){
   const message=error?.message||String(error);console.error("[Forge Next] "+label+": "+message,error);state.lastError=message;status(label+": "+message,"error");
   if($("#noticeTitle")&&$("#noticeBody")&&$("#noticeDialog")){ $("#noticeTitle").textContent=label;$("#noticeBody").textContent=message;if(!$("#noticeDialog").open)$("#noticeDialog").showModal() }
