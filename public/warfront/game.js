@@ -1281,6 +1281,78 @@ async function loadRosterManifest() {
   return roster;
 }
 
+function catalogStatText(balance) {
+  if (!balance) return 'Gameplay balance: pending';
+  return 'HP ' + balance.hp + ' · Mobility ' + balance.speed + ' · Range ' + balance.range + ' · Cost ' + balance.cost;
+}
+function addCatalogItem(container, title, role, root, balance, status) {
+  const card = document.createElement('article');
+  card.className = 'catalog-item';
+  const heading = document.createElement('strong'); heading.textContent = title;
+  const roleNode = document.createElement('div'); roleNode.className = 'catalog-role'; roleNode.textContent = String(role || 'Unassigned role').replaceAll('_', ' ');
+  const rootNode = document.createElement('div'); rootNode.className = 'catalog-root'; rootNode.textContent = root || 'No Blender root';
+  const stats = document.createElement('div'); stats.className = 'catalog-stats'; stats.textContent = catalogStatText(balance);
+  const flag = document.createElement('div'); flag.className = 'catalog-status'; flag.textContent = String(status || 'blender_prototype').replaceAll('_', ' ').toUpperCase();
+  card.append(heading, roleNode, rootNode, stats, flag);
+  container.appendChild(card);
+}
+function populateRosterCatalog(roster) {
+  const vehicles = Array.isArray(roster.vehicles) ? roster.vehicles : [];
+  const ground = vehicles.filter((u) => u.category !== 'fixed_wing_aircraft');
+  const air = vehicles.filter((u) => u.category === 'fixed_wing_aircraft');
+  const infantry = roster.infantry && Array.isArray(roster.infantry.archetypes) ? roster.infantry.archetypes : [];
+  $('catalogGroundCount').textContent = ground.length + ' CLASSES';
+  $('catalogAirCount').textContent = air.length + ' ASSET';
+  $('catalogInfantryCount').textContent = infantry.length + ' ROLES · ' + ((roster.infantry.instances || []).length) + ' INSTANCES';
+  $('catalogMeta').textContent = ground.length + ' LAND · ' + infantry.length + ' ROLES';
+  $('catalogGroundList').replaceChildren();
+  $('catalogAirList').replaceChildren();
+  $('catalogInfantryList').replaceChildren();
+  for (const u of ground) addCatalogItem($('catalogGroundList'), u.name, u.role, u.root, u.balance, u.status);
+  for (const u of air) addCatalogItem($('catalogAirList'), u.name, u.role, u.root, u.balance, u.status);
+  for (const role of infantry) addCatalogItem($('catalogInfantryList'), role.name, role.role, role.id, role.balance, 'blender_prototype');
+}
+async function loadRosterManifest() {
+  const response = await fetch('./roster.json', { cache: 'no-store' });
+  if (!response.ok) throw new Error('Roster manifest status ' + response.status);
+  const roster = await response.json();
+  if (!Array.isArray(roster.vehicles) || !roster.infantry || !Array.isArray(roster.infantry.archetypes)) {
+    throw new Error('Roster manifest has an invalid schema');
+  }
+  state.rosterManifest = roster;
+  populateRosterCatalog(roster);
+  const groundVehicles = roster.vehicles.filter((unit) => unit.category !== 'fixed_wing_aircraft').length;
+  const airAssets = roster.vehicles.filter((unit) => unit.category === 'fixed_wing_aircraft').length;
+  const roles = roster.infantry.archetypes.length;
+  const instances = roster.infantry.instances ? roster.infantry.instances.length : 0;
+  addLog(
+    'Blender asset catalog indexed: ' + groundVehicles + ' ground vehicle classes, ' +
+    airAssets + ' aircraft asset, ' + roles + ' infantry roles (' + instances +
+    ' scene prototypes). Individual GLB unit imports remain pending.',
+    'normal'
+  );
+  return roster;
+}
+function setupCatalogDialog() {
+  const overlay = $('catalogOverlay');
+  $('catalogToggle').addEventListener('click', () => {
+    overlay.classList.add('open');
+    overlay.setAttribute('aria-hidden', 'false');
+    $('catalogClose').focus();
+  });
+  const close = () => {
+    overlay.classList.remove('open');
+    overlay.setAttribute('aria-hidden', 'true');
+    $('catalogToggle').focus();
+  };
+  $('catalogClose').addEventListener('click', close);
+  overlay.addEventListener('click', (event) => { if (event.target === overlay) close(); });
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && overlay.classList.contains('open')) close();
+  });
+}
+setupCatalogDialog();
+
 function initialiseAssets() {
   setLoadProgress(78, 'Starting simulation; optional GLB assets load in the background…');
   // Never block the first playable frame on external CDN/CORS availability.
