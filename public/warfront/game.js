@@ -1134,7 +1134,9 @@ function updatePlane(plane,dt){
   const next = waypoint.p;
   const horizontal = Math.hypot(next.x - pos.x, next.z - pos.z);
   const dist = pos.distanceTo(next);
-  const speed = waypoint.state === 'TAXI-OUT' || waypoint.state === 'TAXI-IN' || waypoint.state === 'LINE-UP' ? 5.2 : (waypoint.state === 'LANDING' ? 8.3 : plane.speed);
+  const speed = plane.flightClass==='rotary-wing'
+    ? (/LANDING|APPROACH/.test(waypoint.state)?4.8:(/HOVER/.test(waypoint.state)?3.8:plane.speed))
+    : (waypoint.state === 'TAXI-OUT' || waypoint.state === 'TAXI-IN' || waypoint.state === 'LINE-UP' ? 5.2 : (waypoint.state === 'LANDING' ? 8.3 : plane.speed));
   const step = Math.max(0.001, speed * dt);
   if (dist <= Math.max(0.55, step)) {
     pos.copy(next);
@@ -1162,16 +1164,47 @@ function updatePlane(plane,dt){
   }
   const dir = next.clone().sub(pos);
   const desiredHeading = Math.atan2(dir.x, dir.z);
-  const desiredPitch = -Math.atan2(dir.y, Math.max(0.01, Math.hypot(dir.x, dir.z)));
-  const currentYaw = plane.group.rotation.y;
-  let diff = ((desiredHeading - currentYaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
-  plane.group.rotation.y += diff * Math.min(1, dt * 2.6);
-  plane.group.rotation.x += (THREE.MathUtils.clamp(desiredPitch, -0.28, 0.25) - plane.group.rotation.x) * Math.min(1, dt * 2);
-  const bank = THREE.MathUtils.clamp(-diff * 1.6, -0.55, 0.55);
-  plane.group.rotation.z += (bank - plane.group.rotation.z) * Math.min(1, dt * 1.7);
+  const pathPitch=-Math.atan2(dir.y,Math.max(.01,Math.hypot(dir.x,dir.z)));
+  const currentYaw=plane.group.rotation.y;
+  let diff=((desiredHeading-currentYaw+Math.PI*3)%(Math.PI*2))-Math.PI;
+  plane.group.rotation.y+=diff*Math.min(1,dt*(plane.flightClass==='rotary-wing'?1.9:2.6));
+  if(plane.flightClass==='rotary-wing'){
+    const rotorPitch=THREE.MathUtils.clamp(pathPitch*.18,-.09,.09);
+    plane.group.rotation.x+=(rotorPitch-plane.group.rotation.x)*Math.min(1,dt*2.5);
+    const rotorBank=THREE.MathUtils.clamp(-diff*.28,-.18,.18);
+    plane.group.rotation.z+=(rotorBank-plane.group.rotation.z)*Math.min(1,dt*2.2);
+  }else{
+    plane.group.rotation.x+=(THREE.MathUtils.clamp(pathPitch,-.28,.25)-plane.group.rotation.x)*Math.min(1,dt*2);
+    const bank=THREE.MathUtils.clamp(-diff*1.6,-.55,.55);
+    plane.group.rotation.z+=(bank-plane.group.rotation.z)*Math.min(1,dt*1.7);
+  }
   plane.status = waypoint.state;
   if (plane.state === 'taxi' && plane.routeIndex >= 2) plane.state = 'airborne';
   if (plane.routeIndex >= 6 && plane.state !== 'return' && plane.route[5] && plane.route[5].state === 'ATTACK RUN') plane.state = 'return';
+}
+function updateAircraftRigMotion(plane,dt){
+  const visual=plane&&plane.visual;if(!visual||plane.flightClass==='rotary-wing')return;
+  const heavy=String(plane.modelRootName||plane.airUnitKey||'').includes('HEAVY_STRIKE');
+  const prefix=heavy?'HSTRIKE':'F16';
+  const get=(name)=>visual.getObjectByName(name);
+  const airborne=plane.state==='airborne'||plane.state==='return'||plane.status==='CLIMB'||plane.status==='INGRESS'||plane.status==='ATTACK RUN'||plane.status==='EGRESS';
+  const gearOut=!airborne||/TAXI|LINE-UP|APPROACH|LANDING|REARM|READY|SERVICE/.test(String(plane.status||''));
+  for(const [side,label] of [[-1,'L'],[1,'R']]){
+    const flap=get(prefix+'_FLAPERON_'+label+'_PIVOT');
+    if(flap){const target=airborne?(side===-1?-plane.group.rotation.z*.34:plane.group.rotation.z*.34):0;flap.rotation.x+=(target-flap.rotation.x)*Math.min(1,dt*4);}
+    const elevator=get(prefix+'_ELEVATOR_'+label+'_PIVOT');
+    if(elevator){const target=airborne?plane.group.rotation.x*.55:0;elevator.rotation.x+=(target-elevator.rotation.x)*Math.min(1,dt*3.5);}
+    const gear=get(prefix+'_MAIN_GEAR_'+label+'_PIVOT');
+    if(gear){const target=gearOut?0:1.0472;gear.rotation.x+=(target-gear.rotation.x)*Math.min(1,dt*3.6);}
+  }
+  const nose=get(prefix+'_NOSE_GEAR_PIVOT');
+  if(nose){const target=gearOut?0:-1.012;nose.rotation.x+=(target-nose.rotation.x)*Math.min(1,dt*3.6);}
+  const rudder=get(prefix+'_RUDDER_PIVOT');
+  if(rudder){const target=airborne?-plane.group.rotation.z*.16:0;rudder.rotation.z+=(target-rudder.rotation.z)*Math.min(1,dt*4);}
+  const thrust=['TAKEOFF','CLIMB','INGRESS'].includes(plane.status)?0.75:0.001;
+  for(const name of heavy?['HSTRIKE_AFTERBURNER_L','HSTRIKE_AFTERBURNER_R']:['F16_Afterburner_Flame']){
+    const flame=get(name);if(flame){flame.scale.set(THREE.MathUtils.damp(flame.scale.x,thrust,4,dt),THREE.MathUtils.damp(flame.scale.y,thrust,4,dt),THREE.MathUtils.damp(flame.scale.z,thrust,4,dt));}
+  }
 }
 function launchShell(unit,target){
   if(!unit||!target||!target.alive)return;
@@ -1921,7 +1954,7 @@ function animate() {
     if (state.activeAssetPreview && state.activeAssetPreview.mixer) state.activeAssetPreview.mixer.update(dt);
     updateTanks(dt);
     updateInfantry(dt);
-    aircraft.forEach((p) => { updatePlane(p, dt); updateAircraftDamage(p, dt); });
+    aircraft.forEach((p) => { updatePlane(p, dt); updateAircraftDamage(p, dt); updateAircraftRigMotion(p,dt); });
     updateBombs(dt);
     updateProjectiles(dt);
     updateDebris(dt);
