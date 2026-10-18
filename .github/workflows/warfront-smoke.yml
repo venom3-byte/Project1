@@ -1,0 +1,65 @@
+name: Warfront RTS smoke checks
+
+on:
+  push:
+    paths:
+      - "public/warfront/**"
+      - ".github/workflows/warfront-smoke.yml"
+  pull_request:
+    paths:
+      - "public/warfront/**"
+      - ".github/workflows/warfront-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-smoke:
+    name: Static contract and JavaScript syntax
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate ES module syntax
+        run: node --check public/warfront/game.js
+      - name: Verify the standalone page contract
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, statSync } from 'node:fs';
+          const htmlPath = 'public/warfront/index.html';
+          const jsPath = 'public/warfront/game.js';
+          const html = readFileSync(htmlPath, 'utf8');
+          const js = readFileSync(jsPath, 'utf8');
+          const requiredHtml = [
+            '<div id="stage"',
+            '<canvas id="minimap"',
+            'src="./game.js"',
+            'three/addons/'
+          ];
+          const requiredGame = [
+            'function launchAirstrike(',
+            'function returnAircraft(',
+            'function updatePlane(',
+            'function updateTanks(',
+            'function resetMission(',
+            'AnimationMixer',
+            'GLTFLoader'
+          ];
+          for (const item of requiredHtml) {
+            if (!html.includes(item)) throw new Error('Missing HTML contract: ' + item);
+          }
+          for (const item of requiredGame) {
+            if (!js.includes(item)) throw new Error('Missing gameplay contract: ' + item);
+          }
+          for (const path of [htmlPath, jsPath]) {
+            if (statSync(path).size < 5000) throw new Error('Unexpectedly small file: ' + path);
+          }
+          console.log('Warfront standalone shell and M0 feature contracts are present.');
+          NODE
+      - name: Check whitespace errors
+        run: git diff --check
