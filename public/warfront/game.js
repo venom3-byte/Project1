@@ -1400,13 +1400,16 @@ async function previewBlenderAsset(rootName, displayName, role) {
   if (!Number.isFinite(size.x + size.y + size.z) || Math.max(size.x, size.y, size.z) < 0.001) {
     throw new Error('Named Blender root has no visible mesh geometry: ' + rootName);
   }
-  model.position.x -= center.x;
-  model.position.z -= center.z;
-  model.position.y -= initialBox.min.y;
+  // The source scene contains both centred hero collections and world-positioned unit roots.
+  // Compute the mesh bounds in the root's local space, then apply scale and offset in the correct order.
+  const originalPosition = model.position.clone();
+  const localCenter = center.clone().sub(originalPosition);
+  const localMinY = initialBox.min.y - originalPosition.y;
   const isInfantry = rootName.startsWith('INF_');
   const targetExtent = isInfantry ? 2.25 : (rootName.includes('JET') ? 12 : 8.5);
   const factor = targetExtent / Math.max(size.x, size.y, size.z);
   model.scale.setScalar(factor);
+  model.position.set(-localCenter.x * factor, -localMinY * factor, -localCenter.z * factor);
   model.updateMatrixWorld(true);
 
   const slotIndex = state.assetPreviewCounter++ % 6;
