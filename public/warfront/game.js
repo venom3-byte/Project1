@@ -1577,7 +1577,120 @@ async function loadBlenderAssetBundle() {
     state.blenderBundlePromise = null;
   }
 }
-
+function normaliseNamedRoot(source,targetExtent=5.8,rotateToGameForward=true){
+  const model=SkeletonUtils.clone(source);model.updateMatrixWorld(true);
+  const box=new THREE.Box3().setFromObject(model),size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3());
+  const extent=Math.max(size.x,size.y,size.z);
+  if(!Number.isFinite(extent)||extent<.001)throw new Error('Blender root has no measurable geometry: '+source.name);
+  const sourcePosition=model.position.clone(),localCenter=center.clone().sub(sourcePosition),localMinY=box.min.y-sourcePosition.y;
+  const factor=targetExtent/extent;
+  model.scale.setScalar(factor);
+  model.position.set(-localCenter.x*factor,-localMinY*factor,-localCenter.z*factor);
+  if(rotateToGameForward)model.rotation.y=Math.PI;
+  model.updateMatrixWorld(true);
+  model.traverse((node)=>{if(node.isMesh){
+    node.castShadow=true;node.receiveShadow=true;
+    if(node.material){
+      const tint=(m)=>{const cloned=m.clone();node.userData.initialMaterial=cloned;return cloned;};
+      node.material=Array.isArray(node.material)?node.material.map(tint):tint(node.material);
+    }
+  }});
+  return model;
+}
+function attachMatchingAnimations(model,unit,autoPattern=/rotor.*spin|tail.?rotor|main.?rotor/i){
+  const bundle=state.blenderBundle;
+  if(!bundle||!bundle.gltf.animations||!bundle.gltf.animations.length)return;
+  const names=new Set();model.traverse((node)=>{if(node.name)names.add(node.name);});
+  const clips=bundle.gltf.animations.filter((clip)=>clip.tracks.some((track)=>{
+    const trackName=track.name.split(/[.]/)[0].split(/[\\/]/).pop();return names.has(trackName);
+  }));
+  if(!clips.length)return;
+  const mixer=new THREE.AnimationMixer(model),actions={};
+  for(const clip of clips){
+    const action=mixer.clipAction(clip);actions[clip.name.toLowerCase()]=action;
+    if(autoPattern.test(clip.name.toLowerCase()))action.play();
+  }
+  unit.mixer=mixer;unit.actions=actions;
+  if(unit.type==='tank'||unit.type==='infantry')unit.animationMixer=mixer;
+}
+function applyTeamMaterialTint(model,team){
+  if(team!=='red')return;
+  model.traverse((node)=>{if(!node.isMesh||!node.material)return;
+    const tint=(m)=>{const cloned=m.clone();if(cloned.color)cloned.color.multiply(new THREE.Color(0x9d6e67));node.userData.initialMaterial=cloned;return cloned;};
+    node.material=Array.isArray(node.material)?node.material.map(tint):tint(node.material);
+  });
+}
+function replaceTankWithBlenderRoot(unit,rootName){
+  const source=state.blenderBundle&&state.blenderBundle.roots.get(rootName);if(!source)return false;
+  const old=unit.visual;
+  if(old){unit.group.remove(old);old.traverse((node)=>{if(node.geometry)node.geometry.dispose();});}
+  const model=normaliseNamedRoot(source,rootName==='UNIT_SPG01_ROOT'?6.2:rootName==='UNIT_APCT01_ROOT'?6.0:5.1,true);
+  model.name='RUNTIME_'+rootName;
+  applyTeamMaterialTint(model,unit.team);
+  const turret=model.getObjectByName('TURRET_PIVOT')||model.getObjectByName('MBT_TURRET_PIVOT')||model.getObjectByName('TANK_TURRET_PIVOT')||null;
+  unit.visual=model;unit.visualData={imported:true,turret,wheels:[],tracks:[]};unit.turret=turret;unit.group.add(model);
+  tagInteractive(model,'rtsUnit',unit);attachMatchingAnimations(model,unit,/driveloop|wheel.*spin|track.*loop|turret.*idle/i);
+  unit.status=unit.team==='blue'?'READY · BLENDER MODEL':'HOSTILE · BLENDER MODEL';return true;
+}
+function replaceInfantryWithBlenderRoot(soldier,rootName){
+  const source=state.blenderBundle&&state.blenderBundle.roots.get(rootName);if(!source)return false;
+  const model=normaliseNamedRoot(source,1.95,true);model.name='RUNTIME_'+rootName;
+  for(const child of [...soldier.group.children]){
+    if(child===soldier.ring)continue;
+    soldier.group.remove(child);
+    child.traverse((node)=>{if(node.geometry)node.geometry.dispose();});
+  }
+  soldier.group.add(model);soldier.visual=model;soldier.arms=[];soldier.legs=[];tagInteractive(model,'rtsUnit',soldier);
+  attachMatchingAnimations(model,soldier,/walk|run|idle|action/i);return true;
+}
+function replaceAircraftWithBlenderRoot(plane,rootName,displayName,targetExtent,flightClass='fixed-wing',isTransport=false){
+  const source=state.blenderBundle&&state.blenderBundle.roots.get(rootName);if(!source)return false;
+  const old=plane.visual;if(old){plane.group.remove(old);old.traverse((node)=>{if(node.geometry)node.geometry.dispose();});}
+  const model=normaliseNamedRoot(source,targetExtent,true);model.name='RUNTIME_'+rootName;
+  plane.visual=model;plane.group.add(model);plane.modelRootName=rootName;plane.name=displayName;plane.flightClass=flightClass;plane.isTransport=isTransport;
+  plane.airUnitKey=rootName;plane.group.rotation.order='YXZ';tagInteractive(model,'rtsUnit',plane);
+  attachMatchingAnimations(model,plane,flightClass==='rotary-wing'?/rotor.*spin|tail.?rotor|main.?rotor/i:/never-play-auto/);
+  plane.status='READY AT BASE';return true;
+}
+function bindBlenderRuntimeAssets(){
+  if(!state.blenderBundle)return false;
+  const tankRoots=['UNIT_MBT_MAIN_ROOT','UNIT_APCT01_ROOT','UNIT_SPG01_ROOT','UNIT_LT01_ROOT','UNIT_MBT_MAIN_ROOT'];
+  tanks.forEach((unit,i)=>replaceTankWithBlenderRoot(unit,tankRoots[i]||'UNIT_MBT_MAIN_ROOT'));
+  const fixed=[
+    {key:'f16c-block50',root:'UNIT_F16C_BLOCK50_ROOT',name:'F-16C BLOCK 50',extent:15.07},
+    {key:'heavy-strike',root:'UNIT_HEAVY_STRIKE_ROOT',name:'HEAVY STRIKE FIGHTER',extent:19.43}
+  ];
+  fixed.forEach((item,i)=>{
+    const plane=aircraft[i];if(!plane)return;
+    plane.airUnitKey=item.key;plane.flightClass='fixed-wing';plane.speed=15;
+    replaceAircraftWithBlenderRoot(plane,item.root,item.name,item.extent,'fixed-wing',false);
+  });
+  const rotorSpecs=[
+    {key:'attack-helicopter',root:'UNIT_ATTACK_HELICOPTER_ROOT',name:'ATTACK HELICOPTER',extent:12.5,transport:false},
+    {key:'transport-helicopter',root:'UNIT_TRANSPORT_HELICOPTER_ROOT',name:'TRANSPORT HELICOPTER',extent:13.5,transport:true}
+  ];
+  for(const item of rotorSpecs){
+    let plane=aircraft.find((p)=>p.airUnitKey===item.key);
+    if(!plane&&state.blenderBundle.roots.has(item.root)){
+      plane=createPlane(0,0,aircraft.length+1);plane.airUnitKey=item.key;plane.flightClass='rotary-wing';plane.isTransport=item.transport;
+      aircraft.push&&null;
+    }
+    if(plane){
+      plane.flightClass='rotary-wing';plane.speed=8;plane.airUnitKey=item.key;
+      replaceAircraftWithBlenderRoot(plane,item.root,item.name,item.extent,'rotary-wing',item.transport);
+    }
+  }
+  const roster=state.rosterManifest;
+  if(roster&&roster.infantry&&Array.isArray(roster.infantry.instances)){
+    const roleAliases={'RIFLE SQUAD':'rifleman','SQUAD LEADER':'leader','MACHINE GUNNER':'machine_gunner','COMBAT MEDIC':'medic','ANTI-ARMOUR':'anti_armor'};
+    soldiers.forEach((soldier,i)=>{
+      const archetype=roleAliases[soldier.role]||'rifleman';
+      const instance=roster.infantry.instances.find((v)=>v.archetype===archetype);
+      if(instance&&instance.sourceRoot)replaceInfantryWithBlenderRoot(soldier,instance.sourceRoot);
+    });
+  }
+  return true;
+}
 function clearAssetPreview() {
   const active = state.activeAssetPreview;
   if (!active) return;
