@@ -1678,8 +1678,11 @@ function animate() {
     state.time += dt;
     if (state.activeAssetPreview && state.activeAssetPreview.mixer) state.activeAssetPreview.mixer.update(dt);
     updateTanks(dt);
-    aircraft.forEach((p) => updatePlane(p, dt));
+    updateInfantry(dt);
+    aircraft.forEach((p) => { updatePlane(p, dt); updateAircraftDamage(p, dt); });
     updateBombs(dt);
+    updateProjectiles(dt);
+    updateDebris(dt);
     updateEffects(dt);
     updateHUD();
   }
