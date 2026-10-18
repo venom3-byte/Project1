@@ -1159,6 +1159,7 @@ function updatePlane(plane,dt){
     if (waypoint.state === 'ATTACK RUN') spawnBomb(plane, plane.target);
     if (waypoint.state === 'LANDING') {
       plane.hasLanded = true;
+      createDustBurst(new THREE.Vector3(plane.group.position.x,.16,plane.group.position.z),plane.flightClass==='rotary-wing'?15:7,plane.flightClass==='rotary-wing'?6.5:2.5);
       if (plane.mixer && plane.actions) Object.keys(plane.actions).forEach((key) => { if (/gear.*retract|retract.*gear/.test(key)) plane.actions[key].stop(); });
     }
     if (waypoint.state === 'REARM') {
@@ -1187,6 +1188,10 @@ function updatePlane(plane,dt){
     plane.group.rotation.z+=(bank-plane.group.rotation.z)*Math.min(1,dt*1.7);
   }
   plane.status = waypoint.state;
+  if(plane.flightClass==='rotary-wing'&&/VERTICAL LIFT|HOVER CLIMB|HOVER ATTACK|LANDING/.test(plane.status)){
+    plane.rotorDustTimer=(plane.rotorDustTimer||0)-dt;
+    if(plane.rotorDustTimer<=0){plane.rotorDustTimer=.32;createDustBurst(new THREE.Vector3(plane.group.position.x,.16,plane.group.position.z),5,4.5);}
+  }
   if (plane.state === 'taxi' && plane.routeIndex >= 2) plane.state = 'airborne';
   if(plane.routeIndex>=6&&plane.state!=='return'&&plane.route.some((w)=>w.state==='ATTACK RUN'))plane.state='return';
 }
@@ -1255,13 +1260,6 @@ function detachAircraftWeaponStore(plane){
   source.visible=false;scene.add(dropped);
   plane.storesRemaining=candidates.filter((node)=>node.visible).length;
   return dropped;
-}
-function restoreAircraftWeaponStores(plane){
-  if(!plane||!plane.visual)return;
-  let count=0;
-  plane.visual.traverse((node)=>{if(node.isMesh&&/(GUIDED_STORE|WINGTIP_MISSILE|TRAINING_STORE)/i.test(node.name)){node.visible=true;count++;}});
-  plane.storesRemaining=count;
-  if(count)addLog(plane.name+' weapon stores replenished by the service convoy.','normal');
 }
 function createDebris(position,amount=6,palette=0x373b37){
   for(let i=0;i<amount;i++){
@@ -1352,6 +1350,8 @@ function updateTanks(dt) {
         const step = Math.min(dist, unit.speed * dt);
         unit.group.position.x += dx / dist * step;
         unit.group.position.z += dz / dist * step;
+        unit.dustTimer=(unit.dustTimer||0)-dt;
+        if(unit.dustTimer<=0){unit.dustTimer=.28;unit.group.updateMatrixWorld(true);for(const side of [-1,1])createDustBurst(unit.group.localToWorld(new THREE.Vector3(side*1.15,.16,-1.2)),4,1.1);}
         const heading = Math.atan2(dx, dz);
         let diff = ((heading - unit.group.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
         unit.group.rotation.y += diff * Math.min(1, dt * 3.1);
@@ -1526,12 +1526,14 @@ function resetMission() {
     plane.hp=100;plane.alive=true;plane.state='ready';plane.status='READY AT BASE';plane.target=null;plane.route=[];plane.routeIndex=0;plane.attackDone=false;plane.hasLanded=false;plane.rearmTimer=0;plane.aaTimer=2.6;plane.crashVelocity=null;plane.group.visible=true;
     if(plane.crashSmoke){plane.group.remove(plane.crashSmoke);plane.crashSmoke.geometry.dispose();plane.crashSmoke.material.dispose();plane.crashSmoke=null;}
     plane.group.position.set(plane.initial.x,0.16,plane.initial.z);plane.group.rotation.set(0,Math.PI,0);
-    plane.visual.traverse((node)=>{if(node.isMesh&&node.userData.initialMaterial)node.material=node.userData.initialMaterial;});
+    plane.visual.traverse((node)=>{if(node.isMesh&&node.userData.initialMaterial)node.material=node.userData.initialMaterial;if(node.isMesh&&/(GUIDED_STORE|WINGTIP_MISSILE|TRAINING_STORE)/i.test(node.name))node.visible=true;});
+    plane.rearmServiceStarted=false;plane.rearmServiceComplete=false;plane.rearmCargoServiced=false;plane.rearmFuelServiced=false;
   }
   bombs.splice(0).forEach((b)=>{scene.remove(b.mesh);if(b.mesh.geometry)b.mesh.geometry.dispose();if(b.mesh.material)b.mesh.material.dispose();});
   projectiles.splice(0).forEach((p)=>{scene.remove(p.mesh);if(p.mesh.geometry)p.mesh.geometry.dispose();if(p.mesh.material)p.mesh.material.dispose();});
   debris.splice(0).forEach((d)=>{scene.remove(d.mesh);if(d.mesh.geometry)d.mesh.geometry.dispose();if(d.mesh.material)d.mesh.material.dispose();});
   effects.splice(0).forEach((e)=>{scene.remove(e.group);e.group.traverse((n)=>{if(n.geometry)n.geometry.dispose();if(n.material)n.material.dispose();});});
+  resetServiceVehiclesAtBase();
   clearImpactMarks();
   selectEntity(null); setCommand('select'); updateObjectives(); updateHUD();
 }
