@@ -61,7 +61,7 @@ export class ForgeEngine{
   }
   async init(){
     this.app=new pc.Application(this.canvas,{graphicsDeviceOptions:{antialias:true,alpha:false,powerPreference:'high-performance',preserveDrawingBuffer:true}});
-    this.app.setCanvasFillMode(pc.FILLMODE_NONE);this.app.setCanvasResolution(pc.RESOLUTION_AUTO);this.app.scene.gammaCorrection=pc.GAMMA_SRGB;this.app.scene.toneMapping=pc.TONEMAP_ACES;this.app.scene.physicalUnits=true;this.app.scene.ambientLightColor=new pc.Color(.18,.22,.28);this.app.scene.ambientLightColor=new pc.Color(.18,.22,.28);
+    this.app.setCanvasFillMode(pc.FILLMODE_NONE);this.app.graphicsDevice.maxPixelRatio=Math.min(2.5,Math.max(1,window.devicePixelRatio||1));this.app.setCanvasResolution(pc.RESOLUTION_AUTO);this.app.scene.gammaCorrection=pc.GAMMA_SRGB;this.app.scene.toneMapping=pc.TONEMAP_ACES;this.app.scene.physicalUnits=true;this.app.scene.ambientLightColor=new pc.Color(.18,.22,.28);this.app.scene.ambientLightColor=new pc.Color(.18,.22,.28);
     this.root=new pc.Entity('ForgeScene');this.app.root.addChild(this.root);
     await RAPIER.init();this.rapier=RAPIER;this.world=new RAPIER.World({x:0,y:-9.81,z:0});this.eventQueue=new RAPIER.EventQueue(true);
     this.createCamera('Main Camera',{x:7,y:5,z:9});this.createLight('Sun');this.createPlane('Ground',30,30);
@@ -315,7 +315,25 @@ export class ForgeEngine{
   async importFile(file){
     const url=URL.createObjectURL(file);if(file.name.toLowerCase().endsWith('.forge.json'))return{type:'project',data:JSON.parse(await file.text())};
     let analysis=null;try{analysis=await window.ForgeProduction?.assets?.analyze?.(file)}catch{}
-    if(/^image\//.test(file.type)){const bmp=await createImageBitmap(file),c=document.createElement('canvas');c.width=bmp.width;c.height=bmp.height;c.getContext('2d').drawImage(bmp,0,0);const tex=new pc.Texture(this.app.graphicsDevice,{width:bmp.width,height:bmp.height,format:pc.PIXELFORMAT_R8_G8_B8_A8});tex.setSource(c);const mat=this.material([1,1,1]);mat.diffuseMap=tex;mat.emissiveMap=tex;mat.emissive=new pc.Color(1,1,1);mat.update();const r=this.primitive('plane',file.name);r.entity.render.material=mat;r.components.asset={type:'image',name:file.name,width:bmp.width,height:bmp.height,analysis,derivedDirty:false};this.assets.set(file.name,{type:'image',file,url});this.select(r.id);window.dispatchEvent(new Event('forge-assets-changed'));window.ForgeRefreshUI?.();return{type:'image',record:r}}
+    if(/^image\//.test(file.type)){
+      const bmp=await createImageBitmap(file),sourceWidth=bmp.width,sourceHeight=bmp.height;
+      // Preserve the original file in the project. Only cap the GPU upload when
+      // the hardware cannot accept the source texture's dimensions.
+      const maxTextureSize=Number(this.app.graphicsDevice.maxTextureSize)||8192;
+      const renderScale=Math.min(1,maxTextureSize/Math.max(sourceWidth,sourceHeight));
+      const renderWidth=Math.max(1,Math.round(sourceWidth*renderScale)),renderHeight=Math.max(1,Math.round(sourceHeight*renderScale));
+      const c=document.createElement('canvas');c.width=renderWidth;c.height=renderHeight;
+      const ctx=c.getContext('2d',{alpha:true});
+      if(!ctx){bmp.close?.();throw new Error('Could not allocate the image texture canvas')}
+      ctx.imageSmoothingEnabled=renderScale<1;ctx.drawImage(bmp,0,0,renderWidth,renderHeight);bmp.close?.();
+      const tex=new pc.Texture(this.app.graphicsDevice,{width:renderWidth,height:renderHeight,format:pc.PIXELFORMAT_R8_G8_B8_A8,mipmaps:true});
+      tex.minFilter=pc.FILTER_LINEAR_MIPMAP_LINEAR;tex.magFilter=pc.FILTER_LINEAR;tex.setSource(c);
+      const mat=this.material([1,1,1]);mat.diffuseMap=tex;mat.emissiveMap=tex;mat.emissive=new pc.Color(1,1,1);mat.update();
+      const r=this.primitive('plane',file.name);r.entity.render.material=mat;
+      r.components.asset={type:'image',name:file.name,width:sourceWidth,height:sourceHeight,renderWidth,renderHeight,sourceBytes:file.size,analysis,derivedDirty:false};
+      this.assets.set(file.name,{type:'image',file,url,width:sourceWidth,height:sourceHeight,renderWidth,renderHeight});this.select(r.id);
+      window.dispatchEvent(new Event('forge-assets-changed'));window.ForgeRefreshUI?.();return{type:'image',record:r}
+    }
     if(/\.(glb|gltf)$/i.test(file.name))return new Promise(async(resolve,reject)=>{
       if(/\.gltf$/i.test(file.name)){try{const json=JSON.parse(await file.text()),external=[...(json.buffers||[]),...(json.images||[])].some(x=>x?.uri&&!String(x.uri).startsWith('data:'));if(external)throw new Error('This .gltf references external files. Use a packaged .glb so Forge can preserve the asset without path breakage')}catch(e){reject(e);return}}
       const asset=new pc.Asset(file.name,'container',{url});this.app.assets.add(asset);asset.once('error',reject);asset.once('load',()=>{try{const e=asset.resource.instantiateRenderEntity({castShadows:true,receiveShadows:true});e.name=file.name.replace(/\.[^.]+$/,'');this.root.addChild(e);const r=this.rec(e.name,'model',e);r.components.asset={type:'model',name:file.name,analysis:analysis||null,sourceUnits:'meters',importScale:1,derivedDirty:false};const clips=this.attachAnimations(e,asset.resource,analysis?.animationNames||[]);if(clips.length)r.components.animation={clips,playing:true};this.assets.set(file.name,{type:'model',file,url,resource:asset.resource});window.dispatchEvent(new Event('forge-assets-changed'));this.select(r.id);window.ForgeRefreshUI?.();requestAnimationFrame(()=>{requestAnimationFrame(()=>{window.ForgeSpatial?.inspect?.(r);resolve({type:'model',record:r})})})}catch(err){reject(err)}});this.app.assets.load(asset)
@@ -369,9 +387,13 @@ export class ForgeEngine{
         try{
           const response=await fetch(referenceData);
           if(!response.ok)throw new Error("Embedded reference image could not be read");
-          const file=await response.blob(),bitmap=await createImageBitmap(file),canvas=document.createElement('canvas');
-          canvas.width=bitmap.width;canvas.height=bitmap.height;canvas.getContext('2d').drawImage(bitmap,0,0);bitmap.close?.();
-          const texture=new pc.Texture(this.app.graphicsDevice,{width:canvas.width,height:canvas.height,format:pc.PIXELFORMAT_R8_G8_B8_A8});
+          const file=await response.blob(),bitmap=await createImageBitmap(file),sourceWidth=bitmap.width,sourceHeight=bitmap.height,canvas=document.createElement('canvas');
+          const maxTextureSize=Number(this.app.graphicsDevice.maxTextureSize)||8192,renderScale=Math.min(1,maxTextureSize/Math.max(sourceWidth,sourceHeight));
+          canvas.width=Math.max(1,Math.round(sourceWidth*renderScale));canvas.height=Math.max(1,Math.round(sourceHeight*renderScale));
+          const ctx=canvas.getContext('2d',{alpha:true});if(!ctx){bitmap.close?.();throw new Error("Could not allocate the restored image texture canvas")}
+          ctx.imageSmoothingEnabled=renderScale<1;ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();
+          const texture=new pc.Texture(this.app.graphicsDevice,{width:canvas.width,height:canvas.height,format:pc.PIXELFORMAT_R8_G8_B8_A8,mipmaps:true});
+          texture.minFilter=pc.FILTER_LINEAR_MIPMAP_LINEAR;texture.magFilter=pc.FILTER_LINEAR;
           texture.setSource(canvas);const material=this.material([1,1,1]);material.diffuseMap=texture;material.emissiveMap=texture;material.emissive=new pc.Color(1,1,1);material.cull=pc.CULLFACE_NONE;material.update();
           for(const instance of(r.entity.render?.meshInstances||[]))instance.material=material;
           this.assets.set(asset.name,{type:'image',file,url:referenceData,embedded:true});
