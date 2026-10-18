@@ -825,8 +825,8 @@ function updateSelectionPanel() {
       : (u.type === 'asset_preview'
         ? 'Blender GLB model · asset preview only'
         : (u.type === 'infantry'
-          ? 'Infantry archetype · asset preview only'
-          : 'Tracked vehicle · Ground force')));
+          ? 'Infantry squad · active movement and damage state'
+          : 'Ground vehicle · active movement and weapons')));
   $('selectedState').textContent = (u.status || (u.alive ? 'ACTIVE' : 'DESTROYED')).toUpperCase();
   $('selectedValue').textContent = Math.max(0, Math.round(u.hp)) + ' HP';
   $('selectedHealth').style.width = Math.max(0, (u.hp / u.maxHp) * 100) + '%';
@@ -879,10 +879,10 @@ function pointerCommand(hit) {
       selectEntity(entity);
       return;
     }
-    if (state.command === 'attack' && entity.type === 'tank') {
+    if (state.command === 'attack' && ['tank','infantry'].includes(entity.type)) {
       const attackers = state.selected && state.selected.team === 'blue' && ['tank','infantry'].includes(state.selected.type) ? [state.selected] : tanks.filter((t) => t.team === 'blue' && t.alive);
-      attackers.forEach((u) => { u.attackTarget = entity; u.status = 'ENGAGING HOSTILE ARMOUR'; });
-      addLog('Hostile armour engaged.', 'alert');
+      attackers.forEach((u) => { u.attackTarget = entity; u.moveTarget = null; u.status = 'ENGAGING HOSTILE UNIT'; });
+      addLog('Hostile unit engaged.', 'alert');
       return;
     }
   }
@@ -1142,12 +1142,18 @@ function updateInfantry(dt){
       if(dist<.7){soldier.moveTarget=null;soldier.status='HOLDING';}
       else{const step=Math.min(dist,2.7*dt);soldier.group.position.x+=dx/dist*step;soldier.group.position.z+=dz/dist*step;const heading=Math.atan2(dx,dz);soldier.group.rotation.y+=((((heading-soldier.group.rotation.y+Math.PI*3)%(Math.PI*2))-Math.PI)*Math.min(1,dt*4));soldier.arms.forEach((arm,i)=>{arm.rotation.x=Math.sin(state.time*7+i*Math.PI)*.22;});soldier.legs.forEach((leg,i)=>{leg.rotation.x=Math.sin(state.time*7+i*Math.PI)*.35;});}
     }
-    soldier.fireTimer-=dt;if(soldier.fireTimer<=0){
-      const enemies=[...tanks.filter((u)=>u.alive&&u.team!==soldier.team),...soldiers.filter((u)=>u.alive&&u.team!==soldier.team)];let closest=null,best=25;
-      for(const enemy of enemies){const dist=soldier.group.position.distanceTo(enemy.group.position);if(dist<best){best=dist;closest=enemy;}}
-      if(closest){soldier.fireTimer=2.4+(soldier.id.length%4)*.24;const from=soldier.group.position.clone().add(new THREE.Vector3(0,1.15,0)),to=closest.group.position.clone().add(new THREE.Vector3(0,closest.type==='tank'?1.3:.9,0));createTracer(from,to);applyDamage(closest,closest.type==='tank'?2.2:5.5,soldier.team,to);}else soldier.fireTimer=.5;
-    }
-  }
+    if(soldier.attackTarget&&!soldier.attackTarget.alive){soldier.attackTarget=null;soldier.status='HOLDING';}
+    const requested=soldier.attackTarget&&soldier.attackTarget.alive?soldier.attackTarget:null;
+    const enemies=requested?[requested]:[...tanks.filter((u)=>u.alive&&u.team!==soldier.team),...soldiers.filter((u)=>u.alive&&u.team!==soldier.team)];
+    let closest=null,best=requested?Infinity:25;
+    for(const enemy of enemies){if(enemy===soldier||!enemy.alive||enemy.team===soldier.team)continue;const dist=soldier.group.position.distanceTo(enemy.group.position);if(dist<best){best=dist;closest=enemy;}}
+    if(closest&&best<25){
+      soldier.fireTimer-=dt;
+      if(soldier.fireTimer<=0){soldier.fireTimer=2.4+(soldier.id.length%4)*.24;const from=soldier.group.position.clone().add(new THREE.Vector3(0,1.15,0)),to=closest.group.position.clone().add(new THREE.Vector3(0,closest.type==='tank'?1.3:.9,0));createTracer(from,to);applyDamage(closest,closest.type==='tank'?2.2:5.5,soldier.team,to);}
+    } else {
+      soldier.fireTimer=Math.max(0,soldier.fireTimer);
+      if(requested&&!soldier.moveTarget){soldier.moveTarget=new THREE.Vector3(requested.group.position.x,0,requested.group.position.z+3);soldier.status='CLOSING ON TARGET';}
+    }  }
   for(const unit of tanks)if(!unit.alive&&unit.wreckSmoke){unit.wreckSmoke.position.y=2.6+Math.sin(state.time*1.7)*.22;unit.wreckSmoke.scale.set(1.4+Math.sin(state.time)*.12,1.8+Math.sin(state.time*1.2)*.16,1.4);}
 }
 function updateAircraftDamage(plane,dt){
@@ -1252,7 +1258,7 @@ function updateHUD() {
   const mins = Math.floor(state.time / 60).toString().padStart(2, '0');
   const secs = Math.floor(state.time % 60).toString().padStart(2, '0');
   $('clock').textContent = mins + ':' + secs;
-  $('airCount').textContent = aircraft.filter((p) => p.state === 'ready').length.toString().padStart(2, '0') + ' / 04';
+  $('airCount').textContent = aircraft.filter((p) => p.state === 'ready').length.toString().padStart(2, '0') + ' / ' + String(aircraft.length).padStart(2, '0');
   if (state.selected) {
     $('selectedState').textContent = (state.selected.status || state.selected.state || 'ACTIVE').toUpperCase();
     $('selectedValue').textContent = Math.max(0, Math.round(state.selected.hp)) + ' HP';
