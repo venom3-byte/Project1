@@ -203,6 +203,8 @@ function refreshTimeline(){
   $("#timelineLoop").classList.toggle("is-active",engine.timelineLoop!==false);
   $("#keyInterpolation").value=engine.keyInterpolation||"ease";
   const record=selectedRecord(),keys=record?(engine.keyframes.get(record.id)||[]):[];
+  if(state.graphChannel.startsWith("light.")&&record?.kind!=="light")state.graphChannel="p0";
+  if(state.graphChannel.startsWith("camera.")&&record?.kind!=="camera")state.graphChannel="p0";
   $("#keyCount").textContent=keys.length+(keys.length===1?" key":" keys");
   $("#timelineTrackName").textContent=record?.name||"No object selected";
   const renderLane=(selector,channel)=>{
