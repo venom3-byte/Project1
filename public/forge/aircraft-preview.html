@@ -66,10 +66,10 @@ steelDark:new THREE.MeshStandardMaterial({color:'#444e53',roughness:.55,metalnes
 black:new THREE.MeshStandardMaterial({color:'#0d1216',roughness:.74,metalness:.14}),
 red:new THREE.MeshStandardMaterial({color:'#bd5148',roughness:.36,metalness:.15,emissive:'#4c120c',emissiveIntensity:.18}),
 green:new THREE.MeshStandardMaterial({color:'#67bb88',roughness:.3,metalness:.15,emissive:'#184c2c',emissiveIntensity:.25}),
-window:new THREE.MeshStandardMaterial({color:'#182c3d',roughness:.2,metalness:.22,clearcoat:.75})
+window:new THREE.MeshPhysicalMaterial({color:'#182c3d',roughness:.2,metalness:.22,clearcoat:.75,clearcoatRoughness:.18})
 };
 let count=0;
-function mesh(g,m,p=[0,0,0],r=[0,0,0],s=null,n='Part'){const o=new THREE.Mesh(g,m);o.position.set(...p);o.rotation.set(...r);if(s)o.scale.set(...s);o.name=n;o.castShadow=true;o.receiveShadow=true;aircraft.add(o);count++;return o;}
+function mesh(g,m,p=[0,0,0],r=[0,0,0],s=null,n='Part'){const o=new THREE.Mesh(g,m);o.position.set(...p);o.rotation.set(...(r||[0,0,0]));if(s)o.scale.set(...s);o.name=n;o.castShadow=true;o.receiveShadow=true;aircraft.add(o);count++;return o;}
 function box(w,h,d,m,p,r=[0,0,0],n='Panel'){return mesh(new THREE.BoxGeometry(w,h,d),m,p,r,null,n);}
 function cyl(rt,rb,len,m,p,r=[0,0,0],n='Cylinder',segs=24){return mesh(new THREE.CylinderGeometry(rt,rb,len,segs),m,p,r,null,n);}
 function sphere(rx,ry,rz,m,p,n='Detail'){return mesh(new THREE.SphereGeometry(1,18,12),m,p,[0,0,0],[rx,ry,rz],n);}
