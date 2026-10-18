@@ -268,13 +268,16 @@ function refreshReferences(){
   const chosen=selectedRecord();if(chosen?.components?.reference){const d=chosen.components.reference;$("#referenceAxis").value=d.axis||"front";$("#referenceWidth").value=String(d.width||3);$("#referenceOpacity").value=String(d.opacity??0.45);$("#referenceOpacityValue").textContent=Math.round((d.opacity??0.45)*100)+"%"}
 }
 function focusReferenceView(){const ref=selectedRecord()?.components?.reference;if(!ref){notice("Image Modeling","Select a calibrated reference plane first.");return}chooseView(ref.axis==="side"?"right":ref.axis||"front");state.engine.frame();status("Reference aligned in "+ref.axis+" view")}
-async function referenceImageDataUrl(file,maxSide=1536){
-  const bitmap=await createImageBitmap(file),scale=Math.min(1,maxSide/Math.max(bitmap.width,bitmap.height));
-  const canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));
-  const ctx=canvas.getContext("2d");if(!ctx){bitmap.close?.();throw new Error("Could not allocate reference-image canvas")}
-  ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();
-  const webp=canvas.toDataURL("image/webp",0.86);
-  return webp.startsWith("data:image/webp")?webp:canvas.toDataURL("image/png");
+// Preserve the exact uploaded bytes. Do not shrink or recompress reference art:
+// image references are often engineering drawings where fine line detail matters.
+async function referenceImageDataUrl(file){
+  if(!file||typeof file.slice!=="function")throw new Error("Reference image file is not readable");
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>typeof reader.result==="string"?resolve(reader.result):reject(new Error("Could not preserve original reference image"));
+    reader.onerror=()=>reject(reader.error||new Error("Could not read the original reference image"));
+    reader.readAsDataURL(file);
+  });
 }
 async function loadReferenceImages(files){
   let added=0;const axis=$("#referenceAxis").value,width=clamp($("#referenceWidth").value,0.01,10000,3),opacity=clamp($("#referenceOpacity").value,0.1,1,0.45);
