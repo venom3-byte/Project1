@@ -69,6 +69,77 @@ export class ForgeEngine{
   }
   rec(name,kind,e){const id=crypto.randomUUID();e.__forge={id,kind,name,components:{}};const r={id,kind,name,entity:e,components:e.__forge.components};this.entities.set(id,r);return r}
   add(kind,name){const e=new pc.Entity(name);this.root.addChild(e);return this.rec(name,kind,e)}
+  _buildRigMarker(record,offsetY=.82){
+    if(!record?.entity||!this.app)return false;
+    let sourceMesh=null;
+    const temporary=new pc.Entity("Forge Rig Marker Source");
+    temporary.addComponent("render",{type:"sphere"});
+    sourceMesh=temporary.render?.meshInstances?.[0]?.mesh||null;
+    const sourcePositions=sourceMesh?.getPositions?.(),sourceIndices=sourceMesh?.getIndices?.();
+    temporary.destroy();
+    if(!sourcePositions||!sourceIndices)return false;
+    const positions=Array.from(sourcePositions,(v,i)=>(i%3===1?Number(v)*.17+offsetY:Number(v)*.17));
+    const indices=Array.from(sourceIndices);
+    const mesh=new pc.Mesh(this.app.graphicsDevice);
+    mesh.setPositions(positions);mesh.setIndices(indices);mesh.setNormals(pc.calculateNormals(positions,indices));mesh.update();
+    const material=this.material([1,.43,.12]);
+    material.emissive=new pc.Color(1,.25,.035);material.emissiveIntensity=.75;material.metalness=0;material.gloss=.35;material.update();
+    if(record.entity.render)record.entity.removeComponent("render");
+    const instance=new pc.MeshInstance(mesh,material);
+    record.entity.addComponent("render",{meshInstances:[instance]});
+    record.entity.render.layers=[pc.LAYERID_WORLD];record.entity.render.frustumCulling=false;
+    record.entity.render.castShadows=false;record.entity.render.receiveShadows=false;
+    return true;
+  }
+  createRigPivotForSelected(name){
+    const child=this.selected();if(!child||child.kind==="rig")return null;
+    const position=child.entity.getPosition().clone(),rotation=child.entity.getRotation().clone(),localScale=child.entity.getLocalScale().clone();
+    const oldParent=child.entity.parent;
+    if(oldParent?.__forge?.kind==="rig"){
+      const previous=this.entities.get(oldParent.__forge.id),children=previous?.components?.rigControl?.children||[];
+      if(previous)previous.components.rigControl.children=children.filter(id=>id!==child.id);
+    }
+    const control=this.add("rig",name||child.name+" Pivot");
+    control.entity.setPosition(position);control.entity.setRotation(rotation);
+    const size=Math.max(.65,Math.abs(localScale.y)*.6+.15);
+    control.components.rigControl={role:"pivot",visual:"sphere-control",children:[child.id],notes:"Rigid-part forward-kinematics pivot; does not skin-deform vertices."};
+    this._buildRigMarker(control,size);
+    control.entity.addChild(child.entity);
+    child.entity.setPosition(position);child.entity.setRotation(rotation);child.entity.setLocalScale(localScale.x,localScale.y,localScale.z);
+    child.components.rigParentId=control.id;
+    window.dispatchEvent(new CustomEvent("forge-hierarchy-changed"));
+    this.select(control.id);return control;
+  }
+  attachSelectedToRigControl(controlId){
+    const child=this.selected(),control=this.entities.get(controlId);
+    if(!child||!control||control.kind!=="rig"||child.id===control.id||child.kind==="rig")return false;
+    for(let node=control.entity;node;node=node.parent)if(node===child.entity)return false;
+    const position=child.entity.getPosition().clone(),rotation=child.entity.getRotation().clone(),localScale=child.entity.getLocalScale().clone(),oldParent=child.entity.parent;
+    if(oldParent?.__forge?.kind==="rig"){
+      const previous=this.entities.get(oldParent.__forge.id);
+      if(previous?.components?.rigControl)previous.components.rigControl.children=(previous.components.rigControl.children||[]).filter(id=>id!==child.id);
+    }
+    control.entity.addChild(child.entity);child.entity.setPosition(position);child.entity.setRotation(rotation);child.entity.setLocalScale(localScale.x,localScale.y,localScale.z);
+    child.components.rigParentId=control.id;
+    control.components.rigControl=control.components.rigControl||{role:"pivot",visual:"sphere-control",children:[]};
+    control.components.rigControl.children=[...new Set([...(control.components.rigControl.children||[]),child.id])];
+    window.dispatchEvent(new CustomEvent("forge-hierarchy-changed"));window.dispatchEvent(new CustomEvent("forge-selection"));
+    return true;
+  }
+  detachSelectedFromRigControl(){
+    const child=this.selected();if(!child||child.kind==="rig")return false;
+    const oldParent=child.entity.parent;
+    if(oldParent?.__forge?.kind!=="rig"&&!child.components.rigParentId)return false;
+    const position=child.entity.getPosition().clone(),rotation=child.entity.getRotation().clone(),localScale=child.entity.getLocalScale().clone();
+    if(oldParent?.__forge?.kind==="rig"){
+      const previous=this.entities.get(oldParent.__forge.id);
+      if(previous?.components?.rigControl)previous.components.rigControl.children=(previous.components.rigControl.children||[]).filter(id=>id!==child.id);
+    }
+    this.root.addChild(child.entity);child.entity.setPosition(position);child.entity.setRotation(rotation);child.entity.setLocalScale(localScale.x,localScale.y,localScale.z);
+    delete child.components.rigParentId;
+    window.dispatchEvent(new CustomEvent("forge-hierarchy-changed"));window.dispatchEvent(new CustomEvent("forge-selection"));
+    return true;
+  }
   material(color=[.22,.62,.9]){const m=new pc.StandardMaterial();m.diffuse=new pc.Color(...color);m.emissive=new pc.Color(0,0,0);m.emissiveIntensity=0;m.metalness=0;m.gloss=.55;m.useMetalness=true;m.useLighting=true;m.useTonemap=true;m.specular=new pc.Color(.04,.04,.04);m.update();return m}
   primitive(kind,name){const r=this.add(kind,name||kind+'-'+(this.entities.size+1)),type=kind==='sphere'?'sphere':kind==='cylinder'?'cylinder':kind==='capsule'?'capsule':kind==='plane'?'plane':'box';r.entity.addComponent('render',{type});r.entity.render.layers=[pc.LAYERID_WORLD];r.entity.render.frustumCulling=false;r.entity.render.enabled=true;r.entity.render.material=this.material(kind==='plane'?[.08,.15,.2]:[.22,.62,.9]);if(kind!=='plane')r.entity.setLocalPosition((Math.random()-.5)*4,1+(Math.random()*1.7),(Math.random()-.5)*4);r.components.geometry={sourceUnits:'meters'};return r}
   createPlane(name,w=30,d=30){const r=this.primitive('plane',name);r.entity.setLocalScale(w,1,d);r.entity.setLocalPosition(0,0,0);if(name==='Ground')r.entity.render.layers=[];this.setPhysics(r.id,'fixed','box');return r}
@@ -417,7 +488,7 @@ export class ForgeEngine{
   }
   attachAnimations(entity,resource,names=[]){const tracks=resource?.animations||[];if(!tracks.length)return[];try{if(!entity.anim)entity.addComponent('anim',{activate:true,speed:1});const clips=[];for(let i=0;i<tracks.length;i++){const name=names[i]||tracks[i]?.name||('Clip_'+i);entity.anim.assignAnimation(name,tracks[i],undefined,1,true);clips.push(name)}entity.anim.playing=true;return clips}catch(e){this.log('Animation attach failed: '+e.message,'error');return[]}}
   setAnimationState(id,state){const r=this.entities.get(id);if(!r?.entity?.anim?.baseLayer)return false;try{r.entity.anim.baseLayer.play(state);return true}catch{return false}}
-  serialize(){return{format:'forge-scene',version:3,meta:{engine:'Forge Studio 3.0',time:new Date().toISOString(),units:'meters'},entities:[...this.entities.values()].map(r=>{const p=r.entity.getLocalPosition(),q=r.entity.getLocalEulerAngles(),s=r.entity.getLocalScale();return{id:r.id,name:r.name,kind:r.kind,transform:{p:[p.x,p.y,p.z],r:[q.x,q.y,q.z],s:[s.x,s.y,s.z]},components:r.components,keyframes:this.keyframes.get(r.id)||[],script:this.scripts.get(r.id)||null}})}}
+  serialize(){return{format:'forge-scene',version:4,meta:{engine:'Forge Eye 0.4',time:new Date().toISOString(),units:'meters'},entities:[...this.entities.values()].map(r=>{const p=r.entity.getLocalPosition(),q=r.entity.getLocalEulerAngles(),s=r.entity.getLocalScale();return{id:r.id,name:r.name,kind:r.kind,parentId:r.entity.parent?.__forge?.id||null,transform:{p:[p.x,p.y,p.z],r:[q.x,q.y,q.z],s:[s.x,s.y,s.z]},components:r.components,keyframes:this.keyframes.get(r.id)||[],script:this.scripts.get(r.id)||null}})}}
   async load(data,{assetRoot='' }={}) {
     for(const r of [...this.entities.values()]){
       this.removePhysics(r.id); r.entity.destroy();
@@ -427,12 +498,14 @@ export class ForgeEngine{
     const activeCameraSource=serializedEntities.find(item=>item.kind==='camera'&&item.components?.camera?.active)?.id
       || serializedEntities.find(item=>item.kind==='camera')?.id
       || null;
+    const sourceIdToRecord=new Map();
 
     for(const d of serializedEntities){
       if(d.kind==='terrain'&&d.components?.terrain&&window.ForgeTerrain){
         window.ForgeTerrain.generate(d.name,d.components.terrain); continue;
       }
       const r=this.add(d.kind,d.name), t=d.transform||{};
+      if(d.id)sourceIdToRecord.set(d.id,r);
       r.entity.setLocalPosition(...(t.p||[0,0,0]));
       r.entity.setLocalEulerAngles(...(t.r||[0,0,0]));
       r.entity.setLocalScale(...(t.s||[1,1,1]));
@@ -453,6 +526,7 @@ export class ForgeEngine{
       }
       r.components=d.components||{};
       r.entity.__forge.components=r.components;
+      if(d.kind==="rig")this._buildRigMarker(r,Number(d.components?.rigControl?.markerOffset)||.82);
       if(d.components?.geometry?.kind==="rust-lathe"&&d.components?.procedural?.generator==="forge-eye-core-lathe"&&window.ForgeEyeRust?.latheMesh){
         const profile=d.components.procedural.profile||[],options=d.components.procedural.options||{},meshData=window.ForgeEyeRust.latheMesh(profile,options);
         this.createLatheMeshFromData({record:r,name:d.name,meshData,profile,options,color:d.components.material?.color||[.34,.62,.78]});
@@ -513,6 +587,22 @@ export class ForgeEngine{
           this.app.assets.load(a);
         });
       }
+    }
+    for(const d of serializedEntities){
+      const r=d.id?sourceIdToRecord.get(d.id):null;if(!r)continue;
+      if(d.parentId){
+        const parent=sourceIdToRecord.get(d.parentId);
+        if(parent&&parent.id!==r.id){
+          let ancestor=parent.entity,cyclic=false;
+          while(ancestor){if(ancestor===r.entity){cyclic=true;break}ancestor=ancestor.parent}
+          if(!cyclic)parent.entity.addChild(r.entity);
+        }
+      }
+    }
+    for(const r of this.entities.values()){
+      if(r.components.rigParentId){const remapped=sourceIdToRecord.get(r.components.rigParentId);if(remapped)r.components.rigParentId=remapped.id;else delete r.components.rigParentId}
+      if(Array.isArray(r.components.rigControl?.children))r.components.rigControl.children=r.components.rigControl.children.map(id=>sourceIdToRecord.get(id)?.id).filter(Boolean);
+      if(r.components.rigControl)r.components.rigControl.markerOffset=Number(r.components.rigControl.markerOffset)||.82;
     }
     if(![...this.entities.values()].some(item=>item.kind==='camera'&&item.components.camera?.active)){
       this.createCamera('Main Camera',{x:7,y:5,z:9});
