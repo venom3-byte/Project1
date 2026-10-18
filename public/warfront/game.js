@@ -1713,7 +1713,7 @@ function replaceInfantryWithBlenderRoot(soldier,rootName){
     soldier.group.remove(child);
     child.traverse((node)=>{if(node.geometry)node.geometry.dispose();});
   }
-  soldier.group.add(model);soldier.visual=model;soldier.arms=[];soldier.legs=[];tagInteractive(model,'rtsUnit',soldier);
+  soldier.group.add(model);soldier.visual=model;soldier.modelRootName=rootName;soldier.arms=[];soldier.legs=[];tagInteractive(model,'rtsUnit',soldier);
   attachMatchingAnimations(model,soldier,/walk|run|idle|action/i);return true;
 }
 function replaceAircraftWithBlenderRoot(plane,rootName,displayName,targetExtent,flightClass='fixed-wing',isTransport=false){
