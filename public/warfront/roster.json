@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "project": "Warfront RTS",
-  "sceneRevision": 6,
+  "sceneRevision": 8,
   "sceneProjectUrl": "https://higgsfield.ai/3d-jutsu/6a8b4f06-f85f-4cac-9897-35fab0bccfe3",
   "sourceEngine": "Blender 5.2 LTS",
   "coordinateNotes": {
@@ -13,16 +13,17 @@
   "integrationStatus": "blender-prototypes-not-yet-packaged-as-individual-runtime-models",
   "balanceNote": "All balance numbers are abstract RTS game values, not real-world performance specifications.",
   "bundle": {
-    "fullSceneGLBBytes": 9956892,
+    "fullSceneGLBBytes": 11131472,
     "individualGLBAssets": "pending",
-    "runtimeImport": "pending"
+    "runtimeImport": "pending",
+    "fullSceneRevision": 8
   },
   "summary": {
     "vehicleAndAircraftRoots": 28,
     "groundVehicleClasses": 27,
     "aircraftRoots": 1,
-    "infantryInstances": 18,
-    "infantryArchetypes": 12
+    "infantryInstances": 24,
+    "infantryArchetypes": 18
   },
   "vehicles": [
     {
@@ -647,6 +648,78 @@
           "damage": 10,
           "cost": 130
         }
+      },
+      {
+        "id": "grenadier",
+        "name": "Grenadier",
+        "role": "explosive area-effect support",
+        "balance": {
+          "hp": 95,
+          "speed": 18,
+          "range": 28,
+          "damage": 18,
+          "cost": 110
+        }
+      },
+      {
+        "id": "sniper",
+        "name": "Sniper",
+        "role": "precision long-range reconnaissance",
+        "balance": {
+          "hp": 85,
+          "speed": 17,
+          "range": 55,
+          "damage": 35,
+          "cost": 210
+        }
+      },
+      {
+        "id": "uav_operator",
+        "name": "UAV operator",
+        "role": "deployable reconnaissance drone control",
+        "balance": {
+          "hp": 80,
+          "speed": 18,
+          "range": 0,
+          "damage": 0,
+          "cost": 230
+        }
+      },
+      {
+        "id": "tank_crew",
+        "name": "Armoured vehicle crewman",
+        "role": "vehicle operation and repair bonus",
+        "balance": {
+          "hp": 95,
+          "speed": 20,
+          "range": 15,
+          "damage": 4,
+          "cost": 110
+        }
+      },
+      {
+        "id": "paratrooper",
+        "name": "Paratrooper / airborne infantry",
+        "role": "airborne deployment and rapid insertion",
+        "balance": {
+          "hp": 100,
+          "speed": 22,
+          "range": 24,
+          "damage": 12,
+          "cost": 140
+        }
+      },
+      {
+        "id": "ammo_bearer",
+        "name": "Heavy-weapons ammunition bearer",
+        "role": "team resupply and support-weapon endurance",
+        "balance": {
+          "hp": 95,
+          "speed": 17,
+          "range": 0,
+          "damage": 0,
+          "cost": 115
+        }
       }
     ],
     "instances": [
@@ -756,6 +829,42 @@
         "sourceRoot": "INF_ENG_B_ROOT",
         "archetype": "engineer",
         "squad": "B-9",
+        "status": "blender_prototype"
+      },
+      {
+        "sourceRoot": "INF_GRN_ROOT",
+        "archetype": "grenadier",
+        "squad": "C-1",
+        "status": "blender_prototype"
+      },
+      {
+        "sourceRoot": "INF_SNP_ROOT",
+        "archetype": "sniper",
+        "squad": "C-2",
+        "status": "blender_prototype"
+      },
+      {
+        "sourceRoot": "INF_UAV_ROOT",
+        "archetype": "uav_operator",
+        "squad": "C-3",
+        "status": "blender_prototype"
+      },
+      {
+        "sourceRoot": "INF_TANKCREW_ROOT",
+        "archetype": "tank_crew",
+        "squad": "C-4",
+        "status": "blender_prototype"
+      },
+      {
+        "sourceRoot": "INF_PARA_ROOT",
+        "archetype": "paratrooper",
+        "squad": "C-5",
+        "status": "blender_prototype"
+      },
+      {
+        "sourceRoot": "INF_AMMO_ROOT",
+        "archetype": "ammo_bearer",
+        "squad": "C-6",
         "status": "blender_prototype"
       }
     ]
