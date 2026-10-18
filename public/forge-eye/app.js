@@ -53,7 +53,7 @@ function setWorkspace(name,{save=true}={}){
   if(name==="materials"){setInspectorPanel("properties",{save:false});$("#materialSection").classList.add("is-open")}
   if(name==="world")setInspectorPanel("scene",{save:false});
   if(name==="animation")refreshTimeline();
-  if(innerWidth<=850&&["assets","materials","world","review","references"].includes(name))openMobilePanel(name==="assets"?"assets":name==="references"?"references":"properties");
+  if(innerWidth<=850){if(["assets","materials","world","review","references"].includes(name))openMobilePanel(name==="assets"?"assets":name==="references"?"references":"properties");else closeMobileDrawers();}
   if(save)persistPrefs();
 }
 function setLeftPanel(name,{save=true}={}){
