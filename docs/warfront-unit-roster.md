@@ -98,6 +98,6 @@ The models are editable Blender prototypes with named roots and selected animati
 1. The main battle tank has a named turret traversal pivot; the strike-aircraft hero has flaperon, elevator, rudder and landing-gear controls.
 2. Tracked/wheeled prototypes have distinct silhouette parts and selected turret, gun, missile-rack or sensor pivots.
 3. Infantry has 18 archetypes across 24 scene instances. Each rig keeps named hips, knees and shoulder controls; additional specialist roles have a basic keyed walk-cycle study.
-4. The full Blender scene exports to a single GLB for preview. Individual per-unit GLB packages, runtime spawn/command binding for the full roster, and a real browser gameplay regression run remain to be completed.
+4. The full Blender scene is committed as `public/warfront/assets/combined-arms-r8.glb`. The in-game catalog now has a “VIEW IN THEATRE” button: it loads the GLB, resolves the named root, and mounts a temporary preview on a staging pad. Individual per-unit GLB packages, live spawn/command binding for all classes, and a real browser gameplay regression run remain to be completed.
 
 The roster manifest is the source of truth: `public/warfront/roster.json`.
