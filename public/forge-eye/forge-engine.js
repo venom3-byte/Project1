@@ -2,6 +2,7 @@ import * as pc from 'https://cdn.jsdelivr.net/npm/playcanvas@2.22.6/build/playca
 import RAPIER from 'https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.21.0/+esm';
 
 const V=(x=0,y=0,z=0)=>new pc.Vec3(x,y,z);
+const clamp=(value,min,max,fallback)=>{const n=Number(value);return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback};
 function rayAabb(o,d,a){
   const mn=a.getMin(),mx=a.getMax();let lo=-Infinity,hi=Infinity;
   for(const k of ['x','y','z']){
