@@ -22,9 +22,7 @@
     "groundVehicleClasses": 27,
     "aircraftRoots": 1,
     "infantryInstances": 18,
-    "infantryArchetypes": 12,
-    "vehicleMeshParts": 0,
-    "infantryMeshParts": 0
+    "infantryArchetypes": 12
   },
   "vehicles": [
     {
