@@ -12,13 +12,16 @@ const cameraTarget = new THREE.Vector3(0, 0, 0);
 const interactables = [];
 const units = [];
 const tanks = [];
+const soldiers = [];
 const aircraft = [];
 const targets = [];
 const mixers = [];
 const bombs = [];
+const projectiles = [];
+const debris = [];
 const effects = [];
 const assets = { tank: null, plane: null, tankSource: '', planeSource: '' };
-const state = { command: 'select', selected: null, time: 0, missionComplete: false, paused: false, started: false, pointerDown: null, dragging: false, touchPoints: new Map(), lastPinch: 0, blenderBundle: null, blenderBundlePromise: null, activeAssetPreview: null, assetPreviewCounter: 0 };
+const state = { command: 'select', selected: null, time: 0, missionComplete: false, paused: false, started: false, mapId: 'pine-valley', pointerDown: null, dragging: false, touchPoints: new Map(), lastPinch: 0, blenderBundle: null, blenderBundlePromise: null, activeAssetPreview: null, assetPreviewCounter: 0 };
 const TEAM = { blue: 0x9fca9c, red: 0xdc7265, amber: 0xeab86b };
 const PACKS = {
   tank: 'https://3dassets.dev/api/v1/packs/armoured-column-and-field-camp',
@@ -33,7 +36,7 @@ const DIRECT = {
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x7e928b);
 scene.fog = new THREE.FogExp2(0x7e928b, 0.0032);
-const camera = new THREE.PerspectiveCamera(43, innerWidth / innerHeight, 0.1, 700);
+const camera = new THREE.PerspectiveCamera(43, innerWidth / innerHeight, 0.1, 1400);
 camera.position.set(0, 104, 126);
 camera.lookAt(cameraTarget);
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
@@ -51,10 +54,10 @@ const sun = new THREE.DirectionalLight(0xfff0d7, 3.25);
 sun.position.set(-55, 100, 52);
 sun.castShadow = true;
 sun.shadow.mapSize.set(1024, 1024);
-sun.shadow.camera.left = -110;
-sun.shadow.camera.right = 110;
-sun.shadow.camera.top = 100;
-sun.shadow.camera.bottom = -100;
+sun.shadow.camera.left = -260;
+sun.shadow.camera.right = 260;
+sun.shadow.camera.top = 240;
+sun.shadow.camera.bottom = -240;
 sun.shadow.bias = -0.00035;
 scene.add(sun);
 
@@ -127,6 +130,15 @@ function addGroundPlane() {
   return ground;
 }
 const ground = addGroundPlane();
+const mapFeatures = new THREE.Group();
+mapFeatures.name = 'generated-battlefield-features';
+scene.add(mapFeatures);
+const MAPS = {
+  'pine-valley': { label: 'PINE VALLEY · 440 × 380', biome: 'forest', width: 440, depth: 380, groundTint: 0xd6e2cf, background: 0x7e928b, fog: 0x7e928b, fogDensity: 0.0018, targetPositions: [[-24,-52],[15,-57],[30,-38],[-2,-39]], tankStarts: [[-18,7],[-12.8,11.3],[-24,0.6],[16,-17],[23,-22]], soldierStarts: [[-21,15,'blue'],[-17,16,'blue'],[-13,18,'blue'],[-30,8,'blue'],[-27,12,'blue'],[-20,3,'blue'],[14,-12,'red'],[18,-13,'red'],[24,-19,'red'],[28,-24,'red'],[10,-22,'red'],[19,-28,'red']] },
+  'desert-basin': { label: 'RED BASIN · 520 × 460', biome: 'desert', width: 520, depth: 460, groundTint: 0xe2c28c, background: 0xb7a080, fog: 0xb7a080, fogDensity: 0.0012, targetPositions: [[-130,-122],[58,-151],[143,-86],[-46,-113]], tankStarts: [[-73,72],[-61,83],[-87,61],[77,-25],[94,-38]], soldierStarts: [[-78,76,'blue'],[-72,81,'blue'],[-66,76,'blue'],[-92,68,'blue'],[-88,75,'blue'],[-81,62,'blue'],[71,-20,'red'],[78,-23,'red'],[87,-31,'red'],[101,-41,'red'],[94,-28,'red'],[82,-40,'red']] },
+  'river-crossing': { label: 'RIVER CROSSING · 560 × 480', biome: 'river', width: 560, depth: 480, groundTint: 0xc8d6b6, background: 0x879b95, fog: 0x879b95, fogDensity: 0.0010, riverZ: -8, targetPositions: [[-154,-116],[106,-130],[150,22],[-39,-142]], tankStarts: [[-86,68],[-71,79],[-99,60],[78,24],[96,34]], soldierStarts: [[-91,73,'blue'],[-85,78,'blue'],[-76,74,'blue'],[-103,63,'blue'],[-96,70,'blue'],[-88,59,'blue'],[72,18,'red'],[81,21,'red'],[90,30,'red'],[102,39,'red'],[92,17,'red'],[81,39,'red']] },
+  'alpine-pass': { label: 'ALPINE PASS · 480 × 440', biome: 'alpine', width: 480, depth: 440, groundTint: 0xcbd2c7, background: 0x89959b, fog: 0x89959b, fogDensity: 0.0016, targetPositions: [[-126,-126],[117,-99],[79,-157],[-19,-120]], tankStarts: [[-70,73],[-57,84],[-84,61],[57,-30],[73,-43]], soldierStarts: [[-76,77,'blue'],[-69,82,'blue'],[-61,75,'blue'],[-88,68,'blue'],[-83,75,'blue'],[-75,61,'blue'],[53,-25,'red'],[61,-30,'red'],[70,-38,'red'],[81,-47,'red'],[70,-24,'red'],[62,-46,'red']] }
+};
 
 function addTerrainDetail() {
   const patch = material(0x465640, 1, 0);
@@ -139,7 +151,7 @@ function addTerrainDetail() {
     tuft.position.set(x, 0.12, z);
     tuft.rotation.y = (i * 0.87) % Math.PI;
     tuft.receiveShadow = true;
-    scene.add(tuft);
+    mapFeatures.add(tuft);
   }
 }
 addTerrainDetail();
@@ -230,16 +242,30 @@ function buildTree(x, z, scale) {
   crown.position.y = 2.4;
   crown.castShadow = true;
   tree.add(crown);
-  scene.add(tree);
+  mapFeatures.add(tree);
 }
-for (let i = 0; i < 38; i++) {
-  const x = Math.sin(i * 9.71) * 82;
-  const z = Math.cos(i * 7.39) * 65;
-  if (Math.abs(x) < 27 && z > 2 && z < 70) continue;
-  if (z < -35 && Math.abs(x) < 40) continue;
-  buildTree(x, z, 0.65 + (i % 4) * 0.14);
-}
+// Tree cover is generated for each chosen battlefield.
 
+
+function clearMapFeatures() { for(const child of [...mapFeatures.children]){mapFeatures.remove(child);child.traverse((node)=>{if(node.geometry)node.geometry.dispose();});} }
+function addRiverFeature(width,centreZ){
+  const vertices=[],indices=[],steps=Math.ceil(width/12);
+  for(let i=0;i<=steps;i++){const x=-width/2+width*i/steps,z=centreZ+Math.sin(x*.018)*10+Math.sin(x*.043)*3;vertices.push(x,.18,z-9,x,.18,z+9);if(i<steps){const k=i*2;indices.push(k,k+1,k+2,k+1,k+3,k+2);}}
+  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geometry.setIndex(indices);geometry.computeVertexNormals();
+  const water=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color:0x397680,roughness:.24,metalness:.08,transparent:true,opacity:.94,side:THREE.DoubleSide}));water.name='wide-river-corridor';water.receiveShadow=true;mapFeatures.add(water);
+  for(const x of [-65,48,160]){const z=centreZ+Math.sin(x*.018)*10+Math.sin(x*.043)*3,bridge=new THREE.Group();bridge.position.set(x,.26,z);addBox(bridge,'bridge-deck',[16,.5,25],[0,0,0],mats.concrete);addBox(bridge,'bridge-rail-a',[16,.55,.25],[0,.54,-11.8],mats.steel);addBox(bridge,'bridge-rail-b',[16,.55,.25],[0,.54,11.8],mats.steel);mapFeatures.add(bridge);}
+}
+function buildMapFeatures(config){
+  clearMapFeatures();addTerrainDetail();const width=config.width,depth=config.depth;
+  const rand=(n,o=0)=>{const v=Math.sin((n+1)*127.1+o*311.7)*43758.5453;return v-Math.floor(v);};
+  if(config.biome==='river')addRiverFeature(width,config.riverZ||-8);
+  if(config.biome==='forest'||config.biome==='river'){const count=config.biome==='forest'?105:64;for(let i=0;i<count;i++){const x=(rand(i,1)-.5)*(width-36),z=(rand(i,2)-.5)*(depth-36);if(Math.abs(x)<74&&z>-126&&z<86)continue;buildTree(x,z,.58+rand(i,3)*.62);}}
+  else if(config.biome==='desert'){const duneMat=material(0xc5a66f,1,0),rockMat=material(0x88785e,.96,0);for(let i=0;i<54;i++){const x=(rand(i,4)-.5)*(width-30),z=(rand(i,5)-.5)*(depth-30);if(Math.abs(x)<80&&z>-126&&z<82)continue;const dune=new THREE.Mesh(new THREE.SphereGeometry(1,10,7),duneMat);dune.name='wind-carved-dune';dune.position.set(x,.18,z);dune.scale.set(7+rand(i,6)*14,.35+rand(i,7)*.7,4+rand(i,8)*8);dune.rotation.y=rand(i,9)*Math.PI;mapFeatures.add(dune);if(i%3===0){const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(1.1+rand(i,10)*2,0),rockMat);rock.position.set(x+4,.7,z-2);rock.rotation.set(rand(i,11),rand(i,12),rand(i,13));rock.castShadow=true;mapFeatures.add(rock);}}}
+  else if(config.biome==='alpine'){const mountainMat=material(0x66716d,.94,.02),snowMat=material(0xaaaead,.9,.02);for(let i=0;i<34;i++){const side=i%4,x=side<2?(rand(i,14)-.5)*width:(side===2?-1:1)*(width*.43+rand(i,15)*width*.06),z=side>=2?(rand(i,16)-.5)*depth:(side===0?-1:1)*(depth*.42+rand(i,17)*depth*.07);if(Math.abs(x)<95&&z>-130&&z<95)continue;const height=13+rand(i,18)*33,mountain=new THREE.Mesh(new THREE.ConeGeometry(11+rand(i,19)*15,height,5+(i%3)),i%4===0?snowMat:mountainMat);mountain.name='mountain-ridge';mountain.position.set(x,height*.47,z);mountain.rotation.y=rand(i,20)*Math.PI;mountain.castShadow=true;mapFeatures.add(mountain);}for(let i=0;i<28;i++){const x=(rand(i,21)-.5)*(width-40),z=(rand(i,22)-.5)*(depth-40);if(Math.abs(x)<90&&z>-130&&z<88)continue;buildTree(x,z,.55+rand(i,23)*.55);}}
+  addBox(mapFeatures,'north-south-supply-road',[5.6,.12,depth*.72],[-width*.27,.12,0],mats.road,false,true);
+  addBox(mapFeatures,'east-west-supply-road',[width*.72,.12,5.6],[width*.11,.12,depth*.23],mats.road,false,true);
+  for(let i=0;i<14;i++){const x=(rand(i,30)-.5)*(width-70),z=(rand(i,31)-.5)*(depth-70);if(Math.abs(x)<100&&z>-140&&z<95)continue;const h=2+rand(i,32)*5,wreck=addBox(mapFeatures,'abandoned-structure',[3+rand(i,33)*5,h,3+rand(i,34)*5],[x,h/2,z],i%2?mats.destroyed:mats.concrete);wreck.rotation.y=rand(i,35)*Math.PI;}
+}
 function addSelectionRing(parent, color) {
   const ring = new THREE.Mesh(new THREE.RingGeometry(1.9, 2.1, 48), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
   ring.rotation.x = -Math.PI / 2;
@@ -424,6 +450,14 @@ createBuildingTarget('LOGISTICS DEPOT', -24, -52, 'depot');
 createBuildingTarget('RADAR SITE', 15, -57, 'radar');
 createBuildingTarget('SAM BATTERY', 30, -38, 'sam');
 createBuildingTarget('FORWARD COMMAND', -2, -39, 'command');
+
+function applyBattlefieldMap(mapId,initial=false){
+  const config=MAPS[mapId]||MAPS['pine-valley'];state.mapId=mapId in MAPS?mapId:'pine-valley';
+  ground.scale.set(config.width/220,1,config.depth/190);ground.material.color.setHex(config.groundTint);scene.background.setHex(config.background);scene.fog.color.setHex(config.fog);scene.fog.density=config.fogDensity;
+  sun.shadow.camera.left=-config.width*.46;sun.shadow.camera.right=config.width*.46;sun.shadow.camera.top=config.depth*.44;sun.shadow.camera.bottom=-config.depth*.44;sun.shadow.camera.updateProjectionMatrix();buildMapFeatures(config);
+  targets.forEach((target,i)=>{const p=config.targetPositions[i]||config.targetPositions[0];target.group.position.set(p[0],0,p[1]);});tanks.forEach((unit,i)=>{const p=config.tankStarts[i]||config.tankStarts[0];unit.group.position.set(p[0],0,p[1]);});
+  cameraTarget.set(0,0,0);camera.position.set(0,config.depth*.42,config.depth*.47);camera.lookAt(cameraTarget);const selector=$('mapSelector');if(selector&&selector.value!==state.mapId)selector.value=state.mapId;resetMission();addLog('Theatre loaded: '+config.label+'. Operational area expanded.','normal');if(!initial)toast(config.label+' · scenario ready');
+}
 
 function makeJetVisual() {
   const root = new THREE.Group();
@@ -1139,14 +1173,16 @@ function drawMinimap() {
   const ctx = canvas.getContext('2d');
   const w = canvas.width, h = canvas.height;
   ctx.clearRect(0, 0, w, h);
-  ctx.fillStyle = '#1e2f29'; ctx.fillRect(0, 0, w, h);
+  const map=MAPS[state.mapId];
+  ctx.fillStyle=map.biome==='desert'?'#79674c':map.biome==='alpine'?'#4f5b5b':'#1e2f29';ctx.fillRect(0,0,w,h);
   ctx.strokeStyle = 'rgba(190,210,192,.08)'; ctx.lineWidth = 1;
   for (let x = 10; x < w; x += 20) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
   for (let y = 10; y < h; y += 20) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
-  const px = (x) => (x + 110) / 220 * w;
-  const py = (z) => (z + 95) / 190 * h;
-  ctx.fillStyle = '#303d40'; ctx.fillRect(px(-8), py(58), (13.5 / 220) * w, (58 / 190) * h);
-  ctx.fillStyle = '#798179'; ctx.fillRect(px(7), py(62), (28 / 220) * w, (16 / 190) * h);
+  const px=(x)=>(x+map.width/2)/map.width*w;
+  const py=(z)=>(z+map.depth/2)/map.depth*h;
+  ctx.fillStyle='#303d40';ctx.fillRect(px(-6.75),py(58),(13.5/map.width)*w,(58/map.depth)*h);
+  ctx.fillStyle='#798179';ctx.fillRect(px(7),py(62),(28/map.width)*w,(16/map.depth)*h);
+  if(map.biome==='river'){ctx.strokeStyle='#4a92a0';ctx.lineWidth=Math.max(2,18/map.width*w);ctx.beginPath();for(let x=-map.width/2;x<=map.width/2;x+=8){const z=(map.riverZ||-8)+Math.sin(x*.018)*10+Math.sin(x*.043)*3;if(x===-map.width/2)ctx.moveTo(px(x),py(z));else ctx.lineTo(px(x),py(z));}ctx.stroke();}
   ctx.fillStyle = 'rgba(234,184,107,.23)';
   targets.filter((t) => t.alive).forEach((t) => {
     ctx.beginPath(); ctx.arc(px(t.group.position.x), py(t.group.position.z), t.kind === 'depot' ? 8 : 6, 0, Math.PI * 2); ctx.fill();
@@ -1178,8 +1214,8 @@ function resetMission() {
   for (const unit of tanks) {
     unit.hp = unit.maxHp; unit.alive = true; unit.status = unit.team === 'blue' ? 'HOLDING' : 'DEFENDING';
     unit.moveTarget = null; unit.attackTarget = null;
-    const seed = unit.id === 'tank-1' ? [-18, 7] : unit.id === 'tank-2' ? [-12.8, 11.3] : unit.id === 'tank-3' ? [-24, 0.6] : unit.id === 'tank-4' ? [16, -17] : [23, -22];
-    unit.group.position.set(seed[0], 0, seed[1]); unit.group.rotation.set(0, 0, 0);
+    const seed=MAPS[state.mapId].tankStarts[tanks.indexOf(unit)]||MAPS[state.mapId].tankStarts[0];
+    unit.group.position.set(seed[0],0,seed[1]);unit.group.rotation.set(0,0,0);
     if (unit.visualData && unit.visualData.tracks) {
       unit.visualData.tracks.forEach((track) => { track.phase = 0; positionTrackSegments(track); });
     }
@@ -1202,7 +1238,7 @@ function panCamera(dx, dy) {
 }
 function zoomCamera(factor) {
   const offset = camera.position.clone().sub(cameraTarget);
-  const distance = THREE.MathUtils.clamp(offset.length() * factor, 42, 205);
+  const distance = THREE.MathUtils.clamp(offset.length() * factor, 36, 365);
   offset.setLength(distance);
   camera.position.copy(cameraTarget).add(offset);
   camera.lookAt(cameraTarget);
@@ -1252,6 +1288,7 @@ renderer.domElement.addEventListener('pointerup', onPointerUp);
 renderer.domElement.addEventListener('pointercancel', onPointerUp);
 renderer.domElement.addEventListener('wheel', (e) => { e.preventDefault(); zoomCamera(e.deltaY > 0 ? 1.09 : 0.92); }, { passive: false });
 renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
+$('mapSelector').addEventListener('change',(event)=>applyBattlefieldMap(event.target.value,false));
 window.addEventListener('keydown', (e) => {
   if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
   const key = e.key.toLowerCase();
@@ -1546,6 +1583,7 @@ function animate() {
   renderer.render(scene, camera);
 }
 setLoadProgress(12, 'Loading battlefield geometry…');
+applyBattlefieldMap(state.mapId,true);
 addLog('Theatre loaded. Ground assets ready.', 'normal');
 animate();
 initialiseAssets().catch((err) => {
