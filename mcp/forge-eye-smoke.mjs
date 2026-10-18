@@ -259,14 +259,22 @@ try {
     engine.timelineTime=2;camera.entity.camera.fov=82;camera.components.camera={...camera.components.camera,fov:82};
     engine.key({interpolation:"linear"});engine.evalAnimation(1);
     const midCamera={fov:camera.entity.camera.fov,keyCount:engine.keyframes.get(camera.id)?.length||0};
+    // Rotations across 360° should follow the short orientation arc (350° -> 10°), not swing through 180°.
+    const spin=engine.add("mesh","QA quaternion shortest-path");
+    engine.timelineTime=0;engine.select(spin.id);spin.entity.setLocalEulerAngles(0,350,0);engine.key({interpolation:"linear"});
+    engine.timelineTime=1;spin.entity.setLocalEulerAngles(0,10,0);engine.key({interpolation:"linear"});engine.evalAnimation(.5);
+    const q=spin.entity.getLocalRotation();
+    const quaternionRotationError=2*Math.acos(Math.min(1,Math.abs(q.w)))*180/Math.PI;
+    engine.keyframes.delete(spin.id);engine.entities.delete(spin.id);spin.entity.destroy();
     engine.timelineTime=1;engine.select(light.id);window.dispatchEvent(new Event("forge-selection"));
-    return {midLight,midCamera};
+    return {midLight,midCamera,quaternionRotationError};
   });
   if(Math.abs(componentAnimation.midLight.intensity-5.5)>.02||
       Math.abs(componentAnimation.midLight.color[0]-.5)>.02||Math.abs(componentAnimation.midLight.color[1])>.02||
       Math.abs(componentAnimation.midLight.color[2]-.5)>.02||componentAnimation.midLight.keyCount!==2||
-      Math.abs(componentAnimation.midCamera.fov-62)>.02||componentAnimation.midCamera.keyCount!==2){
-    throw new Error("Light/camera component keyframes did not interpolate: "+JSON.stringify(componentAnimation));
+      Math.abs(componentAnimation.midCamera.fov-62)>.02||componentAnimation.midCamera.keyCount!==2||
+      componentAnimation.quaternionRotationError>2){
+    throw new Error("Component or quaternion keyframe interpolation failed: "+JSON.stringify(componentAnimation));
   }
   await page.locator('[data-workspace="animation"]').click();
   await page.locator('[data-timeline-view="graph"]').click();
