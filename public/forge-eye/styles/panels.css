@@ -261,3 +261,8 @@
   .lathe-options #latheCreateMesh{grid-column:1/-1}
   .lathe-mesh-report{grid-column:1/-1}
 }
+
+
+/* Clear, compact guidance for the physically based material inspector. */
+.material-note{margin:6px 0 10px;color:#718899;font-size:9px;line-height:1.55}
+#lightSection[hidden],#cameraSection[hidden]{display:none!important}
