@@ -26,7 +26,7 @@ const PACKS = {
 };
 const DIRECT = {
   armourScene: 'https://cdn.3dassets.dev/assets/23739/v1/model.glb',
-  aircraftFallback: 'https://cdn.3dassets.dev/assets/32599/v1/model.glb',
+  aircraftFallback: 'https://cdn.3dassets.dev/assets/32595/v1/model.glb',
   f15: 'https://www.innerscene.com/api/library/f-15-eagle-fighter-jet-e1d11142/download'
 };
 
@@ -602,9 +602,12 @@ function replaceTankVisual(unit, gltf) {
     if (!turret && !node.isMesh && /turret/.test(name)) turret = node;
     if (node.isMesh && /(road.?wheel|wheel|roller)/.test(name)) wheels.push(node);
     if (node.isMesh && node.material && unit.team === 'red') {
-      const tinted = node.material.clone();
-      if (tinted.color) tinted.color.multiply(new THREE.Color(0x9d6e67));
-      node.material = tinted;
+      const tintMaterial = (source) => {
+        const tinted = source.clone();
+        if (tinted.color) tinted.color.multiply(new THREE.Color(0x9d6e67));
+        return tinted;
+      };
+      node.material = Array.isArray(node.material) ? node.material.map(tintMaterial) : tintMaterial(node.material);
     }
   });
   unit.visual = clone;
@@ -645,7 +648,7 @@ async function loadTankAssets() {
     const gltf = await loadGLTF(url, 12000);
     assets.tank = gltf;
     assets.tankSource = url;
-    tanks.filter((u) => u.team === 'blue').forEach((u) => replaceTankVisual(u, gltf));
+    tanks.forEach((u) => replaceTankVisual(u, gltf));
     setAssetText('Imported main battle tank GLB · CC0 pack', true);
     addLog('Armour model imported from CC0 GLB source.', 'normal');
     return true;
@@ -656,9 +659,9 @@ async function loadTankAssets() {
 }
 async function loadPlaneAssets() {
   const packUrl = await findModelUrl(PACKS.aircraft, /tandem[\s_-]*seat[\s_-]*jet[\s_-]*trainer|very[\s_-]*light[\s_-]*personal[\s_-]*jet/i);
-  const candidates = [DIRECT.f15];
+  const candidates = [];
   if (packUrl) candidates.push(packUrl);
-  candidates.push(DIRECT.aircraftFallback);
+  candidates.push(DIRECT.f15, DIRECT.aircraftFallback);
   for (const url of candidates) {
     try {
       const gltf = await loadGLTF(url, 15000);
