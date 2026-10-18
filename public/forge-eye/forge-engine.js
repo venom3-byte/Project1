@@ -71,20 +71,26 @@ export class ForgeEngine{
   rec(name,kind,e){const id=crypto.randomUUID();e.__forge={id,kind,name,components:{}};const r={id,kind,name,entity:e,components:e.__forge.components};this.entities.set(id,r);return r}
   add(kind,name){const e=new pc.Entity(name);this.root.addChild(e);return this.rec(name,kind,e)}
   _buildRigMarker(record,offsetY=.82){
-    if(!record?.entity||!this.app)return false;
-    let sourceMesh=null;
-    const temporary=new pc.Entity("Forge Rig Marker Source");
-    temporary.addComponent("render",{type:"sphere"});
-    sourceMesh=temporary.render?.meshInstances?.[0]?.mesh||null;
-    const sourcePositions=sourceMesh?.getPositions?.(),sourceIndices=sourceMesh?.getIndices?.();
-    temporary.destroy();
-    if(!sourcePositions||!sourceIndices)return false;
-    const positions=Array.from(sourcePositions,(v,i)=>(i%3===1?Number(v)*.17+offsetY:Number(v)*.17));
-    const indices=Array.from(sourceIndices);
+    if(!record?.entity||!this.app?.graphicsDevice)return false;
+    const radius=.13,y=clamp(offsetY,.1,100,.82);
+    const positions=[
+      0,y+radius,0,
+      -radius,y,0,
+      0,y,radius,
+      radius,y,0,
+      0,y,-radius,
+      0,y-radius,0,
+    ];
+    const indices=[
+      0,1,2, 0,2,3, 0,3,4, 0,4,1,
+      5,2,1, 5,3,2, 5,4,3, 5,1,4,
+    ];
     const mesh=new pc.Mesh(this.app.graphicsDevice);
-    mesh.setPositions(positions);mesh.setIndices(indices);mesh.setNormals(pc.calculateNormals(positions,indices));mesh.update();
+    mesh.setPositions(positions);mesh.setIndices(indices);
+    mesh.setNormals(pc.calculateNormals(positions,indices));mesh.update();
     const material=this.material([1,.43,.12]);
-    material.emissive=new pc.Color(1,.25,.035);material.emissiveIntensity=.75;material.metalness=0;material.gloss=.35;material.update();
+    material.emissive=new pc.Color(1,.25,.035);material.emissiveIntensity=.75;
+    material.metalness=0;material.gloss=.35;material.update();
     if(record.entity.render)record.entity.removeComponent("render");
     const instance=new pc.MeshInstance(mesh,material);
     record.entity.addComponent("render",{meshInstances:[instance]});
