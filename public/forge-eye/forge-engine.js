@@ -224,17 +224,34 @@ export class ForgeEngine{
   _rayFromScreen(e){const cam=this.camera();if(!cam?.camera)return null;const rect=this.canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top,a=cam.camera.screenToWorld(x,y,cam.camera.nearClip),b=cam.camera.screenToWorld(x,y,cam.camera.farClip),d=new pc.Vec3().sub2(b,a).normalize();return{a,b,d}}
   _triangleData(mesh){if(this.triangleCache.has(mesh))return this.triangleCache.get(mesh);let positions=null,indices=null;try{positions=mesh.getPositions?.();indices=mesh.getIndices?.()}catch{positions=null}const data={positions,indices};this.triangleCache.set(mesh,data);return data}
   pick(e){
-    const ray=this._rayFromScreen(e);if(!ray)return null;let best=null,bt=Infinity;const candidates=[];
-    for(const r of this.entities.values())for(const mi of(r.entity.render?.meshInstances||[])){const t=rayAabb(ray.a,ray.d,mi.aabb);if(t!==null&&t<bt+10)candidates.push({r,mi,t})}
-    candidates.sort((a,b)=>a.t-b.t);let tested=0;
+    const ray=this._rayFromScreen(e);if(!ray)return null;let best=null,bt=Infinity,tested=0;const candidates=[];
+    // Imported GLB/GLTF assets usually put their render components on descendant
+    // entities. Traverse the entire selectable record, but always return its root
+    // record so transforms, materials, and hierarchy selection stay coherent.
+    const visit=(r,node)=>{
+      if(!node||node.enabled===false)return;
+      for(const mi of(node.render?.meshInstances||[])){
+        if(mi.visible===false||!mi.aabb)continue;
+        const t=rayAabb(ray.a,ray.d,mi.aabb);
+        if(t!==null&&t<bt+10)candidates.push({r,mi,t});
+      }
+      for(const child of(node.children||[]))visit(r,child);
+    };
+    for(const r of this.entities.values())visit(r,r.entity);
+    candidates.sort((a,b)=>a.t-b.t);
     for(const c of candidates){
       const data=this._triangleData(c.mi.mesh);
       if(!data.positions||tested>this.pickBudget){if(c.t<bt){bt=c.t;best=c.r}continue}
       const inv=(c.mi.node?.getWorldTransform?.()||c.r.entity.getWorldTransform()).clone().invert(),ro=inv.transformPoint(ray.a.clone()),rp=inv.transformPoint(ray.a.clone().add(ray.d.clone())),rd=new pc.Vec3().sub2(rp,ro).normalize();
       let hit=null;const prims=c.mi.mesh.primitive||[{base:0,count:data.indices?data.indices.length:data.positions.length/3,indexed:!!data.indices}];
-      for(const p of prims){if(p.type!==pc.PRIMITIVE_TRIANGLES)continue;const end=p.base+p.count;
-        if(p.indexed&&data.indices){for(let i=p.base;i<end;i+=3){const ia=data.indices[i],ib=data.indices[i+1],ic=data.indices[i+2],a=V(data.positions[ia*3],data.positions[ia*3+1],data.positions[ia*3+2]),b=V(data.positions[ib*3],data.positions[ib*3+1],data.positions[ib*3+2]),cc=V(data.positions[ic*3],data.positions[ic*3+1],data.positions[ic*3+2]),t=rayTriangle(ro,rd,a,b,cc);tested++;if(t!=null&&(hit==null||t<hit))hit=t;if(tested>this.pickBudget)break}}
-        else{for(let i=p.base;i<end;i+=3){const a=V(data.positions[i*3],data.positions[i*3+1],data.positions[i*3+2]),b=V(data.positions[(i+1)*3],data.positions[(i+1)*3+1],data.positions[(i+1)*3+2]),cc=V(data.positions[(i+2)*3],data.positions[(i+2)*3+1],data.positions[(i+2)*3+2]),t=rayTriangle(ro,rd,a,b,cc);tested++;if(t!=null&&(hit==null||t<hit))hit=t;if(tested>this.pickBudget)break}}
+      for(const p of prims){
+        if(p.type!==pc.PRIMITIVE_TRIANGLES)continue;
+        const end=p.base+p.count;
+        if(p.indexed&&data.indices){
+          for(let i=p.base;i<end;i+=3){const ia=data.indices[i],ib=data.indices[i+1],ic=data.indices[i+2],a=V(data.positions[ia*3],data.positions[ia*3+1],data.positions[ia*3+2]),b=V(data.positions[ib*3],data.positions[ib*3+1],data.positions[ib*3+2]),cc=V(data.positions[ic*3],data.positions[ic*3+1],data.positions[ic*3+2]),t=rayTriangle(ro,rd,a,b,cc);tested++;if(t!=null&&(hit==null||t<hit))hit=t;if(tested>this.pickBudget)break}
+        }else{
+          for(let i=p.base;i<end;i+=3){const a=V(data.positions[i*3],data.positions[i*3+1],data.positions[i*3+2]),b=V(data.positions[(i+1)*3],data.positions[(i+1)*3+1],data.positions[(i+1)*3+2]),cc=V(data.positions[(i+2)*3],data.positions[(i+2)*3+1],data.positions[(i+2)*3+2]),t=rayTriangle(ro,rd,a,b,cc);tested++;if(t!=null&&(hit==null||t<hit))hit=t;if(tested>this.pickBudget)break}
+        }
       }
       if(hit!=null){const worldHit=c.mi.node?.getWorldTransform?.().transformPoint(ro.clone().add(rd.clone().mulScalar(hit)))||ray.a.clone().add(ray.d.clone().mulScalar(c.t)),wt=worldHit.distance(ray.a);if(wt<bt){bt=wt;best=c.r}}
     }
