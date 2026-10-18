@@ -105,3 +105,34 @@ jobs:
           NODE
       - name: Check whitespace errors
         run: git diff --check
+      - name: Install isolated Chromium test runner
+        run: npm install --prefix mcp --no-audit --no-fund
+      - name: Start local Warfront preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4174 --bind 127.0.0.1 --directory public/warfront > /tmp/warfront-preview.log 2>&1 &
+          echo $! > /tmp/warfront-preview.pid
+          for i in $(seq 1 30); do
+            if curl --silent --fail --max-time 2 http://127.0.0.1:4174/index.html >/dev/null; then
+              echo "Warfront static preview is responding."
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/warfront-preview.log
+          exit 1
+      - name: Test Warfront on desktop and mobile Chromium
+        env:
+          WARFRONT_URL: http://127.0.0.1:4174/index.html
+          WARFRONT_ARTIFACTS: ${{ runner.temp }}/warfront-browser-qa
+        run: node mcp/warfront-browser-smoke.mjs
+      - name: Upload Warfront screenshots and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: warfront-browser-qa
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/warfront-browser-qa/
+            /tmp/warfront-preview.log
