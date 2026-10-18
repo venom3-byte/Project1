@@ -24,8 +24,10 @@ try {
   ]) {
     await page.setViewportSize(profile.viewport);
     const pageErrors = [];
+    const consoleErrors = [];
     const failedRequests = [];
     page.on("pageerror", error => pageErrors.push(String(error?.stack || error)));
+    page.on("console", message => { if (message.type() === "error") consoleErrors.push(message.text()); });
     page.on("requestfailed", request => failedRequests.push({ url: request.url(), error: request.failure()?.errorText || "request failed" }));
     const response = await page.goto(BASE_URL, { waitUntil: "domcontentloaded", timeout: 60000 });
     if (!response || response.status() !== 200) throw new Error(profile.name + ": game page did not return HTTP 200.");
@@ -65,9 +67,19 @@ try {
     if (metrics.diagnostics.tankModels?.length !== 5 || metrics.diagnostics.tankModels.some(t => !t.imported)) throw new Error(profile.name + ": tank/armour model replacement was incomplete.");
     if ((metrics.diagnostics.infantryModels || 0) < 10) throw new Error(profile.name + ": too few Blender infantry models were bound.");
     if (metrics.diagnostics.aircraft?.filter(a => !!a.root).length !== 4) throw new Error(profile.name + ": not every aircraft was bound to its own Blender root.");
+    if (metrics.diagnostics.serviceVehicles?.length !== 2 || !metrics.diagnostics.serviceVehicles.some(v => v.root === "UNIT_CARGO_ROOT") || !metrics.diagnostics.serviceVehicles.some(v => v.root === "UNIT_FUEL_ROOT")) throw new Error(profile.name + ": Blender ammunition/fuel service vehicles were not created.");
     if (failedRequests.some(r => /combined-arms-r19\.glb/.test(r.url))) throw new Error(profile.name + ": Blender GLB asset request failed.");
     if (pageErrors.length) throw new Error(profile.name + ": browser JavaScript errors: " + pageErrors.join("\n"));
-    report.runs.push({ ...profile, ...metrics, pageErrors, failedRequests });
+    const serviceStart = await page.evaluate(() => window.__WARFRONT_TEST__?.startF16Rearm() || null);
+    if (!serviceStart || !serviceStart.started) throw new Error(profile.name + ": local F-16 rearm scenario could not dispatch its ground convoy: " + JSON.stringify(serviceStart));
+    await page.waitForFunction(() => {
+      const d = window.__WARFRONT_DIAGNOSTICS__?.();
+      const f16 = d?.aircraft?.find(a => a.key === "f16c-block50");
+      return !!f16 && f16.state === "ready" && f16.storesRemaining > 0 && d.serviceVehicles?.length === 2 && d.serviceVehicles.every(v => v.state === "idle" && v.job === null);
+    }, null, { timeout: 35000 });
+    const postService = await page.evaluate(() => window.__WARFRONT_DIAGNOSTICS__?.() || null);
+    if (consoleErrors.length) throw new Error(profile.name + ": browser console errors: " + consoleErrors.join("\n"));
+    report.runs.push({ ...profile, ...metrics, serviceStart, postService, pageErrors, consoleErrors, failedRequests });
   }
 } catch (error) {
   report.failures.push(String(error?.stack || error));
