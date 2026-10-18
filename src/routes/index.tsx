@@ -1,15 +1,16 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 /**
- * Keep the public Forge workbench isolated from the host app bundle.
- * This mirrors the Macaly Forge host route and preserves its static ES modules.
+ * Load the real Forge Eye workbench shell rather than the legacy Forge page.
+ * The editor is a live HTML/CSS/PlayCanvas viewport with a Rust/WASM geometry
+ * core, not a pre-rendered screenshot.
  */
 function ForgeHost() {
   return (
     <main className="h-screen w-screen overflow-hidden bg-black">
       <iframe
-        title="Forge Studio 3.7"
-        src="forge/index.html"
+        title="Forge Eye — Rust / WebAssembly 3D Workspace"
+        src="forge-eye/index.html"
         className="h-full w-full border-0"
         allow="fullscreen; clipboard-read; clipboard-write"
       />

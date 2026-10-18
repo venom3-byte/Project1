@@ -1,0 +1,131 @@
+name: Forge Eye Rust/WASM build and browser QA
+
+on:
+  push:
+    branches:
+      - agent/forge-eye-rust-rebuild-2026-10-17
+      - agent/forge-eye-image-quality-2026-10-18
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forge-eye-rust-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  forge-eye:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install web dependencies
+        run: npm ci
+      - name: Set up stable Rust and WebAssembly target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+      - name: Check Rust formatting
+        run: cargo fmt --all -- --check
+      - name: Run deterministic Rust core tests
+        run: cargo test --workspace --locked
+      - name: Lint Rust core without warnings
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Build Rust/WebAssembly core and validate the shipped ABI
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build -p forge-eye-core --release --locked --target wasm32-unknown-unknown
+          gzip -t public/forge-eye/forge_eye_core.wasm.gz
+          node scripts/validate-forge-eye-wasm.mjs public/forge-eye/forge_eye_core.wasm.gz target/wasm32-unknown-unknown/release/forge_eye_core.wasm
+          printf 'Fresh Rust WASM: %s bytes; shipped gzip: %s bytes\n' "$(wc -c < target/wasm32-unknown-unknown/release/forge_eye_core.wasm)" "$(wc -c < public/forge-eye/forge_eye_core.wasm.gz)"
+      - name: Validate Forge Eye browser modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do node --check "$file"; done < <(find public/forge-eye -type f -name '*.js' -print0)
+          node --check mcp/forge-eye-smoke.mjs
+          node --check scripts/validate-forge-eye-wasm.mjs
+      - name: Build static web editor
+        env:
+          DEV_BUILD: "1"
+          STATIC_EXPORT: "1"
+          VITE_BASE_PATH: "/"
+        run: npm run build
+      - name: Start static preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          # STATIC_EXPORT skips Nitro, so Vite publishes the copied public/
+          # directory under dist/client (not .output/public).
+          site_dir="dist/client"
+          test -s "$site_dir/index.html"
+          test -s "$site_dir/forge-eye/index.html"
+          test -s "$site_dir/forge-eye/forge_eye_core.wasm.gz"
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory "$site_dir" > /tmp/forge-eye-preview.log 2>&1 &
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent --max-time 2 http://127.0.0.1:4173/forge-eye/index.html -o /tmp/forge-eye-preview.html; then break; fi
+            sleep 1
+          done
+          if ! grep -q 'FORGE EYE' /tmp/forge-eye-preview.html; then
+            cat /tmp/forge-eye-preview.log
+            find "$site_dir/forge-eye" -maxdepth 2 -type f -print
+            exit 1
+          fi
+          curl --fail --silent --show-error --max-time 10 http://127.0.0.1:4173/ -o /tmp/forge-root-preview.html
+          if ! grep -q 'forge-eye/index.html' /tmp/forge-root-preview.html; then
+            echo "Root route does not point at the actual Forge Eye workbench." >&2
+            exit 1
+          fi
+          curl --fail --silent --show-error --max-time 10 http://127.0.0.1:4173/forge-eye/forge_eye_core.wasm.gz -o /tmp/forge-eye-served.wasm.gz
+          gzip -t /tmp/forge-eye-served.wasm.gz
+      - name: Install isolated Chromium smoke-test dependencies
+        run: npm install --prefix mcp --no-audit --no-fund
+      - name: Test Forge Eye in desktop and mobile Chromium
+        env:
+          FORGE_EYE_URL: http://127.0.0.1:4173/forge-eye/index.html
+          FORGE_EYE_ARTIFACTS: ${{ runner.temp }}/forge-eye-qa
+        run: node mcp/forge-eye-smoke.mjs
+      - name: Check deployed Forge Eye preview route (advisory; deployment is separate)
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://forge-studio.forgemail-agent.workers.dev"
+          for asset in index.html app.js forge-engine.js forge-viewport.js forge-eye-wasm.js forge_eye_core.wasm.gz; do
+            curl --fail --silent --show-error --max-time 20 "$base/forge-eye/$asset" -o "/tmp/forge-eye-public-$asset"
+            test -s "/tmp/forge-eye-public-$asset"
+          done
+          grep -q 'import("./forge-eye-wasm.js")' /tmp/forge-eye-public-app.js
+          grep -q 'function autoDetectTraceSilhouette' /tmp/forge-eye-public-app.js
+          grep -q 'createRigPivotForSelected' /tmp/forge-eye-public-forge-engine.js
+          grep -q 'const clamp=' /tmp/forge-eye-public-forge-engine.js
+          grep -q 'light.intensity' /tmp/forge-eye-public-index.html
+          gzip -t /tmp/forge-eye-public-forge_eye_core.wasm.gz
+          echo "Forge Eye public route serves PBR/rig/image-model improvements and the Rust WASM artifact."
+      - name: Exercise the deployed Forge Eye in real Chromium
+        env:
+          FORGE_EYE_URL: https://forge-studio.forgemail-agent.workers.dev/forge-eye/index.html
+          FORGE_EYE_ARTIFACTS: ${{ runner.temp }}/forge-eye-public-qa
+        run: node mcp/forge-eye-smoke.mjs
+      - name: Upload browser reports and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-eye-rust-browser-qa
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/forge-eye-qa/
+            /tmp/forge-eye-preview.log
+            /tmp/forge-eye-served.wasm.gz

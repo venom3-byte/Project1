@@ -175,18 +175,13 @@ async function buildPlane(record) {
   visibleForView(record);
 }
 async function normalizeImage(file) {
+  // Keep the upload byte-for-byte: reference guides are measurement inputs,
+  // not thumbnails. Decode only to read dimensions; retain the original Blob.
   const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1,4096/Math.max(bitmap.width,bitmap.height));
-  const width = Math.max(1,Math.round(bitmap.width*scale));
-  const height = Math.max(1,Math.round(bitmap.height*scale));
-  const canvas = document.createElement('canvas');
-  canvas.width = width; canvas.height = height;
-  canvas.getContext('2d',{alpha:true}).drawImage(bitmap,0,0,width,height);
+  const width = bitmap.width;
+  const height = bitmap.height;
   bitmap.close?.();
-  const type = file.type === 'image/png' ? 'image/png' : (file.type === 'image/jpeg' ? 'image/jpeg' : 'image/webp');
-  const blob = await new Promise((resolve,reject) => {
-    canvas.toBlob(value => value ? resolve(value) : reject(new Error('Could not encode the reference image')),type,type==='image/jpeg'?0.94:undefined);
-  });
+  const blob = file.slice(0, file.size, file.type || 'application/octet-stream');
   return {blob,width,height};
 }
 async function installReference(info,{save=true}={}) {
