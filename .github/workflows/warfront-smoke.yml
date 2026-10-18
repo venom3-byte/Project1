@@ -43,10 +43,15 @@ jobs:
           if (roster.bundle.fullSceneGLBPath !== bundlePath) throw new Error('Roster does not point to the repository GLB bundle');
           if (roster.bundle.fullSceneGLBBytes !== bundleBytes) throw new Error('Roster GLB byte count does not match committed file');
           if (roster.schemaVersion !== 1) throw new Error('Unexpected roster schema');
-          if (!Array.isArray(roster.vehicles) || roster.vehicles.length !== 28) throw new Error('Expected 28 Blender vehicle/aircraft roots');
+          if (!Array.isArray(roster.vehicles) || roster.vehicles.length !== 31) throw new Error('Expected 31 active Blender vehicle and aircraft classes');
+          const fixedWing = roster.vehicles.filter((u) => u.category === 'fixed_wing_aircraft');
+          const rotaryWing = roster.vehicles.filter((u) => u.category === 'rotary_wing_aircraft');
+          const groundVehicles = roster.vehicles.filter((u) => !['fixed_wing_aircraft','rotary_wing_aircraft'].includes(u.category));
+          if (fixedWing.length !== 2 || rotaryWing.length !== 2 || groundVehicles.length !== 27) throw new Error('Airframe/ground classes are not separated (expected 2 fixed-wing, 2 rotary-wing, 27 ground)');
+          if (!Array.isArray(roster.maps) || roster.maps.length !== 4) throw new Error('Expected four Blender-authored large map roots');
           if (!roster.infantry || !Array.isArray(roster.infantry.instances) || roster.infantry.instances.length !== 24) throw new Error('Expected 24 infantry scene prototypes');
           if (!Array.isArray(roster.infantry.archetypes) || roster.infantry.archetypes.length !== 18) throw new Error('Expected 18 infantry archetypes');
-          const roots = [...roster.vehicles.map((u) => u.root), ...roster.infantry.instances.map((u) => u.sourceRoot)];
+          const roots = [...roster.vehicles.map((u) => u.root), ...roster.infantry.instances.map((u) => u.sourceRoot), ...roster.maps.map((u) => u.root)];
           if (new Set(roots).size !== roots.length) throw new Error('Duplicate asset root identifiers');
           const glb = readFileSync(bundlePath);
           if (glb.readUInt32LE(0) !== 0x46546c67) throw new Error('Combined asset bundle is not a GLB file');
@@ -57,9 +62,10 @@ jobs:
           const missingRoots = roots.filter((name) => !nodeNames.has(name));
           if (missingRoots.length) throw new Error('Missing named roots in GLB: ' + missingRoots.slice(0, 12).join(', '));
           console.log('Validated GLB magic/version and ' + roots.length + ' named roster roots.');
-          if (roster.integrationStatus !== 'full-scene-glb-available-root-preview-supported-individual-unit-packaging-and-gameplay-binding-pending') throw new Error('Roster integration status must stay explicit');
-          if (roster.vehicles.some((u) => u.status !== 'blender_prototype' || !u.root)) throw new Error('Every vehicle must have an explicit prototype status and Blender root');
-          if (roster.infantry.instances.some((u) => u.status !== 'blender_prototype' || !u.sourceRoot)) throw new Error('Every infantry instance must have an explicit prototype status and Blender root');
+          if (!String(roster.integrationStatus || '').includes('revision-19')) throw new Error('Roster must identify its Blender source revision');
+          if (roster.vehicles.some((u) => !u.status || !u.root || !u.category)) throw new Error('Every vehicle must have a status, category and Blender root');
+          if (roster.infantry.instances.some((u) => !u.status || !u.sourceRoot)) throw new Error('Every infantry instance must have a status and Blender root');
+          if (roster.maps.some((u) => !u.root || !u.terrainDimensionsM)) throw new Error('Every battlefield map must have a Blender root and metre dimensions');
           const requiredHtml = [
             '<div id="stage"',
             '<canvas id="minimap"',
@@ -83,6 +89,12 @@ jobs:
             'function updateInfantry(',
             'function crashAircraft(',
             'function createImpactMark(',
+            'function bindBlenderRuntimeAssets(',
+            'function installBlenderMap(',
+            'function buildMapLayout(',
+            'function updateAircraftRigMotion(',
+            'function spawnGuidedMissile(',
+            'window.__WARFRONT_DIAGNOSTICS__',
             'async function loadRosterManifest(',
             'function populateRosterCatalog(',
             'async function loadBlenderAssetBundle(',
