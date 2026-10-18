@@ -227,10 +227,7 @@ function startGesture(e) {
   if (e.pointerType==="touch") {
     if(state.touches.size===0&&gizmo&&!gizmo.state?.nativeReady&&gizmo.state?.mode!=="select"){
       const selected=F.selected(),componentSelection=selected&&["camera","light"].includes(selected.kind),picked=componentSelection?selected:F.pick(e);
-      if(picked||selected){
-        // Without native engine gizmos, continue dragging the current selection
-        // when a complex imported mesh was missed by the ray picker.
-        if(!picked&&selected)F.select(selected.id);
+      if(picked){
         const transform=gizmo.beginPointerGesture?.(e);
         if(transform){state.touches.set(e.pointerId,{x:e.clientX,y:e.clientY});state.gesture={id:e.pointerId,mode:"transform",transform,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false};e.preventDefault();try{canvas.setPointerCapture(e.pointerId)}catch{}return}
       }
@@ -254,10 +251,7 @@ function startGesture(e) {
   else if (e.button===2) mode=e.shiftKey?"orbit":"pan";
   if(mode==="select"&&e.button===0&&gizmo&&!gizmo.state?.nativeReady&&gizmo.state?.mode!=="select"){
     const selected=F.selected(),componentSelection=selected&&["camera","light"].includes(selected.kind),picked=componentSelection?selected:F.pick(e);
-    if(picked||selected){
-      // Keep the transform fallback usable when a renderer cannot expose a
-      // descendant mesh for picking; numeric Inspector fields remain available.
-      if(!picked&&selected)F.select(selected.id);
+    if(picked){
       const transform=gizmo.beginPointerGesture?.(e);
       if(transform){state.gesture={id:e.pointerId,mode:"transform",transform,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false};e.preventDefault();try{canvas.setPointerCapture(e.pointerId)}catch{}return}
     }
