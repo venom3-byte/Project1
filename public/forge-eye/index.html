@@ -263,13 +263,14 @@
           <div class="panel-heading"><div><strong>Image Modeling</strong><span>CALIBRATE · ALIGN · TRACE</span></div></div>
           <button id="addReferenceImages" class="wide-secondary reference-add">＋ Add reference images</button>
           <div class="silhouette-tools">
+            <div class="visual-hull-title"><strong>Any image contour → 3D mesh</strong><span>FREEFORM · NOT LATHE-ONLY</span></div>
             <label>Extrusion depth (m)<input id="silhouetteDepth" type="number" min="0.01" max="1000" step="0.05" value="0.35"></label>
-            <button id="traceSilhouette" class="wide-secondary">Trace outline → build 3D</button>
-            <p>For a clean cutout or measured orthographic view: trace the outer contour, then Forge builds and saves an editable 3D slab. This is a silhouette blockout, not full hidden-surface reconstruction.</p>
+            <button id="traceSilhouette" class="wide-secondary">Trace any shape → build 3D mesh</button>
+            <p>Works with angular, irregular and non-round outlines: import an image, trace or auto-detect its outer boundary, then generate an editable extruded mesh. For a more volumetric blockout, trace aligned Front and Side images in the multi-view tool below. A single contour cannot reveal hidden surfaces or true depth.</p>
           </div>
           <div class="lathe-tools">
-            <div class="visual-hull-title"><strong>Profile → solid (Rust)</strong><span>SPIN 360°</span></div>
-            <p>For bottles, vases, cups, columns and other axisymmetric shapes: edit a 2D radius-height profile and revolve it into a real indexed 3D mesh using the Rust/WASM kernel.</p>
+            <div class="visual-hull-title"><strong>Rotational profile → solid (Rust)</strong><span>SPIN 360°</span></div>
+            <p>This is a specialised tool for axisymmetric objects such as bottles, vases, cups and columns. Edit the radius-height section and revolve it into a real indexed 3D mesh using the Rust/WASM kernel; use Freeform Contour above for other shapes.</p>
             <button id="createBottleQuick" class="wide-secondary">One-click bottle · Rust</button>
             <button id="openLatheEditor" class="wide-secondary">Edit profile / Spin 360°</button>
             <button id="useReferenceForLathe" class="wide-secondary">Use selected image outline</button>
