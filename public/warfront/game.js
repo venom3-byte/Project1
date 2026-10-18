@@ -2126,7 +2126,7 @@ window.__WARFRONT_DIAGNOSTICS__=()=>({
   tankModels:tanks.map((unit)=>({name:unit.name,root:unit.visual&&unit.visual.name,imported:!!(unit.visualData&&unit.visualData.imported)})),
   infantryModels:soldiers.filter((unit)=>!!unit.modelRootName).length,
   serviceVehicles:serviceVehicles.map((truck)=>({name:truck.name,root:truck.sourceRoot,state:truck.state,status:truck.status,job:truck.job?truck.job.stage:null})),
-  aircraft:aircraft.map((plane)=>({key:plane.airUnitKey||null,name:plane.name,root:plane.modelRootName||null,flightClass:plane.flightClass||'unbound',transport:!!plane.isTransport,state:plane.state,status:plane.status,ready:plane.state==='ready',storesRemaining:plane.storesRemaining??null})))
+  aircraft:aircraft.map((plane)=>({key:plane.airUnitKey||null,name:plane.name,root:plane.modelRootName||null,flightClass:plane.flightClass||'unbound',transport:!!plane.isTransport,state:plane.state,status:plane.status,ready:plane.state==='ready',storesRemaining:plane.storesRemaining??null}))
 });
 if(location.hostname==='127.0.0.1'||location.hostname==='localhost'){
   window.__WARFRONT_TEST__={
