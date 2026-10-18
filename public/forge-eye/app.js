@@ -448,6 +448,110 @@ function handleTracePointerDown(event){
   }
   addTracePoint(event);
 }
+function autoDetectTraceSilhouette(){
+  const trace=state.trace,canvas=$("#traceCanvas");
+  if(!trace||!canvas)return;
+  const width=canvas.width,height=canvas.height,total=width*height;
+  if(total<16||total>1000000){$("#traceMessage").textContent="Image is outside the automatic silhouette detector's safe size range. Resize the reference or trace it manually.";return}
+  const source=document.createElement("canvas");source.width=width;source.height=height;
+  const sourceCtx=source.getContext("2d",{willReadFrequently:true});
+  if(!sourceCtx){$("#traceMessage").textContent="Could not allocate image analysis buffer.";return}
+  sourceCtx.drawImage(trace.bitmap,0,0,width,height);
+  let image;
+  try{image=sourceCtx.getImageData(0,0,width,height)}catch(error){$("#traceMessage").textContent="Browser denied image-pixel access: "+(error?.message||String(error));return}
+  const data=image.data,rgba=(x,y)=>{const at=(y*width+x)*4;return[data[at],data[at+1],data[at+2],data[at+3]]};
+  let edgeTransparent=0,edgeSamples=0;
+  const stride=Math.max(1,Math.floor(Math.min(width,height)/250));
+  for(let x=0;x<width;x+=stride){
+    if(rgba(x,0)[3]<210)edgeTransparent++;
+    if(rgba(x,height-1)[3]<210)edgeTransparent++;
+    edgeSamples+=2;
+  }
+  for(let y=stride;y<height;y+=stride){
+    if(rgba(0,y)[3]<210)edgeTransparent++;
+    if(rgba(width-1,y)[3]<210)edgeTransparent++;
+    edgeSamples+=2;
+  }
+  const transparency=edgeTransparent/Math.max(1,edgeSamples)>.18;
+  let background=[0,0,0],flatCorners=true;
+  const corners=[[0,0],[width-1,0],[0,height-1],[width-1,height-1]].map(([x,y])=>rgba(x,y));
+  for(let channel=0;channel<3;channel++)background[channel]=corners.reduce((sum,c)=>sum+c[channel],0)/4;
+  const cornerSpread=Math.max(...corners.map(c=>Math.hypot(c[0]-background[0],c[1]-background[1],c[2]-background[2])));
+  flatCorners=cornerSpread<68;
+  if(!transparency&&!flatCorners){
+    $("#traceMessage").textContent="Auto-detection needs a transparent-background PNG or a mostly uniform background. This photo has a variable background, so use manual contour tracing or first create a clean cutout.";
+    return;
+  }
+  const mask=new Uint8Array(total);
+  let foreground=0;
+  for(let i=0;i<total;i++){
+    const at=i*4,a=data[at+3],distance=Math.hypot(data[at]-background[0],data[at+1]-background[1],data[at+2]-background[2]);
+    const isForeground=transparency?a>24:(a>24&&distance>Math.max(28,Math.min(72,cornerSpread*.75+28)));
+    if(isForeground){mask[i]=1;foreground++}
+  }
+  if(foreground<Math.max(20,total*.0015)||foreground>total*.94){
+    $("#traceMessage").textContent="The image background could not be separated confidently. Try a transparent PNG or trace the contour manually; no existing outline was changed.";
+    return;
+  }
+  const visited=new Uint8Array(total),queue=new Int32Array(total);
+  let largest=null,largestCount=0;
+  for(let start=0;start<total;start++){
+    if(!mask[start]||visited[start])continue;
+    let head=0,tail=0;queue[tail++]=start;visited[start]=1;
+    while(head<tail){
+      const at=queue[head++],x=at%width,y=(at/width)|0;
+      const neighbors=[];
+      if(x>0)neighbors.push(at-1);
+      if(x+1<width)neighbors.push(at+1);
+      if(y>0)neighbors.push(at-width);
+      if(y+1<height)neighbors.push(at+width);
+      for(const n of neighbors)if(mask[n]&&!visited[n]){visited[n]=1;queue[tail++]=n}
+    }
+    if(tail>largestCount){largestCount=tail;largest=new Int32Array(tail);largest.set(queue.subarray(0,tail))}
+  }
+  if(!largest||largestCount<Math.max(20,total*.0015)){
+    $("#traceMessage").textContent="No usable foreground object was detected. Try a cleaner cutout or manual tracing.";
+    return;
+  }
+  const objectMask=new Uint8Array(total);
+  for(const at of largest)objectMask[at]=1;
+  const edges=[],outgoing=new Map();
+  const addEdge=(sx,sy,ex,ey)=>{
+    const edge={sx,sy,ex,ey,used:false},key=sx+","+sy;
+    edges.push(edge);if(!outgoing.has(key))outgoing.set(key,[]);outgoing.get(key).push(edge);
+  };
+  for(const at of largest){
+    const x=at%width,y=(at/width)|0;
+    if(y===0||!objectMask[at-width])addEdge(x,y,x+1,y);
+    if(x===width-1||!objectMask[at+1])addEdge(x+1,y,x+1,y+1);
+    if(y===height-1||!objectMask[at+width])addEdge(x+1,y+1,x,y+1);
+    if(x===0||!objectMask[at-1])addEdge(x,y+1,x,y);
+  }
+  if(edges.length<12){$("#traceMessage").textContent="The detected silhouette boundary was too small to form a stable mesh.";return}
+  let first=edges[0];
+  for(const edge of edges)if(edge.sy<first.sy||(edge.sy===first.sy&&edge.sx<first.sx))first=edge;
+  const boundary=[[first.sx,first.sy]];let current=first;current.used=true;let closed=false;
+  for(let steps=0;steps<=edges.length+1;steps++){
+    boundary.push([current.ex,current.ey]);
+    if(current.ex===first.sx&&current.ey===first.sy){closed=true;break}
+    const options=(outgoing.get(current.ex+","+current.ey)||[]).filter(edge=>!edge.used);
+    if(!options.length)break;
+    current=options[0];current.used=true;
+  }
+  if(!closed||boundary.length<8){
+    $("#traceMessage").textContent="The outline contains a noisy or ambiguous boundary. Use a cleaner transparent cutout or edit the trace manually; no old outline was changed.";
+    return;
+  }
+  boundary.pop();
+  const maxPoints=210,step=Math.max(1,Math.ceil(boundary.length/maxPoints)),sampled=[];
+  for(let i=0;i<boundary.length;i+=step)sampled.push(boundary[i]);
+  const points=sampled.map(([x,y])=>[clamp(x/width,0,1,0),clamp(y/height,0,1,0)]);
+  const deduped=points.filter((point,i)=>i===0||Math.hypot((point[0]-points[i-1][0])*width,(point[1]-points[i-1][1])*height)>1);
+  if(deduped.length<3){$("#traceMessage").textContent="The detected shape simplified to too few points. Trace manually for better control.";return}
+  trace.points=deduped;trace.closed=true;trace.editing=true;
+  $("#traceMessage").textContent="Auto-detected the largest foreground silhouette ("+largestCount.toLocaleString()+" pixels, "+deduped.length+" contour points). Review and adjust the outline before building: this creates a depth-extruded blockout, not hidden surfaces.";
+  traceDraw();
+}
 function closeTraceEditor(){
   if(state.trace?.bitmap)state.trace.bitmap.close?.();state.trace=null;
   if($("#traceDialog")?.open)$("#traceDialog").close();
@@ -811,6 +915,7 @@ function bindUI(){
   $("#addReferenceImages").addEventListener("click",()=>$("#referenceInput").click());
   $("#traceSilhouette").addEventListener("click",()=>void startSilhouetteTrace());
   $("#traceCanvas").addEventListener("pointerdown",handleTracePointerDown);
+  $("#traceAutoDetect").addEventListener("click",autoDetectTraceSilhouette);
   $("#traceUndo").addEventListener("click",()=>{if(state.trace){state.trace.points.pop();state.trace.closed=false;$("#traceMessage").textContent="Last contour point removed.";traceDraw()}});
   $("#traceClear").addEventListener("click",()=>{if(state.trace){state.trace.points=[];state.trace.closed=false;state.trace.editing=false;$("#traceMessage").textContent="Outline cleared. Trace a new contour in one direction.";traceDraw()}});
   $("#traceSaveOutline").addEventListener("click",saveTraceOutline);
