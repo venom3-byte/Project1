@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "project": "Warfront RTS",
-  "sceneRevision": 14,
+  "sceneRevision": 19,
   "sceneProjectUrl": "https://higgsfield.ai/3d-jutsu/6a8b4f06-f85f-4cac-9897-35fab0bccfe3",
   "sourceEngine": "Blender 5.2 LTS",
   "coordinateNotes": {
@@ -10,21 +10,24 @@
     "authoredVehicleForward": "+Y",
     "exportFormat": "GLB/glTF converts coordinates for consumers"
   },
-  "integrationStatus": "full-scene-glb-available-root-preview-supported-individual-unit-packaging-and-gameplay-binding-pending",
+  "integrationStatus": "blender-scene-revision-19-committed; f16-and-heavy-strike-prototypes-authored; root-specific-web-runtime-binding-and-android-packaging-in-progress",
   "balanceNote": "All balance numbers are abstract RTS game values, not real-world performance specifications.",
   "bundle": {
-    "fullSceneGLBBytes": 13793416,
+    "fullSceneGLBBytes": 14618908,
     "individualGLBAssets": "pending",
-    "runtimeImport": "pending",
-    "fullSceneRevision": 14,
-    "fullSceneGLBPath": "public/warfront/assets/combined-arms-r8.glb"
+    "runtimeImport": "pending until revision-19 bundle sync and browser verification",
+    "fullSceneRevision": 19,
+    "fullSceneGLBPath": "public/warfront/assets/combined-arms-r19.glb"
   },
   "summary": {
-    "vehicleAndAircraftRoots": 28,
+    "vehicleAndAircraftRoots": 31,
     "groundVehicleClasses": 27,
-    "aircraftRoots": 1,
+    "aircraftRoots": 4,
+    "fixedWingAircraftRoots": 2,
+    "rotaryWingAircraftRoots": 2,
     "infantryInstances": 24,
-    "infantryArchetypes": 18
+    "infantryArchetypes": 18,
+    "battlefieldMaps": 4
   },
   "vehicles": [
     {
@@ -487,21 +490,116 @@
       "status": "blender_prototype"
     },
     {
-      "id": "strike-aircraft",
-      "name": "Strike fighter hero asset",
-      "root": "UNIT_STRIKE_JET_ROOT",
-      "class": "strike_aircraft",
+      "id": "f16c-block50",
+      "name": "F-16C Block 50",
+      "root": "UNIT_F16C_BLOCK50_ROOT",
+      "class": "f16c_multirole_fighter",
       "category": "fixed_wing_aircraft",
-      "role": "sortie_strike_and_recovery",
+      "role": "multirole_strike_fighter",
       "balance": {
         "hp": 100,
-        "speed": 82,
+        "speed": 96,
         "armour": 1,
-        "range": 75,
-        "damage": 72,
-        "cost": 1250
+        "range": 85,
+        "damage": 78,
+        "cost": 1300
       },
-      "status": "blender_prototype"
+      "designDimensionsM": {
+        "length": 15.07,
+        "wingspan": 9.943,
+        "height": 4.87
+      },
+      "engineCount": 1,
+      "verticalTailCount": 1,
+      "animationActions": [
+        "ANIM_F16_AFTERBURNER_PULSE",
+        "ANIM_F16_DEMO_FLIGHT_PROFILE",
+        "ANIM_F16_ELEVATOR_L",
+        "ANIM_F16_ELEVATOR_R",
+        "ANIM_F16_FLAPERON_L",
+        "ANIM_F16_FLAPERON_R",
+        "ANIM_F16_MAIN_GEAR_L",
+        "ANIM_F16_MAIN_GEAR_R",
+        "ANIM_F16_NOSE_GEAR",
+        "ANIM_F16_RUDDER"
+      ],
+      "status": "blender_authored_prototype"
+    },
+    {
+      "id": "heavy-strike",
+      "name": "Heavy twin-engine strike fighter",
+      "root": "UNIT_HEAVY_STRIKE_ROOT",
+      "class": "heavy_twin_engine_strike_fighter",
+      "category": "fixed_wing_aircraft",
+      "role": "heavy_strike_and_air_superiority",
+      "balance": {
+        "hp": 145,
+        "speed": 74,
+        "armour": 2,
+        "range": 105,
+        "damage": 92,
+        "cost": 1650
+      },
+      "designDimensionsM": {
+        "length": 19.43,
+        "wingspan": 13.052,
+        "height": 5.611
+      },
+      "engineCount": 2,
+      "verticalTailCount": 2,
+      "animationActions": [
+        "ANIM_HSTRIKE_DEMO_FLIGHT_PROFILE",
+        "ANIM_HSTRIKE_ELEVATOR_L",
+        "ANIM_HSTRIKE_ELEVATOR_R",
+        "ANIM_HSTRIKE_FLAPERON_L",
+        "ANIM_HSTRIKE_FLAPERON_R",
+        "ANIM_HSTRIKE_MAIN_GEAR_L",
+        "ANIM_HSTRIKE_MAIN_GEAR_R",
+        "ANIM_HSTRIKE_RUDDER"
+      ],
+      "status": "blender_authored_prototype"
+    },
+    {
+      "id": "attack-helicopter",
+      "name": "Attack helicopter",
+      "root": "UNIT_ATTACK_HELICOPTER_ROOT",
+      "class": "attack_helicopter",
+      "category": "rotary_wing_aircraft",
+      "role": "armed_close_air_support",
+      "balance": {
+        "hp": 95,
+        "speed": 48,
+        "armour": 2,
+        "range": 38,
+        "damage": 50,
+        "cost": 850
+      },
+      "rotorAnimationActions": [
+        "ANIM_HELI_ATTACK_MAIN_ROTOR_SPIN",
+        "ANIM_HELI_ATTACK_TAIL_ROTOR_SPIN"
+      ],
+      "status": "blender_authored_prototype"
+    },
+    {
+      "id": "transport-helicopter",
+      "name": "Transport helicopter",
+      "root": "UNIT_TRANSPORT_HELICOPTER_ROOT",
+      "class": "transport_helicopter",
+      "category": "rotary_wing_aircraft",
+      "role": "troop_and_supply_transport",
+      "balance": {
+        "hp": 125,
+        "speed": 40,
+        "armour": 1,
+        "range": 0,
+        "damage": 0,
+        "cost": 700
+      },
+      "rotorAnimationActions": [
+        "ANIM_HELI_TRANSPORT_MAIN_ROTOR_SPIN",
+        "ANIM_HELI_TRANSPORT_TAIL_ROTOR_SPIN"
+      ],
+      "status": "blender_authored_prototype"
     }
   ],
   "infantry": {
@@ -869,5 +967,97 @@
         "status": "blender_prototype"
       }
     ]
+  },
+  "maps": [
+    {
+      "id": "pine-valley",
+      "name": "Pine Valley",
+      "root": "MAP_PINE_VALLEY_ROOT",
+      "terrainDimensionsM": {
+        "width": 520,
+        "depth": 460
+      },
+      "biome": "woodland",
+      "airbaseRoot": "AIRBASE_BLUE_PINE_VALLEY",
+      "objectives": [
+        "OBJECTIVE_COMMAND_PINE_VALLEY",
+        "OBJECTIVE_DEPOT_PINE_VALLEY",
+        "OBJECTIVE_RADAR_PINE_VALLEY",
+        "OBJECTIVE_SAM_PINE_VALLEY"
+      ],
+      "status": "blender_authored_map_prototype"
+    },
+    {
+      "id": "desert-basin",
+      "name": "Red Basin",
+      "root": "MAP_RED_BASIN_ROOT",
+      "terrainDimensionsM": {
+        "width": 560,
+        "depth": 500
+      },
+      "biome": "desert",
+      "airbaseRoot": "AIRBASE_BLUE_RED_BASIN",
+      "objectives": [
+        "OBJECTIVE_COMMAND_RED_BASIN",
+        "OBJECTIVE_DEPOT_RED_BASIN",
+        "OBJECTIVE_RADAR_RED_BASIN",
+        "OBJECTIVE_SAM_RED_BASIN"
+      ],
+      "status": "blender_authored_map_prototype"
+    },
+    {
+      "id": "river-crossing",
+      "name": "River Crossing",
+      "root": "MAP_RIVER_CROSSING_ROOT",
+      "terrainDimensionsM": {
+        "width": 580,
+        "depth": 500
+      },
+      "biome": "river",
+      "airbaseRoot": "AIRBASE_BLUE_RIVER_CROSSING",
+      "objectives": [
+        "OBJECTIVE_COMMAND_RIVER_CROSSING",
+        "OBJECTIVE_DEPOT_RIVER_CROSSING",
+        "OBJECTIVE_RADAR_RIVER_CROSSING",
+        "OBJECTIVE_SAM_RIVER_CROSSING"
+      ],
+      "status": "blender_authored_map_prototype"
+    },
+    {
+      "id": "alpine-pass",
+      "name": "Alpine Pass",
+      "root": "MAP_ALPINE_PASS_ROOT",
+      "terrainDimensionsM": {
+        "width": 520,
+        "depth": 500
+      },
+      "biome": "alpine",
+      "airbaseRoot": "AIRBASE_BLUE_ALPINE_PASS",
+      "objectives": [
+        "OBJECTIVE_COMMAND_ALPINE_PASS",
+        "OBJECTIVE_DEPOT_ALPINE_PASS",
+        "OBJECTIVE_RADAR_ALPINE_PASS",
+        "OBJECTIVE_SAM_ALPINE_PASS"
+      ],
+      "status": "blender_authored_map_prototype"
+    }
+  ],
+  "legacyAirframe": {
+    "id": "strike-aircraft",
+    "name": "Strike fighter hero asset",
+    "root": "UNIT_STRIKE_JET_ROOT",
+    "class": "strike_aircraft",
+    "category": "fixed_wing_aircraft",
+    "role": "sortie_strike_and_recovery",
+    "balance": {
+      "hp": 100,
+      "speed": 82,
+      "armour": 1,
+      "range": 75,
+      "damage": 72,
+      "cost": 1250
+    },
+    "status": "archived_prototype_do_not_use_for_f16",
+    "reason": "Legacy twin-tail/twin-engine silhouette is retained only for backwards compatibility; F-16 is mapped to UNIT_F16C_BLOCK50_ROOT."
   }
 }
