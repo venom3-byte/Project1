@@ -69,11 +69,11 @@ export class ForgeEngine{
   }
   rec(name,kind,e){const id=crypto.randomUUID();e.__forge={id,kind,name,components:{}};const r={id,kind,name,entity:e,components:e.__forge.components};this.entities.set(id,r);return r}
   add(kind,name){const e=new pc.Entity(name);this.root.addChild(e);return this.rec(name,kind,e)}
-  material(color=[.22,.62,.9]){const m=new pc.StandardMaterial();m.diffuse=new pc.Color(...color);m.emissive=new pc.Color(...color);m.emissiveIntensity=2;m.metalness=.0;m.gloss=.5;m.useMetalness=false;m.useLighting=false;m.useTonemap=false;m.specular=new pc.Color(0,0,0);m.update();return m}
+  material(color=[.22,.62,.9]){const m=new pc.StandardMaterial();m.diffuse=new pc.Color(...color);m.emissive=new pc.Color(0,0,0);m.emissiveIntensity=0;m.metalness=0;m.gloss=.55;m.useMetalness=true;m.useLighting=true;m.useTonemap=true;m.specular=new pc.Color(.04,.04,.04);m.update();return m}
   primitive(kind,name){const r=this.add(kind,name||kind+'-'+(this.entities.size+1)),type=kind==='sphere'?'sphere':kind==='cylinder'?'cylinder':kind==='capsule'?'capsule':kind==='plane'?'plane':'box';r.entity.addComponent('render',{type});r.entity.render.layers=[pc.LAYERID_WORLD];r.entity.render.frustumCulling=false;r.entity.render.enabled=true;r.entity.render.material=this.material(kind==='plane'?[.08,.15,.2]:[.22,.62,.9]);if(kind!=='plane')r.entity.setLocalPosition((Math.random()-.5)*4,1+(Math.random()*1.7),(Math.random()-.5)*4);r.components.geometry={sourceUnits:'meters'};return r}
   createPlane(name,w=30,d=30){const r=this.primitive('plane',name);r.entity.setLocalScale(w,1,d);r.entity.setLocalPosition(0,0,0);if(name==='Ground')r.entity.render.layers=[];this.setPhysics(r.id,'fixed','box');return r}
-  createCamera(name,pos){const r=this.add('camera',name);r.entity.addComponent('camera',{clearColor:new pc.Color(.035,.07,.12),clearColorBuffer:true,clearDepthBuffer:true,fov:60,nearClip:.01,farClip:10000,enabled:true,layers:[pc.LAYERID_WORLD]});r.entity.setLocalPosition(pos.x,pos.y,pos.z);r.entity.lookAt(0,1,0);r.components.camera={active:true};r.entity.camera.enabled=true;return r}
-  createLight(name){const r=this.add('light',name);r.entity.addComponent('light',{type:'directional',color:new pc.Color(1,.96,.88),intensity:2.5,castShadows:true,shadowDistance:80,enabled:true,layers:[pc.LAYERID_WORLD]});r.entity.setEulerAngles(48,-32,0);r.components.light={type:'directional'};return r}
+  createCamera(name,pos){const r=this.add('camera',name),active=![...this.entities.values()].some(item=>item.kind==='camera'&&item.components.camera?.active);r.entity.addComponent('camera',{clearColor:new pc.Color(.035,.07,.12),clearColorBuffer:true,clearDepthBuffer:true,fov:60,nearClip:.01,farClip:10000,enabled:active,layers:[pc.LAYERID_WORLD]});r.entity.setLocalPosition(pos.x,pos.y,pos.z);r.entity.lookAt(0,1,0);r.components.camera={active,fov:60,projection:'perspective'};r.entity.camera.enabled=active;return r}
+  createLight(name){const r=this.add('light',name);r.entity.addComponent('light',{type:'directional',color:new pc.Color(1,.96,.88),intensity:2.5,castShadows:true,shadowDistance:80,enabled:true,layers:[pc.LAYERID_WORLD]});r.entity.setEulerAngles(48,-32,0);r.components.light={type:'directional',color:[1,.96,.88],intensity:2.5,castShadows:true,range:12,innerConeAngle:25,outerConeAngle:45};return r}
   camera(){return[...this.entities.values()].find(r=>r.kind==='camera'&&r.components.camera?.active)?.entity}
   selected(){return this.selectedId?this.entities.get(this.selectedId):null}
   select(id){this.selectedId=id;window.dispatchEvent(new CustomEvent('forge-selection',{detail:this.selected()}));return this.selected()}
@@ -85,8 +85,27 @@ export class ForgeEngine{
     return true
   }
   applyMaterial(params={}){
-    const r=this.selected();if(!r)return false;if(r.components?.asset)r.components.asset.derivedDirty=true;const color=params.color||[.22,.62,.9],mats=[],walk=e=>{for(const mi of(e.render?.meshInstances||[])){let m=mi.material?.clone?.()||this.material(color);m.diffuse=new pc.Color(...color);if(params.metalness!=null)m.metalness=Number(params.metalness);if(params.roughness!=null)m.gloss=1-Number(params.roughness);if(params.opacity!=null){m.opacity=Number(params.opacity);m.blendType=params.opacity<1?pc.BLEND_NORMAL:pc.BLEND_NONE;m.alphaTest=params.opacity<1?.01:0}if(params.emissive){m.emissive=new pc.Color(...params.emissive);m.emissiveIntensity=Number(params.emissiveIntensity||0)}m.update();mi.material=m;mats.push(m)}for(const c of e.children)walk(c)};walk(r.entity);
-    r.components.material={color,metalness:Number(params.metalness??.05),roughness:Number(params.roughness??.5),opacity:Number(params.opacity??1),emissive:params.emissive||[0,0,0]};return mats.length
+    const r=this.selected();if(!r)return false;
+    if(r.components?.asset)r.components.asset.derivedDirty=true;
+    const prior=r.components.material||{},color=(params.color||prior.color||[.22,.62,.9]).map(v=>clamp(Number(v),0,1,0));
+    const metalness=clamp(params.metalness??prior.metalness??0,0,1,0);
+    const roughness=clamp(params.roughness??prior.roughness??.55,0,1,.55);
+    const opacity=clamp(params.opacity??prior.opacity??1,0,1,1),mats=[];
+    const walk=e=>{
+      for(const mi of(e.render?.meshInstances||[])){
+        const m=mi.material?.clone?.()||this.material(color);
+        m.diffuse=new pc.Color(...color);m.useLighting=true;m.useMetalness=true;m.useTonemap=true;
+        m.metalness=metalness;m.gloss=1-roughness;m.opacity=opacity;
+        m.blendType=opacity<.999?pc.BLEND_NORMAL:pc.BLEND_NONE;m.depthWrite=opacity>=.999;m.alphaTest=0;
+        if(params.emissive){m.emissive=new pc.Color(...params.emissive);m.emissiveIntensity=clamp(params.emissiveIntensity??1,0,20,1)}
+        else if(!r.components?.asset||r.components.asset.type!=='image'){m.emissive=new pc.Color(0,0,0);m.emissiveIntensity=0}
+        m.update();mi.material=m;mats.push(m);
+      }
+      for(const c of e.children)walk(c);
+    };
+    walk(r.entity);
+    r.components.material={...prior,color,metalness,roughness,opacity,emissive:params.emissive||prior.emissive||[0,0,0],preset:params.preset||prior.preset||'custom'};
+    return mats.length;
   }
   materialState(){return this.selected()?.components.material||null}
   onPrePhysics(fn){this.prePhysicsSystems.add(fn);return()=>this.prePhysicsSystems.delete(fn)}
