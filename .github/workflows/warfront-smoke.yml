@@ -43,7 +43,7 @@ jobs:
           if (!Array.isArray(roster.infantry.archetypes) || roster.infantry.archetypes.length !== 18) throw new Error('Expected 18 infantry archetypes');
           const roots = [...roster.vehicles.map((u) => u.root), ...roster.infantry.instances.map((u) => u.sourceRoot)];
           if (new Set(roots).size !== roots.length) throw new Error('Duplicate asset root identifiers');
-          if (roster.integrationStatus !== 'blender-prototypes-not-yet-packaged-as-individual-runtime-models') throw new Error('Roster integration status must stay explicit');
+          if (roster.integrationStatus !== 'full-scene-glb-available-root-preview-supported-individual-unit-packaging-and-gameplay-binding-pending') throw new Error('Roster integration status must stay explicit');
           if (roster.vehicles.some((u) => u.status !== 'blender_prototype' || !u.root)) throw new Error('Every vehicle must have an explicit prototype status and Blender root');
           if (roster.infantry.instances.some((u) => u.status !== 'blender_prototype' || !u.sourceRoot)) throw new Error('Every infantry instance must have an explicit prototype status and Blender root');
           const requiredHtml = [
