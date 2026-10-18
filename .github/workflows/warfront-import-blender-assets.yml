@@ -9,7 +9,6 @@ permissions:
   contents: write
 jobs:
   import-glb:
-    if: hashFiles('public/warfront/assets/glb-import-source.json') != ''
     runs-on: ubuntu-latest
     steps:
       - name: Checkout main
@@ -18,6 +17,7 @@ jobs:
           ref: main
           persist-credentials: true
       - name: Download the current Blender scene export
+        if: ${{ hashFiles('public/warfront/assets/glb-import-source.json') != '' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -28,6 +28,7 @@ jobs:
           echo "Downloaded Blender GLB bytes: $BYTES"
           test "$BYTES" -ge 8000000
       - name: Commit the generated asset to the repository
+        if: ${{ hashFiles('public/warfront/assets/glb-import-source.json') != '' && hashFiles('public/warfront/assets/combined-arms-r8.glb') != '' }}
         shell: bash
         run: |
           set -euo pipefail
