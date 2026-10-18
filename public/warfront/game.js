@@ -247,7 +247,10 @@ function buildTree(x, z, scale) {
 // Tree cover is generated for each chosen battlefield.
 
 
-function clearMapFeatures() { for(const child of [...mapFeatures.children]){mapFeatures.remove(child);child.traverse((node)=>{if(node.geometry)node.geometry.dispose();});} }
+function clearMapFeatures() {
+  const shared=new Set(Object.values(mats).flatMap((entry)=>Array.isArray(entry)?entry:[entry]));
+  for(const child of [...mapFeatures.children]){const ownedMaterials=new Set();mapFeatures.remove(child);child.traverse((node)=>{if(node.geometry)node.geometry.dispose();if(node.material)(Array.isArray(node.material)?node.material:[node.material]).forEach((m)=>{if(m&&!shared.has(m))ownedMaterials.add(m);});});ownedMaterials.forEach((m)=>m.dispose());}
+}
 function addRiverFeature(width,centreZ){
   const vertices=[],indices=[],steps=Math.ceil(width/12);
   for(let i=0;i<=steps;i++){const x=-width/2+width*i/steps,z=centreZ+Math.sin(x*.018)*10+Math.sin(x*.043)*3;vertices.push(x,.18,z-9,x,.18,z+9);if(i<steps){const k=i*2;indices.push(k,k+1,k+2,k+1,k+3,k+2);}}
@@ -670,6 +673,7 @@ function replaceTankVisual(unit, gltf) {
       node.material = Array.isArray(node.material) ? node.material.map(tintMaterial) : tintMaterial(node.material);
     }
   });
+  clone.traverse((node)=>{if(node.isMesh)node.userData.initialMaterial=node.material;});
   unit.visual = clone;
   unit.visualData = { imported: true, turret, wheels, tracks: [] };
   unit.turret = turret;
@@ -971,6 +975,11 @@ function spawnBomb(plane, target) {
   bombs.push({ mesh: bomb, target, t: 0, duration: 1.1, from: bomb.position.clone(), to: new THREE.Vector3(target.group.position.x + (Math.sin(state.time) * 1.4), 0.8, target.group.position.z + (Math.cos(state.time * 1.3) * 1.2)) });
   addLog('Weapon release confirmed. Impact solution locked.', 'alert');
 }
+function createImpactMark(position,size=2.6){
+  const mark=new THREE.Group();mark.position.set(position.x,.055,position.z);mark.name='persistent-impact-scorch';
+  const soot=new THREE.Mesh(new THREE.CircleGeometry(size,20),new THREE.MeshStandardMaterial({color:0x33342f,roughness:1,transparent:true,opacity:.78,depthWrite:false}));soot.rotation.x=-Math.PI/2;soot.scale.set(1,.78,1);mark.add(soot);
+  const rim=new THREE.Mesh(new THREE.RingGeometry(size*.72,size,24),new THREE.MeshStandardMaterial({color:0x777266,roughness:1,transparent:true,opacity:.7,side:THREE.DoubleSide,depthWrite:false}));rim.rotation.x=-Math.PI/2;rim.position.y=.015;mark.add(rim);mapFeatures.add(mark);
+}
 function explodeAt(position,target,payload={}){
   const blast=new THREE.Group();blast.position.copy(position);scene.add(blast);
   const core=new THREE.Mesh(new THREE.SphereGeometry(payload.aerial?1.9:1.1,14,10),new THREE.MeshBasicMaterial({color:0xffa43c,transparent:true,opacity:.94,depthWrite:false}));core.position.y=.85;blast.add(core);
@@ -978,6 +987,7 @@ function explodeAt(position,target,payload={}){
   const ring=new THREE.Mesh(new THREE.RingGeometry(.45,.78,32),new THREE.MeshBasicMaterial({color:0xffd07e,transparent:true,opacity:.82,side:THREE.DoubleSide,depthWrite:false}));ring.rotation.x=-Math.PI/2;ring.position.y=.18;blast.add(ring);
   const flash=new THREE.Mesh(new THREE.SphereGeometry(.5,10,8),new THREE.MeshBasicMaterial({color:0xffe8ad,transparent:true,opacity:.8}));flash.position.y=.75;blast.add(flash);
   effects.push({group:blast,t:0,duration:payload.aerial?1.85:1.25,target,explosion:true});
+  createImpactMark(position,payload.aerial?7:(payload.shell?2.8:3.8));
   createDebris(position,payload.aerial?13:(payload.shell?5:8),payload.aerial?0x373b35:0x413c34);
   const radius=payload.radius||8,damage=payload.damage||45,team=payload.team||'blue';
   for(const entity of [...targets,...tanks,...soldiers]){
@@ -1165,6 +1175,13 @@ function updateAircraftDamage(plane,dt){
 function updateTanks(dt) {
   for (const unit of tanks) {
     if (!unit.alive) continue;
+    if(unit.attackTarget&&!unit.attackTarget.alive){unit.attackTarget=null;unit.moveTarget=null;unit.status=unit.team==='red'?'DEFENDING':'HOLDING POSITION';}
+    if(unit.team==='red'&&!unit.attackTarget){
+      const hostiles=[...tanks.filter((candidate)=>candidate.alive&&candidate.team==='blue'),...soldiers.filter((candidate)=>candidate.alive&&candidate.team==='blue')];
+      let nearest=null,nearestDistance=82;
+      for(const candidate of hostiles){const d=unit.group.position.distanceTo(candidate.group.position);if(d<nearestDistance){nearest=candidate;nearestDistance=d;}}
+      if(nearest){unit.attackTarget=nearest;unit.status='ENGAGING HOSTILE FORCE';}
+    }
     if (unit.moveTarget) {
       const dx = unit.moveTarget.x - unit.group.position.x;
       const dz = unit.moveTarget.z - unit.group.position.z;
@@ -1206,6 +1223,7 @@ function updateTanks(dt) {
         unit.visualData.turret.rotation.y += delta * Math.min(1, dt * 2.3);
       }
       if (distance < 35) {
+        if(unit.team==='red'&&unit.moveTarget)unit.moveTarget=null;
         unit.fireTimer -= dt;
         if (unit.fireTimer <= 0) {
           unit.fireTimer = 3.0;
