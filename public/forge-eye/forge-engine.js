@@ -367,8 +367,12 @@ export class ForgeEngine{
       this.removePhysics(r.id); r.entity.destroy();
     }
     this.entities.clear(); this.selectedId=null; this.keyframes.clear(); this.scripts.clear();
+    const serializedEntities=Array.isArray(data.entities)?data.entities:[];
+    const activeCameraSource=serializedEntities.find(item=>item.kind==='camera'&&item.components?.camera?.active)?.id
+      || serializedEntities.find(item=>item.kind==='camera')?.id
+      || null;
 
-    for(const d of data.entities||[]){
+    for(const d of serializedEntities){
       if(d.kind==='terrain'&&d.components?.terrain&&window.ForgeTerrain){
         window.ForgeTerrain.generate(d.name,d.components.terrain); continue;
       }
@@ -380,9 +384,19 @@ export class ForgeEngine{
         r.entity.addComponent('render',{type:d.kind==='sphere'?'sphere':d.kind==='cylinder'?'cylinder':d.kind==='capsule'?'capsule':d.kind==='plane'?'plane':'box'});
         r.entity.render.material=this.material();
       }
-      if(d.kind==='camera')r.entity.addComponent('camera',{clearColor:new pc.Color(.02,.05,.09)});
-      if(d.kind==='light')r.entity.addComponent('light',{type:'directional',intensity:2,castShadows:true});
+      const cameraMeta=d.components?.camera||{};
+      if(d.kind==='camera'){
+        const active=d.id===activeCameraSource,projection=cameraMeta.projection==='orthographic'?pc.PROJECTION_ORTHOGRAPHIC:pc.PROJECTION_PERSPECTIVE;
+        r.entity.addComponent('camera',{clearColor:new pc.Color(.02,.05,.09),fov:clamp(cameraMeta.fov,20,110,60),projection,orthoHeight:Math.max(.5,Number(cameraMeta.orthoHeight)||5),enabled:active});
+        r.entity.camera.enabled=active;
+      }
+      const lightMeta=d.components?.light||{};
+      if(d.kind==='light'){
+        const lightColor=Array.isArray(lightMeta.color)&&lightMeta.color.length>=3?lightMeta.color:[1,.96,.88];
+        r.entity.addComponent('light',{type:['directional','omni','spot'].includes(lightMeta.type)?lightMeta.type:'directional',color:new pc.Color(...lightColor),intensity:clamp(lightMeta.intensity,0,1000,2.5),range:clamp(lightMeta.range,0.01,10000,12),innerConeAngle:clamp(lightMeta.innerConeAngle,0,89,25),outerConeAngle:clamp(lightMeta.outerConeAngle,1,89,45),castShadows:lightMeta.castShadows!==false,enabled:true,layers:[pc.LAYERID_WORLD]});
+      }
       r.components=d.components||{};
+      r.entity.__forge.components=r.components;
       if(d.components?.geometry?.kind==="rust-lathe"&&d.components?.procedural?.generator==="forge-eye-core-lathe"&&window.ForgeEyeRust?.latheMesh){
         const profile=d.components.procedural.profile||[],options=d.components.procedural.options||{},meshData=window.ForgeEyeRust.latheMesh(profile,options);
         this.createLatheMeshFromData({record:r,name:d.name,meshData,profile,options,color:d.components.material?.color||[.34,.62,.78]});
@@ -443,6 +457,9 @@ export class ForgeEngine{
           this.app.assets.load(a);
         });
       }
+    }
+    if(![...this.entities.values()].some(item=>item.kind==='camera'&&item.components.camera?.active)){
+      this.createCamera('Main Camera',{x:7,y:5,z:9});
     }
     this.frame();
   }
