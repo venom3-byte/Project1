@@ -22,7 +22,7 @@ const debris = [];
 const impactMarks = [];
 const effects = [];
 const assets = { tank: null, plane: null, tankSource: '', planeSource: '' };
-const state = { command: 'select', selected: null, time: 0, missionComplete: false, paused: false, started: false, mapId: 'pine-valley', pointerDown: null, dragging: false, touchPoints: new Map(), lastPinch: 0, blenderBundle: null, blenderBundlePromise: null, activeAssetPreview: null, assetPreviewCounter: 0 };
+const state = { command: 'select', selected: null, time: 0, missionComplete: false, paused: false, started: false, mapId: 'pine-valley', pointerDown: null, dragging: false, touchPoints: new Map(), lastPinch: 0, blenderBundle: null, blenderBundlePromise: null, activeAssetPreview: null, activeBlenderMap: null, mapLayout: null, rotorcraftCreated: false, assetPreviewCounter: 0 };
 const TEAM = { blue: 0x9fca9c, red: 0xdc7265, amber: 0xeab86b };
 const PACKS = {
   tank: 'https://3dassets.dev/api/v1/packs/armoured-column-and-field-camp',
@@ -135,10 +135,10 @@ const mapFeatures = new THREE.Group();
 mapFeatures.name = 'generated-battlefield-features';
 scene.add(mapFeatures);
 const MAPS = {
-  'pine-valley': { label: 'PINE VALLEY · 440 × 380', biome: 'forest', width: 440, depth: 380, groundTint: 0xd6e2cf, background: 0x7e928b, fog: 0x7e928b, fogDensity: 0.0018, targetPositions: [[-24,-52],[15,-57],[30,-38],[-2,-39]], tankStarts: [[-18,7],[-12.8,11.3],[-24,0.6],[16,-17],[23,-22]], soldierStarts: [[-21,15,'blue'],[-17,16,'blue'],[-13,18,'blue'],[-30,8,'blue'],[-27,12,'blue'],[-20,3,'blue'],[14,-12,'red'],[18,-13,'red'],[24,-19,'red'],[28,-24,'red'],[10,-22,'red'],[19,-28,'red']] },
-  'desert-basin': { label: 'RED BASIN · 520 × 460', biome: 'desert', width: 520, depth: 460, groundTint: 0xe2c28c, background: 0xb7a080, fog: 0xb7a080, fogDensity: 0.0012, targetPositions: [[-130,-122],[58,-151],[143,-86],[-46,-113]], tankStarts: [[-73,72],[-61,83],[-87,61],[77,-25],[94,-38]], soldierStarts: [[-78,76,'blue'],[-72,81,'blue'],[-66,76,'blue'],[-92,68,'blue'],[-88,75,'blue'],[-81,62,'blue'],[71,-20,'red'],[78,-23,'red'],[87,-31,'red'],[101,-41,'red'],[94,-28,'red'],[82,-40,'red']] },
-  'river-crossing': { label: 'RIVER CROSSING · 560 × 480', biome: 'river', width: 560, depth: 480, groundTint: 0xc8d6b6, background: 0x879b95, fog: 0x879b95, fogDensity: 0.0010, riverZ: -8, targetPositions: [[-154,-116],[106,-130],[150,22],[-39,-142]], tankStarts: [[-86,68],[-71,79],[-99,60],[78,24],[96,34]], soldierStarts: [[-91,73,'blue'],[-85,78,'blue'],[-76,74,'blue'],[-103,63,'blue'],[-96,70,'blue'],[-88,59,'blue'],[72,18,'red'],[81,21,'red'],[90,30,'red'],[102,39,'red'],[92,17,'red'],[81,39,'red']] },
-  'alpine-pass': { label: 'ALPINE PASS · 480 × 440', biome: 'alpine', width: 480, depth: 440, groundTint: 0xcbd2c7, background: 0x89959b, fog: 0x89959b, fogDensity: 0.0016, targetPositions: [[-126,-126],[117,-99],[79,-157],[-19,-120]], tankStarts: [[-70,73],[-57,84],[-84,61],[57,-30],[73,-43]], soldierStarts: [[-76,77,'blue'],[-69,82,'blue'],[-61,75,'blue'],[-88,68,'blue'],[-83,75,'blue'],[-75,61,'blue'],[53,-25,'red'],[61,-30,'red'],[70,-38,'red'],[81,-47,'red'],[70,-24,'red'],[62,-46,'red']] }
+  'pine-valley': { label: 'PINE VALLEY · 520 × 460', root: 'MAP_PINE_VALLEY_ROOT', suffix: 'PINE_VALLEY', biome: 'forest', width: 520, depth: 460, groundTint: 0xd6e2cf, background: 0x7e928b, fog: 0x7e928b, fogDensity: 0.0014, targetPositions: [[-25,-26],[162,-138],[108,-92],[18,18]], tankStarts: [[-150,124],[-143,128],[-157,120],[150,-124],[143,-128]], soldierStarts: [[-162,110,'blue'],[-155,110,'blue'],[-148,110,'blue'],[-162,117,'blue'],[-155,117,'blue'],[-148,117,'blue'],[162,-110,'red'],[155,-110,'red'],[148,-110,'red'],[162,-117,'red'],[155,-117,'red'],[148,-117,'red']] },
+  'desert-basin': { label: 'RED BASIN · 560 × 500', root: 'MAP_RED_BASIN_ROOT', suffix: 'RED_BASIN', biome: 'desert', width: 560, depth: 500, groundTint: 0xe2c28c, background: 0xb7a080, fog: 0xb7a080, fogDensity: 0.0010, targetPositions: [[-25,-26],[162,-138],[108,-92],[18,18]], tankStarts: [[-160,132],[-153,136],[-167,128],[160,-132],[153,-136]], soldierStarts: [[-172,118,'blue'],[-165,118,'blue'],[-158,118,'blue'],[-172,125,'blue'],[-165,125,'blue'],[-158,125,'blue'],[172,-118,'red'],[165,-118,'red'],[158,-118,'red'],[172,-125,'red'],[165,-125,'red'],[158,-125,'red']] },
+  'river-crossing': { label: 'RIVER CROSSING · 580 × 500', root: 'MAP_RIVER_CROSSING_ROOT', suffix: 'RIVER_CROSSING', biome: 'river', width: 580, depth: 500, groundTint: 0xc8d6b6, background: 0x879b95, fog: 0x879b95, fogDensity: 0.0009, riverZ: -8, targetPositions: [[-25,-26],[162,-138],[108,-92],[18,18]], tankStarts: [[-165,132],[-158,136],[-172,128],[165,-132],[158,-136]], soldierStarts: [[-177,118,'blue'],[-170,118,'blue'],[-163,118,'blue'],[-177,125,'blue'],[-170,125,'blue'],[-163,125,'blue'],[177,-118,'red'],[170,-118,'red'],[163,-118,'red'],[177,-125,'red'],[170,-125,'red'],[163,-125,'red']] },
+  'alpine-pass': { label: 'ALPINE PASS · 520 × 500', root: 'MAP_ALPINE_PASS_ROOT', suffix: 'ALPINE_PASS', biome: 'alpine', width: 520, depth: 500, groundTint: 0xcbd2c7, background: 0x89959b, fog: 0x89959b, fogDensity: 0.0012, targetPositions: [[-25,-26],[162,-138],[108,-92],[18,18]], tankStarts: [[-150,132],[-143,136],[-157,128],[150,-132],[143,-136]], soldierStarts: [[-162,118,'blue'],[-155,118,'blue'],[-148,118,'blue'],[-162,125,'blue'],[-155,125,'blue'],[-148,125,'blue'],[162,-118,'red'],[155,-118,'red'],[148,-118,'red'],[162,-125,'red'],[155,-125,'red'],[148,-125,'red']] }
 };
 
 function addTerrainDetail() {
@@ -482,13 +482,66 @@ createBuildingTarget('RADAR SITE', 15, -57, 'radar');
 createBuildingTarget('SAM BATTERY', 30, -38, 'sam');
 createBuildingTarget('FORWARD COMMAND', -2, -39, 'command');
 
+function markerPositionInMap(root,name){
+  if(!root||!name)return null;const marker=root.getObjectByName(name);if(!marker)return null;
+  root.updateMatrixWorld(true);const p=marker.getWorldPosition(new THREE.Vector3());return {x:p.x,z:p.z};
+}
+function installBlenderMap(mapId){
+  const config=MAPS[mapId];if(!config||!state.blenderBundle)return false;
+  const source=state.blenderBundle.roots.get(config.root);if(!source)return false;
+  if(state.activeBlenderMap&&state.activeBlenderMap.group)scene.remove(state.activeBlenderMap.group);
+  clearMapFeatures();mapFeatures.visible=false;ground.visible=false;
+  const fallbackAirbase=scene.getObjectByName('airbase');if(fallbackAirbase)fallbackAirbase.visible=false;
+  const oldIndex=interactables.indexOf(ground);if(oldIndex>=0)interactables.splice(oldIndex,1);
+  const group=SkeletonUtils.clone(source);group.name='ACTIVE_BLENDER_MAP_'+mapId.toUpperCase().replaceAll('-','_');
+  group.position.set(0,0,0);group.rotation.set(0,0,0);group.scale.set(1,1,1);scene.add(group);group.updateMatrixWorld(true);
+  state.activeBlenderMap={mapId,group,sourceRoot:config.root};return true;
+}
+function buildMapLayout(config,useBlender){
+  const root=useBlender&&state.activeBlenderMap?state.activeBlenderMap.group:null;
+  const at=(suffix)=>root?markerPositionInMap(root,suffix+'_'+config.suffix):null;
+  const targetMarkers=[at('OBJECTIVE_DEPOT'),at('OBJECTIVE_RADAR'),at('OBJECTIVE_SAM'),at('OBJECTIVE_COMMAND')];
+  const targetLayout=config.targetPositions.map(p=>({x:p[0],z:p[1]}));
+  targetMarkers.forEach((p,i)=>{if(p)targetLayout[i]=p;});
+  const blueArmour=at('SPAWN_BLUE_ARMOUR'),redArmour=at('SPAWN_RED_ARMOUR');
+  const blueInfantry=at('SPAWN_BLUE_INFANTRY'),redInfantry=at('SPAWN_RED_INFANTRY');
+  const offsets=[[-4,0],[0,3],[4,-2],[0,0],[4,3],[-4,3]];
+  const teamTankCount={blue:0,red:0};
+  const tankLayout=tanks.map((unit,i)=>{
+    const base=unit.team==='blue'?blueArmour:redArmour,idx=teamTankCount[unit.team]++,d=offsets[idx%offsets.length];
+    const fb=config.tankStarts[i]||config.tankStarts[0];return base?{x:base.x+d[0],z:base.z+d[1]}:{x:fb[0],z:fb[1]};
+  });
+  const teamInfCount={blue:0,red:0};
+  const soldierLayout=soldiers.map((unit,i)=>{
+    const base=unit.team==='blue'?blueInfantry:redInfantry,idx=teamInfCount[unit.team]++,dx=(idx%3-1)*4.5,dz=Math.floor(idx/3)*4.5;
+    const fb=config.soldierStarts[i]||config.soldierStarts[0];return base?{x:base.x+dx,z:base.z+dz,team:unit.team}:{x:fb[0],z:fb[1],team:fb[2]};
+  });
+  const airbase=at('AIRBASE_BLUE'),airOffsets=[[-3,-2],[3,-2],[-5,3],[5,3],[0,5],[0,-5]];
+  const aircraftLayout=aircraft.map((plane,i)=>{const o=airOffsets[i%airOffsets.length];return airbase?{x:airbase.x+o[0],z:airbase.z+o[1]}:{x:plane.initial.x,z:plane.initial.z};});
+  return {targets:targetLayout,tanks:tankLayout,soldiers:soldierLayout,aircraft:aircraftLayout,airbase};
+}
 function applyBattlefieldMap(mapId,initial=false){
   const config=MAPS[mapId]||MAPS['pine-valley'];state.mapId=mapId in MAPS?mapId:'pine-valley';
-  ground.scale.set(config.width/220,1,config.depth/190);ground.material.color.setHex(config.groundTint);scene.background.setHex(config.background);scene.fog.color.setHex(config.fog);scene.fog.density=config.fogDensity;
-  sun.shadow.camera.left=-config.width*.46;sun.shadow.camera.right=config.width*.46;sun.shadow.camera.top=config.depth*.44;sun.shadow.camera.bottom=-config.depth*.44;sun.shadow.camera.updateProjectionMatrix();buildMapFeatures(config);
-  targets.forEach((target,i)=>{const p=config.targetPositions[i]||config.targetPositions[0];target.group.position.set(p[0],0,p[1]);});tanks.forEach((unit,i)=>{const p=config.tankStarts[i]||config.tankStarts[0];unit.group.position.set(p[0],0,p[1]);});
-  soldiers.forEach((unit,i)=>{const p=config.soldierStarts[i]||config.soldierStarts[0];unit.group.position.set(p[0],0,p[1]);unit.team=p[2]||unit.team;unit.name=unit.role+' · '+unit.team.toUpperCase();});
-  cameraTarget.set(0,0,0);camera.position.set(0,config.depth*.42,config.depth*.47);camera.lookAt(cameraTarget);const selector=$('mapSelector');if(selector&&selector.value!==state.mapId)selector.value=state.mapId;resetMission();addLog('Theatre loaded: '+config.label+'. Operational area expanded.','normal');if(!initial)toast(config.label+' · scenario ready');
+  ground.scale.set(config.width/220,1,config.depth/190);ground.material.color.setHex(config.groundTint);
+  scene.background.setHex(config.background);scene.fog.color.setHex(config.fog);scene.fog.density=config.fogDensity;
+  sun.shadow.camera.left=-config.width*.46;sun.shadow.camera.right=config.width*.46;sun.shadow.camera.top=config.depth*.44;sun.shadow.camera.bottom=-config.depth*.44;sun.shadow.camera.updateProjectionMatrix();
+  const usingBlender=installBlenderMap(state.mapId);
+  if(!usingBlender){
+    if(state.activeBlenderMap&&state.activeBlenderMap.group)scene.remove(state.activeBlenderMap.group);
+    state.activeBlenderMap=null;ground.visible=true;mapFeatures.visible=true;
+    const fallbackAirbase=scene.getObjectByName('airbase');if(fallbackAirbase)fallbackAirbase.visible=true;
+    if(!interactables.includes(ground))interactables.push(ground);
+    buildMapFeatures(config);
+  }
+  const layout=buildMapLayout(config,usingBlender);state.mapLayout=layout;
+  targets.forEach((target,i)=>{const p=layout.targets[i]||layout.targets[0];target.group.position.set(p.x,0,p.z);});
+  tanks.forEach((unit,i)=>{const p=layout.tanks[i]||{x:config.tankStarts[i][0],z:config.tankStarts[i][1]};unit.group.position.set(p.x,0,p.z);});
+  soldiers.forEach((unit,i)=>{const p=layout.soldiers[i]||{x:config.soldierStarts[i][0],z:config.soldierStarts[i][1],team:unit.team};unit.group.position.set(p.x,0,p.z);unit.team=p.team||unit.team;unit.name=unit.role+' · '+unit.team.toUpperCase();});
+  aircraft.forEach((plane,i)=>{const p=layout.aircraft[i];if(!p)return;plane.initial.x=p.x;plane.initial.z=p.z;plane.group.position.set(p.x,.16,p.z);});
+  cameraTarget.set(0,0,0);camera.position.set(0,config.depth*.42,config.depth*.47);camera.lookAt(cameraTarget);
+  const selector=$('mapSelector');if(selector&&selector.value!==state.mapId)selector.value=state.mapId;
+  resetMission();addLog((usingBlender?'Blender-authored theatre loaded: ':'Fallback theatre loaded: ')+config.label,'normal');
+  if(!initial)toast(config.label+' · '+(usingBlender?'Blender map loaded':'fallback map loaded'));
 }
 
 function makeJetVisual() {
@@ -1369,7 +1422,7 @@ function panCamera(dx, dy) {
 }
 function zoomCamera(factor) {
   const offset = camera.position.clone().sub(cameraTarget);
-  const distance = THREE.MathUtils.clamp(offset.length() * factor, 36, 365);
+  const distance = THREE.MathUtils.clamp(offset.length() * factor, 36, 580);
   offset.setLength(distance);
   camera.position.copy(cameraTarget).add(offset);
   camera.lookAt(cameraTarget);
@@ -1480,12 +1533,13 @@ function addCatalogItem(container, title, role, root, balance, status) {
   container.appendChild(card);
 }
 function populateRosterCatalog(roster) {
-  const vehicles = Array.isArray(roster.vehicles) ? roster.vehicles : [];
-  const ground = vehicles.filter((u) => u.category !== 'fixed_wing_aircraft');
-  const air = vehicles.filter((u) => u.category === 'fixed_wing_aircraft');
+  const vehicles = Array.isArray(roster.vehicles) ? roster.vehicles.filter((u)=>!String(u.status||'').startsWith('archived')) : [];
+  const airCategories = new Set(['fixed_wing_aircraft','rotary_wing_aircraft']);
+  const ground = vehicles.filter((u) => !airCategories.has(u.category));
+  const air = vehicles.filter((u) => airCategories.has(u.category));
   const infantry = roster.infantry && Array.isArray(roster.infantry.archetypes) ? roster.infantry.archetypes : [];
   $('catalogGroundCount').textContent = ground.length + ' CLASSES';
-  $('catalogAirCount').textContent = air.length + ' ASSET';
+  $('catalogAirCount').textContent = air.length + ' AIR ASSETS';
   $('catalogInfantryCount').textContent = infantry.length + ' ROLES · ' + ((roster.infantry.instances || []).length) + ' INSTANCES';
   $('catalogMeta').textContent = ground.length + ' LAND · ' + infantry.length + ' ROLES';
   $('catalogGroundList').replaceChildren();
@@ -1502,12 +1556,12 @@ async function loadBlenderAssetBundle() {
   if (state.blenderBundle) return state.blenderBundle;
   if (state.blenderBundlePromise) return state.blenderBundlePromise;
   state.blenderBundlePromise = (async () => {
-    setAssetText('Loading repository Blender GLB · 11.1 MB', false);
-    const gltf = await loadGLTF('./assets/combined-arms-r8.glb', 60000);
+    setAssetText('Loading Blender scene GLB · 14.6 MB', false);
+    const gltf = await loadGLTF('./assets/combined-arms-r19.glb', 90000);
     if (!gltf || !gltf.scene) throw new Error('GLB loaded without a scene');
     const roots = new Map();
     gltf.scene.traverse((node) => {
-      if (node.name && (/^UNIT_.*_ROOT$/.test(node.name) || /^INF_.*_ROOT$/.test(node.name))) {
+      if (node.name && (/^UNIT_.*_ROOT$/.test(node.name) || /^INF_.*_ROOT$/.test(node.name) || /^MAP_.*_ROOT$/.test(node.name))) {
         roots.set(node.name, node);
       }
     });
@@ -1574,10 +1628,11 @@ async function previewBlenderAsset(rootName, displayName, role) {
   const localCenter = center.clone().sub(originalPosition);
   const localMinY = initialBox.min.y - originalPosition.y;
   const isInfantry = rootName.startsWith('INF_');
-  const targetExtent = isInfantry ? 2.25 : (rootName.includes('JET') ? 12 : 8.5);
+  const targetExtent = isInfantry ? 2.0 : (rootName==='UNIT_F16C_BLOCK50_ROOT' ? 15.07 : rootName==='UNIT_HEAVY_STRIKE_ROOT' ? 19.43 : rootName.includes('HELICOPTER') ? 12 : rootName.startsWith('MAP_') ? 1 : 5.8);
   const factor = targetExtent / Math.max(size.x, size.y, size.z);
   model.scale.setScalar(factor);
   model.position.set(-localCenter.x * factor, -localMinY * factor, -localCenter.z * factor);
+  if(!isInfantry && rootName.startsWith('UNIT_'))model.rotation.y=Math.PI;
   model.updateMatrixWorld(true);
 
   const slotIndex = state.assetPreviewCounter++ % 6;
@@ -1641,8 +1696,8 @@ async function loadRosterManifest() {
   }
   state.rosterManifest = roster;
   populateRosterCatalog(roster);
-  const groundVehicles = roster.vehicles.filter((unit) => unit.category !== 'fixed_wing_aircraft').length;
-  const airAssets = roster.vehicles.filter((unit) => unit.category === 'fixed_wing_aircraft').length;
+  const groundVehicles = roster.vehicles.filter((unit) => !['fixed_wing_aircraft','rotary_wing_aircraft'].includes(unit.category)).length;
+  const airAssets = roster.vehicles.filter((unit) => ['fixed_wing_aircraft','rotary_wing_aircraft'].includes(unit.category)).length;
   const roles = roster.infantry.archetypes.length;
   const instances = roster.infantry.instances ? roster.infantry.instances.length : 0;
   addLog(
