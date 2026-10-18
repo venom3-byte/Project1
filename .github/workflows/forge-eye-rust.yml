@@ -84,6 +84,8 @@ jobs:
           fi
           curl --fail --silent --show-error --max-time 10 http://127.0.0.1:4173/forge-eye/forge_eye_core.wasm.gz -o /tmp/forge-eye-served.wasm.gz
           gzip -t /tmp/forge-eye-served.wasm.gz
+      - name: Install isolated Chromium smoke-test dependencies
+        run: npm install --prefix mcp --no-audit --no-fund
       - name: Test Forge Eye in desktop and mobile Chromium
         env:
           FORGE_EYE_URL: http://127.0.0.1:4173/forge-eye/index.html
