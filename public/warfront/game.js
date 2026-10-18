@@ -18,7 +18,7 @@ const mixers = [];
 const bombs = [];
 const effects = [];
 const assets = { tank: null, plane: null, tankSource: '', planeSource: '' };
-const state = { command: 'select', selected: null, time: 0, missionComplete: false, paused: false, started: false, pointerDown: null, dragging: false, touchPoints: new Map(), lastPinch: 0 };
+const state = { command: 'select', selected: null, time: 0, missionComplete: false, paused: false, started: false, pointerDown: null, dragging: false, touchPoints: new Map(), lastPinch: 0, blenderBundle: null, blenderBundlePromise: null, activeAssetPreview: null, assetPreviewCounter: 0 };
 const TEAM = { blue: 0x9fca9c, red: 0xdc7265, amber: 0xeab86b };
 const PACKS = {
   tank: 'https://3dassets.dev/api/v1/packs/armoured-column-and-field-camp',
@@ -756,7 +756,15 @@ function updateSelectionPanel() {
     return;
   }
   $('selectedName').textContent = u.name;
-  $('selectedMeta').textContent = u.type === 'target' ? 'Hostile objective · ' + String(u.kind).toUpperCase() : (u.type === 'aircraft' ? 'Fixed-wing strike asset · Air wing' : 'Tracked vehicle · Ground force');
+  $('selectedMeta').textContent = u.type === 'target'
+    ? 'Hostile objective · ' + String(u.kind).toUpperCase()
+    : (u.type === 'aircraft'
+      ? 'Fixed-wing strike asset · Air wing'
+      : (u.type === 'asset_preview'
+        ? 'Blender GLB model · asset preview only'
+        : (u.type === 'infantry'
+          ? 'Infantry archetype · asset preview only'
+          : 'Tracked vehicle · Ground force')));
   $('selectedState').textContent = (u.status || (u.alive ? 'ACTIVE' : 'DESTROYED')).toUpperCase();
   $('selectedValue').textContent = Math.max(0, Math.round(u.hp)) + ' HP';
   $('selectedHealth').style.width = Math.max(0, (u.hp / u.maxHp) * 100) + '%';
@@ -787,6 +795,11 @@ function pointerCommand(hit) {
   if (!hit) return;
   const entity = hit.entity;
   if (entity) {
+    if (entity.assetOnly) {
+      selectEntity(entity);
+      toast('Catalog preview · ' + entity.name);
+      return;
+    }
     if (entity.type === 'target' || entity.kind) {
       if (state.command === 'airstrike') {
         launchAirstrike(entity);
@@ -1272,7 +1285,30 @@ function addCatalogItem(container, title, role, root, balance, status) {
   const rootNode = document.createElement('div'); rootNode.className = 'catalog-root'; rootNode.textContent = root || 'No Blender root';
   const stats = document.createElement('div'); stats.className = 'catalog-stats'; stats.textContent = catalogStatText(balance);
   const flag = document.createElement('div'); flag.className = 'catalog-status'; flag.textContent = String(status || 'blender_prototype').replaceAll('_', ' ').toUpperCase();
-  card.append(heading, roleNode, rootNode, stats, flag);
+  const preview = document.createElement('button');
+  preview.type = 'button';
+  preview.className = 'catalog-preview-btn';
+  preview.textContent = 'VIEW IN THEATRE';
+  preview.disabled = !root;
+  preview.title = root ? 'Load this named Blender object from the combined-arms GLB' : 'No Blender scene root is mapped to this role';
+  preview.addEventListener('click', async () => {
+    preview.disabled = true;
+    const oldText = preview.textContent;
+    preview.textContent = 'LOADING…';
+    try {
+      await previewBlenderAsset(root, title, role);
+      $('catalogOverlay').classList.remove('open');
+      $('catalogOverlay').setAttribute('aria-hidden', 'true');
+    } catch (error) {
+      console.error('Blender asset preview failed', error);
+      toast('Could not load model: ' + title);
+      addLog('Asset preview failed for ' + title + '.', 'alert');
+    } finally {
+      preview.disabled = false;
+      preview.textContent = oldText;
+    }
+  });
+  card.append(heading, roleNode, rootNode, stats, flag, preview);
   container.appendChild(card);
 }
 function populateRosterCatalog(roster) {
@@ -1289,8 +1325,142 @@ function populateRosterCatalog(roster) {
   $('catalogInfantryList').replaceChildren();
   for (const u of ground) addCatalogItem($('catalogGroundList'), u.name, u.role, u.root, u.balance, u.status);
   for (const u of air) addCatalogItem($('catalogAirList'), u.name, u.role, u.root, u.balance, u.status);
-  for (const role of infantry) addCatalogItem($('catalogInfantryList'), role.name, role.role, role.id, role.balance, 'blender_prototype');
+  for (const role of infantry) {
+    const instance = (roster.infantry.instances || []).find((item) => item.archetype === role.id);
+    addCatalogItem($('catalogInfantryList'), role.name, role.role, instance ? instance.sourceRoot : '', role.balance, 'blender_prototype');
+  }
 }
+async function loadBlenderAssetBundle() {
+  if (state.blenderBundle) return state.blenderBundle;
+  if (state.blenderBundlePromise) return state.blenderBundlePromise;
+  state.blenderBundlePromise = (async () => {
+    setAssetText('Loading repository Blender GLB · 11.1 MB', false);
+    const gltf = await loadGLTF('./assets/combined-arms-r8.glb', 60000);
+    if (!gltf || !gltf.scene) throw new Error('GLB loaded without a scene');
+    const roots = new Map();
+    gltf.scene.traverse((node) => {
+      if (node.name && (/^UNIT_.*_ROOT$/.test(node.name) || /^INF_.*_ROOT$/.test(node.name))) {
+        roots.set(node.name, node);
+      }
+    });
+    if (!roots.size) throw new Error('No named Blender vehicle or infantry roots were found in the GLB');
+    state.blenderBundle = { gltf, roots };
+    setAssetText('Repository Blender GLB loaded · ' + roots.size + ' named roots', true);
+    addLog('Blender combined-arms GLB loaded from the repository (' + roots.size + ' named roots).', 'normal');
+    return state.blenderBundle;
+  })();
+  try {
+    return await state.blenderBundlePromise;
+  } finally {
+    state.blenderBundlePromise = null;
+  }
+}
+
+function clearAssetPreview() {
+  const active = state.activeAssetPreview;
+  if (!active) return;
+  if (state.selected === active.unit) selectEntity(null);
+  scene.remove(active.group);
+  const ix = interactables.indexOf(active.group);
+  if (ix >= 0) interactables.splice(ix, 1);
+  if (active.pad) scene.remove(active.pad);
+  if (active.marker) scene.remove(active.marker);
+  state.activeAssetPreview = null;
+}
+
+function focusCameraAt(point) {
+  const target = point.clone();
+  cameraTarget.copy(target);
+  camera.position.copy(target).add(new THREE.Vector3(0, 48, 55));
+  camera.lookAt(cameraTarget);
+}
+
+async function previewBlenderAsset(rootName, displayName, role) {
+  if (!rootName || typeof rootName !== 'string') throw new Error('This catalog item has no mapped Blender root');
+  toast('Loading Blender model…');
+  const bundle = await loadBlenderAssetBundle();
+  const original = bundle.roots.get(rootName) || bundle.gltf.scene.getObjectByName(rootName);
+  if (!original) {
+    throw new Error('Named root not found in combined GLB: ' + rootName);
+  }
+  clearAssetPreview();
+  const model = SkeletonUtils.clone(original);
+  model.name = 'CATALOG_PREVIEW_' + rootName;
+  model.traverse((node) => {
+    if (node.isMesh) {
+      node.castShadow = true;
+      node.receiveShadow = true;
+      node.frustumCulled = true;
+    }
+  });
+  model.updateMatrixWorld(true);
+  const initialBox = new THREE.Box3().setFromObject(model);
+  const size = initialBox.getSize(new THREE.Vector3());
+  const center = initialBox.getCenter(new THREE.Vector3());
+  if (!Number.isFinite(size.x + size.y + size.z) || Math.max(size.x, size.y, size.z) < 0.001) {
+    throw new Error('Named Blender root has no visible mesh geometry: ' + rootName);
+  }
+  model.position.x -= center.x;
+  model.position.z -= center.z;
+  model.position.y -= initialBox.min.y;
+  const isInfantry = rootName.startsWith('INF_');
+  const targetExtent = isInfantry ? 2.25 : (rootName.includes('JET') ? 12 : 8.5);
+  const factor = targetExtent / Math.max(size.x, size.y, size.z);
+  model.scale.setScalar(factor);
+  model.updateMatrixWorld(true);
+
+  const slotIndex = state.assetPreviewCounter++;
+  const x = 58 + (slotIndex % 3) * 14;
+  const z = 22 + Math.floor(slotIndex / 3) * 13;
+  const group = new THREE.Group();
+  group.name = 'CATALOG_PREVIEW_GROUP_' + rootName;
+  group.position.set(x, 0, z);
+  group.add(model);
+  const pad = addBox(scene, 'CATALOG_PREVIEW_PAD_' + slotIndex, [11, 0.18, 11], [x, 0.08, z], mats.concrete, false, true);
+  const marker = addBox(scene, 'CATALOG_PREVIEW_ID_' + slotIndex, [0.10, 0.025, 3.0], [x - 4.8, 0.20, z], mats.emissive, false, false);
+  const unit = {
+    id: 'asset-preview-' + slotIndex,
+    type: isInfantry ? 'infantry' : 'asset_preview',
+    name: displayName,
+    team: 'blue',
+    group,
+    visual: model,
+    ring: addSelectionRing(group, TEAM.blue),
+    hp: 100,
+    maxHp: 100,
+    status: 'BLENDER MODEL PREVIEW',
+    selected: false,
+    alive: true,
+    role,
+    rootName,
+    assetOnly: true
+  };
+  group.position.set(x, 0, z);
+  tagInteractive(group, 'rtsUnit', unit);
+  scene.add(group);
+  interactables.push(group);
+  state.activeAssetPreview = { group, unit, pad, marker };
+  if (bundle.gltf.animations && bundle.gltf.animations.length) {
+    const modelNames = new Set();
+    model.traverse((node) => { if (node.name) modelNames.add(node.name); });
+    const matchingClips = bundle.gltf.animations.filter((clip) => clip.tracks.some((track) => {
+      const trackName = track.name.split(/[.]/)[0].split(/[\/]/).pop();
+      return modelNames.has(trackName);
+    }));
+    if (matchingClips.length) {
+      const mixer = new THREE.AnimationMixer(model);
+      for (const clip of matchingClips) mixer.clipAction(clip).play();
+      state.activeAssetPreview.mixer = mixer;
+    }
+  }
+  selectEntity(unit);
+  focusCameraAt(new THREE.Vector3(x, 1, z));
+  setCommand('select');
+  addLog('Preview loaded: ' + displayName + ' · ' + rootName + '.', 'normal');
+  toast('Loaded: ' + displayName);
+  return unit;
+}
+
 async function loadRosterManifest() {
   const response = await fetch('./roster.json', { cache: 'no-store' });
   if (!response.ok) throw new Error('Roster manifest status ' + response.status);
@@ -1363,6 +1533,7 @@ function animate() {
   const dt = Math.min(0.05, clock.getDelta() || 0);
   if (state.started && !state.paused) {
     state.time += dt;
+    if (state.activeAssetPreview && state.activeAssetPreview.mixer) state.activeAssetPreview.mixer.update(dt);
     updateTanks(dt);
     aircraft.forEach((p) => updatePlane(p, dt));
     updateBombs(dt);
