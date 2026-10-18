@@ -98,6 +98,79 @@ try {
     throw new Error("Transform fallback did not change position, rotation, and scale: "+JSON.stringify(editorSystems));
   }
 
+  // These regressions run against the freshly-built branch preview. The separately
+  // deployed public Worker can lag behind the branch and is still checked by the
+  // common smoke suite below, so branch-only assertions must not mislabel it.
+  if (["127.0.0.1", "localhost"].includes(new URL(URL_TO_TEST).hostname)) {
+    const nestedModel = await page.evaluate(async () => {
+      const engine=window.Forge,pc=window.ForgePC,gizmo=window.ForgeGizmo;
+      const camera=engine.camera();
+      if(!camera?.camera)throw new Error("No active camera for nested-model pick regression");
+      const saved={position:camera.getPosition().clone(),rotation:camera.getRotation().clone(),
+        projection:camera.camera.projection,orthoHeight:camera.camera.orthoHeight,
+        nativeReady:gizmo.state.nativeReady,mode:gizmo.state.mode,space:gizmo.state.space};
+      const original=[...engine.entities.values()].find(r=>r.name==="QA transform and PBR");
+      if(!original)throw new Error("The original QA mesh was not found");
+      const root=engine.add("model","QA nested imported model");
+      root.entity.setPosition(15,1,0);
+      const child=new pc.Entity("QA imported child mesh");
+      root.entity.addChild(child);
+      child.addComponent("render",{type:"box"});
+      child.render.material=engine.material([.25,.65,.85]);
+      child.setLocalScale(2,2,2);
+      camera.camera.projection=pc.PROJECTION_PERSPECTIVE;
+      camera.setPosition(15,3.5,7);camera.lookAt(15,1,0);
+      engine.app.render?.();
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      try {
+        const rect=engine.canvas.getBoundingClientRect();
+        const picked=engine.pick({clientX:rect.left+rect.width/2,clientY:rect.top+rect.height/2});
+        const selectedRoot=engine.selected()?.id===root.id;
+        gizmo.state.nativeReady=false;gizmo.setMode("translate");
+        const before=engine._transformState(root);
+        const drag=gizmo.beginPointerGesture({pointerId:981,clientX:rect.left+rect.width/2,clientY:rect.top+rect.height/2});
+        if(!drag)throw new Error("Fallback drag did not start on nested model");
+        gizmo.movePointerGesture({pointerId:981,clientX:rect.left+rect.width/2+32,clientY:rect.top+rect.height/2+16,shiftKey:false,altKey:false},drag);
+        gizmo.endPointerGesture(drag);
+        const after=engine._transformState(root);
+        return {pickedName:picked?.name,selectedRoot,rootId:root.id,
+          moved:JSON.stringify(before.p)!==JSON.stringify(after.p),before:before.p,after:after.p,
+          childRenderCount:child.render?.meshInstances?.length||0,root:root.id};
+      } finally {
+        const rootNow=engine.entities.get(root.id);
+        if(rootNow){engine.select(rootNow.id);engine.delete()}
+        camera.camera.projection=saved.projection;camera.camera.orthoHeight=saved.orthoHeight;
+        camera.setPosition(saved.position);camera.setRotation(saved.rotation);
+        gizmo.state.nativeReady=saved.nativeReady;gizmo.setSpace(saved.space);gizmo.setMode(saved.mode);
+        if(saved.nativeReady)gizmo.sync();
+        engine.select(original.id);window.dispatchEvent(new Event("forge-selection"));engine.app.render?.();
+      }
+    });
+    if(nestedModel.pickedName!=="QA nested imported model"||!nestedModel.selectedRoot||!nestedModel.moved||nestedModel.childRenderCount<1){
+      throw new Error("Nested imported-model pick/transform regression failed: "+JSON.stringify(nestedModel));
+    }
+
+    const freeform = await page.evaluate(() => {
+      const engine=window.Forge;
+      const contour=[[.5,.02],[.62,.34],[.95,.36],[.7,.58],[.78,.94],
+        [.5,.73],[.22,.94],[.3,.58],[.05,.36],[.38,.34]];
+      const record=engine.createExtrudedSilhouette({name:"QA irregular freeform shape",contour,axis:"front",width:2,height:2,depth:.4});
+      const meshInstances=record.entity.render?.meshInstances||[];
+      const result={id:record.id,kind:record.components.geometry?.kind,
+        contourPoints:record.components.geometry?.contour?.length,
+        depth:record.components.geometry?.depth,meshCount:meshInstances.length,
+        indexedTriangles:meshInstances[0]?.mesh?.primitive?.[0]?.count||0,
+        finiteBounds:!!meshInstances[0]?.aabb&&Number.isFinite(meshInstances[0].aabb.center.x)};
+      engine.select(record.id);engine.delete();
+      const original=[...engine.entities.values()].find(r=>r.name==="QA transform and PBR");
+      if(original){engine.select(original.id);window.dispatchEvent(new Event("forge-selection"))}
+      return result;
+    });
+    if(freeform.kind!=="extruded-silhouette"||freeform.contourPoints<6||freeform.depth<=0||freeform.meshCount!==1||!freeform.finiteBounds){
+      throw new Error("Irregular freeform image-contour mesh regression failed: "+JSON.stringify(freeform));
+    }
+  }
+
   await page.locator("#materialPreset").selectOption("glass");
   await page.locator("#materialOpacity").evaluate(el=>{el.value="0.31";el.dispatchEvent(new Event("input",{bubbles:true}));el.dispatchEvent(new Event("change",{bubbles:true}));});
   const pbr = await page.evaluate(() => {
