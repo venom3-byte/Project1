@@ -226,7 +226,8 @@ function startGesture(e) {
   const gizmo=window.ForgeGizmo;
   if (e.pointerType==="touch") {
     if(state.touches.size===0&&gizmo&&!gizmo.state?.nativeReady&&gizmo.state?.mode!=="select"){
-      F.pick(e);
+      const selected=F.selected();
+      if(!selected||!["camera","light"].includes(selected.kind))F.pick(e);
       const transform=gizmo.beginPointerGesture?.(e);
       if(transform){state.touches.set(e.pointerId,{x:e.clientX,y:e.clientY});state.gesture={id:e.pointerId,mode:"transform",transform,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false};e.preventDefault();try{canvas.setPointerCapture(e.pointerId)}catch{}return}
     }
@@ -248,7 +249,8 @@ function startGesture(e) {
   if (e.button===1 || (e.button===0 && e.altKey)) mode=e.shiftKey?"pan":"orbit";
   else if (e.button===2) mode=e.shiftKey?"orbit":"pan";
   if(mode==="select"&&e.button===0&&gizmo&&!gizmo.state?.nativeReady&&gizmo.state?.mode!=="select"){
-    F.pick(e);
+    const selected=F.selected();
+    if(!selected||!["camera","light"].includes(selected.kind))F.pick(e);
     const transform=gizmo.beginPointerGesture?.(e);
     if(transform){state.gesture={id:e.pointerId,mode:"transform",transform,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false};e.preventDefault();try{canvas.setPointerCapture(e.pointerId)}catch{}return}
   }
@@ -384,4 +386,4 @@ function status(){
 state.installed=true;
 createWorldGrid();
 readCamera(vec(0,1,0));
-window.ForgeViewport={state,status,setGridVisible,toggleGrid,orbit,pan,zoomBy,frame:()=>F.frame()};
+window.ForgeViewport={state,status,setGridVisible,toggleGrid,orbit,pan,zoomBy,frame:()=>F.frame(),syncCamera:()=>readCamera(state.target)};
