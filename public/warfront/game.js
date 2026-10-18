@@ -2126,8 +2126,20 @@ window.__WARFRONT_DIAGNOSTICS__=()=>({
   tankModels:tanks.map((unit)=>({name:unit.name,root:unit.visual&&unit.visual.name,imported:!!(unit.visualData&&unit.visualData.imported)})),
   infantryModels:soldiers.filter((unit)=>!!unit.modelRootName).length,
   serviceVehicles:serviceVehicles.map((truck)=>({name:truck.name,root:truck.sourceRoot,state:truck.state,status:truck.status,job:truck.job?truck.job.stage:null})),
-  aircraft:aircraft.map((plane)=>({name:plane.name,root:plane.modelRootName||null,flightClass:plane.flightClass||'unbound',transport:!!plane.isTransport,ready:plane.state==='ready'}))
+  aircraft:aircraft.map((plane)=>({key:plane.airUnitKey||null,name:plane.name,root:plane.modelRootName||null,flightClass:plane.flightClass||'unbound',transport:!!plane.isTransport,state:plane.state,status:plane.status,ready:plane.state==='ready',storesRemaining:plane.storesRemaining??null})))
 });
+if(location.hostname==='127.0.0.1'||location.hostname==='localhost'){
+  window.__WARFRONT_TEST__={
+    startF16Rearm(){
+      const plane=aircraft.find((p)=>p.airUnitKey==='f16c-block50');
+      if(!plane)throw new Error('F-16 runtime entity missing');
+      plane.state='rearm';plane.status='REARM / QA TEST';plane.route=[];plane.routeIndex=0;plane.rearmTimer=0;
+      plane.rearmServiceStarted=false;plane.rearmServiceComplete=false;plane.rearmCargoServiced=false;plane.rearmFuelServiced=false;
+      plane.group.position.set(plane.initial.x,.16,plane.initial.z);dispatchRearmConvoy(plane);
+      return {aircraft:plane.name,serviceVehicleCount:serviceVehicles.length,started:plane.rearmServiceStarted,serviceComplete:plane.rearmServiceComplete};
+    }
+  };
+}
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(0.05, clock.getDelta() || 0);
