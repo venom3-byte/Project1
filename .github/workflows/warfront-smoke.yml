@@ -65,6 +65,7 @@ jobs:
             '<canvas id="minimap"',
             'id="catalogToggle"',
             'id="catalogOverlay"',
+            'id="mapSelector"',
             'src="./game.js"',
             'three/addons/'
           ];
@@ -74,6 +75,14 @@ jobs:
             'function updatePlane(',
             'function updateTanks(',
             'function resetMission(',
+            'const MAPS = {',
+            'function applyBattlefieldMap(',
+            'function createInfantry(',
+            'function launchShell(',
+            'function updateProjectiles(',
+            'function updateInfantry(',
+            'function crashAircraft(',
+            'function createImpactMark(',
             'async function loadRosterManifest(',
             'function populateRosterCatalog(',
             'async function loadBlenderAssetBundle(',
