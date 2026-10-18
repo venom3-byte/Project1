@@ -204,7 +204,38 @@
               <div class="property-section-body">
                 <label class="property-name">Base color <span class="color-editor"><input id="materialColor" type="color" value="#389fe0"><output id="materialHex">#389FE0</output></span></label>
                 <label class="range-property"><span>Metalness <output id="metalnessValue">0.05</output></span><input id="metalness" type="range" min="0" max="1" step="0.01" value="0.05"></label>
-                <label class="range-property"><span>Roughness <output id="roughnessValue">0.50</output></span><input id="roughness" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+                <label class="range-property"><span>Roughness <output id="roughnessValue">0.55</output></span><input id="roughness" type="range" min="0" max="1" step="0.01" value="0.55"></label>
+                <label class="property-name">Surface preset<select id="materialPreset">
+                  <option value="custom">Custom / current values</option>
+                  <option value="plastic">Plastic</option>
+                  <option value="paint">Painted metal</option>
+                  <option value="metal">Bare metal</option>
+                  <option value="rubber">Rubber</option>
+                  <option value="ceramic">Ceramic</option>
+                  <option value="glass">Tinted glass · transparent preview</option>
+                </select></label>
+                <label class="range-property"><span>Opacity <output id="opacityValue">100%</output></span><input id="materialOpacity" type="range" min="0.05" max="1" step="0.01" value="1"></label>
+                <p class="material-note">Metalness and roughness affect a lit PBR surface. Glass preview uses alpha transparency; full optical refraction is not yet simulated.</p>
+              </div>
+            </section>
+            <section class="property-section is-open" id="lightSection" hidden>
+              <button type="button" class="property-section-heading" aria-expanded="true"><span>▾</span><b>Light</b><small>COMPONENT</small></button>
+              <div class="property-section-body">
+                <label class="property-name">Type<select id="lightType"><option value="directional">Directional / Sun</option><option value="omni">Point / Omni</option><option value="spot">Spot</option></select></label>
+                <label class="property-name">Color <span class="color-editor"><input id="lightColor" type="color" value="#FFF5E0"><output id="lightHex">#FFF5E0</output></span></label>
+                <label class="range-property"><span>Intensity <output id="lightIntensityValue">2.50</output></span><input id="lightIntensity" type="range" min="0" max="10" step="0.05" value="2.5"></label>
+                <label class="range-property"><span>Range (point / spot) <output id="lightRangeValue">12 m</output></span><input id="lightRange" type="range" min="1" max="100" step="1" value="12"></label>
+                <label class="range-property"><span>Spot cone <output id="lightConeValue">45°</output></span><input id="lightCone" type="range" min="5" max="85" step="1" value="45"></label>
+                <label class="check-property"><input id="lightShadows" type="checkbox" checked><span>Cast shadows</span></label>
+              </div>
+            </section>
+            <section class="property-section is-open" id="cameraSection" hidden>
+              <button type="button" class="property-section-heading" aria-expanded="true"><span>▾</span><b>Camera</b><small>COMPONENT</small></button>
+              <div class="property-section-body">
+                <label class="range-property"><span>Field of view <output id="cameraFovValue">60°</output></span><input id="cameraFov" type="range" min="20" max="110" step="1" value="60"></label>
+                <label class="property-name">Projection<select id="cameraProjection"><option value="perspective">Perspective</option><option value="orthographic">Orthographic</option></select></label>
+                <label class="check-property"><input id="cameraActive" type="checkbox"><span>Use as active editor camera</span></label>
+                <p class="material-note">The active camera drives the current editor view. Use the Transform fields to position and rotate it.</p>
               </div>
             </section>
             <div class="inspector-actions"><button type="button" class="secondary-button" data-command="duplicate">Duplicate</button><button type="button" class="danger-button" data-command="delete">Delete</button></div>
