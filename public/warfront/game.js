@@ -1409,7 +1409,7 @@ async function previewBlenderAsset(rootName, displayName, role) {
   model.scale.setScalar(factor);
   model.updateMatrixWorld(true);
 
-  const slotIndex = state.assetPreviewCounter++;
+  const slotIndex = state.assetPreviewCounter++ % 6;
   const x = 58 + (slotIndex % 3) * 14;
   const z = 22 + Math.floor(slotIndex / 3) * 13;
   const group = new THREE.Group();
