@@ -68,7 +68,7 @@ function movePointerGesture(event,drag){
     if(F.snapEnabled){const step=Math.max(.0001,Number(F.snapSize)||.25);x=Math.round(x/step)*step;y=Math.round(y/step)*step;z=Math.round(z/step)*step}
     r.entity.setLocalPosition(x,y,z);
   }else if(drag.mode==="rotate"){
-    const amount=event.shiftKey?.1:.5;
+    const amount=event.shiftKey ? 0.1 : 0.5;
     r.entity.setLocalEulerAngles(rot[0]+dy*amount,rot[1]+dx*amount,rot[2]+(event.altKey?dx*amount:0));
   }else if(drag.mode==="scale"){
     const factor=Math.max(.01,Math.min(100,Math.exp((dx-dy)*.008)));
