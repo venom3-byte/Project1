@@ -1,0 +1,765 @@
+{
+  "schemaVersion": 1,
+  "project": "Warfront RTS",
+  "sceneRevision": 6,
+  "sceneProjectUrl": "https://higgsfield.ai/3d-jutsu/6a8b4f06-f85f-4cac-9897-35fab0bccfe3",
+  "sourceEngine": "Blender 5.2 LTS",
+  "coordinateNotes": {
+    "blenderUnits": "metres",
+    "blenderUpAxis": "Z",
+    "authoredVehicleForward": "+Y",
+    "exportFormat": "GLB/glTF converts coordinates for consumers"
+  },
+  "integrationStatus": "blender-prototypes-not-yet-packaged-as-individual-runtime-models",
+  "balanceNote": "All balance numbers are abstract RTS game values, not real-world performance specifications.",
+  "bundle": {
+    "fullSceneGLBBytes": 9956892,
+    "individualGLBAssets": "pending",
+    "runtimeImport": "pending"
+  },
+  "summary": {
+    "vehicleAndAircraftRoots": 28,
+    "groundVehicleClasses": 27,
+    "aircraftRoots": 1,
+    "infantryInstances": 18,
+    "infantryArchetypes": 12,
+    "vehicleMeshParts": 0,
+    "infantryMeshParts": 0
+  },
+  "vehicles": [
+    {
+      "id": "mbt-main",
+      "name": "Main battle tank",
+      "root": "UNIT_MBT_MAIN_ROOT",
+      "class": "main_battle_tank",
+      "category": "tracked_armour",
+      "role": "frontline_heavy",
+      "balance": {
+        "hp": 280,
+        "speed": 24,
+        "armour": 9,
+        "range": 60,
+        "damage": 58,
+        "cost": 900
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "light-tank",
+      "name": "Light tank",
+      "root": "UNIT_LT01_ROOT",
+      "class": "light_tank",
+      "category": "tracked_armour",
+      "role": "mobile_direct_fire",
+      "balance": {
+        "hp": 180,
+        "speed": 34,
+        "armour": 5,
+        "range": 42,
+        "damage": 32,
+        "cost": 550
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "ifv-tracked",
+      "name": "Tracked infantry fighting vehicle",
+      "root": "UNIT_IFV01_ROOT",
+      "class": "ifv",
+      "category": "tracked_armour",
+      "role": "infantry_support",
+      "balance": {
+        "hp": 170,
+        "speed": 29,
+        "armour": 5,
+        "range": 38,
+        "damage": 24,
+        "cost": 600
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "apc-tracked",
+      "name": "Tracked armoured personnel carrier",
+      "root": "UNIT_APCT01_ROOT",
+      "class": "tracked_apc",
+      "category": "tracked_armour",
+      "role": "troop_transport",
+      "balance": {
+        "hp": 155,
+        "speed": 27,
+        "armour": 5,
+        "range": 20,
+        "damage": 8,
+        "cost": 420
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "howitzer-spg",
+      "name": "Self-propelled howitzer",
+      "root": "UNIT_SPG01_ROOT",
+      "class": "spg",
+      "category": "tracked_artillery",
+      "role": "indirect_fire",
+      "balance": {
+        "hp": 135,
+        "speed": 22,
+        "armour": 3,
+        "range": 95,
+        "damage": 70,
+        "cost": 800
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "spaa",
+      "name": "Self-propelled anti-air gun",
+      "root": "UNIT_SPAA01_ROOT",
+      "class": "spaa",
+      "category": "tracked_air_defence",
+      "role": "close_air_defence",
+      "balance": {
+        "hp": 145,
+        "speed": 26,
+        "armour": 4,
+        "range": 50,
+        "damage": 18,
+        "cost": 700
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "tracked-engineer",
+      "name": "Tracked armoured engineer vehicle",
+      "root": "UNIT_AEVT01_ROOT",
+      "class": "engineer",
+      "category": "tracked_support",
+      "role": "obstacle_clearance",
+      "balance": {
+        "hp": 165,
+        "speed": 22,
+        "armour": 5,
+        "range": 8,
+        "damage": 4,
+        "cost": 480
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "apc-8x8",
+      "name": "8×8 armoured personnel carrier",
+      "root": "UNIT_APC8_ROOT",
+      "class": "apc_8x8",
+      "category": "wheeled_armour",
+      "role": "troop_transport",
+      "balance": {
+        "hp": 145,
+        "speed": 36,
+        "armour": 4,
+        "range": 24,
+        "damage": 10,
+        "cost": 430
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "mrap",
+      "name": "Mine-resistant patrol vehicle",
+      "root": "UNIT_MRAP_ROOT",
+      "class": "mrap",
+      "category": "wheeled_armour",
+      "role": "protected_patrol",
+      "balance": {
+        "hp": 120,
+        "speed": 38,
+        "armour": 3,
+        "range": 24,
+        "damage": 12,
+        "cost": 360
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "recon",
+      "name": "Reconnaissance scout vehicle",
+      "root": "UNIT_SCOUT_ROOT",
+      "class": "recon",
+      "category": "wheeled_recon",
+      "role": "scouting_and_spotting",
+      "balance": {
+        "hp": 95,
+        "speed": 44,
+        "armour": 2,
+        "range": 22,
+        "damage": 8,
+        "cost": 300
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "sam",
+      "name": "Mobile surface-to-air missile unit",
+      "root": "UNIT_SAM_ROOT",
+      "class": "sam",
+      "category": "wheeled_air_defence",
+      "role": "longer_range_air_defence",
+      "balance": {
+        "hp": 115,
+        "speed": 30,
+        "armour": 2,
+        "range": 90,
+        "damage": 48,
+        "cost": 760
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "cargo",
+      "name": "Logistics cargo truck",
+      "root": "UNIT_CARGO_ROOT",
+      "class": "cargo",
+      "category": "logistics",
+      "role": "supply_delivery",
+      "balance": {
+        "hp": 80,
+        "speed": 40,
+        "armour": 1,
+        "range": 0,
+        "damage": 0,
+        "cost": 180
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "fuel",
+      "name": "Fuel and refuelling truck",
+      "root": "UNIT_FUEL_ROOT",
+      "class": "fuel",
+      "category": "logistics",
+      "role": "aircraft_and_vehicle_rearm",
+      "balance": {
+        "hp": 85,
+        "speed": 35,
+        "armour": 1,
+        "range": 0,
+        "damage": 0,
+        "cost": 220
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "recovery-truck",
+      "name": "Recovery and wrecker truck",
+      "root": "UNIT_WREC_ROOT",
+      "class": "recovery",
+      "category": "support",
+      "role": "vehicle_recovery",
+      "balance": {
+        "hp": 110,
+        "speed": 30,
+        "armour": 2,
+        "range": 0,
+        "damage": 0,
+        "cost": 300
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "command-radar",
+      "name": "Mobile command and radar vehicle",
+      "root": "UNIT_C2RAD_ROOT",
+      "class": "radar_command",
+      "category": "command_support",
+      "role": "sensor_and_command",
+      "balance": {
+        "hp": 95,
+        "speed": 32,
+        "armour": 1,
+        "range": 0,
+        "damage": 0,
+        "cost": 420
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "bridge-layer",
+      "name": "Mobile bridge-layer support vehicle",
+      "root": "UNIT_BRIDGE_ROOT",
+      "class": "bridge",
+      "category": "engineering_support",
+      "role": "gap_crossing",
+      "balance": {
+        "hp": 130,
+        "speed": 24,
+        "armour": 3,
+        "range": 0,
+        "damage": 0,
+        "cost": 400
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "repair-truck",
+      "name": "Field repair and maintenance vehicle",
+      "root": "UNIT_REPAIR_ROOT",
+      "class": "recovery",
+      "category": "support",
+      "role": "repair_and_rearm",
+      "balance": {
+        "hp": 95,
+        "speed": 33,
+        "armour": 1,
+        "range": 0,
+        "damage": 0,
+        "cost": 280
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "electronic-support",
+      "name": "Electronic support and signals vehicle",
+      "root": "UNIT_EW_ROOT",
+      "class": "ew",
+      "category": "command_support",
+      "role": "sensor_disruption_gameplay",
+      "balance": {
+        "hp": 90,
+        "speed": 34,
+        "armour": 1,
+        "range": 0,
+        "damage": 0,
+        "cost": 440
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "armoured-dozer",
+      "name": "Armoured dozer engineering vehicle",
+      "root": "UNIT_BULL_ROOT",
+      "class": "engineer",
+      "category": "engineering_support",
+      "role": "construction_and_obstacle_clearance",
+      "balance": {
+        "hp": 150,
+        "speed": 20,
+        "armour": 4,
+        "range": 4,
+        "damage": 3,
+        "cost": 380
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "mlrs",
+      "name": "Multiple launch rocket system 8×8",
+      "root": "UNIT_MLRS01_ROOT",
+      "class": "mlrs",
+      "category": "wheeled_artillery",
+      "role": "area_fire_support",
+      "balance": {
+        "hp": 120,
+        "speed": 32,
+        "armour": 2,
+        "range": 100,
+        "damage": 86,
+        "cost": 920
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "wheeled-antitank",
+      "name": "Wheeled anti-armour missile carrier",
+      "root": "UNIT_ATGM_WHEEL01_ROOT",
+      "class": "anti_armor_vehicle",
+      "category": "wheeled_armour",
+      "role": "anti_armour_support",
+      "balance": {
+        "hp": 100,
+        "speed": 35,
+        "armour": 2,
+        "range": 70,
+        "damage": 52,
+        "cost": 650
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "ambulance",
+      "name": "Field ambulance / casualty evacuation",
+      "root": "UNIT_AMB01_ROOT",
+      "class": "ambulance",
+      "category": "medical_support",
+      "role": "casualty_recovery",
+      "balance": {
+        "hp": 75,
+        "speed": 38,
+        "armour": 1,
+        "range": 0,
+        "damage": 0,
+        "cost": 240
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "light-utility",
+      "name": "Light tactical utility 4×4",
+      "root": "UNIT_LUV01_ROOT",
+      "class": "light_utility",
+      "category": "light_vehicles",
+      "role": "liaison_and_light_transport",
+      "balance": {
+        "hp": 65,
+        "speed": 48,
+        "armour": 1,
+        "range": 0,
+        "damage": 0,
+        "cost": 150
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "amphibious-apc",
+      "name": "Amphibious 8×8 armoured personnel carrier",
+      "root": "UNIT_AMPH01_ROOT",
+      "class": "amphibious_apc",
+      "category": "amphibious_armour",
+      "role": "water_obstacle_transport",
+      "balance": {
+        "hp": 145,
+        "speed": 31,
+        "armour": 4,
+        "range": 26,
+        "damage": 12,
+        "cost": 500
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "towed-artillery",
+      "name": "Towed field artillery piece and limber",
+      "root": "UNIT_TOWART01_ROOT",
+      "class": "towed_artillery",
+      "category": "towed_artillery",
+      "role": "emplaced_indirect_fire",
+      "balance": {
+        "hp": 65,
+        "speed": 0,
+        "armour": 1,
+        "range": 82,
+        "damage": 62,
+        "cost": 450
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "tracked-recovery",
+      "name": "Tracked armoured recovery vehicle",
+      "root": "UNIT_ARV_T01_ROOT",
+      "class": "tracked_recovery",
+      "category": "tracked_support",
+      "role": "heavy_recovery_and_winch",
+      "balance": {
+        "hp": 165,
+        "speed": 21,
+        "armour": 5,
+        "range": 0,
+        "damage": 0,
+        "cost": 440
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "wheeled-ifv",
+      "name": "Wheeled infantry fighting / fire support vehicle",
+      "root": "UNIT_WIFV01_ROOT",
+      "class": "wheeled_ifv",
+      "category": "wheeled_armour",
+      "role": "mobile_infantry_fire_support",
+      "balance": {
+        "hp": 155,
+        "speed": 38,
+        "armour": 4,
+        "range": 42,
+        "damage": 22,
+        "cost": 610
+      },
+      "status": "blender_prototype"
+    },
+    {
+      "id": "strike-aircraft",
+      "name": "Strike fighter hero asset",
+      "root": "UNIT_STRIKE_JET_ROOT",
+      "class": "strike_aircraft",
+      "category": "fixed_wing_aircraft",
+      "role": "sortie_strike_and_recovery",
+      "balance": {
+        "hp": 100,
+        "speed": 82,
+        "armour": 1,
+        "range": 75,
+        "damage": 72,
+        "cost": 1250
+      },
+      "status": "blender_prototype"
+    }
+  ],
+  "infantry": {
+    "archetypes": [
+      {
+        "id": "rifleman",
+        "name": "Rifle infantry",
+        "role": "general_infantry",
+        "balance": {
+          "hp": 100,
+          "speed": 20,
+          "range": 24,
+          "damage": 12,
+          "cost": 80
+        }
+      },
+      {
+        "id": "leader",
+        "name": "Squad leader",
+        "role": "command_and_squad_cohesion",
+        "balance": {
+          "hp": 110,
+          "speed": 20,
+          "range": 24,
+          "damage": 10,
+          "cost": 130
+        }
+      },
+      {
+        "id": "machine_gunner",
+        "name": "Machine gunner",
+        "role": "area_suppression",
+        "balance": {
+          "hp": 100,
+          "speed": 16,
+          "range": 32,
+          "damage": 18,
+          "cost": 140
+        }
+      },
+      {
+        "id": "anti_armor",
+        "name": "Anti-armour specialist",
+        "role": "armour_counter",
+        "balance": {
+          "hp": 95,
+          "speed": 16,
+          "range": 35,
+          "damage": 42,
+          "cost": 160
+        }
+      },
+      {
+        "id": "engineer",
+        "name": "Combat engineer",
+        "role": "repair_and_obstacle_tasks",
+        "balance": {
+          "hp": 100,
+          "speed": 18,
+          "range": 18,
+          "damage": 8,
+          "cost": 120
+        }
+      },
+      {
+        "id": "medic",
+        "name": "Combat medic",
+        "role": "casualty_support",
+        "balance": {
+          "hp": 90,
+          "speed": 19,
+          "range": 0,
+          "damage": 0,
+          "cost": 120
+        }
+      },
+      {
+        "id": "marksman",
+        "name": "Designated marksman",
+        "role": "precision_support",
+        "balance": {
+          "hp": 90,
+          "speed": 18,
+          "range": 42,
+          "damage": 26,
+          "cost": 155
+        }
+      },
+      {
+        "id": "mortar",
+        "name": "Mortar crew",
+        "role": "indirect_fire_support",
+        "balance": {
+          "hp": 85,
+          "speed": 12,
+          "range": 55,
+          "damage": 28,
+          "cost": 185
+        }
+      },
+      {
+        "id": "air_defence",
+        "name": "Man-portable air defence",
+        "role": "local_air_defence",
+        "balance": {
+          "hp": 90,
+          "speed": 15,
+          "range": 45,
+          "damage": 30,
+          "cost": 170
+        }
+      },
+      {
+        "id": "radio",
+        "name": "Radio operator",
+        "role": "communications",
+        "balance": {
+          "hp": 85,
+          "speed": 19,
+          "range": 0,
+          "damage": 0,
+          "cost": 90
+        }
+      },
+      {
+        "id": "officer",
+        "name": "Field officer",
+        "role": "command_bonus",
+        "balance": {
+          "hp": 100,
+          "speed": 19,
+          "range": 18,
+          "damage": 6,
+          "cost": 170
+        }
+      },
+      {
+        "id": "recon",
+        "name": "Recon scout",
+        "role": "reconnaissance_and_spotting",
+        "balance": {
+          "hp": 80,
+          "speed": 24,
+          "range": 28,
+          "damage": 10,
+          "cost": 130
+        }
+      }
+    ],
+    "instances": [
+      {
+        "sourceRoot": "INF_RIFLE_ROOT",
+        "archetype": "rifleman",
+        "squad": "A-1",
+        "status": "blender_prototype"
+      },
+      {
+        "sourceRoot": "INF_LEAD_ROOT",
+        "archetype": "leader",
+        "squad": "A-2",
+        "status": "blender_prototype"
+      },
+      {
+        "sourceRoot": "INF_MG_ROOT",
+        "archetype": "machine_gunner",
+        "squad": "A-3",
+        "status": "blender_prototype"
+      },
+      {
+        "sourceRoot": "INF_AT_ROOT",
+        "archetype": "anti_armor",
+        "squad": "A-4",
+        "status": "blender_prototype"
+      },
+      {
+        "sourceRoot": "INF_ENG_ROOT",
+        "archetype": "engineer",
+        "squad": "A-5",
+        "status": "blender_prototype"
+      },
+      {
+        "sourceRoot": "INF_MED_ROOT",
+        "archetype": "medic",
+        "squad": "A-6",
+        "status": "blender_prototype"
+      },
+      {
+        "sourceRoot": "INF_MRK_ROOT",
+        "archetype": "marksman",
+        "squad": "A-7",
+        "status": "blender_prototype"
+      },
+      {
+        "sourceRoot": "INF_MOR_ROOT",
+        "archetype": "mortar",
+        "squad": "A-8",
+        "status": "blender_prototype"
+      },
+      {
+        "sourceRoot": "INF_AAD_ROOT",
+        "archetype": "air_defence",
+        "squad": "A-9",
+        "status": "blender_prototype"
+      },
+      {
+        "sourceRoot": "INF_RAD_ROOT",
+        "archetype": "radio",
+        "squad": "B-1",
+        "status": "blender_prototype"
+      },
+      {
+        "sourceRoot": "INF_OFF_ROOT",
+        "archetype": "officer",
+        "squad": "B-2",
+        "status": "blender_prototype"
+      },
+      {
+        "sourceRoot": "INF_REC_ROOT",
+        "archetype": "recon",
+        "squad": "B-3",
+        "status": "blender_prototype"
+      },
+      {
+        "sourceRoot": "INF_RIFLE_B_ROOT",
+        "archetype": "rifleman",
+        "squad": "B-4",
+        "status": "blender_prototype"
+      },
+      {
+        "sourceRoot": "INF_LEAD_B_ROOT",
+        "archetype": "leader",
+        "squad": "B-5",
+        "status": "blender_prototype"
+      },
+      {
+        "sourceRoot": "INF_MG_B_ROOT",
+        "archetype": "machine_gunner",
+        "squad": "B-6",
+        "status": "blender_prototype"
+      },
+      {
+        "sourceRoot": "INF_AT_B_ROOT",
+        "archetype": "anti_armor",
+        "squad": "B-7",
+        "status": "blender_prototype"
+      },
+      {
+        "sourceRoot": "INF_MED_B_ROOT",
+        "archetype": "medic",
+        "squad": "B-8",
+        "status": "blender_prototype"
+      },
+      {
+        "sourceRoot": "INF_ENG_B_ROOT",
+        "archetype": "engineer",
+        "squad": "B-9",
+        "status": "blender_prototype"
+      }
+    ]
+  }
+}
