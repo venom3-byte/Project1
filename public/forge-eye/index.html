@@ -240,6 +240,17 @@
                 <p class="material-note">The active camera drives the current editor view. Use the Transform fields to position and rotate it.</p>
               </div>
             </section>
+            <section class="property-section is-open" id="rigSection">
+              <button type="button" class="property-section-heading" aria-expanded="true"><span>▾</span><b>Rig / Pivots</b><small>FK CONTROLS</small></button>
+              <div class="property-section-body">
+                <p class="material-note">Create real parent-child pivot controls for separate rigid parts, then keyframe their transforms. This first stage does not skin-deform a continuous mesh or include weight painting.</p>
+                <button id="createRigPivot" type="button" class="wide-secondary">Create pivot for selected part</button>
+                <label class="property-name">Parent control<select id="rigParentControl"><option value="">Choose a rig pivot</option></select></label>
+                <button id="attachSelectedToRigControl" type="button" class="secondary-button">Attach selected part</button>
+                <button id="detachSelectedFromRigControl" type="button" class="secondary-button">Detach selected part</button>
+                <p id="rigStatus" class="material-note" role="status">Rigid-part FK controls · skinning and weight painting are not implemented yet.</p>
+              </div>
+            </section>
             <div class="inspector-actions"><button type="button" class="secondary-button" data-command="duplicate">Duplicate</button><button type="button" class="danger-button" data-command="delete">Delete</button></div>
           </form>
         </section>
