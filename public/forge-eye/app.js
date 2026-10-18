@@ -74,7 +74,7 @@ function openMobilePanel(name){
   else if(name==="timeline"){setWorkspace("animation");$('[data-mobile-panel="timeline"]')?.classList.add("is-active")}
   $("#drawerScrim").hidden=!["scene","assets","properties","references"].includes(name);
 }
-function iconForKind(kind){return ({box:"□",sphere:"◉",cylinder:"⬡",capsule:"◌",plane:"▱",camera:"▣",light:"☼",model:"◇",mesh:"◇"})[String(kind).toLowerCase()]||"◇"}
+function iconForKind(kind){return ({box:"□",sphere:"◉",cylinder:"⬡",capsule:"◌",plane:"▱",camera:"▣",light:"☼",rig:"⊙",model:"◇",mesh:"◇"})[String(kind).toLowerCase()]||"◇"}
 function selectedRecord(){return state.engine?.selected?.()||null}
 function refreshHierarchy(){
   const engine=state.engine;if(!engine)return;const search=($("#sceneSearch").value||"").trim().toLowerCase(),tree=$("#hierarchy");
@@ -82,12 +82,35 @@ function refreshHierarchy(){
   tree.replaceChildren();const frag=document.createDocumentFragment();
   for(const record of items){
     const row=document.createElement("button");row.type="button";row.className="tree-row"+(record.id===engine.selectedId?" is-selected":"");row.dataset.entityId=record.id;row.setAttribute("role","treeitem");row.setAttribute("aria-selected",String(record.id===engine.selectedId));
+    let depth=0,parent=record.entity.parent;
+    while(parent&&parent!==engine.root&&depth<8){depth++;parent=parent.parent}
+    row.style.paddingLeft=(7+depth*14)+"px";
     const glyph=document.createElement("span");glyph.className="tree-row-icon";glyph.textContent=iconForKind(record.kind);
     const name=document.createElement("span");name.className="tree-row-name";name.textContent=record.name;name.title=record.name;
     const type=document.createElement("span");type.className="tree-row-type";type.textContent=record.kind;
     row.append(glyph,name,type);row.addEventListener("click",()=>engine.select(record.id));frag.append(row)
   }
-  tree.append(frag);$("#entityCount").textContent=engine.entities.size+(engine.entities.size===1?" object":" objects");$("#sceneFooter").textContent=engine.selected()?"Selected: "+engine.selected().name:"Scene ready";$("#emptyHierarchy").hidden=items.length!==0;$("#entityStatus").textContent=engine.entities.size+" entities";$("#viewportHint").hidden=engine.entities.size>0;refreshAssetList();
+  tree.append(frag);$("#entityCount").textContent=engine.entities.size+(engine.entities.size===1?" object":" objects");$("#sceneFooter").textContent=engine.selected()?"Selected: "+engine.selected().name:"Scene ready";$("#emptyHierarchy").hidden=items.length!==0;$("#entityStatus").textContent=engine.entities.size+" entities";$("#viewportHint").hidden=engine.entities.size>0;refreshRigControls();refreshAssetList();
+}
+function refreshRigControls(){
+  const engine=state.engine,select=$("#rigParentControl");if(!engine||!select)return;
+  const current=select.value,record=selectedRecord(),controls=[...engine.entities.values()].filter(item=>item.kind==="rig");
+  select.replaceChildren();
+  const placeholder=document.createElement("option");placeholder.value="";placeholder.textContent=controls.length?"Choose a rig pivot":"No rig pivots yet";select.append(placeholder);
+  for(const control of controls){const option=document.createElement("option");option.value=control.id;option.textContent=control.name;select.append(option)}
+  const parentId=record?.components?.rigParentId||((record?.entity?.parent?.__forge?.kind==="rig")?record.entity.parent.__forge.id:"");
+  select.value=controls.some(control=>control.id===parentId)?parentId:(controls.some(control=>control.id===current)?current:"");
+  const canCreate=!!record&&record.kind!=="rig"&&record.name!=="Ground";
+  $("#createRigPivot").disabled=!canCreate;
+  const canAttach=!!record&&record.kind!=="rig"&&!!select.value&&select.value!==record.id;
+  $("#attachSelectedToRigControl").disabled=!canAttach;
+  $("#detachSelectedFromRigControl").disabled=!(record&&(record.components?.rigParentId||record.entity?.parent?.__forge?.kind==="rig"));
+  const statusLabel=$("#rigStatus");
+  if(statusLabel){
+    if(record?.kind==="rig")statusLabel.textContent="Rig pivot selected · select a part, choose this control, then Attach.";
+    else if(record?.components?.rigParentId)statusLabel.textContent="Part attached to "+(engine.entities.get(record.components.rigParentId)?.name||"rig pivot")+". Its transform follows the pivot.";
+    else statusLabel.textContent=controls.length?"Select a part and choose a pivot to attach it.":"Create a pivot on a separate rigid part to begin.";
+  }
 }
 function refreshInspector(){
   const record=selectedRecord();
@@ -939,6 +962,22 @@ function bindUI(){
   $("#latheCreateMesh").addEventListener("click",()=>safeRun("Rust lathe mesh",()=>generateLatheFromProfile()));
   $("#latheSegments").addEventListener("change",()=>{$("#latheStatus").textContent="Quality changed. Generate again to apply the new radial segment count."});
   $("#latheSmoothing").addEventListener("change",()=>{$("#latheStatus").textContent="Profile smoothing changed. Generate again to apply it."});
+  $("#createRigPivot").addEventListener("click",()=>safeRun("Create rig pivot",()=>{
+    const selected=selectedRecord();if(!selected||selected.kind==="rig")return;
+    const control=state.engine.createRigPivotForSelected(selected.name+" Pivot");
+    if(!control){notice("Rig / Pivots","Select a mesh or rigid part to create a pivot.");return}
+    refreshAll();refreshRigControls();status("Rig pivot created · animate this control with keyframes","dirty");
+  }));
+  $("#attachSelectedToRigControl").addEventListener("click",()=>safeRun("Attach to rig pivot",()=>{
+    const record=selectedRecord(),controlId=$("#rigParentControl").value;
+    if(!controlId){notice("Rig / Pivots","Create a pivot and select it in Parent control first.");return}
+    if(state.engine.attachSelectedToRigControl(controlId)){refreshAll();refreshRigControls();status("Rigid part attached to pivot","dirty")}
+    else notice("Rig / Pivots","Cannot attach this selection. Choose a different pivot and avoid attaching a pivot to itself or its own descendants.");
+  }));
+  $("#detachSelectedFromRigControl").addEventListener("click",()=>safeRun("Detach from rig pivot",()=>{
+    if(state.engine.detachSelectedFromRigControl()){refreshAll();refreshRigControls();status("Rigid part detached; world transform preserved","dirty")}
+    else notice("Rig / Pivots","Select a part that is already attached to a rig pivot.");
+  }));
   $("#addReferenceImages").addEventListener("click",()=>$("#referenceInput").click());
   $("#traceSilhouette").addEventListener("click",()=>void startSilhouetteTrace());
   $("#traceCanvas").addEventListener("pointerdown",handleTracePointerDown);
