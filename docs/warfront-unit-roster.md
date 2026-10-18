@@ -1,9 +1,9 @@
 # Warfront RTS — Combined-Arms Asset Roster
 
-**Scene:** Blender 5.2 LTS, revision 6.
-**Current inventory:** 27 land vehicle classes, 1 aircraft root, 12 infantry archetypes represented by 18 scene prototypes.
+**Scene:** Blender 5.2 LTS, revision 8.
+**Current inventory:** 27 ground vehicle classes, 1 aircraft root, 18 infantry archetypes represented by 24 scene prototypes.
 
-The models are editable Blender prototypes with named roots and selected animation controls. They are not yet individually exported and connected as spawnable GLB unit assets in the live Three.js battle scene. Values in `roster.json` are abstract gameplay-balance numbers, not real vehicle specifications.
+The models are editable Blender prototypes with named roots and selected animation controls. They are not yet individually exported and connected as spawnable GLB unit assets in the live Three.js battle scene. Values in `roster.json` are abstract gameplay-balance numbers, not real-world performance specifications.
 
 ## Land systems
 
@@ -57,6 +57,12 @@ The models are editable Blender prototypes with named roots and selected animati
 | `radio` | Radio operator | communications |
 | `officer` | Field officer | command_bonus |
 | `recon` | Recon scout | reconnaissance_and_spotting |
+| `grenadier` | Grenadier | explosive area-effect support |
+| `sniper` | Sniper | precision long-range reconnaissance |
+| `uav_operator` | UAV operator | deployable reconnaissance drone control |
+| `tank_crew` | Armoured vehicle crewman | vehicle operation and repair bonus |
+| `paratrooper` | Paratrooper / airborne infantry | airborne deployment and rapid insertion |
+| `ammo_bearer` | Heavy-weapons ammunition bearer | team resupply and support-weapon endurance |
 
 ## Scene instances
 
@@ -80,12 +86,18 @@ The models are editable Blender prototypes with named roots and selected animati
 | `INF_AT_B_ROOT` | `anti_armor` | B-7 |
 | `INF_MED_B_ROOT` | `medic` | B-8 |
 | `INF_ENG_B_ROOT` | `engineer` | B-9 |
+| `INF_GRN_ROOT` | `grenadier` | C-1 |
+| `INF_SNP_ROOT` | `sniper` | C-2 |
+| `INF_UAV_ROOT` | `uav_operator` | C-3 |
+| `INF_TANKCREW_ROOT` | `tank_crew` | C-4 |
+| `INF_PARA_ROOT` | `paratrooper` | C-5 |
+| `INF_AMMO_ROOT` | `ammo_bearer` | C-6 |
 
 ## Integration state
 
-1. Source scene includes a main battle tank root and a strike-aircraft root; the tank has a turret traversal pivot, and the aircraft has flaperon, elevator, rudder and landing-gear controls.
-2. Tracked and wheeled prototypes have separate semantic parts and selected turret, gun, missile-rack or sensor pivots.
-3. Infantry meshes are grouped by role with separate hip, knee, shoulder and forearm pivots; the prototype walk-cycle keys are authored over frames 1–25.
-4. The complete Blender scene has been exported as a single GLB for preview. Individual per-unit GLB packages, runtime spawn/command binding, and a real browser gameplay regression run remain to be completed.
+1. The main battle tank has a named turret traversal pivot; the strike-aircraft hero has flaperon, elevator, rudder and landing-gear controls.
+2. Tracked/wheeled prototypes have distinct silhouette parts and selected turret, gun, missile-rack or sensor pivots.
+3. Infantry has 18 archetypes across 24 scene instances. Each rig keeps named hips, knees and shoulder controls; additional specialist roles have a basic keyed walk-cycle study.
+4. The full Blender scene exports to a single GLB for preview. Individual per-unit GLB packages, runtime spawn/command binding for the full roster, and a real browser gameplay regression run remain to be completed.
 
-The roster manifest is the source of truth for asset identifiers, categories and game-balancing values: `public/warfront/roster.json`.
+The roster manifest is the source of truth: `public/warfront/roster.json`.
