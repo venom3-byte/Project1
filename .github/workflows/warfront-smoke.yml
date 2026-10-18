@@ -33,8 +33,17 @@ jobs:
           import { readFileSync, statSync } from 'node:fs';
           const htmlPath = 'public/warfront/index.html';
           const jsPath = 'public/warfront/game.js';
+          const rosterPath = 'public/warfront/roster.json';
           const html = readFileSync(htmlPath, 'utf8');
           const js = readFileSync(jsPath, 'utf8');
+          const roster = JSON.parse(readFileSync(rosterPath, 'utf8'));
+          if (roster.schemaVersion !== 1) throw new Error('Unexpected roster schema');
+          if (!Array.isArray(roster.vehicles) || roster.vehicles.length !== 28) throw new Error('Expected 28 Blender vehicle/aircraft roots');
+          if (!roster.infantry || !Array.isArray(roster.infantry.instances) || roster.infantry.instances.length !== 18) throw new Error('Expected 18 infantry scene prototypes');
+          if (!Array.isArray(roster.infantry.archetypes) || roster.infantry.archetypes.length !== 12) throw new Error('Expected 12 infantry archetypes');
+          const roots = [...roster.vehicles.map((u) => u.root), ...roster.infantry.instances.map((u) => u.sourceRoot)];
+          if (new Set(roots).size !== roots.length) throw new Error('Duplicate asset root identifiers');
+          if (roster.integrationStatus !== 'blender-prototypes-not-yet-packaged-as-individual-runtime-models') throw new Error('Roster integration status must stay explicit');
           const requiredHtml = [
             '<div id="stage"',
             '<canvas id="minimap"',
@@ -56,7 +65,7 @@ jobs:
           for (const item of requiredGame) {
             if (!js.includes(item)) throw new Error('Missing gameplay contract: ' + item);
           }
-          for (const path of [htmlPath, jsPath]) {
+          for (const path of [htmlPath, jsPath, rosterPath]) {
             if (statSync(path).size < 5000) throw new Error('Unexpectedly small file: ' + path);
           }
           console.log('Warfront standalone shell and M0 feature contracts are present.');
