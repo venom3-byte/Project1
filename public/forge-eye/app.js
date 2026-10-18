@@ -44,7 +44,7 @@ function setWorkspace(name,{save=true}={}){
   const allowed=["layout","modeling","references","materials","animation","assets","world","review"];if(!allowed.includes(name))return;
   state.workspace=name;document.documentElement.dataset.forgeWorkspace=name;document.documentElement.classList.remove("timeline-manually-closed");
   $$(".workspace-tab").forEach(tab=>{const active=tab.dataset.workspace===name;tab.classList.toggle("is-active",active);tab.setAttribute("aria-selected",String(active))});
-  const contexts={layout:["SCENE / LAYOUT","Orbit: drag · Pan: right-drag · Zoom: wheel"],modeling:["MODELING","Select · Move W · Rotate E · Scale R · Focus F"],references:["IMAGE MODELING","Calibrate front, side and top reference planes before tracing geometry"],materials:["MATERIALS","Surface appearance · Base color, metalness and roughness"],animation:["ANIMATION","Keyframes store transforms; interpolation fills motion between them"],assets:["ASSET WORKFLOW","Import and inspect 2D/3D content"],world:["WORLD SETTINGS","Grid and unit settings"],review:["REVIEW / QA","Scene diagnostics and engine status"]};
+  const contexts={layout:["SCENE / LAYOUT","Orbit: drag · Pan: right-drag · Zoom: wheel"],modeling:["MODELING","Select · Move W · Rotate E · Scale R · Focus F"],references:["IMAGE MODELING","Calibrate front, side and top reference planes before tracing geometry"],materials:["MATERIALS","Surface appearance · Base color, metalness and roughness"],animation:["ANIMATION","Keyframes store transforms plus light and camera settings; rigging needs joint/skin data"],assets:["ASSET WORKFLOW","Import and inspect 2D/3D content"],world:["WORLD SETTINGS","Grid and unit settings"],review:["REVIEW / QA","Scene diagnostics and engine status"]};
   $("#workspaceContext").textContent=contexts[name][0];$("#viewportHelp").textContent=contexts[name][1];$("#timelinePanel").hidden=name!=="animation";
   if(name==="assets")setLeftPanel("assets",{save:false});
   if(["layout","modeling","references","review"].includes(name))setLeftPanel("scene",{save:false});
@@ -155,7 +155,8 @@ function applyLightSettings(){
   light.type=type;light.color=new window.ForgePC.Color(...color);light.intensity=intensity;light.range=range;light.outerConeAngle=cone;light.innerConeAngle=Math.min(cone*.6,clamp(cone*.55,1,84,25));light.castShadows=shadows;
   record.components.light={...record.components.light,type,color,intensity,range,outerConeAngle:cone,innerConeAngle:light.innerConeAngle,castShadows:shadows};
   $("#lightHex").value=hex.toUpperCase();$("#lightIntensityValue").textContent=intensity.toFixed(2);$("#lightRangeValue").textContent=range.toFixed(0)+" m";$("#lightConeValue").textContent=cone.toFixed(0)+"°";
-  status("Light component updated","dirty");refreshInspector();
+  if(state.autoKey){state.engine.keyInterpolation=$("#keyInterpolation").value;state.engine.key({interpolation:state.engine.keyInterpolation});refreshTimeline()}
+  status(state.autoKey?"Light component updated · auto-key recorded":"Light component updated","dirty");refreshInspector();
 }
 function activateCamera(record){
   for(const candidate of state.engine.entities.values()){
@@ -179,7 +180,8 @@ function applyCameraSettings(){
     notice("Active camera","At least one editor camera must remain active. Activate another camera before switching this one off.");
   }else record.components.camera={...record.components.camera,fov,projection,active:false};
   $("#cameraFovValue").textContent=fov.toFixed(0)+"°";
-  window.ForgeViewport?.syncCamera?.();status("Camera component updated","dirty");refreshInspector();
+  if(state.autoKey){state.engine.keyInterpolation=$("#keyInterpolation").value;state.engine.key({interpolation:state.engine.keyInterpolation});refreshTimeline()}
+  window.ForgeViewport?.syncCamera?.();status(state.autoKey?"Camera component updated · auto-key recorded":"Camera component updated","dirty");refreshInspector();
 }
 function refreshAssetList(){
   const list=$("#assetList");if(!list||!state.engine)return;const all=[...(state.engine.assets?.entries?.()||[])].map(([name,a])=>({name,type:a.type||"asset"})),q=($("#assetSearch")?.value||"").trim().toLowerCase(),assets=all.filter(a=>a.name.toLowerCase().includes(q));
