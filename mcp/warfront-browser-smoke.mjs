@@ -31,10 +31,16 @@ try {
     if (!response || response.status() !== 200) throw new Error(profile.name + ": game page did not return HTTP 200.");
     await page.locator("#mapSelector").waitFor({ state: "attached", timeout: 20000 });
     await page.locator("#stage canvas").waitFor({ state: "attached", timeout: 30000 });
+    await page.waitForFunction(() => typeof window.__WARFRONT_DIAGNOSTICS__ === "function" && window.__WARFRONT_DIAGNOSTICS__().bundleLoaded === true, null, { timeout: 120000 });
+    await page.waitForFunction(() => {
+      const d = window.__WARFRONT_DIAGNOSTICS__?.();
+      return !!d && d.aircraft?.length === 4 && d.aircraft.filter(a => a.flightClass === "fixed-wing").length === 2 && d.aircraft.filter(a => a.flightClass === "rotary-wing").length === 2;
+    }, null, { timeout: 30000 });
     const optionValues = await page.locator("#mapSelector option").evaluateAll(options => options.map(option => option.value));
     if (optionValues.length !== 4) throw new Error(profile.name + ": expected four selectable theatres, found " + optionValues.length);
     await page.selectOption("#mapSelector", profile.map);
-    await sleep(700);
+    await page.waitForFunction(expected => window.__WARFRONT_DIAGNOSTICS__?.().activeBlenderMap === ({"pine-valley":"MAP_PINE_VALLEY_ROOT","desert-basin":"MAP_RED_BASIN_ROOT","river-crossing":"MAP_RIVER_CROSSING_ROOT","alpine-pass":"MAP_ALPINE_PASS_ROOT"}[expected]), profile.map, { timeout: 15000 });
+    await sleep(350);
     const metrics = await page.evaluate(() => {
       const canvas = document.querySelector("#stage canvas");
       const selector = document.querySelector("#mapSelector");
@@ -44,13 +50,22 @@ try {
         options: selector?.options?.length || 0,
         canvas: canvas ? { width: canvas.width, height: canvas.height, rectWidth: Math.round(canvas.getBoundingClientRect().width), rectHeight: Math.round(canvas.getBoundingClientRect().height) } : null,
         stage: stage ? { width: Math.round(stage.getBoundingClientRect().width), height: Math.round(stage.getBoundingClientRect().height) } : null,
-        hasWebGL: !!canvas?.getContext("webgl2") || !!canvas?.getContext("webgl")
+        hasWebGL: !!canvas?.getContext("webgl2") || !!canvas?.getContext("webgl"),
+        diagnostics: window.__WARFRONT_DIAGNOSTICS__?.() || null
       };
     });
     await page.screenshot({ path: path.join(OUT, "warfront-" + profile.name + ".png"), fullPage: true });
     if (!metrics.canvas || metrics.canvas.rectWidth < 50 || metrics.canvas.rectHeight < 50) throw new Error(profile.name + ": 3D canvas is missing or has no visible dimensions.");
     if (!metrics.hasWebGL) throw new Error(profile.name + ": Chromium could not initialize a WebGL context.");
     if (metrics.map !== profile.map) throw new Error(profile.name + ": selected theatre was not applied.");
+    if (!metrics.diagnostics?.bundleLoaded || !metrics.diagnostics?.activeBlenderMap) throw new Error(profile.name + ": Blender bundle or active map root was not loaded.");
+    if (metrics.diagnostics.fallbackGroundVisible !== false) throw new Error(profile.name + ": fallback terrain is still visible over the Blender map.");
+    if (!metrics.diagnostics.roots?.includes("UNIT_F16C_BLOCK50_ROOT") || !metrics.diagnostics.roots?.includes("UNIT_HEAVY_STRIKE_ROOT")) throw new Error(profile.name + ": F-16/heavy strike Blender roots missing.");
+    if (!metrics.diagnostics.roots?.includes("UNIT_ATTACK_HELICOPTER_ROOT") || !metrics.diagnostics.roots?.includes("UNIT_TRANSPORT_HELICOPTER_ROOT")) throw new Error(profile.name + ": rotary-wing model roots missing.");
+    if (metrics.diagnostics.tankModels?.length !== 5 || metrics.diagnostics.tankModels.some(t => !t.imported)) throw new Error(profile.name + ": tank/armour model replacement was incomplete.");
+    if ((metrics.diagnostics.infantryModels || 0) < 10) throw new Error(profile.name + ": too few Blender infantry models were bound.");
+    if (metrics.diagnostics.aircraft?.filter(a => !!a.root).length !== 4) throw new Error(profile.name + ": not every aircraft was bound to its own Blender root.");
+    if (failedRequests.some(r => /combined-arms-r19\.glb/.test(r.url))) throw new Error(profile.name + ": Blender GLB asset request failed.");
     if (pageErrors.length) throw new Error(profile.name + ": browser JavaScript errors: " + pageErrors.join("\n"));
     report.runs.push({ ...profile, ...metrics, pageErrors, failedRequests });
   }
