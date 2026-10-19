@@ -493,13 +493,18 @@ function markerPositionInMap(root,name){
 function installBlenderMap(mapId){
   const config=MAPS[mapId];if(!config||!state.blenderBundle)return false;
   const source=state.blenderBundle.roots.get(config.root);if(!source)return false;
-  if(state.activeBlenderMap&&state.activeBlenderMap.group)scene.remove(state.activeBlenderMap.group);
+  if(state.activeBlenderMap&&state.activeBlenderMap.group){
+    const oldTerrain=state.activeBlenderMap.terrainMesh;const oldIndex=interactables.indexOf(oldTerrain);if(oldIndex>=0)interactables.splice(oldIndex,1);
+    scene.remove(state.activeBlenderMap.group);
+  }
   clearMapFeatures();mapFeatures.visible=false;ground.visible=false;
   const fallbackAirbase=scene.getObjectByName('airbase');if(fallbackAirbase)fallbackAirbase.visible=false;
   const oldIndex=interactables.indexOf(ground);if(oldIndex>=0)interactables.splice(oldIndex,1);
   const group=SkeletonUtils.clone(source);group.name='ACTIVE_BLENDER_MAP_'+mapId.toUpperCase().replaceAll('-','_');
   group.position.set(0,0,0);group.rotation.set(0,0,0);group.scale.set(1,1,1);scene.add(group);group.updateMatrixWorld(true);
-  state.activeBlenderMap={mapId,group,sourceRoot:config.root};return true;
+  const terrainMesh=group.getObjectByName('ENV_'+config.suffix+'_TERRAIN')||null;
+  if(terrainMesh){terrainMesh.userData.ground=true;interactables.push(terrainMesh);}
+  state.activeBlenderMap={mapId,group,sourceRoot:config.root,terrainMesh};return true;
 }
 function buildMapLayout(config,useBlender){
   const root=useBlender&&state.activeBlenderMap?state.activeBlenderMap.group:null;
@@ -524,6 +529,12 @@ function buildMapLayout(config,useBlender){
   const aircraftLayout=aircraft.map((plane,i)=>{const o=airOffsets[i%airOffsets.length];return airbase?{x:airbase.x+o[0],z:airbase.z+o[1]}:{x:plane.initial.x,z:plane.initial.z};});
   return {targets:targetLayout,tanks:tankLayout,soldiers:soldierLayout,aircraft:aircraftLayout,airbase};
 }
+function getTerrainHeight(x,z){
+  const terrain=state.activeBlenderMap&&state.activeBlenderMap.terrainMesh;
+  if(!terrain||!terrain.visible)return 0;
+  const cast=new THREE.Raycaster(new THREE.Vector3(x,260,z),new THREE.Vector3(0,-1,0),0,520);
+  const hit=cast.intersectObject(terrain,true)[0];return hit?hit.point.y:0;
+}
 function applyBattlefieldMap(mapId,initial=false){
   const config=MAPS[mapId]||MAPS['pine-valley'];state.mapId=mapId in MAPS?mapId:'pine-valley';
   ground.scale.set(config.width/220,1,config.depth/190);ground.material.color.setHex(config.groundTint);
@@ -531,19 +542,24 @@ function applyBattlefieldMap(mapId,initial=false){
   sun.shadow.camera.left=-config.width*.46;sun.shadow.camera.right=config.width*.46;sun.shadow.camera.top=config.depth*.44;sun.shadow.camera.bottom=-config.depth*.44;sun.shadow.camera.updateProjectionMatrix();
   const usingBlender=installBlenderMap(state.mapId);
   if(!usingBlender){
-    if(state.activeBlenderMap&&state.activeBlenderMap.group)scene.remove(state.activeBlenderMap.group);
+    if(state.activeBlenderMap&&state.activeBlenderMap.group){const oldTerrain=state.activeBlenderMap.terrainMesh;const oldIndex=interactables.indexOf(oldTerrain);if(oldIndex>=0)interactables.splice(oldIndex,1);scene.remove(state.activeBlenderMap.group);}
     state.activeBlenderMap=null;ground.visible=true;mapFeatures.visible=true;
     const fallbackAirbase=scene.getObjectByName('airbase');if(fallbackAirbase)fallbackAirbase.visible=true;
     if(!interactables.includes(ground))interactables.push(ground);
     buildMapFeatures(config);
   }
   const layout=buildMapLayout(config,usingBlender);state.mapLayout=layout;
-  targets.forEach((target,i)=>{const p=layout.targets[i]||layout.targets[0];target.group.position.set(p.x,0,p.z);});
-  tanks.forEach((unit,i)=>{const p=layout.tanks[i]||{x:config.tankStarts[i][0],z:config.tankStarts[i][1]};unit.group.position.set(p.x,0,p.z);});
-  soldiers.forEach((unit,i)=>{const p=layout.soldiers[i]||{x:config.soldierStarts[i][0],z:config.soldierStarts[i][1],team:unit.team};unit.group.position.set(p.x,0,p.z);unit.team=p.team||unit.team;unit.name=unit.role+' · '+unit.team.toUpperCase();});
-  aircraft.forEach((plane,i)=>{const p=layout.aircraft[i];if(!p)return;plane.initial.x=p.x;plane.initial.z=p.z;plane.group.position.set(p.x,.16,p.z);});
+  targets.forEach((target,i)=>{const p=layout.targets[i]||layout.targets[0];target.group.position.set(p.x,getTerrainHeight(p.x,p.z),p.z);});
+  tanks.forEach((unit,i)=>{const p=layout.tanks[i]||{x:config.tankStarts[i][0],z:config.tankStarts[i][1]};unit.group.position.set(p.x,getTerrainHeight(p.x,p.z),p.z);});
+  soldiers.forEach((unit,i)=>{const p=layout.soldiers[i]||{x:config.soldierStarts[i][0],z:config.soldierStarts[i][1],team:unit.team};unit.group.position.set(p.x,getTerrainHeight(p.x,p.z),p.z);unit.team=p.team||unit.team;unit.name=unit.role+' · '+unit.team.toUpperCase();});
+  aircraft.forEach((plane,i)=>{const p=layout.aircraft[i];if(!p)return;plane.initial.x=p.x;plane.initial.z=p.z;plane.baseHeight=getTerrainHeight(p.x,p.z);plane.group.position.set(p.x,plane.baseHeight+.16,p.z);});
   ensureServiceVehicles();
-  cameraTarget.set(0,0,0);camera.position.set(0,config.depth*.42,config.depth*.47);camera.lookAt(cameraTarget);
+  const blueStart=layout.tanks[0]||{x:0,z:0},firstObjective=layout.targets[0]||blueStart;
+  const focusX=blueStart.x*.58+firstObjective.x*.42,focusZ=blueStart.z*.58+firstObjective.z*.42;
+  cameraTarget.set(focusX,getTerrainHeight(focusX,focusZ),focusZ);
+  const cameraBack=Math.max(100,Math.min(config.depth*.43,Math.hypot(firstObjective.x-blueStart.x,firstObjective.z-blueStart.z)*.72+48));
+  const cameraHeight=Math.max(78,Math.min(config.depth*.32,Math.hypot(firstObjective.x-blueStart.x,firstObjective.z-blueStart.z)*.48+48));
+  camera.position.set(focusX,cameraTarget.y+cameraHeight,focusZ+cameraBack);camera.lookAt(cameraTarget);
   const selector=$('mapSelector');if(selector&&selector.value!==state.mapId)selector.value=state.mapId;
   resetMission();addLog((usingBlender?'Blender-authored theatre loaded: ':'Fallback theatre loaded: ')+config.label,'normal');
   if(!initial)toast(config.label+' · '+(usingBlender?'Blender map loaded':'fallback map loaded'));
@@ -915,8 +931,9 @@ function worldPoint(event) {
     const entity = getRootEntity(hit.object);
     if (entity) return { entity, point: hit.point };
   }
-  const groundHit = raycaster.intersectObject(ground, false)[0];
-  return groundHit ? { entity: null, point: groundHit.point } : null;
+  const terrain=state.activeBlenderMap&&state.activeBlenderMap.terrainMesh;
+  const groundHit=terrain?raycaster.intersectObject(terrain,true)[0]:raycaster.intersectObject(ground,false)[0];
+  return groundHit?{entity:null,point:groundHit.point}:null;
 }
 function pointerCommand(hit) {
   if (!hit) return;
@@ -2150,6 +2167,8 @@ window.__WARFRONT_DIAGNOSTICS__=()=>({
   roots:state.blenderBundle?['UNIT_F16C_BLOCK50_ROOT','UNIT_HEAVY_STRIKE_ROOT','UNIT_ATTACK_HELICOPTER_ROOT','UNIT_TRANSPORT_HELICOPTER_ROOT','MAP_PINE_VALLEY_ROOT','MAP_RED_BASIN_ROOT','MAP_RIVER_CROSSING_ROOT','MAP_ALPINE_PASS_ROOT'].filter((name)=>state.blenderBundle.roots.has(name)):[],
   mapId:state.mapId,
   activeBlenderMap:state.activeBlenderMap?state.activeBlenderMap.sourceRoot:null,
+  terrainCollider:state.activeBlenderMap&&state.activeBlenderMap.terrainMesh?state.activeBlenderMap.terrainMesh.name:null,
+  cameraTarget:{x:Math.round(cameraTarget.x),y:Math.round(cameraTarget.y),z:Math.round(cameraTarget.z)},
   fallbackGroundVisible:ground.visible,
   tankModels:tanks.map((unit)=>({name:unit.name,root:unit.visual&&unit.visual.name,imported:!!(unit.visualData&&unit.visualData.imported)})),
   infantryModels:soldiers.filter((unit)=>!!unit.modelRootName).length,
