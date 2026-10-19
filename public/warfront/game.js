@@ -555,10 +555,12 @@ function applyBattlefieldMap(mapId,initial=false){
   aircraft.forEach((plane,i)=>{const p=layout.aircraft[i];if(!p)return;plane.initial.x=p.x;plane.initial.z=p.z;plane.baseHeight=getTerrainHeight(p.x,p.z);plane.group.position.set(p.x,plane.baseHeight+.16,p.z);});
   ensureServiceVehicles();
   const blueStart=layout.tanks[0]||{x:0,z:0},firstObjective=layout.targets[0]||blueStart;
-  const focusX=blueStart.x*.58+firstObjective.x*.42,focusZ=blueStart.z*.58+firstObjective.z*.42;
+  const focusX=blueStart.x*.82+firstObjective.x*.18,focusZ=blueStart.z*.82+firstObjective.z*.18;
   cameraTarget.set(focusX,getTerrainHeight(focusX,focusZ),focusZ);
-  const cameraBack=Math.max(100,Math.min(config.depth*.43,Math.hypot(firstObjective.x-blueStart.x,firstObjective.z-blueStart.z)*.72+48));
-  const cameraHeight=Math.max(78,Math.min(config.depth*.32,Math.hypot(firstObjective.x-blueStart.x,firstObjective.z-blueStart.z)*.48+48));
+  // Start on the player force, not at map scale: pan/mini-map are used to travel across the large theatre.
+  const compactViewport=stage.clientWidth<760;
+  const cameraBack=compactViewport?76:110;
+  const cameraHeight=compactViewport?86:112;
   camera.position.set(focusX,cameraTarget.y+cameraHeight,focusZ+cameraBack);camera.lookAt(cameraTarget);
   const selector=$('mapSelector');if(selector&&selector.value!==state.mapId)selector.value=state.mapId;
   resetMission();addLog((usingBlender?'Blender-authored theatre loaded: ':'Fallback theatre loaded: ')+config.label,'normal');
@@ -1726,7 +1728,7 @@ async function loadBlenderAssetBundle() {
   if (state.blenderBundlePromise) return state.blenderBundlePromise;
   state.blenderBundlePromise = (async () => {
     setAssetText('Loading Blender scene GLB · 14.6 MB', false);
-    const gltf = await loadGLTF('./assets/combined-arms-r19.glb', 90000);
+    const gltf = await loadGLTF('./assets/combined-arms-r21.glb', 90000);
     if (!gltf || !gltf.scene) throw new Error('GLB loaded without a scene');
     const roots = new Map();
     gltf.scene.traverse((node) => {
@@ -2147,7 +2149,7 @@ function initialiseAssets() {
       try{
         bindBlenderRuntimeAssets();
         applyBattlefieldMap(state.mapId,true);
-        setAssetText('Blender r19 loaded · '+state.blenderBundle.roots.size+' named roots',true);
+        setAssetText('Blender r21 loaded · '+state.blenderBundle.roots.size+' named roots',true);
         addLog('Blender revision-19 roots bound to separate land, fixed-wing, rotary-wing and infantry classes.','normal');
       }catch(error){
         console.error('Blender runtime binding failed',error);
