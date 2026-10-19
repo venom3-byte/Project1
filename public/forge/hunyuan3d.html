@@ -223,6 +223,8 @@
   let gradioModulePromise = null;
   let client = null;
   let fallbackClient = null;
+  let activeBackend = BASE;
+  let fallbackHasExport = false;
   let handleFile = null;
   let selectedFile = null;
   let generatedFiles = null;
@@ -275,6 +277,8 @@
       fallbackClient = null;
       throw new Error('النموذج الاحتياطي لا يعرض واجهة shape_generation.');
     }
+    fallbackHasExport = Boolean(endpoints['/on_export_click']);
+    activeBackend = FALLBACK_BASE;
     handleFile = lib.handle_file;
     return fallbackClient;
   }
@@ -292,6 +296,7 @@
         client = null;
         throw new Error('لم يعثر الاتصال على واجهتي shape_generation وon_export_click في مساحة النموذج.');
       }
+      activeBackend = BASE;
       status('تم الاتصال. ارفع صورة للبدء.', 'ok');
       $('connectBtn').textContent = 'متصل ✓';
       $('generateBtn').disabled = !selectedFile;
@@ -333,24 +338,24 @@
     while (value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, 'value') && (value.__type__ === 'update' || value.interactive !== undefined)) value = value.value;
     return value;
   }
-  function resolveFileUrl(file) {
+  function resolveFileUrl(file, base = BASE) {
     file = unwrapUpdate(file);
     if (!file) return '';
     if (typeof file === 'string') {
       if (/^https?:\/\//i.test(file)) return file;
-      if (file.startsWith('/file=')) return BASE + file;
-      if (file.startsWith('/tmp/')) return BASE + '/file=' + file;
-      if (file.startsWith('tmp/')) return BASE + '/file=/' + file;
+      if (file.startsWith('/file=')) return base + file;
+      if (file.startsWith('/tmp/')) return base + '/file=' + file;
+      if (file.startsWith('tmp/')) return base + '/file=/' + file;
       return '';
     }
     if (typeof file.url === 'string' && file.url) {
       if (/^https?:\/\//i.test(file.url)) return file.url;
-      return BASE + (file.url.startsWith('/') ? file.url : '/' + file.url);
+      return base + (file.url.startsWith('/') ? file.url : '/' + file.url);
     }
-    return resolveFileUrl(file.path || '');
+    return resolveFileUrl(file.path || '', base);
   }
-  function setDownload(anchor, file, name) {
-    const url = resolveFileUrl(file);
+  function setDownload(anchor, file, name, base = BASE) {
+    const url = resolveFileUrl(file, base);
     if (!url) {
       anchor.style.display = 'none';
       return false;
@@ -370,8 +375,8 @@
     $('timingInfo').textContent = Number.isFinite(total) ? 'وقت التوليد حسب الخادم: ' + total.toFixed(1) + ' ثانية.' : '';
     $('statsPanel').style.display = 'block';
   }
-  function showModel(file, textured) {
-    const url = resolveFileUrl(file);
+  function showModel(file, textured, base = BASE) {
+    const url = resolveFileUrl(file, base);
     $('emptyState').style.display = url ? 'none' : 'block';
     const viewer = $('modelViewer');
     if (url && /\.glb(?:$|[?#])/i.test(url)) {
@@ -382,7 +387,7 @@
       $('resultMode').textContent = textured ? 'PBR TEXTURED' : 'GEOMETRY';
       $('resultBadge').style.display = 'inline-flex';
       $('resultActions').style.display = 'flex';
-      setDownload($('rawDownload'), file, textured ? 'hunyuan3d-textured.glb' : 'hunyuan3d-mesh.glb');
+      setDownload($('rawDownload'), file, file?.orig_name || file?.name || (textured ? 'hunyuan3d-textured.glb' : 'hunyuan3d-mesh.glb'), base);
     } else if (url) {
       viewer.style.display = 'none';
       $('openFile').href = url;
@@ -485,11 +490,11 @@
       const stats = data[textured ? 3 : 2];
       const actualSeed = data[textured ? 4 : 3];
       const previewFile = textureFile || shapeFile;
-      generatedFiles = { shape: shapeFile, texture: textureFile, textured: textured, stats: stats, seed: actualSeed };
-      showModel(previewFile, Boolean(textureFile));
+      generatedFiles = { shape: shapeFile, texture: textureFile, textured: textured, stats: stats, seed: actualSeed, base: activeBackend };
+      showModel(previewFile, Boolean(textureFile), activeBackend);
       setStats(stats, actualSeed);
-      $('exportOptions').style.display = 'block';
-      $('exportBtn').disabled = false;
+      $('exportOptions').style.display = activeBackend === FALLBACK_BASE && !fallbackHasExport ? 'none' : 'block';
+      $('exportBtn').disabled = activeBackend === FALLBACK_BASE && !fallbackHasExport;
       $('resultMode').textContent = textureFile ? 'PBR TEXTURED' : 'GEOMETRY';
       status(textured ? 'اكتمل التوليد مع الخامات. راجع الشكل ثم جهّز الملف النهائي للتنزيل.' : 'اكتمل توليد المجسم الهندسي. يمكن تنزيله الآن؛ مسار الخامات متاح فقط إذا سمح خادم GPU بوقته.', 'ok');
     } catch (error) {
@@ -516,9 +521,10 @@
         Boolean(generatedFiles.texture),
         targetFaces
       ];
-      const out = await runJob('/on_export_click', payload, 'تصدير الملف النهائي');
+      const exportClient = generatedFiles.base === FALLBACK_BASE ? fallbackClient : client;
+      const out = await runJob('/on_export_click', payload, 'تصدير الملف النهائي', exportClient);
       const exportFile = unwrapUpdate(out[1]);
-      if (!setDownload($('finalDownload'), exportFile, 'hunyuan3d-export.' + type)) {
+      if (!setDownload($('finalDownload'), exportFile, 'hunyuan3d-export.' + type, generatedFiles.base || BASE)) {
         throw new Error('أكمل الخادم التصدير لكن لم يرجع رابط ملف واضحًا.');
       }
       $('finalDownload').textContent = 'تنزيل الملف النهائي (' + type.toUpperCase() + ')';
