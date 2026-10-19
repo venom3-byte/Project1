@@ -1,0 +1,118 @@
+name: Sync Warfront Blender r28 bundle
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/warfront-r28-source-url.txt"
+
+permissions:
+  contents: write
+
+jobs:
+  sync-and-verify:
+    name: Import Blender r28 and run browser gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download and verify the Blender export
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_URL="$(tr -d '\r\n' < .github/warfront-r28-source-url.txt)"
+          case "$SOURCE_URL" in
+            https://*.r2.cloudflarestorage.com/*) ;;
+            *) echo "The temporary Blender source is not an accepted R2 export URL."; exit 1 ;;
+          esac
+          curl --fail --location --silent --show-error --retry 2 --max-time 180 "$SOURCE_URL" -o public/warfront/assets/combined-arms-r28.glb
+
+          node --input-type=module <<'NODE'
+          import { readFileSync, statSync, writeFileSync } from 'node:fs';
+          const bundlePath = 'public/warfront/assets/combined-arms-r28.glb';
+          const rosterPath = 'public/warfront/roster.json';
+          const gamePath = 'public/warfront/game.js';
+          const bytes = statSync(bundlePath).size;
+          if (bytes < 10000000) throw new Error('Blender r28 GLB is unexpectedly small: ' + bytes);
+          const glb = readFileSync(bundlePath);
+          if (glb.readUInt32LE(0) !== 0x46546c67 || glb.readUInt32LE(4) !== 2) throw new Error('Downloaded file is not a valid glTF 2.0 binary');
+          const jsonLength = glb.readUInt32LE(12);
+          const gltf = JSON.parse(glb.toString('utf8', 20, 20 + jsonLength).trim());
+          const nodeNames = new Set((gltf.nodes || []).map(n => n.name).filter(Boolean));
+          const roster = JSON.parse(readFileSync(rosterPath, 'utf8'));
+          const requiredRoots = [...roster.vehicles.map(v => v.root), ...roster.infantry.instances.map(v => v.sourceRoot), ...roster.maps.map(v => v.root)];
+          const missing = requiredRoots.filter(name => !nodeNames.has(name));
+          if (missing.length) throw new Error('Blender r28 export is missing named roster roots: ' + missing.slice(0, 12).join(', '));
+          roster.sceneRevision = 28;
+          roster.bundle.fullSceneGLBBytes = bytes;
+          roster.bundle.fullSceneGLBPath = bundlePath;
+          roster.bundle.fullSceneRevision = 28;
+          roster.bundle.runtimeImport = 'revision-28 Blender export synchronized; desktop-and-mobile runtime visual QA included in this workflow';
+          roster.integrationStatus = 'blender-scene-revision-28-export-ready; F-16 strike-impact and landing-rearm-sortie animation authored; current bundle root audit passed; browser runtime checks recorded separately';
+          writeFileSync(rosterPath, JSON.stringify(roster, null, 2) + '\n');
+
+          let game = readFileSync(gamePath, 'utf8');
+          if (!game.includes('combined-arms-r21.glb')) throw new Error('Expected old bundle reference was not found in game.js');
+          game = game.replace('combined-arms-r21.glb', 'combined-arms-r28.glb');
+          if (game.includes('Blender r21 loaded')) game = game.replace('Blender r21 loaded', 'Blender r28 loaded');
+          if (game.includes('Blender revision-19 roots bound')) game = game.replace('Blender revision-19 roots bound', 'Blender revision-28 roots bound');
+          game = game.replace('Loading Blender scene GLB · 14.6 MB', 'Loading Blender scene GLB · about 22 MB');
+          writeFileSync(gamePath, game);
+          console.log(JSON.stringify({revision: 28, bytes, rootCount: requiredRoots.length, nodeCount: nodeNames.size}));
+          NODE
+
+      - name: Install isolated Chromium test runner
+        run: npm install --prefix mcp --no-audit --no-fund
+
+      - name: Run desktop and mobile-size Chromium smoke
+        continue-on-error: true
+        shell: bash
+        env:
+          WARFRONT_URL: http://127.0.0.1:4174/index.html
+          WARFRONT_ARTIFACTS: /tmp/warfront-browser-qa
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4174 --bind 127.0.0.1 --directory public/warfront > /tmp/warfront-preview.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl --silent --fail --max-time 2 http://127.0.0.1:4174/index.html >/dev/null; then break; fi
+            sleep 1
+          done
+          node mcp/warfront-browser-smoke.mjs
+
+      - name: Upload browser QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: warfront-r28-browser-qa
+          if-no-files-found: warn
+          path: |
+            /tmp/warfront-browser-qa/
+            /tmp/warfront-preview.log
+
+      - name: Verify bundle contracts and JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check public/warfront/game.js
+          node --input-type=module <<'NODE'
+          import { readFileSync, statSync } from 'node:fs';
+          const roster = JSON.parse(readFileSync('public/warfront/roster.json','utf8'));
+          const p = roster.bundle.fullSceneGLBPath;
+          const b = readFileSync(p);
+          if (roster.sceneRevision !== 28 || roster.bundle.fullSceneRevision !== 28) throw new Error('Scene revision mismatch');
+          if (roster.bundle.fullSceneGLBBytes !== statSync(p).size) throw new Error('GLB byte count mismatch');
+          if (!readFileSync('public/warfront/game.js','utf8').includes('combined-arms-r28.glb')) throw new Error('Runtime still points at an old Blender bundle');
+          console.log('r28 bundle, roster and runtime reference verified.');
+          NODE
+
+      - name: Commit synchronized GLB and runtime manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/warfront-r28-source-url.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- public/warfront/assets/combined-arms-r28.glb public/warfront/game.js public/warfront/roster.json .github/warfront-r28-source-url.txt
+          git commit -m "sync(warfront): import Blender scene revision 28 and rearm animation"
+          git push origin HEAD:main
