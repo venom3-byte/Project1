@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "project": "Warfront RTS",
-  "sceneRevision": 19,
+  "sceneRevision": 21,
   "sceneProjectUrl": "https://higgsfield.ai/3d-jutsu/6a8b4f06-f85f-4cac-9897-35fab0bccfe3",
   "sourceEngine": "Blender 5.2 LTS",
   "coordinateNotes": {
@@ -10,14 +10,14 @@
     "authoredVehicleForward": "+Y",
     "exportFormat": "GLB/glTF converts coordinates for consumers"
   },
-  "integrationStatus": "blender-scene-revision-19-committed; f16-and-heavy-strike-prototypes-authored; root-specific-web-runtime-binding-and-android-packaging-in-progress",
+  "integrationStatus": "blender-scene-revision-21-export-ready; terrain-albedo-textures-and-dense-biome-details-authored; r21-bundle-sync-and-visual-runtime-verification-in-progress",
   "balanceNote": "All balance numbers are abstract RTS game values, not real-world performance specifications.",
   "bundle": {
-    "fullSceneGLBBytes": 14618908,
+    "fullSceneGLBBytes": 18095672,
     "individualGLBAssets": "pending",
-    "runtimeImport": "pending until revision-19 bundle sync and browser verification",
-    "fullSceneRevision": 19,
-    "fullSceneGLBPath": "public/warfront/assets/combined-arms-r19.glb"
+    "runtimeImport": "revision-21-bundle-sync-triggered; desktop-and-mobile-runtime-qa-required-after-import",
+    "fullSceneRevision": 21,
+    "fullSceneGLBPath": "public/warfront/assets/combined-arms-r21.glb"
   },
   "summary": {
     "vehicleAndAircraftRoots": 31,
