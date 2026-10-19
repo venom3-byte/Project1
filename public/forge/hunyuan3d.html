@@ -314,7 +314,12 @@
     if (!Array.isArray(result) || result.length === 0) throw new Error('انتهى الطلب دون بيانات نتيجة قابلة للاستخدام.');
     return result;
   }
+  function unwrapUpdate(value) {
+    while (value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, 'value') && (value.__type__ === 'update' || value.interactive !== undefined)) value = value.value;
+    return value;
+  }
   function resolveFileUrl(file) {
+    file = unwrapUpdate(file);
     if (!file) return '';
     if (typeof file === 'string') {
       if (/^https?:\/\//i.test(file)) return file;
@@ -441,8 +446,8 @@
       ];
       const endpoint = textured ? '/generation_all' : '/shape_generation';
       const data = await runJob(endpoint, payload, textured ? 'إنشاء المجسم والخامات' : 'إنشاء المجسم');
-      const shapeFile = data[0];
-      const textureFile = textured ? data[1] : null;
+      const shapeFile = unwrapUpdate(data[0]);
+      const textureFile = textured ? unwrapUpdate(data[1]) : null;
       const stats = data[textured ? 3 : 2];
       const actualSeed = data[textured ? 4 : 3];
       const previewFile = textureFile || shapeFile;
@@ -478,7 +483,7 @@
         targetFaces
       ];
       const out = await runJob('/on_export_click', payload, 'تصدير الملف النهائي');
-      const exportFile = out[1];
+      const exportFile = unwrapUpdate(out[1]);
       if (!setDownload($('finalDownload'), exportFile, 'hunyuan3d-export.' + type)) {
         throw new Error('أكمل الخادم التصدير لكن لم يرجع رابط ملف واضحًا.');
       }
