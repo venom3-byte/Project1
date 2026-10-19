@@ -267,7 +267,7 @@
     return await gradioModulePromise;
   }
   async function connectFallback() {
-    if (fallbackClient) return fallbackClient;
+    if (fallbackClient) { activeBackend = FALLBACK_BASE; return fallbackClient; }
     const lib = await loadGradioClient();
     status('المسار الأساسي رفض وقت GPU؛ جارٍ الاتصال بنموذج Hunyuan3D-2mini-Turbo الأسرع والأقل حجزًا لوقت GPU…', 'busy');
     fallbackClient = await lib.Client.connect(FALLBACK_BASE, { events: ['data', 'status'] });
@@ -283,7 +283,7 @@
     return fallbackClient;
   }
   async function connect() {
-    if (client) return client;
+    if (client) { activeBackend = BASE; return client; }
     status('جارٍ الاتصال بعنوان واجهة Hunyuan3D مباشرة…', 'busy');
     $('connectBtn').textContent = 'جارٍ الاتصال…';
     try {
