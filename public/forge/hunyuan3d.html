@@ -160,6 +160,18 @@
           <button class="btn secondary" id="resetBtn">إعادة الضبط</button>
         </div>
         <div class="queue-line"><span class="spinner" id="spinner"></span><span id="statusText">اختر صورة ثم اتصل بالخدمة لبدء التوليد.</span></div>
+        <div class="notice info" id="alternativeBox" style="display:none;margin-top:12px;margin-bottom:0">
+          <span>↗</span>
+          <div>
+            <strong>خدمة Hunyuan لم تكمل الطلب.</strong>
+            <div style="margin-top:4px">جرّب أحد مولدات الصورة إلى 3D البديلة؛ كلاهما يعلن عن استخدام مجاني، لكن قد توجد حدود تشغيل أو ازدحام.</div>
+            <div class="actions" style="margin-top:10px">
+              <a class="btn primary" href="https://hyper3d.site/" target="_blank" rel="noopener noreferrer">فتح Hyper3D · 3 محاولات/ساعة حسب الموقع</a>
+              <a class="btn secondary" href="https://3dai.dev/en" target="_blank" rel="noopener noreferrer">فتح 3DAI Studio</a>
+            </div>
+            <div class="subhint" style="margin-top:8px">أنشئ الملف في الخدمة البديلة، نزّله بصيغة GLB، ثم استورده إلى Forge. لا ترفع صورًا حساسة إلى خدمة خارجية.</div>
+          </div>
+        </div>
         <a class="small-link" href="https://huggingface.co/spaces/tencent/Hunyuan3D-2.1" target="_blank" rel="noopener noreferrer">إذا كانت الخدمة غير متاحة، افتح واجهة Tencent الرسمية ↗</a>
       </div>
     </section>
@@ -513,6 +525,7 @@
       status(textured ? 'اكتمل التوليد مع الخامات. راجع الشكل ثم جهّز الملف النهائي للتنزيل.' : 'اكتمل توليد المجسم الهندسي. يمكن تنزيله الآن؛ مسار الخامات متاح فقط إذا سمح خادم GPU بوقته.', 'ok');
     } catch (error) {
       status('فشل التوليد: ' + readableError(error), 'off');
+      $('alternativeBox').style.display = 'flex';
     } finally {
       setBusy(false);
       $('generateBtn').textContent = '◇ إنشاء المجسم باستخدام Hunyuan3D';
