@@ -1,4 +1,4 @@
-name: Iron Veil browser-game checks
+name: Iron Veil mobile game checks
 on:
   push:
     paths:
@@ -17,25 +17,39 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Extract inline game JavaScript
+      - name: Validate gameplay and PWA contracts
         run: |
           node - <<'NODE'
           const fs = require('node:fs');
           const html = fs.readFileSync('public/iron-veil/index.html', 'utf8');
-          const matches = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
-          if (matches.length !== 1) throw new Error('Expected exactly one inline game script');
-          fs.writeFileSync('/tmp/iron-veil.js', matches[0][1]);
-          for (const required of ['function makeWorld()', 'function update(dt)', 'function draw()', 'function fire(u,t)', 'function drawMini()', 'Capture 2 sectors']) {
-            if (!html.includes(required)) throw new Error('Missing gameplay feature: ' + required);
-          }
-          for (const id of ['game','mini','roster','actions','pause','sup','cmd','sector']) {
+          const scripts = [...html.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)];
+          if (scripts.length !== 1) throw new Error('Expected exactly one inline game script');
+          fs.writeFileSync('/tmp/iron-veil.js', scripts[0][1]);
+          const required = [
+            'function makeWorld()', 'function update(dt)', 'function draw()',
+            'function fire(u,t)', 'function drawMini()', 'function drawRiver()',
+            'function updateLogistics(dt)', 'function navigationTarget(u)',
+            'Capture 2 sectors', 'A-10A THUNDERBOLT II', 'TAP TARGET AREA',
+            "navigator.serviceWorker.register('./sw.js')"
+          ];
+          for (const item of required) if (!html.includes(item)) throw new Error('Missing gameplay contract: ' + item);
+          for (const id of ['game','mini','roster','actions','pause','sup','cmd','sector','zoomIn','zoomOut','fireMission']) {
             if (!new RegExp('id="' + id + '"').test(html)) throw new Error('Missing UI element: ' + id);
           }
-          console.log('Static feature checks passed.');
+          const manifest = JSON.parse(fs.readFileSync('public/iron-veil/manifest.webmanifest', 'utf8'));
+          if (manifest.orientation !== 'landscape' || manifest.display !== 'fullscreen') throw new Error('PWA orientation/display contract changed');
+          if (!manifest.icons?.some(icon => icon.src === './icon.svg')) throw new Error('Manifest does not point to the original game icon');
+          const sw = fs.readFileSync('public/iron-veil/sw.js', 'utf8');
+          if (!sw.includes('caches.open(CACHE_NAME)') || !sw.includes('self.clients.claim()')) throw new Error('Offline cache lifecycle incomplete');
+          const icon = fs.readFileSync('public/iron-veil/icon.svg', 'utf8');
+          if (!icon.includes('<svg') || !icon.includes('</svg>')) throw new Error('Invalid SVG icon wrapper');
+          console.log('Gameplay UI and PWA contracts passed.');
           NODE
       - name: Check JavaScript syntax
-        run: node --check /tmp/iron-veil.js
-      - name: Check mobile/offline-friendly self-contained build
+        run: |
+          node --check /tmp/iron-veil.js
+          node --check public/iron-veil/sw.js
+      - name: Check self-contained runtime
         run: |
           ! grep -Eo '<script[^>]+src=|<link[^>]+href="https?://' public/iron-veil/index.html
           grep -q 'pointerdown' public/iron-veil/index.html
