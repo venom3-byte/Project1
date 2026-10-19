@@ -217,7 +217,6 @@
 <script>
 (function(){
   'use strict';
-  const SPACE = 'tencent/Hunyuan3D-2.1';
   const BASE = 'https://tencent-hunyuan3d-2-1.hf.space';
   const CLIENT_URL = 'https://cdn.jsdelivr.net/npm/@gradio/client@2.7.1/dist/index.min.js';
   let gradioModulePromise = null;
@@ -265,12 +264,12 @@
   }
   async function connect() {
     if (client) return client;
-    status('جارٍ الاتصال بواجهة Hunyuan3D العامة…', 'busy');
+    status('جارٍ الاتصال بعنوان واجهة Hunyuan3D مباشرة…', 'busy');
     $('connectBtn').textContent = 'جارٍ الاتصال…';
     try {
       const lib = await loadGradioClient();
       handleFile = lib.handle_file;
-      client = await lib.Client.connect(SPACE, { events: ['data', 'status'] });
+      client = await lib.Client.connect(BASE, { events: ['data', 'status'] });
       const api = await client.view_api();
       const endpoints = api && api.named_endpoints ? api.named_endpoints : {};
       if (!endpoints['/shape_generation'] || !endpoints['/on_export_click']) {
