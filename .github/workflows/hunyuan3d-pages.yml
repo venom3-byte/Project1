@@ -1,0 +1,63 @@
+name: Publish Forge Hunyuan3D Studio
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "public/forge/hunyuan3d.html"
+      - ".github/workflows/hunyuan3d-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "hunyuan3d-pages"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Assemble standalone mobile app
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          cp public/forge/hunyuan3d.html _site/index.html
+          cp public/forge/hunyuan3d.html _site/hunyuan3d.html
+          cat > _site/404.html <<'EOF'
+          <!doctype html>
+          <html lang="ar" dir="rtl">
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1">
+          <meta http-equiv="refresh" content="0;url=./">
+          <title>Forge Hunyuan3D Studio</title>
+          <p><a href="./">فتح Forge Hunyuan3D Studio</a></p>
+          </html>
+          EOF
+          test -s _site/index.html
+          grep -q 'Forge Hunyuan3D Studio' _site/index.html
+          grep -q 'function unwrapUpdate' _site/index.html
+
+      - name: Upload static website artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
