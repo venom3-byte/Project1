@@ -471,8 +471,10 @@
       } catch (generationError) {
         const errorText = String(generationError && generationError.message || generationError);
         const gpuLimit = /requested GPU duration.*larger than the maximum allowed|GPU duration.*maximum allowed/i.test(errorText);
-        if (!gpuLimit) throw generationError;
-        status('رفض Hunyuan3D-2.1 الطلب بسبب حد وقت GPU. سأحوّل الطلب تلقائيًا إلى Hunyuan3D-2mini-Turbo مع إعدادات Turbo لإكمال توليد الشكل.', 'busy');
+        const quotaExceeded = /exceeded your zerogpu quota|quota exceeded|requested vs\.?\s*\d+s left|try again in\s+\d/i.test(errorText);
+        if (!gpuLimit && !quotaExceeded) throw generationError;
+        const reason = quotaExceeded ? 'الحصة المتبقية أقل من مدة الطلب' : 'مدة GPU المطلوبة تتجاوز الحد';
+        status('Hunyuan3D-2.1 رفض الطلب (' + reason + '). سأحوّل تلقائيًا إلى Hunyuan3D-2mini-Turbo الذي يطلب وقت GPU أقل.', 'busy');
         const fallback = await connectFallback();
         const fallbackPayload = [
           handleFile(selectedFile), null, null, null, null,
