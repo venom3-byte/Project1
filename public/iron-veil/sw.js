@@ -1,4 +1,4 @@
-const CACHE_NAME = "iron-veil-shell-v1";
+const CACHE_NAME = "iron-veil-shell-v2";
 const CORE_ASSETS = ["./", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", event => {
