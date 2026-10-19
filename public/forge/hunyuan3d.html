@@ -218,9 +218,11 @@
 (function(){
   'use strict';
   const BASE = 'https://tencent-hunyuan3d-2-1.hf.space';
+  const FALLBACK_BASE = 'https://tencent-hunyuan3d-2.hf.space';
   const CLIENT_URL = 'https://cdn.jsdelivr.net/npm/@gradio/client@2.7.1/dist/index.min.js';
   let gradioModulePromise = null;
   let client = null;
+  let fallbackClient = null;
   let handleFile = null;
   let selectedFile = null;
   let generatedFiles = null;
@@ -262,6 +264,20 @@
     if (!gradioModulePromise) gradioModulePromise = import(CLIENT_URL);
     return await gradioModulePromise;
   }
+  async function connectFallback() {
+    if (fallbackClient) return fallbackClient;
+    const lib = await loadGradioClient();
+    status('المسار الأساسي رفض وقت GPU؛ جارٍ الاتصال بنموذج Hunyuan3D-2 الاحتياطي الأقل طلبًا لموارد GPU…', 'busy');
+    fallbackClient = await lib.Client.connect(FALLBACK_BASE, { events: ['data', 'status'] });
+    const api = await fallbackClient.view_api();
+    const endpoints = api && api.named_endpoints ? api.named_endpoints : {};
+    if (!endpoints['/shape_generation']) {
+      fallbackClient = null;
+      throw new Error('النموذج الاحتياطي لا يعرض واجهة shape_generation.');
+    }
+    handleFile = lib.handle_file;
+    return fallbackClient;
+  }
   async function connect() {
     if (client) return client;
     status('جارٍ الاتصال بعنوان واجهة Hunyuan3D مباشرة…', 'busy');
@@ -287,8 +303,8 @@
       throw error;
     }
   }
-  async function runJob(endpoint, payload, label) {
-    const api = await connect();
+  async function runJob(endpoint, payload, label, clientOverride = null) {
+    const api = clientOverride || await connect();
     status(label + ' — جارٍ إرسال الطلب إلى قائمة الانتظار…', 'busy');
     const job = api.submit(endpoint, payload);
     let result = null;
@@ -450,12 +466,19 @@
       } catch (generationError) {
         const errorText = String(generationError && generationError.message || generationError);
         const gpuLimit = /requested GPU duration.*larger than the maximum allowed|GPU duration.*maximum allowed/i.test(errorText);
-        if (!textured || !gpuLimit) throw generationError;
-        status('مسار الخامات يتجاوز حد GPU المجاني؛ سأعيد المحاولة بمسار المجسم الهندسي فقط.', 'busy');
-        data = await runJob('/shape_generation', payload, 'إعادة المحاولة بمسار أقل استهلاكًا');
+        if (!gpuLimit) throw generationError;
+        status('رفض Hunyuan3D-2.1 الطلب بسبب حد وقت GPU. سأحوّل الطلب تلقائيًا إلى Hunyuan3D-2 مع إعدادات خفيفة لإكمال توليد الشكل.', 'busy');
+        const fallback = await connectFallback();
+        const fallbackPayload = [
+          handleFile(selectedFile), null, null, null, null,
+          5, Math.min(5, guidance), seed, 256, $('removeBg').checked, 8000, true
+        ];
+        data = await runJob('/shape_generation', fallbackPayload, 'توليد الشكل عبر Hunyuan3D-2 الاحتياطي', fallback);
         textured = false;
         $('genMode').value = 'shape';
-        $('modeHint').textContent = 'تم اختيار المجسم الهندسي فقط تلقائيًا لأن مسار الخامات تجاوز حد وقت GPU المتاح.';
+        $('steps').value = '5';
+        $('resolution').value = '256';
+        $('modeHint').textContent = 'تم التحويل تلقائيًا إلى Hunyuan3D-2 وإعدادات خفيفة بعد رفض وقت GPU في Hunyuan3D-2.1. هذه النتيجة هندسية دون خامات.';
       }
       const shapeFile = unwrapUpdate(data[0]);
       const textureFile = textured ? unwrapUpdate(data[1]) : null;
