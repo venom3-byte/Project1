@@ -434,7 +434,7 @@
     $('finalDownload').style.display = 'none';
     $('exportOptions').style.display = 'none';
     try {
-      const textured = $('genMode').value === 'textured';
+      let textured = $('genMode').value === 'textured';
       const steps = Number($('steps').value);
       const guidance = Number($('guidance').value);
       const seed = Math.max(0, Math.min(10000000, Math.floor(Number($('seed').value) || 1234)));
@@ -443,8 +443,20 @@
         handleFile(selectedFile), null, null, null, null,
         steps, guidance, seed, resolution, $('removeBg').checked, 8000, $('randomSeed').checked
       ];
-      const endpoint = textured ? '/generation_all' : '/shape_generation';
-      const data = await runJob(endpoint, payload, textured ? 'إنشاء المجسم والخامات' : 'إنشاء المجسم');
+      let data;
+      try {
+        const endpoint = textured ? '/generation_all' : '/shape_generation';
+        data = await runJob(endpoint, payload, textured ? 'إنشاء المجسم والخامات' : 'إنشاء المجسم');
+      } catch (generationError) {
+        const errorText = String(generationError && generationError.message || generationError);
+        const gpuLimit = /requested GPU duration.*larger than the maximum allowed|GPU duration.*maximum allowed/i.test(errorText);
+        if (!textured || !gpuLimit) throw generationError;
+        status('مسار الخامات يتجاوز حد GPU المجاني؛ سأعيد المحاولة بمسار المجسم الهندسي فقط.', 'busy');
+        data = await runJob('/shape_generation', payload, 'إعادة المحاولة بمسار أقل استهلاكًا');
+        textured = false;
+        $('genMode').value = 'shape';
+        $('modeHint').textContent = 'تم اختيار المجسم الهندسي فقط تلقائيًا لأن مسار الخامات تجاوز حد وقت GPU المتاح.';
+      }
       const shapeFile = unwrapUpdate(data[0]);
       const textureFile = textured ? unwrapUpdate(data[1]) : null;
       const stats = data[textured ? 3 : 2];
@@ -456,7 +468,7 @@
       $('exportOptions').style.display = 'block';
       $('exportBtn').disabled = false;
       $('resultMode').textContent = textureFile ? 'PBR TEXTURED' : 'GEOMETRY';
-      status('اكتمل التوليد. راجع الشكل ثم جهّز الملف النهائي للتنزيل.', 'ok');
+      status(textured ? 'اكتمل التوليد مع الخامات. راجع الشكل ثم جهّز الملف النهائي للتنزيل.' : 'اكتمل توليد المجسم الهندسي. يمكن تنزيله الآن؛ مسار الخامات متاح فقط إذا سمح خادم GPU بوقته.', 'ok');
     } catch (error) {
       status('فشل التوليد: ' + readableError(error), 'off');
     } finally {
