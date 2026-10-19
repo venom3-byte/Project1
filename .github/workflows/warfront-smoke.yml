@@ -36,7 +36,7 @@ jobs:
           const htmlPath = 'public/warfront/index.html';
           const jsPath = 'public/warfront/game.js';
           const rosterPath = 'public/warfront/roster.json';
-          const bundlePath = 'public/warfront/assets/combined-arms-r19.glb';
+          const bundlePath = 'public/warfront/assets/combined-arms-r21.glb';
           const html = readFileSync(htmlPath, 'utf8');
           const js = readFileSync(jsPath, 'utf8');
           const roster = JSON.parse(readFileSync(rosterPath, 'utf8'));
