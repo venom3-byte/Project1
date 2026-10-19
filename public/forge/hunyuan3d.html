@@ -220,12 +220,15 @@
   const BASE = 'https://tencent-hunyuan3d-2-1.hf.space';
   const FALLBACK_BASE = 'https://tencent-hunyuan3d-2mini-turbo.hf.space';
   const CLIENT_URL = 'https://cdn.jsdelivr.net/npm/@gradio/client@2.7.1/dist/index.min.js';
+  const FALLBACK_CLIENT_URL = 'https://cdn.jsdelivr.net/npm/@gradio/client@0.20.1/dist/index.min.js';
   let gradioModulePromise = null;
+  let fallbackGradioModulePromise = null;
   let client = null;
   let fallbackClient = null;
   let activeBackend = BASE;
   let fallbackHasExport = false;
   let handleFile = null;
+  let fallbackHandleFile = null;
   let selectedFile = null;
   let generatedFiles = null;
   let isBusy = false;
@@ -266,16 +269,19 @@
     if (!gradioModulePromise) gradioModulePromise = import(CLIENT_URL);
     return await gradioModulePromise;
   }
+  async function loadFallbackGradioClient() {
+    if (!fallbackGradioModulePromise) fallbackGradioModulePromise = import(FALLBACK_CLIENT_URL);
+    return await fallbackGradioModulePromise;
+  }
   async function connectFallback() {
     if (fallbackClient) { activeBackend = FALLBACK_BASE; return fallbackClient; }
-    const lib = await loadGradioClient();
-    status('المسار الأساسي رفض وقت GPU؛ جارٍ الاتصال بنموذج Hunyuan3D-2mini-Turbo الأسرع والأقل حجزًا لوقت GPU…', 'busy');
-    // Some Gradio Spaces do not expose /info reliably. Client.connect can still
-    // load /config and submit a known API endpoint, so do not make /info mandatory.
-    fallbackClient = await lib.Client.connect(FALLBACK_BASE, { events: ['data', 'status'] });
+    const lib = await loadFallbackGradioClient();
+    status('المسار الأساسي رفض وقت GPU؛ جارٍ الاتصال بعميل Gradio المتوافق مع مساحة Hunyuan3D-2mini-Turbo…', 'busy');
+    // Tencent Turbo Space runs Gradio 4.44.1; use its compatible client API.
+    fallbackClient = await lib.Client.connect(FALLBACK_BASE);
+    fallbackHandleFile = lib.handle_file;
     fallbackHasExport = false;
     activeBackend = FALLBACK_BASE;
-    handleFile = lib.handle_file;
     return fallbackClient;
   }
   async function connect() {
@@ -303,6 +309,13 @@
       status(readableError(error), 'off');
       throw error;
     }
+  }
+  async function runFallbackJob(endpoint, payload, label, api) {
+    status(label + ' — يجري إرسال الطلب إلى مساحة Turbo…', 'busy');
+    const response = await api.predict(endpoint, payload);
+    const data = response && Array.isArray(response.data) ? response.data : (Array.isArray(response) ? response : null);
+    if (!data || !data.length) throw new Error('استجاب نموذج Turbo دون بيانات نتيجة قابلة للتنزيل.');
+    return data;
   }
   async function runJob(endpoint, payload, label, clientOverride = null) {
     const api = clientOverride || await connect();
@@ -476,10 +489,10 @@
         // images, steps, guidance, seed, octree resolution, remove background,
         // chunk count, randomize seed.
         const fallbackPayload = [
-          null, handleFile(selectedFile), null, null, null, null,
-          5, Math.min(5, guidance), seed, 256, $('removeBg').checked, 8000, true
+          null, fallbackHandleFile(selectedFile), null, null, null, null,
+          5, Math.min(5, guidance), seed, 196, $('removeBg').checked, 8000, true
         ];
-        data = await runJob('/shape_generation', fallbackPayload, 'توليد الشكل عبر Hunyuan3D-2mini-Turbo', fallback);
+        data = await runFallbackJob('/shape_generation', fallbackPayload, 'توليد الشكل عبر Hunyuan3D-2mini-Turbo', fallback);
         textured = false;
         $('genMode').value = 'shape';
         $('steps').value = '5';
