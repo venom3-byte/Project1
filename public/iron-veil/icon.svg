@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="72" fill="#101512"/>
+  <path d="M0 338 512 170v342H0Z" fill="#35402e"/>
+  <path d="M0 382 512 214" stroke="#8e8a69" stroke-width="30"/>
+  <path d="M0 382 512 214" stroke="#c9be91" stroke-width="3" stroke-dasharray="30 28"/>
+  <g transform="translate(256 240)">
+    <rect x="-118" y="-45" width="236" height="94" rx="8" fill="#29312a" stroke="#87917a" stroke-width="8"/>
+    <rect x="-83" y="-34" width="166" height="72" fill="#66724c"/>
+    <rect x="-42" y="-53" width="84" height="58" fill="#4b5940" stroke="#202923" stroke-width="7"/>
+    <path d="M0 -23 160 -23 160 -9 0 -9Z" fill="#bcc4a2"/>
+    <path d="M-142 -35h24v70h-24M118 -35h24v70h-24" fill="#131915" stroke="#8a907a" stroke-width="7"/>
+    <rect x="-21" y="-18" width="42" height="17" fill="#d2bd7a"/>
+  </g>
+  <path d="M88 92h336v18H88Z" fill="#d6bd7c"/>
+  <text x="256" y="156" fill="#e6e9df" font-family="monospace" font-weight="bold" font-size="49" text-anchor="middle" letter-spacing="4">IRON VEIL</text>
+</svg>
