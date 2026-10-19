@@ -1597,6 +1597,34 @@ renderer.domElement.addEventListener('pointercancel', onPointerUp);
 renderer.domElement.addEventListener('wheel', (e) => { e.preventDefault(); zoomCamera(e.deltaY > 0 ? 1.09 : 0.92); }, { passive: false });
 renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
 $('mapSelector').addEventListener('change',(event)=>applyBattlefieldMap(event.target.value,false));
+function syncFullscreenButton(){
+  const btn=$('fullscreenBtn');if(!btn)return;
+  const active=!!(document.fullscreenElement||document.webkitFullscreenElement);
+  btn.setAttribute('aria-pressed',String(active));
+  btn.title=active?'Exit fullscreen':'Enter fullscreen';
+  btn.setAttribute('aria-label',btn.title);
+  btn.textContent=active?'⛶':'⛶';
+}
+$('fullscreenBtn').addEventListener('click',async()=>{
+  try{
+    const active=!!(document.fullscreenElement||document.webkitFullscreenElement);
+    if(active){
+      if(document.exitFullscreen)await document.exitFullscreen();
+      else if(document.webkitExitFullscreen)document.webkitExitFullscreen();
+      return;
+    }
+    const root=document.documentElement;
+    if(root.requestFullscreen)await root.requestFullscreen({navigationUI:'hide'});
+    else if(root.webkitRequestFullscreen)root.webkitRequestFullscreen();
+    else{toast('Use the Android browser menu for immersive display');return;}
+  }catch(error){
+    console.warn('Fullscreen request unavailable in this browser context',error);
+    toast('Fullscreen is controlled by your Android browser');
+  }
+});
+document.addEventListener('fullscreenchange',syncFullscreenButton);
+document.addEventListener('webkitfullscreenchange',syncFullscreenButton);
+syncFullscreenButton();
 window.addEventListener('keydown', (e) => {
   if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
   const key = e.key.toLowerCase();
