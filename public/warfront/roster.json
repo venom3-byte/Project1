@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "project": "Warfront RTS",
-  "sceneRevision": 21,
+  "sceneRevision": 28,
   "sceneProjectUrl": "https://higgsfield.ai/3d-jutsu/6a8b4f06-f85f-4cac-9897-35fab0bccfe3",
   "sourceEngine": "Blender 5.2 LTS",
   "coordinateNotes": {
@@ -10,14 +10,14 @@
     "authoredVehicleForward": "+Y",
     "exportFormat": "GLB/glTF converts coordinates for consumers"
   },
-  "integrationStatus": "blender-scene-revision-21-export-ready; terrain-albedo-textures-and-dense-biome-details-authored; r21-bundle-sync-and-visual-runtime-verification-in-progress",
+  "integrationStatus": "blender-scene-revision-28-export-ready; F-16 strike-impact and landing-rearm-sortie animation authored; current bundle root audit passed; browser runtime checks recorded separately",
   "balanceNote": "All balance numbers are abstract RTS game values, not real-world performance specifications.",
   "bundle": {
-    "fullSceneGLBBytes": 18095672,
+    "fullSceneGLBBytes": 21997740,
     "individualGLBAssets": "pending",
-    "runtimeImport": "revision-21-bundle-sync-triggered; desktop-and-mobile-runtime-qa-required-after-import",
-    "fullSceneRevision": 21,
-    "fullSceneGLBPath": "public/warfront/assets/combined-arms-r21.glb"
+    "runtimeImport": "revision-28 Blender export synchronized; desktop-and-mobile runtime visual QA included in this workflow",
+    "fullSceneRevision": 28,
+    "fullSceneGLBPath": "public/warfront/assets/combined-arms-r28.glb"
   },
   "summary": {
     "vehicleAndAircraftRoots": 31,

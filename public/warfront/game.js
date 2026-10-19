@@ -1727,8 +1727,8 @@ async function loadBlenderAssetBundle() {
   if (state.blenderBundle) return state.blenderBundle;
   if (state.blenderBundlePromise) return state.blenderBundlePromise;
   state.blenderBundlePromise = (async () => {
-    setAssetText('Loading Blender scene GLB · 14.6 MB', false);
-    const gltf = await loadGLTF('./assets/combined-arms-r21.glb', 90000);
+    setAssetText('Loading Blender scene GLB · about 22 MB', false);
+    const gltf = await loadGLTF('./assets/combined-arms-r28.glb', 90000);
     if (!gltf || !gltf.scene) throw new Error('GLB loaded without a scene');
     const roots = new Map();
     gltf.scene.traverse((node) => {
@@ -2149,8 +2149,8 @@ function initialiseAssets() {
       try{
         bindBlenderRuntimeAssets();
         applyBattlefieldMap(state.mapId,true);
-        setAssetText('Blender r21 loaded · '+state.blenderBundle.roots.size+' named roots',true);
-        addLog('Blender revision-19 roots bound to separate land, fixed-wing, rotary-wing and infantry classes.','normal');
+        setAssetText('Blender r28 loaded · '+state.blenderBundle.roots.size+' named roots',true);
+        addLog('Blender revision-28 roots bound to separate land, fixed-wing, rotary-wing and infantry classes.','normal');
       }catch(error){
         console.error('Blender runtime binding failed',error);
         addLog('Blender scene loaded but a class-specific runtime binding failed.','alert');
