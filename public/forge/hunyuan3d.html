@@ -270,14 +270,10 @@
     if (fallbackClient) { activeBackend = FALLBACK_BASE; return fallbackClient; }
     const lib = await loadGradioClient();
     status('المسار الأساسي رفض وقت GPU؛ جارٍ الاتصال بنموذج Hunyuan3D-2mini-Turbo الأسرع والأقل حجزًا لوقت GPU…', 'busy');
+    // Some Gradio Spaces do not expose /info reliably. Client.connect can still
+    // load /config and submit a known API endpoint, so do not make /info mandatory.
     fallbackClient = await lib.Client.connect(FALLBACK_BASE, { events: ['data', 'status'] });
-    const api = await fallbackClient.view_api();
-    const endpoints = api && api.named_endpoints ? api.named_endpoints : {};
-    if (!endpoints['/shape_generation']) {
-      fallbackClient = null;
-      throw new Error('نموذج Hunyuan3D-2mini-Turbo لا يعرض واجهة shape_generation.');
-    }
-    fallbackHasExport = Boolean(endpoints['/on_export_click']);
+    fallbackHasExport = false;
     activeBackend = FALLBACK_BASE;
     handleFile = lib.handle_file;
     return fallbackClient;
@@ -476,8 +472,11 @@
         const reason = quotaExceeded ? 'الحصة المتبقية أقل من مدة الطلب' : 'مدة GPU المطلوبة تتجاوز الحد';
         status('Hunyuan3D-2.1 رفض الطلب (' + reason + '). سأحوّل تلقائيًا إلى Hunyuan3D-2mini-Turbo الذي يطلب وقت GPU أقل.', 'busy');
         const fallback = await connectFallback();
+        // Hunyuan3D-2mini-Turbo API order: caption, image, four multi-view
+        // images, steps, guidance, seed, octree resolution, remove background,
+        // chunk count, randomize seed.
         const fallbackPayload = [
-          handleFile(selectedFile), null, null, null, null,
+          null, handleFile(selectedFile), null, null, null, null,
           5, Math.min(5, guidance), seed, 256, $('removeBg').checked, 8000, true
         ];
         data = await runJob('/shape_generation', fallbackPayload, 'توليد الشكل عبر Hunyuan3D-2mini-Turbo', fallback);
