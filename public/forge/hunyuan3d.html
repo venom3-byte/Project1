@@ -218,7 +218,7 @@
 (function(){
   'use strict';
   const BASE = 'https://tencent-hunyuan3d-2-1.hf.space';
-  const FALLBACK_BASE = 'https://tencent-hunyuan3d-2.hf.space';
+  const FALLBACK_BASE = 'https://tencent-hunyuan3d-2mini-turbo.hf.space';
   const CLIENT_URL = 'https://cdn.jsdelivr.net/npm/@gradio/client@2.7.1/dist/index.min.js';
   let gradioModulePromise = null;
   let client = null;
@@ -269,13 +269,13 @@
   async function connectFallback() {
     if (fallbackClient) return fallbackClient;
     const lib = await loadGradioClient();
-    status('المسار الأساسي رفض وقت GPU؛ جارٍ الاتصال بنموذج Hunyuan3D-2 الاحتياطي الأقل طلبًا لموارد GPU…', 'busy');
+    status('المسار الأساسي رفض وقت GPU؛ جارٍ الاتصال بنموذج Hunyuan3D-2mini-Turbo الأسرع والأقل حجزًا لوقت GPU…', 'busy');
     fallbackClient = await lib.Client.connect(FALLBACK_BASE, { events: ['data', 'status'] });
     const api = await fallbackClient.view_api();
     const endpoints = api && api.named_endpoints ? api.named_endpoints : {};
     if (!endpoints['/shape_generation']) {
       fallbackClient = null;
-      throw new Error('النموذج الاحتياطي لا يعرض واجهة shape_generation.');
+      throw new Error('نموذج Hunyuan3D-2mini-Turbo لا يعرض واجهة shape_generation.');
     }
     fallbackHasExport = Boolean(endpoints['/on_export_click']);
     activeBackend = FALLBACK_BASE;
@@ -472,18 +472,18 @@
         const errorText = String(generationError && generationError.message || generationError);
         const gpuLimit = /requested GPU duration.*larger than the maximum allowed|GPU duration.*maximum allowed/i.test(errorText);
         if (!gpuLimit) throw generationError;
-        status('رفض Hunyuan3D-2.1 الطلب بسبب حد وقت GPU. سأحوّل الطلب تلقائيًا إلى Hunyuan3D-2 مع إعدادات خفيفة لإكمال توليد الشكل.', 'busy');
+        status('رفض Hunyuan3D-2.1 الطلب بسبب حد وقت GPU. سأحوّل الطلب تلقائيًا إلى Hunyuan3D-2mini-Turbo مع إعدادات Turbo لإكمال توليد الشكل.', 'busy');
         const fallback = await connectFallback();
         const fallbackPayload = [
           handleFile(selectedFile), null, null, null, null,
           5, Math.min(5, guidance), seed, 256, $('removeBg').checked, 8000, true
         ];
-        data = await runJob('/shape_generation', fallbackPayload, 'توليد الشكل عبر Hunyuan3D-2 الاحتياطي', fallback);
+        data = await runJob('/shape_generation', fallbackPayload, 'توليد الشكل عبر Hunyuan3D-2mini-Turbo', fallback);
         textured = false;
         $('genMode').value = 'shape';
         $('steps').value = '5';
         $('resolution').value = '256';
-        $('modeHint').textContent = 'تم التحويل تلقائيًا إلى Hunyuan3D-2 وإعدادات خفيفة بعد رفض وقت GPU في Hunyuan3D-2.1. هذه النتيجة هندسية دون خامات.';
+        $('modeHint').textContent = 'تم التحويل تلقائيًا إلى Hunyuan3D-2mini-Turbo بإعداد Turbo بعد رفض وقت GPU في Hunyuan3D-2.1. هذه النتيجة هندسية دون خامات.';
       }
       const shapeFile = unwrapUpdate(data[0]);
       const textureFile = textured ? unwrapUpdate(data[1]) : null;
