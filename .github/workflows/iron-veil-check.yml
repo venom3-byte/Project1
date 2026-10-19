@@ -1,0 +1,43 @@
+name: Iron Veil browser-game checks
+on:
+  push:
+    paths:
+      - "public/iron-veil/**"
+      - ".github/workflows/iron-veil-check.yml"
+  pull_request:
+    paths:
+      - "public/iron-veil/**"
+      - ".github/workflows/iron-veil-check.yml"
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Extract inline game JavaScript
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const html = fs.readFileSync('public/iron-veil/index.html', 'utf8');
+          const matches = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+          if (matches.length !== 1) throw new Error('Expected exactly one inline game script');
+          fs.writeFileSync('/tmp/iron-veil.js', matches[0][1]);
+          for (const required of ['function makeWorld()', 'function update(dt)', 'function draw()', 'function fire(u,t)', 'function drawMini()', 'Capture 2 sectors']) {
+            if (!html.includes(required)) throw new Error('Missing gameplay feature: ' + required);
+          }
+          for (const id of ['game','mini','roster','actions','pause','sup','cmd','sector']) {
+            if (!new RegExp('id="' + id + '"').test(html)) throw new Error('Missing UI element: ' + id);
+          }
+          console.log('Static feature checks passed.');
+          NODE
+      - name: Check JavaScript syntax
+        run: node --check /tmp/iron-veil.js
+      - name: Check mobile/offline-friendly self-contained build
+        run: |
+          ! grep -Eo '<script[^>]+src=|<link[^>]+href="https?://' public/iron-veil/index.html
+          grep -q 'pointerdown' public/iron-veil/index.html
+          grep -q 'image-rendering:pixelated' public/iron-veil/index.html
+          echo "No runtime external scripts/styles detected."
