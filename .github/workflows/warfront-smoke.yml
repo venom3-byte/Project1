@@ -36,10 +36,11 @@ jobs:
           const htmlPath = 'public/warfront/index.html';
           const jsPath = 'public/warfront/game.js';
           const rosterPath = 'public/warfront/roster.json';
-          const bundlePath = 'public/warfront/assets/combined-arms-r21.glb';
           const html = readFileSync(htmlPath, 'utf8');
           const js = readFileSync(jsPath, 'utf8');
           const roster = JSON.parse(readFileSync(rosterPath, 'utf8'));
+          const bundlePath = roster.bundle.fullSceneGLBPath;
+          if (!bundlePath || !bundlePath.startsWith('public/warfront/assets/combined-arms-r')) throw new Error('Roster bundle path must point to a versioned Blender GLB in the assets directory');
           const bundleBytes = statSync(bundlePath).size;
           if (bundleBytes < 8000000) throw new Error('Combined-arms GLB missing or too small: ' + bundleBytes + ' bytes');
           if (roster.bundle.fullSceneGLBPath !== bundlePath) throw new Error('Roster does not point to the repository GLB bundle');
@@ -64,7 +65,9 @@ jobs:
           const missingRoots = roots.filter((name) => !nodeNames.has(name));
           if (missingRoots.length) throw new Error('Missing named roots in GLB: ' + missingRoots.slice(0, 12).join(', '));
           console.log('Validated GLB magic/version and ' + roots.length + ' named roster roots.');
-          if (!String(roster.integrationStatus || '').includes('revision-19')) throw new Error('Roster must identify its Blender source revision');
+          const revisionTag = 'revision-' + String(roster.sceneRevision);
+          if (!Number.isInteger(roster.sceneRevision) || roster.bundle.fullSceneRevision !== roster.sceneRevision) throw new Error('Roster scene revision and bundle revision must match');
+          if (!String(roster.integrationStatus || '').includes(revisionTag)) throw new Error('Roster must identify its current Blender source revision: ' + revisionTag);
           if (roster.vehicles.some((u) => !u.status || !u.root || !u.category)) throw new Error('Every vehicle must have a status, category and Blender root');
           if (roster.infantry.instances.some((u) => !u.status || !u.sourceRoot)) throw new Error('Every infantry instance must have a status and Blender root');
           if (roster.maps.some((u) => !u.root || !u.terrainDimensionsM)) throw new Error('Every battlefield map must have a Blender root and metre dimensions');
