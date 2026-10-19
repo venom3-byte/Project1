@@ -30,7 +30,9 @@ jobs:
             'function fire(u,t)', 'function drawMini()', 'function drawRiver()',
             'function updateLogistics(dt)', 'function navigationTarget(u)',
             'Capture 2 sectors', 'A-10A THUNDERBOLT II', 'TAP TARGET AREA',
-            "navigator.serviceWorker.register('./sw.js')"
+            "navigator.serviceWorker.register('./sw.js')",
+            'const SPRITE_DATA=', 'SPRITES.explosion2', 'SPRITES.explosion3', 'SPRITES.explosion4',
+            'turretAngle', 'u.recoil', 'explosions.push', 'Math.sin(Math.PI*t)'
           ];
           for (const item of required) if (!html.includes(item)) throw new Error('Missing gameplay contract: ' + item);
           for (const id of ['game','mini','roster','actions','pause','sup','cmd','sector','zoomIn','zoomOut','fireMission']) {
