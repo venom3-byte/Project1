@@ -20,8 +20,9 @@ const required = [
   ["provider selector", /providerSelect/],
   ["truthful unconfigured status", /AI_NOT_CONFIGURED/]
 ];
+const combinedSource = [html, chat, status, gemini].join("\n");
 for (const [label, pattern] of required) {
-  ["Gemini server-side key", /process\.env\.GEMINI_API_KEY/],
+  if (!pattern.test(combinedSource)) {
     throw new Error("Forge Eye check failed: " + label);
   }
 }
