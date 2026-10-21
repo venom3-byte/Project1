@@ -18,18 +18,18 @@ function rayTriangle(ro,rd,a,b,c){
 
 export class ForgeEngine{
   constructor(canvas,log=()=>{}){
-    this.canvas=canvas;this.log=log;this.app=null;this.root=null;this.entities=new Map();this.selectedId=null;this.assets=new Map();
+    this.canvas=canvas;this.log=log;this.app=null;this.root=null;this.mobileMode=window.matchMedia('(max-width: 820px)').matches||(navigator.maxTouchPoints||0)>0;this.onVisibilityChange=()=>{if(!this.app)return;this.app.autoRender=!document.hidden;if(!document.hidden)this.app.renderNextFrame=true};this.entities=new Map();this.selectedId=null;this.assets=new Map();
     this.rapier=null;this.world=null;this.physics=new Map();this.keyframes=new Map();this.scripts=new Map();this.timelineTime=0;this.running=false;this.timelinePlaying=false;this.fps=0;this.frames=0;this.lastFPS=performance.now();this.frameMs=0;
     this.physicsAccumulator=0;this.physicsFixedDt=1/60;this.physicsMaxSubsteps=5;this.prePhysicsSystems=new Set();this.postPhysicsSystems=new Set();this.collisionListeners=new Set();this.colliderEntityMap=new Map();this.eventQueue=null;
     this.triangleCache=new WeakMap();this.pickBudget=120000;this.unitSystem='meters';this.viewMode='perspective';this.gizmoSpace='world';this.snapEnabled=false;this.snapSize=.25;this.history=[];this.redoStack=[];this.historyLimit=100;
   }
   async init(){
-    this.app=new pc.Application(this.canvas,{graphicsDeviceOptions:{antialias:true,alpha:false,powerPreference:'high-performance',preserveDrawingBuffer:true}});
-    this.app.setCanvasFillMode(pc.FILLMODE_NONE);this.app.setCanvasResolution(pc.RESOLUTION_AUTO);this.app.scene.gammaCorrection=pc.GAMMA_SRGB;this.app.scene.toneMapping=pc.TONEMAP_ACES;this.app.scene.physicalUnits=true;this.app.scene.ambientLightColor=new pc.Color(.18,.22,.28);this.app.scene.ambientLightColor=new pc.Color(.18,.22,.28);
+    this.app=new pc.Application(this.canvas,{graphicsDeviceOptions:{antialias:!this.mobileMode,alpha:false,powerPreference:this.mobileMode?'low-power':'default',preserveDrawingBuffer:true}});
+    this.app.graphicsDevice.maxPixelRatio=this.mobileMode?1:Math.min(window.devicePixelRatio||1,1.5);this.app.setCanvasFillMode(pc.FILLMODE_NONE);this.app.setCanvasResolution(pc.RESOLUTION_AUTO);this.app.scene.gammaCorrection=pc.GAMMA_SRGB;this.app.scene.toneMapping=pc.TONEMAP_ACES;this.app.scene.physicalUnits=true;this.app.scene.ambientLightColor=new pc.Color(.18,.22,.28);this.app.scene.ambientLightColor=new pc.Color(.18,.22,.28);
     this.root=new pc.Entity('ForgeScene');this.app.root.addChild(this.root);
     await RAPIER.init();this.rapier=RAPIER;this.world=new RAPIER.World({x:0,y:-9.81,z:0});this.eventQueue=new RAPIER.EventQueue(true);
     this.createCamera('Main Camera',{x:7,y:5,z:9});this.createLight('Sun');this.createPlane('Ground',30,30);
-    this.app.on('update',dt=>this.update(dt));window.addEventListener('resize',()=>this.app.resizeCanvas());this.app.resizeCanvas();this.app.autoRender=true;this.app.start();this.app.render?.();this.log('Forge Engine 3.0 online');return this
+    this.app.on('update',dt=>{if(!document.hidden)this.update(dt)});window.addEventListener('resize',()=>this.app.resizeCanvas());document.addEventListener('visibilitychange',this.onVisibilityChange);this.app.resizeCanvas();this.app.autoRender=!document.hidden;this.app.start();if(!document.hidden)this.app.render?.();this.log(`Forge Engine 3.0 online${this.mobileMode?' (mobile low-power mode)':''}`);return this
   }
   rec(name,kind,e){const id=crypto.randomUUID();e.__forge={id,kind,name,components:{}};const r={id,kind,name,entity:e,components:e.__forge.components};this.entities.set(id,r);return r}
   add(kind,name){const e=new pc.Entity(name);this.root.addChild(e);return this.rec(name,kind,e)}
@@ -37,7 +37,7 @@ export class ForgeEngine{
   primitive(kind,name){const r=this.add(kind,name||kind+'-'+(this.entities.size+1)),type=kind==='sphere'?'sphere':kind==='cylinder'?'cylinder':kind==='capsule'?'capsule':kind==='plane'?'plane':'box';r.entity.addComponent('render',{type});r.entity.render.layers=[pc.LAYERID_WORLD];r.entity.render.frustumCulling=false;r.entity.render.enabled=true;r.entity.render.material=this.material(kind==='plane'?[.08,.15,.2]:[.22,.62,.9]);if(kind!=='plane')r.entity.setLocalPosition((Math.random()-.5)*4,1+(Math.random()*1.7),(Math.random()-.5)*4);r.components.geometry={sourceUnits:'meters'};return r}
   createPlane(name,w=30,d=30){const r=this.primitive('plane',name);r.entity.setLocalScale(w,1,d);r.entity.setLocalPosition(0,0,0);if(name==='Ground')r.entity.render.layers=[];this.setPhysics(r.id,'fixed','box');return r}
   createCamera(name,pos){const r=this.add('camera',name);r.entity.addComponent('camera',{clearColor:new pc.Color(.035,.07,.12),clearColorBuffer:true,clearDepthBuffer:true,fov:60,nearClip:.01,farClip:10000,enabled:true,layers:[pc.LAYERID_WORLD]});r.entity.setLocalPosition(pos.x,pos.y,pos.z);r.entity.lookAt(0,1,0);r.components.camera={active:true};r.entity.camera.enabled=true;return r}
-  createLight(name){const r=this.add('light',name);r.entity.addComponent('light',{type:'directional',color:new pc.Color(1,.96,.88),intensity:2.5,castShadows:true,shadowDistance:80,enabled:true,layers:[pc.LAYERID_WORLD]});r.entity.setEulerAngles(48,-32,0);r.components.light={type:'directional'};return r}
+  createLight(name){const r=this.add('light',name);r.entity.addComponent('light',{type:'directional',color:new pc.Color(1,.96,.88),intensity:2.5,castShadows:!this.mobileMode,shadowDistance:80,enabled:true,layers:[pc.LAYERID_WORLD]});r.entity.setEulerAngles(48,-32,0);r.components.light={type:'directional'};return r}
   camera(){return[...this.entities.values()].find(r=>r.kind==='camera'&&r.components.camera?.active)?.entity}
   selected(){return this.selectedId?this.entities.get(this.selectedId):null}
   select(id){this.selectedId=id;window.dispatchEvent(new CustomEvent('forge-selection',{detail:this.selected()}));return this.selected()}
