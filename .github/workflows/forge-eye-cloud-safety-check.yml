@@ -6,18 +6,28 @@ on:
       - forge-eye-cloud-first
     paths:
       - "public/forge/**"
+      - "src/**"
+      - "server/**"
+      - "mcp/**"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/forge-eye-cloud-safety-check.yml"
   pull_request:
     branches:
       - main
     paths:
       - "public/forge/**"
+      - "src/**"
+      - "server/**"
+      - "mcp/**"
+      - "package.json"
+      - "package-lock.json"
 
 permissions:
   contents: read
 
 jobs:
-  mobile-safety-and-syntax:
+  mobile-safety-and-build:
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
@@ -26,6 +36,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: "npm"
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Build the full web app
+        run: npm run build
+      - name: Run existing unit tests
+        run: npm test
       - name: Parse Forge engine JavaScript
         run: node --check public/forge/forge-engine.js
       - name: Verify mobile resource safeguards
