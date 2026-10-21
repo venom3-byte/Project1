@@ -76,6 +76,7 @@ try {
   const apiBody = await apiResponse.json();
   assert.equal(apiBody.code, "AI_NOT_CONFIGURED", "unconfigured endpoint should expose the expected setup-required state");
 
+  await page.locator("#providerSelect").selectOption("deepseek");
   await page.locator("#chatInput").fill("اختبار واجهة المحادثة");
   await page.locator("#sendBtn").click();
   await page.waitForFunction(() => [...document.querySelectorAll(".message.notice")].some(el => el.textContent?.includes("لم يُضبط مفتاح DeepSeek")), null, { timeout: 10000 });
