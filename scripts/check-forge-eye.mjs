@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 const html = readFileSync("public/forge/ai-studio.html", "utf8");
 const chat = readFileSync("server/api/forge-eye/chat.post.mjs", "utf8");
 const status = readFileSync("server/api/forge-eye/status.get.mjs", "utf8");
+const gemini = readFileSync("server/api/forge-eye/gemini.post.mjs", "utf8");
 const required = [
   ["Arabic right-to-left UI", /<html lang="ar" dir="rtl">/],
   ["actual Three.js module", /importmap/],
@@ -17,7 +18,7 @@ const required = [
   ["truthful unconfigured status", /AI_NOT_CONFIGURED/]
 ];
 for (const [label, pattern] of required) {
-  if (!pattern.test(label === "server-side provider key" ? chat + status : html + chat + status)) {
+  if (!pattern.test(label === "server-side provider key" ? chat + status : label === "Gemini server-side key" || label === "Gemini official model endpoint" ? gemini : html + chat + status + gemini)) {
     throw new Error("Forge Eye check failed: " + label);
   }
 }
