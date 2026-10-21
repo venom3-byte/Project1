@@ -1,0 +1,49 @@
+name: Forge Eye cloud-first safety checks
+
+on:
+  push:
+    branches:
+      - forge-eye-cloud-first
+    paths:
+      - "public/forge/**"
+      - ".github/workflows/forge-eye-cloud-safety-check.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "public/forge/**"
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-safety-and-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Parse Forge engine JavaScript
+        run: node --check public/forge/forge-engine.js
+      - name: Verify mobile resource safeguards
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const source = readFileSync('public/forge/forge-engine.js', 'utf8');
+          const required = [
+            "powerPreference:this.mobileMode?'low-power':'default'",
+            'graphicsDevice.maxPixelRatio=this.mobileMode?1:',
+            "document.addEventListener('visibilitychange',this.onVisibilityChange)",
+            'if(!document.hidden)this.update(dt)',
+            'castShadows:!this.mobileMode'
+          ];
+          const missing = required.filter((snippet) => !source.includes(snippet));
+          if (missing.length) {
+            console.error('Missing phone-safety safeguards:', missing);
+            process.exit(1);
+          }
+          console.log('All phone-safety safeguards are present.');
+          NODE
