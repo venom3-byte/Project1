@@ -62,6 +62,6 @@ The active Forge static editor at `public/forge/index.html` loads `public/forge/
 - The engine caps mobile device pixel ratio at 1 and desktop at 1.5.
 - Dynamic directional-light shadows are disabled on mobile.
 - Rendering and the editor's custom update work are paused while the document is hidden; rendering is re-enabled when the user returns.
-- A GitHub Actions workflow parses the engine JavaScript and checks these safeguards.
+- A GitHub Actions workflow installs the locked dependencies, builds the full web app, runs the existing unit tests, parses the Forge engine JavaScript, and checks that the mobile safeguards remain present.
 
-Verification: the `Forge Eye cloud-first safety checks` workflow completed successfully for commit `77d1c1fbec1da1889c8e979b926be1a93f20cfea`. This verifies syntax and the presence of the safeguards; it is not a full browser/device test, and the separate Forge Eye AI chat app is still not confirmed live.
+Verification: the latest `Forge Eye cloud-first safety checks` workflow completed successfully for commit `56fd95a429b533cdbd2f6b02f0eb496ae1928172`. Dependency installation, full application build, existing unit tests, JavaScript syntax check, and mobile-safeguard checks all passed. This still does not replace a real-device thermal/FPS test, and the separate Forge Eye AI chat app is not yet confirmed live.
