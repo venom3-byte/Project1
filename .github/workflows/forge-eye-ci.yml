@@ -6,8 +6,12 @@ on:
       - forge-eye-cloud-first
     paths:
       - "public/forge/**"
+      - "src/routes/api/**"
+      - "src/lib/forge-eye-api.ts"
       - "server/api/forge-eye/**"
       - "scripts/check-forge-eye.mjs"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/forge-eye-ci.yml"
   pull_request:
     paths:
