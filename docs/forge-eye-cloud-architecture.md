@@ -52,3 +52,16 @@ A mobile-first Arabic/RTL workspace that combines:
 - No API key is returned to the browser.
 - Missing credentials produce an honest setup message, not simulated AI output.
 - The app remains usable on a phone with reduced viewport quality.
+
+
+## Implemented on this branch — 2026-10-21
+
+The active Forge static editor at `public/forge/index.html` loads `public/forge/forge-engine.js`. A mobile resource-safety change was committed to `forge-eye-cloud-first`:
+
+- Mobile/touch devices request the browser's low-power graphics preference and disable antialiasing.
+- The engine caps mobile device pixel ratio at 1 and desktop at 1.5.
+- Dynamic directional-light shadows are disabled on mobile.
+- Rendering and the editor's custom update work are paused while the document is hidden; rendering is re-enabled when the user returns.
+- A GitHub Actions workflow parses the engine JavaScript and checks these safeguards.
+
+Verification: the `Forge Eye cloud-first safety checks` workflow completed successfully for commit `77d1c1fbec1da1889c8e979b926be1a93f20cfea`. This verifies syntax and the presence of the safeguards; it is not a full browser/device test, and the separate Forge Eye AI chat app is still not confirmed live.
