@@ -21,7 +21,12 @@ const pageErrors = [];
 const consoleErrors = [];
 page.on("pageerror", error => pageErrors.push(String(error?.stack || error)));
 page.on("console", message => {
-  if (message.type() === "error") consoleErrors.push(message.text().slice(0, 500));
+  // Chromium reports handled HTTP 4xx/5xx fetch responses as resource errors.
+  // The smoke test intentionally requests an unconfigured provider (503), so
+  // route assertions validate those responses while this list tracks JS errors.
+  if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+    consoleErrors.push(message.text().slice(0, 500));
+  }
 });
 
 try {
