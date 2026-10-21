@@ -4,28 +4,38 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const html = readFileSync("public/forge/ai-studio.html", "utf8");
-const chat = readFileSync("server/api/forge-eye/chat.post.mjs", "utf8");
-const status = readFileSync("server/api/forge-eye/status.get.mjs", "utf8");
-const gemini = readFileSync("server/api/forge-eye/gemini.post.mjs", "utf8");
+const api = readFileSync("src/lib/forge-eye-api.ts", "utf8");
+const statusRoute = readFileSync("src/routes/api/forge-eye/status.ts", "utf8");
+const chatRoute = readFileSync("src/routes/api/forge-eye/chat.ts", "utf8");
+const geminiRoute = readFileSync("src/routes/api/forge-eye/gemini.ts", "utf8");
+const combined = [html, api, statusRoute, chatRoute, geminiRoute].join("\n");
+
 const required = [
   ["Arabic right-to-left UI", /<html lang="ar" dir="rtl">/],
   ["actual Three.js module", /importmap/],
   ["transform controls", /TransformControls/],
-  ["mobile reduced rendering", /powerPreference:"low-power"/],
-  ["pause while hidden", /visibilitychange/],
-  ["local project save", /forge-eye-scene-v1/],
-  ["server-side provider key", /process\.env\.DEEPSEEK_API_KEY/],
-  ["Gemini server-side key", /process\.env\.GEMINI_API_KEY/],
-  ["Gemini official model endpoint", /generateContent/],
-  ["provider selector", /providerSelect/],
-  ["truthful unconfigured status", /AI_NOT_CONFIGURED/]
+  ["mobile low-power graphics", /powerPreference:"low-power"/],
+  ["pause drawing while hidden", /visibilitychange/],
+  ["local scene saving", /forge-eye-scene-v1/],
+  ["real material factory invocation", /const makeMaterial=materialDefs\[mat\]\|\|materialDefs\.plastic;const o=new THREE\.Mesh\(geometryFor\(kind\),makeMaterial\(\)\)/],
+  ["DeepSeek is the default provider", /<option value="deepseek" selected>DeepSeek<\/option>/],
+  ["server-side DeepSeek key", /process\.env\.DEEPSEEK_API_KEY/],
+  ["server-side Gemini key", /process\.env\.GEMINI_API_KEY/],
+  ["official Gemini generateContent API", /generateContent/],
+  ["TanStack status route", /createFileRoute\("\/api\/forge-eye\/status"\)/],
+  ["TanStack DeepSeek chat route", /createFileRoute\("\/api\/forge-eye\/chat"\)/],
+  ["TanStack Gemini chat route", /createFileRoute\("\/api\/forge-eye\/gemini"\)/],
+  ["payload-size limit", /BODY_TOO_LARGE/],
+  ["truthful not-configured response", /AI_NOT_CONFIGURED/],
+  ["Higgsfield disconnected until verified", /not-connected/]
 ];
-const combinedSource = [html, chat, status, gemini].join("\n");
+
 for (const [label, pattern] of required) {
-  if (!pattern.test(combinedSource)) {
+  if (!pattern.test(combined)) {
     throw new Error("Forge Eye check failed: " + label);
   }
 }
+
 const blocks = [...html.matchAll(/<script\s+type="module"\s*>([\s\S]*?)<\/script>/g)];
 if (!blocks.length) throw new Error("No executable JavaScript module found in the AI Studio HTML.");
 const dir = mkdtempSync(join(tmpdir(), "forge-eye-check-"));
@@ -39,4 +49,4 @@ try {
 } finally {
   rmSync(dir, { recursive: true, force: true });
 }
-console.log("Forge Eye static checks passed: required features found and inline module parses.");
+console.log("Forge Eye static checks passed: provider routes, server-side credentials, mobile safeguards, material creation, and inline JavaScript syntax.");
