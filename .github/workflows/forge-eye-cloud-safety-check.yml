@@ -27,7 +27,7 @@ permissions:
   contents: read
 
 jobs:
-  mobile-safety-and-build:
+  mobile-safety-build-browser-smoke:
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
@@ -37,7 +37,7 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
-      - name: Install locked dependencies
+      - name: Install locked application dependencies
         run: npm ci
       - name: Build the full web app
         run: npm run build
@@ -64,3 +64,30 @@ jobs:
           }
           console.log('All phone-safety safeguards are present.');
           NODE
+      - name: Install browser smoke-test dependencies
+        run: npm install --prefix mcp --no-package-lock
+      - name: Start production preview
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 --strictPort > /tmp/forge-preview.log 2>&1 &
+          echo $! > /tmp/forge-preview.pid
+          for attempt in $(seq 1 45); do
+            if curl --fail --silent http://127.0.0.1:4173/ > /dev/null; then
+              echo "Production preview is responding."
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/forge-preview.log
+          exit 1
+      - name: Run real Chromium desktop and mobile smoke test
+        run: node mcp/forge-port-smoke.mjs
+        env:
+          FORGE_PORT_URL: http://127.0.0.1:4173/
+          FORGE_PORT_ARTIFACTS: artifacts/forge-port
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-eye-browser-smoke
+          path: artifacts/forge-port/
+          if-no-files-found: warn
