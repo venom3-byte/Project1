@@ -37,6 +37,7 @@ jobs:
       - name: Check API route syntax
         run: |
           node --check server/api/forge-eye/chat.post.mjs
+          node --check server/api/forge-eye/gemini.post.mjs
           node --check server/api/forge-eye/status.get.mjs
       - name: Check AI Studio client
         run: node scripts/check-forge-eye.mjs
