@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1118">
+  <meta name="description" content="أداة Forge مخصصة لتوليد مجسمات ثلاثية الأبعاد من الصور باستخدام Hunyuan3D-2.1.">
+  <title>Forge Hunyuan3D Studio</title>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.0.0/dist/model-viewer.min.js"></script>
+  <style>
+    :root{color-scheme:dark;--bg:#0b1118;--panel:#111b25;--panel2:#162330;--line:#2a3a49;--text:#eef4f7;--muted:#a7b6c2;--accent:#58dfbf;--accent2:#b6f7e7;--warn:#f2c879;--danger:#ff8f92}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(ellipse at 80% -10%,#1a3740 0,transparent 45%),var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Tahoma,Arial,sans-serif;line-height:1.6}
+    a{color:inherit}.shell{width:min(1220px,100% - 24px);margin:auto}
+    header{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 0;border-bottom:1px solid #ffffff14}
+    .brand{display:flex;align-items:center;gap:11px;font-weight:800}.mark{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:linear-gradient(145deg,#7bf0d2,#31a994);color:#06231e;font-size:14px;font-weight:900}
+    .brand small{display:block;color:var(--muted);font-size:10px;font-weight:700;letter-spacing:1.5px}.header-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .status{display:inline-flex;align-items:center;gap:8px;border:1px solid #3b675c;background:#102721;padding:7px 11px;border-radius:999px;font-size:11px;color:#baf7e7;white-space:nowrap}
+    .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px #58dfbf18}.dot.busy{background:var(--warn)}.dot.off{background:#7f8c96}
+    .hero{padding:32px 0 20px;display:grid;grid-template-columns:1.2fr .8fr;gap:22px;align-items:center}
+    .eyebrow{color:var(--accent);font-size:11px;font-weight:850;letter-spacing:1.4px;text-transform:uppercase}
+    h1{font-size:clamp(30px,4.5vw,50px);line-height:1.14;letter-spacing:-1.2px;margin:10px 0 13px}
+    .lead{color:var(--muted);font-size:14px;max-width:760px;margin:0}.hero-card{background:linear-gradient(150deg,#1a2e39,#101923);border:1px solid #324651;border-radius:18px;padding:18px}
+    .hero-card strong{font-size:18px}.hero-card p{color:var(--muted);font-size:12px;margin:6px 0 0}
+    .pills{display:flex;gap:7px;flex-wrap:wrap;margin-top:13px}.pill{font-size:10px;border:1px solid #ffffff17;border-radius:999px;padding:4px 8px;color:#d6e4e9;background:#ffffff05}
+    .notice{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;background:#2a2416;border:1px solid #55482d;border-radius:12px;color:#ead8a9;font-size:12px;margin:0 0 18px}
+    .notice strong{color:#fff1c7}.notice.info{background:#102320;border-color:#285247;color:#c6eee3}.notice.error{background:#2b181b;border-color:#663238;color:#ffc2c6}
+    .grid{display:grid;grid-template-columns:minmax(300px,.83fr) minmax(0,1.17fr);gap:15px;align-items:start}
+    .card{background:linear-gradient(180deg,#121d28,#101822);border:1px solid var(--line);border-radius:16px;overflow:hidden;min-width:0}
+    .card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line);background:#ffffff03}
+    .card-head h2{font-size:14px;margin:0}.card-head span{font-size:10px;color:var(--muted)}.card-body{padding:15px}
+    .dropzone{border:1.5px dashed #486273;background:#0d151e;border-radius:13px;min-height:194px;display:flex;align-items:center;justify-content:center;text-align:center;position:relative;overflow:hidden;cursor:pointer;padding:12px}
+    .dropzone.dragover{border-color:var(--accent);background:#102720}.dropzone.has-image{border-style:solid}
+    .dropzone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:2}
+    .drop-inner{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;max-width:100%}
+    .upload-icon{font-size:28px;color:var(--accent);line-height:1}.drop-inner b{font-size:13px}.drop-inner small{font-size:11px;color:var(--muted)}
+    #sourcePreview{max-width:100%;max-height:255px;object-fit:contain;border-radius:9px;display:none}
+    .file-meta{display:none;color:var(--muted);font-size:10px;margin-top:9px;overflow-wrap:anywhere}
+    .label{display:block;color:#d3dfe6;font-size:11px;font-weight:750;margin:14px 0 6px}
+    select,input[type=number]{display:block;width:100%;background:#0b131c;color:var(--text);border:1px solid #344858;border-radius:9px;padding:10px;font:inherit;font-size:12px;min-height:40px;outline:none}
+    select:focus,input:focus{border-color:var(--accent);box-shadow:0 0 0 2px #58dfbf20}
+    .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.check{display:flex;gap:9px;align-items:center;margin-top:13px;color:#d5e0e6;font-size:11px}
+    .check input{accent-color:var(--accent);width:16px;height:16px}
+    .subhint{font-size:10px;color:var(--muted);margin-top:5px}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 14px;border-radius:10px;border:1px solid transparent;text-decoration:none;font:inherit;font-weight:800;font-size:12px;cursor:pointer;transition:transform .15s,background .15s}
+    .btn:hover{transform:translateY(-1px)}.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+    .primary{background:var(--accent);color:#06221d}.secondary{background:#ffffff08;border-color:var(--line);color:var(--text)}
+    .wide{width:100%;margin-top:15px}.actions{display:flex;gap:8px;flex-wrap:wrap}.actions .btn{flex:1}
+    .queue-line{display:flex;align-items:center;gap:9px;margin-top:12px;color:var(--muted);font-size:11px}
+    .spinner{display:none;width:14px;height:14px;border:2px solid #7d948f;border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}
+    .spinner.on{display:inline-block}@keyframes spin{to{transform:rotate(360deg)}}
+    .result-screen{min-height:360px;background:radial-gradient(ellipse at 50% 40%,#1b303b 0,transparent 65%),#0b121a;display:flex;align-items:center;justify-content:center;position:relative;padding:12px}
+    model-viewer{display:none;width:100%;height:410px;background:transparent;--poster-color:transparent}
+    .empty-state{text-align:center;color:var(--muted);max-width:260px;padding:25px}.empty-icon{font-size:42px;color:#5f7783}.empty-state b{display:block;color:#d6e2e8;margin:8px 0;font-size:13px}.empty-state p{font-size:11px;margin:0}
+    .result-badge{position:absolute;top:13px;right:13px;z-index:1;border:1px solid #385649;background:#10271f;color:#c2f4e5;border-radius:999px;padding:5px 9px;font-size:10px;display:none}
+    .result-actions{padding:12px 14px;display:none;border-top:1px solid var(--line);gap:8px;flex-wrap:wrap}.result-actions .btn{flex:1}
+    .stats{padding:12px 14px;border-top:1px solid var(--line);display:none}.stats-head{font-size:11px;font-weight:800;margin-bottom:9px}.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+    .stat{background:#0b131c;border:1px solid #243746;border-radius:10px;padding:9px;min-width:0}.stat span{display:block;color:var(--muted);font-size:9px}.stat b{display:block;font-size:15px;overflow-wrap:anywhere}
+    .export-options{padding:13px 14px;border-top:1px solid var(--line);display:none}.export-options h3{margin:0 0 5px;font-size:12px}.export-options .subhint{margin-bottom:8px}
+    .footer{border-top:1px solid #ffffff14;padding:16px 0 24px;color:#8899a7;font-size:10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:24px}
+    .footer a{color:#b8c9d2;text-decoration:none}.small-link{font-size:10px;color:#9ab7c4;display:inline-block;margin-top:12px}
+    @media(max-width:850px){.hero{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.result-screen{min-height:300px}model-viewer{height:350px}}
+    @media(max-width:520px){.shell{width:calc(100% - 16px)}header{align-items:flex-start;flex-direction:column}.header-actions{width:100%;justify-content:space-between}.hero{padding-top:23px}h1{font-size:31px}.two{gap:8px}.card-body{padding:12px}.result-screen{min-height:270px}model-viewer{height:310px}.btn{min-height:41px;padding:0 10px;font-size:11px}.stats-grid{grid-template-columns:repeat(3,1fr)}}
+    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{transition:none!important;animation-duration:.001ms!important}}
+  </style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <div class="brand">
+      <div class="mark">H3D</div>
+      <div>Forge Hunyuan3D Studio<small>IMAGE TO 3D · CONNECTED TO HUNYUAN</small></div>
+    </div>
+    <div class="header-actions">
+      <div class="status" id="connectionBadge" role="status"><span class="dot off" id="connectionDot"></span><span id="connectionText">لم يتم الاتصال بعد</span></div>
+      <a class="btn secondary" href="https://huggingface.co/spaces/tencent/Hunyuan3D-2.1" target="_blank" rel="noopener noreferrer">النموذج الأصلي ↗</a>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div>
+      <div class="eyebrow">Forge asset pipeline</div>
+      <h1>من الصورة إلى أصل ثلاثي الأبعاد قابل للتنزيل</h1>
+      <p class="lead">هذه أداة خاصة ضمن Forge تستدعي واجهة Hunyuan3D-2.1 عبر Gradio API مباشرة، بدل عرض صفحة النموذج داخل إطار. اختر الصورة واضبط الإعدادات ثم ولّد المجسم ونزّل الملف الناتج.</p>
+      <div class="pills"><span class="pill">رفع صورة مباشر</span><span class="pill">إزالة خلفية اختيارية</span><span class="pill">معاينة تفاعلية</span><span class="pill">GLB / OBJ</span></div>
+    </div>
+    <aside class="hero-card">
+      <div class="eyebrow">Backend</div>
+      <strong>Tencent Hunyuan3D-2.1</strong>
+      <p>يتم تنفيذ التوليد على مساحة Hugging Face العامة التابعة لـ Tencent، بينما الواجهة والإعدادات هنا ضمن Forge. ازدحام الخادم وحدود GPU الخارجية قد تؤثر في وقت الانتظار والتوافر.</p>
+    </aside>
+  </section>
+
+  <div class="notice info" role="note">
+    <span>ⓘ</span>
+    <div><strong>حول الخصوصية والتكلفة:</strong> لا تحتاج الأداة إلى إدخال مفتاح API. تُرفع الصورة التي تختارها إلى خدمة Hunyuan العامة لمعالجتها؛ لا ترفع صورًا خاصة أو حساسة. استخدام مساحة عامة قد يخضع للانتظار أو حدود الموارد، وليس ضمانًا لتوليد مجاني بلا حدود.</div>
+  </div>
+
+  <main class="grid">
+    <section class="card">
+      <div class="card-head"><h2>١. الصورة والإعدادات</h2><span>INPUT</span></div>
+      <div class="card-body">
+        <label class="label" for="imageInput">الصورة المرجعية</label>
+        <div class="dropzone" id="dropzone">
+          <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp" aria-label="اختر صورة مرجعية">
+          <div class="drop-inner" id="dropPrompt">
+            <div class="upload-icon">＋</div>
+            <b>اضغط لاختيار صورة أو اسحبها هنا</b>
+            <small>PNG أو JPG أو WebP · حد 15 ميغابايت</small>
+            <small>صورة واحدة واضحة للجسم كاملًا تعطي أفضل نقطة بداية</small>
+          </div>
+          <img id="sourcePreview" alt="معاينة الصورة المرجعية">
+        </div>
+        <div class="file-meta" id="fileMeta"></div>
+
+        <label class="label" for="genMode">طريقة الإنشاء</label>
+        <select id="genMode">
+          <option value="shape" selected>مجسم هندسي فقط — أسرع وأقل استهلاكًا</option>
+          <option value="textured">مجسم مع خامات PBR — يحتاج موارد ووقتًا أكثر</option>
+        </select>
+        <div class="subhint" id="modeHint">سيُنشأ مجسم أولي يمكن تنزيله كملف GLB.</div>
+
+        <div class="two">
+          <div>
+            <label class="label" for="steps">سرعة / جودة التوليد</label>
+            <select id="steps">
+              <option value="5" selected>Turbo · 5 خطوات</option>
+              <option value="10">Fast · 10 خطوات</option>
+              <option value="30">Standard · 30 خطوة</option>
+            </select>
+          </div>
+          <div>
+            <label class="label" for="resolution">دقة الشبكة</label>
+            <select id="resolution">
+              <option value="256" selected>256 · متوازنة</option>
+              <option value="384">384 · أعلى</option>
+              <option value="512">512 · ثقيلة</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="two">
+          <div>
+            <label class="label" for="guidance">Guidance scale</label>
+            <input id="guidance" type="number" min="1" max="20" step="0.5" value="5">
+          </div>
+          <div>
+            <label class="label" for="seed">Seed</label>
+            <input id="seed" type="number" min="0" max="10000000" step="1" value="1234">
+          </div>
+        </div>
+        <label class="check"><input id="removeBg" type="checkbox" checked> إزالة خلفية الصورة قبل التوليد</label>
+        <label class="check"><input id="randomSeed" type="checkbox" checked> اختيار Seed عشوائي كل مرة</label>
+        <div class="notice" style="margin-top:13px;margin-bottom:0;font-size:10px">
+          <span>⚙</span>
+          <div>ارفع الدقة تدريجيًا. إذا أخفق الخادم أو انتهت مهلة GPU، جرّب Turbo ودقة 256 ثم أعد المحاولة.</div>
+        </div>
+        <button class="btn primary wide" id="generateBtn" disabled>◇ إنشاء المجسم باستخدام Hunyuan3D</button>
+        <div class="actions" style="margin-top:8px">
+          <button class="btn secondary" id="connectBtn">اختبار الاتصال</button>
+          <button class="btn secondary" id="resetBtn">إعادة الضبط</button>
+        </div>
+        <div class="queue-line"><span class="spinner" id="spinner"></span><span id="statusText">اختر صورة ثم اتصل بالخدمة لبدء التوليد.</span></div>
+        <div class="notice info" id="alternativeBox" style="display:none;margin-top:12px;margin-bottom:0">
+          <span>↗</span>
+          <div>
+            <strong>خدمة Hunyuan لم تكمل الطلب — خيارات بلا حصة GPU سحابية</strong>
+            <div style="margin-top:4px">للتوليد المتكرر بلا عدّاد سحابي، استخدم نموذجًا يعمل محليًا على جهازك. هذا يتجنب حصص خوادم التوليد، لكنه يعتمد على قدرة جهازك، وقد تختلف جودة النتيجة.</div>
+            <div class="actions" style="margin-top:10px">
+              <a class="btn primary" href="https://play.google.com/store/apps/details?id=com.basitce.mobai_assist" target="_blank" rel="noopener noreferrer">Android · Image to 3D Model · TripoSR</a>
+              <a class="btn secondary" href="https://github.com/skyiron/modly3D/releases" target="_blank" rel="noopener noreferrer">Windows / Linux · Modly · محلي ومفتوح المصدر</a>
+            </div>
+            <div class="subhint" style="margin-top:8px">تطبيق Android يعالج الصور محليًا ويُصدر OBJ، لكن Google Play يشير إلى وجود مشتريات داخل التطبيق؛ تحقق من أن ميزتك المطلوبة لا تطلب دفعًا. Modly يعمل على الحاسوب باستخدام موارده المحلية ويتطلب تنزيل النماذج، ولذلك لا يعتمد على حصص GPU سحابية.</div>
+            <div style="margin-top:12px;font-weight:800;font-size:11px">خيارات سحابية مجانية لكنها محدودة الحصة</div>
+            <div class="actions" style="margin-top:8px">
+              <a class="btn secondary" href="https://3dvalley.com/tools/create/image-to-3d" target="_blank" rel="noopener noreferrer">3D Valley · TRELLIS.2</a>
+              <a class="btn secondary" href="https://upsampler.com/free-image-to-3d-no-signup" target="_blank" rel="noopener noreferrer">Upsampler · Stable Fast 3D</a>
+            </div>
+            <div class="subhint" style="margin-top:8px">نزّل الناتج بصيغة OBJ أو GLB ثم استورده إلى Forge. لا توجد حاليًا خدمة سحابية مجانية أستطيع أن أضمن لك أنها غير محدودة دائمًا.</div>
+          </div>
+        </div>
+        <a class="small-link" href="https://huggingface.co/spaces/tencent/Hunyuan3D-2.1" target="_blank" rel="noopener noreferrer">إذا كانت الخدمة غير متاحة، افتح واجهة Tencent الرسمية ↗</a>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>٢. النتيجة والمعاينة</h2><span id="resultMode">NO OUTPUT</span></div>
+      <div class="result-screen">
+        <div class="result-badge" id="resultBadge">تم إنشاء المجسم</div>
+        <div class="empty-state" id="emptyState">
+          <div class="empty-icon">⬡</div>
+          <b>سيظهر المجسم هنا</b>
+          <p>بعد اكتمال التوليد، اسحب المجسم في المعاينة لتدويره واستخدم التكبير لفحص الشكل.</p>
+        </div>
+        <model-viewer id="modelViewer" camera-controls auto-rotate shadow-intensity="1" exposure="1" interaction-prompt="auto" alt="المجسم ثلاثي الأبعاد الناتج"></model-viewer>
+      </div>
+      <div class="result-actions" id="resultActions">
+        <a class="btn primary" id="rawDownload" href="#" target="_blank" rel="noopener noreferrer">تنزيل المجسم الأولي</a>
+        <a class="btn secondary" id="openFile" href="#" target="_blank" rel="noopener noreferrer">فتح الملف ↗</a>
+      </div>
+      <div class="stats" id="statsPanel">
+        <div class="stats-head">إحصاءات التوليد</div>
+        <div class="stats-grid">
+          <div class="stat"><span>عدد الوجوه</span><b id="faceCount">—</b></div>
+          <div class="stat"><span>عدد الرؤوس</span><b id="vertexCount">—</b></div>
+          <div class="stat"><span>Seed الناتج</span><b id="actualSeed">—</b></div>
+        </div>
+        <div class="subhint" id="timingInfo"></div>
+      </div>
+      <div class="export-options" id="exportOptions">
+        <h3>إعداد الملف النهائي</h3>
+        <div class="subhint">يمكنك طلب تصدير جديد مع تبسيط الشبكة. GLB هو الخيار المفضل لمعظم محركات الألعاب الحديثة.</div>
+        <div class="two">
+          <div>
+            <label class="label" for="exportType">صيغة التنزيل</label>
+            <select id="exportType"><option value="glb" selected>GLB — موصى به للألعاب</option><option value="obj">OBJ — شبكة ثلاثية الأبعاد</option></select>
+          </div>
+          <div>
+            <label class="label" for="targetFaces">الوجوه المستهدفة</label>
+            <input id="targetFaces" type="number" min="1000" max="1000000" step="1000" value="10000">
+          </div>
+        </div>
+        <label class="check"><input id="simplify" type="checkbox"> تبسيط الشبكة لتخفيفها للألعاب</label>
+        <button class="btn secondary wide" id="exportBtn">تجهيز ملف التنزيل النهائي</button>
+        <a class="btn primary wide" id="finalDownload" href="#" target="_blank" rel="noopener noreferrer" style="display:none">تنزيل الملف النهائي</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>Forge Hunyuan3D Studio · واجهة مستقلة غير رسمية</span>
+    <span><a href="https://github.com/Tencent-Hunyuan/Hunyuan3D-2.1" target="_blank" rel="noopener noreferrer">الكود الرسمي</a> · <a href="https://huggingface.co/spaces/tencent/Hunyuan3D-2.1" target="_blank" rel="noopener noreferrer">خدمة التوليد</a></span>
+  </footer>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  const BASE = 'https://tencent-hunyuan3d-2-1.hf.space';
+  const FALLBACK_BASE = 'https://tencent-hunyuan3d-2mini-turbo.hf.space';
+  const CLIENT_URL = 'https://cdn.jsdelivr.net/npm/@gradio/client@2.7.1/dist/index.min.js';
+  const FALLBACK_CLIENT_URL = 'https://cdn.jsdelivr.net/npm/@gradio/client@0.20.1/dist/index.min.js';
+  let gradioModulePromise = null;
+  let fallbackGradioModulePromise = null;
+  let client = null;
+  let fallbackClient = null;
+  let activeBackend = BASE;
+  let fallbackHasExport = false;
+  let handleFile = null;
+  let fallbackHandleFile = null;
+  let selectedFile = null;
+  let generatedFiles = null;
+  let isBusy = false;
+
+  const $ = (id) => document.getElementById(id);
+  const fileInput = $('imageInput');
+  const dropzone = $('dropzone');
+  const sourcePreview = $('sourcePreview');
+  const dropPrompt = $('dropPrompt');
+
+  function status(message, type) {
+    $('statusText').textContent = message;
+    const dot = $('connectionDot');
+    dot.className = 'dot' + (type === 'busy' ? ' busy' : type === 'off' ? ' off' : '');
+    $('connectionText').textContent = type === 'ok' ? 'متصل بـ Hunyuan3D' : type === 'busy' ? 'جارٍ الاتصال أو المعالجة' : 'الخدمة غير متصلة';
+  }
+  function setBusy(value) {
+    isBusy = value;
+    $('spinner').classList.toggle('on', value);
+    $('generateBtn').disabled = value || !selectedFile;
+    $('connectBtn').disabled = value;
+    $('exportBtn').disabled = value || !generatedFiles;
+    if (value) status($('statusText').textContent, 'busy');
+    else if (!client) status($('statusText').textContent, 'off');
+    else status($('statusText').textContent, 'ok');
+  }
+  function readableError(error) {
+    let message = error && (error.message || String(error)) || 'خطأ غير معروف';
+    if (/failed to fetch|networkerror|network error|cors|fetch/i.test(message)) {
+      return 'تعذر الوصول إلى واجهة Hunyuan API. قد يكون اتصال CDN أو خادم Hugging Face محجوبًا مؤقتًا. افتح النموذج الرسمي من رابط الصفحة أو جرّب مجددًا.';
+    }
+    if (/not running|sleep|starting|build/i.test(message)) {
+      return 'مساحة Hunyuan قد تكون نائمة أو قيد التشغيل. انتظر قليلًا ثم أعد اختبار الاتصال.';
+    }
+    return message.slice(0, 320);
+  }
+  async function loadGradioClient() {
+    if (!gradioModulePromise) gradioModulePromise = import(CLIENT_URL);
+    return await gradioModulePromise;
+  }
+  async function loadFallbackGradioClient() {
+    if (!fallbackGradioModulePromise) fallbackGradioModulePromise = import(FALLBACK_CLIENT_URL);
+    return await fallbackGradioModulePromise;
+  }
+  async function connectFallback() {
+    if (fallbackClient) { activeBackend = FALLBACK_BASE; return fallbackClient; }
+    const lib = await loadFallbackGradioClient();
+    status('المسار الأساسي رفض وقت GPU؛ جارٍ الاتصال بعميل Gradio المتوافق مع مساحة Hunyuan3D-2mini-Turbo…', 'busy');
+    // Tencent Turbo Space runs Gradio 4.44.1; use its compatible client API.
+    fallbackClient = await lib.Client.connect(FALLBACK_BASE);
+    fallbackHandleFile = lib.handle_file;
+    fallbackHasExport = false;
+    activeBackend = FALLBACK_BASE;
+    return fallbackClient;
+  }
+  async function connect() {
+    if (client) { activeBackend = BASE; return client; }
+    status('جارٍ الاتصال بعنوان واجهة Hunyuan3D مباشرة…', 'busy');
+    $('connectBtn').textContent = 'جارٍ الاتصال…';
+    try {
+      const lib = await loadGradioClient();
+      handleFile = lib.handle_file;
+      client = await lib.Client.connect(BASE, { events: ['data', 'status'] });
+      const api = await client.view_api();
+      const endpoints = api && api.named_endpoints ? api.named_endpoints : {};
+      if (!endpoints['/shape_generation'] || !endpoints['/on_export_click']) {
+        client = null;
+        throw new Error('لم يعثر الاتصال على واجهتي shape_generation وon_export_click في مساحة النموذج.');
+      }
+      activeBackend = BASE;
+      status('تم الاتصال. ارفع صورة للبدء.', 'ok');
+      $('connectBtn').textContent = 'متصل ✓';
+      $('generateBtn').disabled = !selectedFile;
+      return client;
+    } catch (error) {
+      client = null;
+      $('connectBtn').textContent = 'إعادة اختبار الاتصال';
+      status(readableError(error), 'off');
+      throw error;
+    }
+  }
+  async function runFallbackJob(endpoint, payload, label, api) {
+    status(label + ' — يجري إرسال الطلب إلى مساحة Turbo…', 'busy');
+    const response = await api.predict(endpoint, payload);
+    const data = response && Array.isArray(response.data) ? response.data : (Array.isArray(response) ? response : null);
+    if (!data || !data.length) throw new Error('استجاب نموذج Turbo دون بيانات نتيجة قابلة للتنزيل.');
+    return data;
+  }
+  async function runJob(endpoint, payload, label, clientOverride = null) {
+    const api = clientOverride || await connect();
+    status(label + ' — جارٍ إرسال الطلب إلى قائمة الانتظار…', 'busy');
+    const job = api.submit(endpoint, payload);
+    let result = null;
+    for await (const message of job) {
+      if (message.type === 'status') {
+        const detail = message.status || message;
+        const stage = detail.stage || detail.status || '';
+        if (stage === 'pending') {
+          const position = Number.isFinite(detail.position) ? ' · ترتيبك ' + (detail.position + 1) : '';
+          status(label + ' — في الانتظار' + position, 'busy');
+        } else if (stage === 'generating') {
+          const progress = Array.isArray(detail.progress_data) && detail.progress_data[0] && Number.isFinite(detail.progress_data[0].progress)
+            ? ' · ' + Math.round(detail.progress_data[0].progress * 100) + '%' : '';
+          status(label + ' — يجري تنفيذ النموذج' + progress, 'busy');
+        } else if (stage === 'error' || detail.success === false) {
+          throw new Error(detail.message || 'أعاد خادم النموذج حالة خطأ.');
+        }
+      } else if (message.type === 'data') {
+        result = message.data;
+      }
+    }
+    if (!Array.isArray(result) || result.length === 0) throw new Error('انتهى الطلب دون بيانات نتيجة قابلة للاستخدام.');
+    return result;
+  }
+  function unwrapUpdate(value) {
+    while (value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, 'value') && (value.__type__ === 'update' || value.interactive !== undefined)) value = value.value;
+    return value;
+  }
+  function resolveFileUrl(file, base = BASE) {
+    file = unwrapUpdate(file);
+    if (!file) return '';
+    if (typeof file === 'string') {
+      if (/^https?:\/\//i.test(file)) return file;
+      if (file.startsWith('/file=')) return base + file;
+      if (file.startsWith('/tmp/')) return base + '/file=' + file;
+      if (file.startsWith('tmp/')) return base + '/file=/' + file;
+      return '';
+    }
+    if (typeof file.url === 'string' && file.url) {
+      if (/^https?:\/\//i.test(file.url)) return file.url;
+      return base + (file.url.startsWith('/') ? file.url : '/' + file.url);
+    }
+    return resolveFileUrl(file.path || '', base);
+  }
+  function setDownload(anchor, file, name, base = BASE) {
+    const url = resolveFileUrl(file, base);
+    if (!url) {
+      anchor.style.display = 'none';
+      return false;
+    }
+    anchor.href = url;
+    anchor.setAttribute('download', name || file.orig_name || 'hunyuan3d-output.glb');
+    anchor.style.display = 'inline-flex';
+    return true;
+  }
+  function setStats(stats, seed) {
+    const mesh = stats && stats.number_of_faces !== undefined ? stats : {};
+    $('faceCount').textContent = mesh.number_of_faces !== undefined ? Number(mesh.number_of_faces).toLocaleString('en-US') : '—';
+    $('vertexCount').textContent = mesh.number_of_vertices !== undefined ? Number(mesh.number_of_vertices).toLocaleString('en-US') : '—';
+    $('actualSeed').textContent = seed !== undefined && seed !== null ? String(seed) : '—';
+    const times = mesh.time || {};
+    const total = times.total;
+    $('timingInfo').textContent = Number.isFinite(total) ? 'وقت التوليد حسب الخادم: ' + total.toFixed(1) + ' ثانية.' : '';
+    $('statsPanel').style.display = 'block';
+  }
+  function showModel(file, textured, base = BASE) {
+    const url = resolveFileUrl(file, base);
+    $('emptyState').style.display = url ? 'none' : 'block';
+    const viewer = $('modelViewer');
+    if (url && /\.glb(?:$|[?#])/i.test(url)) {
+      viewer.src = url;
+      viewer.style.display = 'block';
+      $('openFile').href = url;
+      $('openFile').style.display = 'inline-flex';
+      $('resultMode').textContent = textured ? 'PBR TEXTURED' : 'GEOMETRY';
+      $('resultBadge').style.display = 'inline-flex';
+      $('resultActions').style.display = 'flex';
+      setDownload($('rawDownload'), file, file?.orig_name || file?.name || (textured ? 'hunyuan3d-textured.glb' : 'hunyuan3d-mesh.glb'), base);
+    } else if (url) {
+      viewer.style.display = 'none';
+      $('openFile').href = url;
+      $('openFile').style.display = 'inline-flex';
+      $('resultMode').textContent = 'MESH READY';
+      $('resultActions').style.display = 'flex';
+      setDownload($('rawDownload'), file, textured ? 'hunyuan3d-textured.glb' : 'hunyuan3d-mesh.glb');
+    } else {
+      viewer.style.display = 'none';
+      $('resultMode').textContent = 'OUTPUT';
+      $('resultActions').style.display = 'none';
+    }
+  }
+  function formatBytes(n) {
+    if (!Number.isFinite(n)) return '';
+    return n > 1024 * 1024 ? (n / (1024 * 1024)).toFixed(2) + ' MB' : (n / 1024).toFixed(0) + ' KB';
+  }
+  function setFile(file) {
+    if (!file) return;
+    if (!file.type || !file.type.startsWith('image/')) {
+      status('اختر ملف صورة فقط.', 'off');
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      status('حجم الصورة أكبر من 15 ميغابايت. صغّرها ثم أعد الرفع.', 'off');
+      return;
+    }
+    selectedFile = file;
+    sourcePreview.src = URL.createObjectURL(file);
+    sourcePreview.style.display = 'block';
+    dropPrompt.style.display = 'none';
+    dropzone.classList.add('has-image');
+    $('fileMeta').textContent = file.name + ' · ' + formatBytes(file.size);
+    $('fileMeta').style.display = 'block';
+    $('generateBtn').disabled = isBusy;
+    status('الصورة جاهزة. اختبر الاتصال أو ابدأ التوليد.', client ? 'ok' : 'off');
+  }
+  fileInput.addEventListener('change', () => setFile(fileInput.files && fileInput.files[0]));
+  ['dragenter','dragover'].forEach(name => dropzone.addEventListener(name, e => {
+    e.preventDefault(); dropzone.classList.add('dragover');
+  }));
+  ['dragleave','drop'].forEach(name => dropzone.addEventListener(name, e => {
+    e.preventDefault(); dropzone.classList.remove('dragover');
+  }));
+  dropzone.addEventListener('drop', e => {
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (file) setFile(file);
+  });
+  $('genMode').addEventListener('change', () => {
+    const textured = $('genMode').value === 'textured';
+    $('modeHint').textContent = textured
+      ? 'سيتم استدعاء مسار generation_all الذي ينتج شبكة وخامات؛ قد يستغرق وقتًا أطول أو يصطدم بحد موارد GPU.'
+      : 'سيتم استدعاء shape_generation لإنشاء الشبكة الهندسية فقط، ثم تجهيز الملف عند الطلب.';
+  });
+  $('randomSeed').addEventListener('change', () => $('seed').disabled = $('randomSeed').checked);
+  $('seed').disabled = true;
+  $('connectBtn').addEventListener('click', async () => {
+    try { await connect(); } catch (_) {}
+  });
+  $('generateBtn').addEventListener('click', async () => {
+    if (!selectedFile || isBusy) return;
+    setBusy(true);
+    $('generateBtn').textContent = 'جارٍ إنشاء المجسم…';
+    $('resultMode').textContent = 'PROCESSING';
+    $('finalDownload').style.display = 'none';
+    $('exportOptions').style.display = 'none';
+    try {
+      let textured = $('genMode').value === 'textured';
+      const steps = Number($('steps').value);
+      const guidance = Number($('guidance').value);
+      const seed = Math.max(0, Math.min(10000000, Math.floor(Number($('seed').value) || 1234)));
+      const resolution = Number($('resolution').value);
+      const payload = [
+        handleFile(selectedFile), null, null, null, null,
+        steps, guidance, seed, resolution, $('removeBg').checked, 8000, $('randomSeed').checked
+      ];
+      let data;
+      try {
+        const endpoint = textured ? '/generation_all' : '/shape_generation';
+        data = await runJob(endpoint, payload, textured ? 'إنشاء المجسم والخامات' : 'إنشاء المجسم');
+      } catch (generationError) {
+        const errorText = String(generationError && generationError.message || generationError);
+        const gpuLimit = /requested GPU duration.*larger than the maximum allowed|GPU duration.*maximum allowed/i.test(errorText);
+        const quotaExceeded = /exceeded your zerogpu quota|quota exceeded|requested vs\.?\s*\d+s left|try again in\s+\d/i.test(errorText);
+        if (!gpuLimit && !quotaExceeded) throw generationError;
+        const reason = quotaExceeded ? 'الحصة المتبقية أقل من مدة الطلب' : 'مدة GPU المطلوبة تتجاوز الحد';
+        status('Hunyuan3D-2.1 رفض الطلب (' + reason + '). سأحوّل تلقائيًا إلى Hunyuan3D-2mini-Turbo الذي يطلب وقت GPU أقل.', 'busy');
+        const fallback = await connectFallback();
+        // Hunyuan3D-2mini-Turbo API order: caption, image, four multi-view
+        // images, steps, guidance, seed, octree resolution, remove background,
+        // chunk count, randomize seed.
+        const fallbackPayload = [
+          null, fallbackHandleFile(selectedFile), null, null, null, null,
+          5, Math.min(5, guidance), seed, 196, $('removeBg').checked, 8000, true
+        ];
+        data = await runFallbackJob('/shape_generation', fallbackPayload, 'توليد الشكل عبر Hunyuan3D-2mini-Turbo', fallback);
+        textured = false;
+        $('genMode').value = 'shape';
+        $('steps').value = '5';
+        $('resolution').value = '256';
+        $('modeHint').textContent = 'تم التحويل تلقائيًا إلى Hunyuan3D-2mini-Turbo بإعداد Turbo بعد رفض وقت GPU في Hunyuan3D-2.1. هذه النتيجة هندسية دون خامات.';
+      }
+      const shapeFile = unwrapUpdate(data[0]);
+      const textureFile = textured ? unwrapUpdate(data[1]) : null;
+      const stats = data[textured ? 3 : 2];
+      const actualSeed = data[textured ? 4 : 3];
+      const previewFile = textureFile || shapeFile;
+      generatedFiles = { shape: shapeFile, texture: textureFile, textured: textured, stats: stats, seed: actualSeed, base: activeBackend };
+      showModel(previewFile, Boolean(textureFile), activeBackend);
+      setStats(stats, actualSeed);
+      $('exportOptions').style.display = activeBackend === FALLBACK_BASE && !fallbackHasExport ? 'none' : 'block';
+      $('exportBtn').disabled = activeBackend === FALLBACK_BASE && !fallbackHasExport;
+      $('resultMode').textContent = textureFile ? 'PBR TEXTURED' : 'GEOMETRY';
+      status(textured ? 'اكتمل التوليد مع الخامات. راجع الشكل ثم جهّز الملف النهائي للتنزيل.' : 'اكتمل توليد المجسم الهندسي. يمكن تنزيله الآن؛ مسار الخامات متاح فقط إذا سمح خادم GPU بوقته.', 'ok');
+    } catch (error) {
+      status('فشل التوليد: ' + readableError(error), 'off');
+      $('alternativeBox').style.display = 'flex';
+    } finally {
+      setBusy(false);
+      $('generateBtn').textContent = '◇ إنشاء المجسم باستخدام Hunyuan3D';
+      $('generateBtn').disabled = !selectedFile;
+    }
+  });
+  $('exportBtn').addEventListener('click', async () => {
+    if (!generatedFiles || isBusy) return;
+    setBusy(true);
+    $('exportBtn').textContent = 'جارٍ تجهيز الملف…';
+    $('finalDownload').style.display = 'none';
+    try {
+      const type = $('exportType').value;
+      const targetFaces = Math.max(1000, Math.min(1000000, Math.floor(Number($('targetFaces').value) || 10000)));
+      const payload = [
+        generatedFiles.shape,
+        generatedFiles.texture || null,
+        type,
+        $('simplify').checked,
+        Boolean(generatedFiles.texture),
+        targetFaces
+      ];
+      const exportClient = generatedFiles.base === FALLBACK_BASE ? fallbackClient : client;
+      const out = await runJob('/on_export_click', payload, 'تصدير الملف النهائي', exportClient);
+      const exportFile = unwrapUpdate(out[1]);
+      if (!setDownload($('finalDownload'), exportFile, 'hunyuan3d-export.' + type, generatedFiles.base || BASE)) {
+        throw new Error('أكمل الخادم التصدير لكن لم يرجع رابط ملف واضحًا.');
+      }
+      $('finalDownload').textContent = 'تنزيل الملف النهائي (' + type.toUpperCase() + ')';
+      status('تم تجهيز ملف التصدير. استخدم زر التنزيل النهائي.', 'ok');
+    } catch (error) {
+      status('تعذر التصدير: ' + readableError(error), 'off');
+    } finally {
+      setBusy(false);
+      $('exportBtn').textContent = 'تجهيز ملف التنزيل النهائي';
+      $('exportBtn').disabled = !generatedFiles;
+    }
+  });
+  $('resetBtn').addEventListener('click', () => {
+    if (isBusy) return;
+    selectedFile = null;
+    generatedFiles = null;
+    fileInput.value = '';
+    sourcePreview.removeAttribute('src');
+    sourcePreview.style.display = 'none';
+    dropPrompt.style.display = 'flex';
+    dropzone.classList.remove('has-image');
+    $('fileMeta').textContent = '';
+    $('fileMeta').style.display = 'none';
+    $('modelViewer').removeAttribute('src');
+    $('modelViewer').style.display = 'none';
+    $('emptyState').style.display = 'block';
+    $('resultActions').style.display = 'none';
+    $('statsPanel').style.display = 'none';
+    $('exportOptions').style.display = 'none';
+    $('finalDownload').style.display = 'none';
+    $('resultBadge').style.display = 'none';
+    $('resultMode').textContent = 'NO OUTPUT';
+    $('generateBtn').disabled = true;
+    status(client ? 'تمت إعادة الضبط. الاتصال بالخدمة ما زال قائمًا.' : 'اختر صورة ثم اتصل بالخدمة لبدء التوليد.', client ? 'ok' : 'off');
+  });
+  window.addEventListener('online', () => {
+    if (!client) status('عاد اتصال الإنترنت. اختبر اتصال Hunyuan3D.', 'off');
+  });
+})();
+</script>
+</body>
+</html>

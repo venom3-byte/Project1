@@ -1,0 +1,513 @@
+const bootEl=document.getElementById("forgeBoot"),bootText=document.getElementById("forgeBootText");
+window.ForgeReady=false;window.ForgeBootState="loading";document.documentElement.dataset.forgeReady="0";
+function bootMessage(s,error=false){if(bootText)bootText.textContent=s;if(error){bootEl?.classList.remove("hidden");if(bootText)bootText.style.color="#ff9aa6"}}
+const $=id=>document.getElementById(id),out=$("log");
+let forgeExportPromise=null;
+const loadForgeExport=async()=>{
+  if(forgeExportPromise)return forgeExportPromise;
+  forgeExportPromise=import("./forge-export.js").then(()=>window.ForgeExport);
+  return forgeExportPromise;
+};
+const forgeExportProxy=new Proxy({},{
+  get(_target,prop){
+    return async(...args)=>{
+      const api=await loadForgeExport();
+      const fn=api?.[prop];
+      if(typeof fn!=="function")throw new Error("Forge export API method unavailable: "+String(prop));
+      return fn(...args);
+    };
+  }
+});
+window.ForgeExport=forgeExportProxy;
+let forgeAgentPromise=null;
+const loadForgeAgent=async()=>{
+  if(forgeAgentPromise)return forgeAgentPromise;
+  forgeAgentPromise=import("./forge-agent.js").then(()=>window.ForgeAgent);
+  return forgeAgentPromise;
+};
+const forgeAgentProxy=new Proxy({},{
+  get(_target,prop){
+    if(prop==="serverCapable")return()=>{
+      const configured=window.ForgeServerBridge?.webSocketUrl;
+      if(typeof configured!=="string"||!configured.trim()||location.protocol==="file:"||typeof WebSocket==="undefined")return false;
+      try{
+        const target=new URL(configured.trim(),location.href);
+        return ["ws:","wss:"].includes(target.protocol)&&!(location.protocol==="https:"&&target.protocol!=="wss:");
+      }catch{return false}
+    };
+    return async(...args)=>{
+      const api=await loadForgeAgent();
+      const fn=api?.[prop];
+      if(typeof fn!=="function")throw new Error("Forge agent API method unavailable: "+String(prop));
+      return fn.apply(api,args);
+    };
+  }
+});
+window.ForgeAgent=forgeAgentProxy;
+let forgeVisionPromise=null;
+const loadForgeVision=async()=>{
+  if(forgeVisionPromise)return forgeVisionPromise;
+  forgeVisionPromise=import("./live-vision.js").then(()=>window.AssetForgeLiveVision);
+  return forgeVisionPromise;
+};
+const lightweightVision={
+  visualHealth(){
+    const canvas=document.getElementById("viewport"),root=document.documentElement;
+    const rect=canvas?.getBoundingClientRect?.()||{width:0,height:0};
+    const viewport={width:rect.width||0,height:rect.height||0};
+    const overflow=Math.max(0,(root.scrollWidth||0)-(root.clientWidth||0));
+    return{ok:viewport.width>300&&viewport.height>300&&overflow<=1,viewport,overflow,mode:"lightweight"};
+  },
+  status(){return{running:false,connected:false,standalone:location.protocol==="file:"||/github\\.io$/i.test(location.hostname),lazy:true};}
+};
+const forgeVisionProxy=new Proxy(lightweightVision,{
+  get(target,prop){
+    if(prop in target)return target[prop];
+    return async(...args)=>{
+      const api=await loadForgeVision();
+      const fn=api?.[prop];
+      if(typeof fn!=="function")throw new Error("Forge vision API method unavailable: "+String(prop));
+      return fn(...args);
+    };
+  }
+});
+window.AssetForgeLiveVision=forgeVisionProxy;const write=(s,type="info")=>{out.textContent+="["+new Date().toLocaleTimeString()+"] "+s+"\n";out.scrollTop=out.scrollHeight;if(type==="error")console.error(s)};
+const toast=s=>{const e=document.createElement("div");e.textContent=s;Object.assign(e.style,{position:"fixed",bottom:"18px",left:"50%",transform:"translateX(-50%)",background:"#0b1d31",border:"1px solid #31506f",padding:"10px 14px",borderRadius:"10px",zIndex:99,maxWidth:"92vw",boxShadow:"0 8px 30px #0008"});document.body.appendChild(e);setTimeout(()=>e.remove(),1900)};
+import{ForgeEngine}from"./forge-engine.js";
+const forgeRuntimeDefaults=()=>{
+  const bindings=new Map([
+    ["moveForward",["KeyW","ArrowUp"]],["moveBack",["KeyS","ArrowDown"]],
+    ["moveLeft",["KeyA","ArrowLeft"]],["moveRight",["KeyD","ArrowRight"]],
+    ["jump",["Space"]],["fire",["Mouse0","KeyJ"]],["sprint",["ShiftLeft","ShiftRight"]]
+  ]);
+  const down=new Set(),gamepadDown=new Set();
+  const input={
+    bindings,down,gamepadDown,virtualMove:{x:0,z:0},gamepadMove:{x:0,z:0},
+    bind(action,keys){bindings.set(action,[...(keys||[])]);return this},
+    isDown(action){return down.has(action)||gamepadDown.has(action)},
+    moveVector(){const x=this.virtualMove.x+((down.has("moveRight")?1:0)-(down.has("moveLeft")?1:0));const z=this.virtualMove.z+((down.has("moveForward")?1:0)-(down.has("moveBack")?1:0));const l=Math.hypot(x,z);return l>1?{x:x/l,z:z/l}:{x,z}},
+    snapshot(){return Object.fromEntries([...bindings].map(([k])=>[k,this.isDown(k)]))},
+    mountMobileControls(){return this}
+  };
+  addEventListener("keydown",e=>{for(const[k,keys]of bindings)if(keys.includes(e.code)||keys.includes(e.key))down.add(k)});
+  addEventListener("keyup",e=>{for(const[k,keys]of bindings)if(keys.includes(e.code)||keys.includes(e.key))down.delete(k)});
+  addEventListener("blur",()=>{down.clear();gamepadDown.clear()});
+  const nav={cell:.75,width:80,height:80,blocked:new Uint8Array(80*80),clear(){this.blocked.fill(0)},bakeFromScene(F){this.clear();for(const r of F.entities.values()){if(!r.components.navObstacle)continue;const p=r.entity.getPosition(),s=r.entity.getLocalScale();const min={x:Math.floor((p.x-s.x)/this.cell+this.width/2),z:Math.floor((p.z-s.z)/this.cell+this.height/2)},max={x:Math.floor((p.x+s.x)/this.cell+this.width/2),z:Math.floor((p.z+s.z)/this.cell+this.height/2)};for(let z=Math.max(0,min.z);z<=Math.min(this.height-1,max.z);z++)for(let x=Math.max(0,min.x);x<=Math.min(this.width-1,max.x);x++)this.blocked[z*this.width+x]=1}},path(){return[]}};
+  const save={save(slot,data){localStorage.setItem("forge.slot."+slot,JSON.stringify({savedAt:new Date().toISOString(),data}));return true},load(slot){const v=localStorage.getItem("forge.slot."+slot);return v?JSON.parse(v):null},list(){return Object.keys(localStorage).filter(k=>k.startsWith("forge.slot.")).map(k=>k.slice(11))},remove(slot){localStorage.removeItem("forge.slot."+slot)}};
+  const audio={volumes:{master:1,music:1,sfx:1,ui:1,ambience:1},serialize(){return{volumes:this.volumes}},loadState(d){if(d?.volumes)this.volumes=Object.assign(this.volumes,d.volumes)},setVolume(bus,value){this.volumes[bus]=Math.max(0,Math.min(1,Number(value)||0))}};
+  const prefabs={store:new Map(JSON.parse(localStorage.getItem("forge.prefabs")||"[]")),list(){return[...this.store.keys()]},persist(){localStorage.setItem("forge.prefabs",JSON.stringify([...this.store.entries()]))},capture(){return null},save(){return null},get(){return null},spawn(){return null}};
+  return{input,nav,save,audio,prefabs,snapshot(){return{input:input.snapshot(),slots:save.list(),prefabs:prefabs.list(),audio:audio.serialize(),lazyRuntime:true}}};
+};
+if(!window.ForgeRuntime)window.ForgeRuntime=forgeRuntimeDefaults();
+let forgeRuntimePromise=null;
+const loadForgeRuntime=async()=>{
+  if(forgeRuntimePromise)return forgeRuntimePromise;
+  forgeRuntimePromise=import("./forge-runtime.js").then(()=>{
+    const R=window.ForgeRuntime;
+    if(R){const old=R.snapshot;R.snapshot=()=>Object.assign(old?old():{},window.ForgeGameplay?{gameplay:window.ForgeGameplay.status()}:{});R.__lazyLoaded=true}
+    return R;
+  });
+  return forgeRuntimePromise;
+};
+const engine=new ForgeEngine($("viewport"),write);
+try{bootMessage("Starting renderer and physics…");await engine.init();window.Forge=engine;bootMessage("Building the 3D workspace and camera controls…");await import("./forge-viewport.js");bootMessage("Loading spatial core and editor systems…");await import("./forge-spatial.js");for(const module of [
+  "./forge-reference-studio.js","./forge-production.js","./forge-project.js","./forge-render.js","./forge-ui-system.js","./forge-vfx.js",
+  "./forge-2d.js","./forge-ai.js","./forge-gameplay-data.js","./forge-network.js","./forge-replay.js",
+  "./forge-session.js","./forge-shader.js","./forge-terrain.js","./forge-qa.js","./forge-animation.js","./forge-gameplay.js",
+]){
+  bootMessage("Loading "+module+"…");
+  const started=performance.now();
+  await Promise.race([
+    import(module),
+    new Promise((_,reject)=>setTimeout(()=>reject(new Error("Module load timeout after 15000ms: "+module)),15000))
+  ]);
+  write("Loaded "+module+" in "+Math.round(performance.now()-started)+"ms");
+}}
+catch(error){window.ForgeBootState="error";bootMessage("Forge could not complete startup: "+(error?.message||String(error)),true);console.error(error);throw error}
+
+let forgeGizmoLoad=null;
+function ensureForgeGizmo(){
+  if(window.ForgeGizmo?.nativeReady) return Promise.resolve(window.ForgeGizmo);
+  if(forgeGizmoLoad) return forgeGizmoLoad;
+  const fallbackState=window.ForgeGizmo?.state||{};
+  forgeGizmoLoad=import("./forge-gizmo.js").then(()=>{const api=window.ForgeGizmo;if(api?.state){api.state.mode=["select","translate","rotate","scale"].includes(fallbackState.mode)?fallbackState.mode:"select";api.setSpace?.(fallbackState.space==="local"?"local":"world");api.sync?.()}return api}).catch(error=>{
+    forgeGizmoLoad=null;
+    write("Native gizmo load failed: "+error.message,"error");
+    return window.ForgeGizmo;
+  });
+  return forgeGizmoLoad;
+}
+if(!window.ForgeGizmo){
+  const state={mode:"select",space:"world",layer:null,gizmos:{},ready:true,nativeReady:false,initializing:false};
+  window.ForgeGizmo={
+    state,
+    setMode(mode){if(!["select","translate","rotate","scale"].includes(mode))return false;state.mode=mode;return true},
+    setSpace(space){state.space=space==="local"?"local":"world";return state.space},
+    init(){return ensureForgeGizmo().then(g=>g?.init?.().then?.(()=>g)??g)}
+  };
+}
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function icon(k){return({box:"▣",sphere:"●",cylinder:"⬢",capsule:"◉",plane:"▱",camera:"◫",light:"☼",model:"◇",empty:"＋"})[k]||"•"}
+function matchesFilter(r){const q=String($("treeFilter")?.value||"").trim().toLowerCase();return !q||r.name.toLowerCase().includes(q)||r.kind.toLowerCase().includes(q)}
+function refresh(){
+  const tree=$("tree");tree.innerHTML="";
+  for(const r of engine.entities.values()){
+    if(!matchesFilter(r))continue;
+    const row=document.createElement("div");row.className="tree-row"+(r.id===engine.selectedId?" active":"");
+    row.innerHTML="<span>"+icon(r.kind)+"</span><span title='"+esc(r.name)+"'>"+esc(r.name)+"</span><small>"+r.kind+"</small>";
+    row.onclick=()=>{engine.select(r.id);inspect();refresh()};
+    tree.append(row)
+  }
+  const s=engine.selected();$("selected").textContent=s?s.name:"None";$("sceneCount").textContent=engine.entities.size+" entities";$("hierarchyCount").textContent=engine.entities.size?String(engine.entities.size):"";updateSpatial();updateAssetPanel();updateAssetBrowser()
+}
+function inspect(){
+  const r=engine.selected();$("empty").classList.toggle("hidden",!!r);$("form").classList.toggle("hidden",!r);$("kind").textContent=r?r.kind:"—";
+  if(!r){$("spatialInfo").classList.add("hidden");updateAssetPanel();return}
+  $("name").value=r.name;const p=r.entity.getLocalPosition(),q=r.entity.getLocalEulerAngles(),s=r.entity.getLocalScale();
+  for(const[id,v]of[["px",p.x],["py",p.y],["pz",p.z],["rx",q.x],["ry",q.y],["rz",q.z],["sx",s.x],["sy",s.y],["sz",s.z]])$(id).value=Number(v.toFixed(3));
+  $("body").value=r.components.physics?.mode||"none";$("shape").value=r.components.physics?.shape||"none";updateSpatial();updateAssetPanel()
+}
+function updateSpatial(){
+  const r=engine.selected(),box=$("spatialInfo"),empty=$("spatialEmpty");if(!box)return;
+  if(!r||!window.ForgeSpatial){box.classList.add("hidden");empty?.classList.remove("hidden");return}
+  const i=window.ForgeSpatial.inspect(r);if(!i){box.classList.add("hidden");empty?.classList.remove("hidden");return}
+  box.classList.remove("hidden");empty?.classList.add("hidden");const s=i.world.size,o=i.source.size,g=i.geometry||{};
+  $("sourceDim").textContent=[o.x,o.y,o.z].map(v=>v.toFixed(3)).join(" × ")+" m";
+  $("worldDim").textContent=[s.x,s.y,s.z].map(v=>v.toFixed(3)).join(" × ")+" m";
+  const center=i.world.center;
+  const cx=Number(center?.x??center?.[0]??0),cy=Number(center?.y??center?.[1]??0),cz=Number(center?.z??center?.[2]??0);
+  $("worldCenter").textContent=[cx,cy,cz].map(v=>v.toFixed(3)).join(", ");
+  $("geoVertices").textContent=String(g.vertices||0);
+  $("geoTriangles").textContent=String(g.triangles||0);
+  $("geoUV").textContent=String(g.uvChannels||0);
+  $("geoMaterials").textContent=String(g.materials||0);
+  $("geoAnimations").textContent=String(g.animations||0);
+  $("geoLOD").textContent=String(g.lods||1);
+  $("geoCollision").textContent=r.components.physics?(r.components.physics.mode+"/"+r.components.physics.shape):"none";
+}
+function updateAssetPanel(){
+  const r=engine.selected(),label=$("assetSelected"),type=$("assetType"),meta=$("assetMeta");
+  if(!label||!type)return;
+  const a=r?.components?.asset;
+  label.textContent=r?.name||"No asset selected";
+  type.textContent=a?.type?(a.type==="model"?"3D GLB":a.type==="image"?"2D Image":a.type.toUpperCase()):"Scene object";
+  if(meta){
+    if(!a){
+      meta.textContent="Select an imported asset to inspect source metadata.";
+    }else{
+      const entry=engine.assets?.get?.(a.name);
+      const bytes=Number(entry?.file?.size||0);
+      const mime=entry?.file?.type||"application/octet-stream";
+      const dims=a.width&&a.height?(" · "+a.width+"×"+a.height+"px"):"";
+      meta.textContent="SOURCE · "+a.name+" · "+bytes.toLocaleString()+" bytes · "+mime+dims;
+    }
+  }
+}
+function updateAssetBrowser(){
+  const list=$("assetList");if(!list)return;
+  const q=String($("assetSearch")?.value||"").trim().toLowerCase();
+  list.innerHTML="";
+  const records=[...engine.entities.values()].filter(r=>r.components?.asset?.name).filter(r=>!q||r.name.toLowerCase().includes(q)||String(r.components.asset.type).toLowerCase().includes(q));
+  if(!records.length){const e=document.createElement("div");e.className="asset-empty";e.textContent="No imported assets";list.append(e);return}
+  for(const r of records){
+    const row=document.createElement("button");row.className="asset-row"+(r.id===engine.selectedId?" active":"");
+    const t=r.components.asset.type==="model"?"3D":r.components.asset.type==="image"?"2D":"FILE";
+    const visual=document.createElement("span");visual.className="asset-visual";
+    const entry=engine.assets?.get?.(r.components.asset.name);
+    if(r.components.asset.type==="image"&&entry?.file){
+      if(!entry.previewUrl){try{entry.previewUrl=URL.createObjectURL(entry.file)}catch{}}
+      if(entry.previewUrl){
+        const img=document.createElement("img");img.className="asset-thumb";img.alt="";img.src=entry.previewUrl;visual.append(img);
+      }else{
+        const ic=document.createElement("span");ic.className="asset-icon";ic.textContent=t;visual.append(ic);
+      }
+    }else{
+      const ic=document.createElement("span");ic.className="asset-icon";ic.textContent=t;visual.append(ic);
+    }
+    row.append(visual);
+    const nameNode=document.createElement("span");nameNode.className="asset-name";nameNode.textContent=r.name;row.append(nameNode);
+    const kindNode=document.createElement("span");kindNode.className="asset-kind";kindNode.textContent=r.kind;row.append(kindNode);
+    row.onclick=()=>{engine.select(r.id);refresh();inspect();engine.focus()};
+    list.append(row)
+  }
+}
+function apply(){
+  const r=engine.selected();if(!r)return;
+  engine.transform({x:+$("px").value,y:+$("py").value,z:+$("pz").value,rx:+$("rx").value,ry:+$("ry").value,rz:+$("rz").value,sx:+$("sx").value,sy:+$("sy").value,sz:+$("sz").value});
+  r.name=$("name").value||r.name;r.entity.name=r.name;
+  const b=$("body").value,sh=$("shape").value;if(b==="none")engine.removePhysics(r.id);else engine.setPhysics(r.id,b,sh==="none"?"box":sh);
+  refresh();inspect()
+}
+const selectAndRefresh=(r)=>{
+  if(!r)return;
+  engine.select(r.id);
+  try{refresh()}catch(e){write("Selection refresh failed: "+e.message,"error")}
+  try{inspect()}catch(e){write("Selection inspect failed: "+e.message,"error")}
+  requestAnimationFrame(()=>{try{refresh();inspect()}catch(e){write("Deferred selection UI failed: "+e.message,"error")}});
+};
+document.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>{
+  const r=b.dataset.add==="camera"?engine.createCamera("Camera "+(engine.entities.size+1),{x:6,y:4,z:8}):b.dataset.add==="light"?engine.createLight("Light "+(engine.entities.size+1)):engine.primitive(b.dataset.add,b.dataset.add+"-"+(engine.entities.size+1));
+  selectAndRefresh(r);
+});
+$("apply").onclick=apply;["px","py","pz","rx","ry","rz","sx","sy","sz","name"].forEach(id=>$(id).onchange=apply);
+$("duplicate").onclick=()=>{if(engine.duplicate()){refresh();inspect()}};$("undo")?.addEventListener("click",()=>{if(engine.undo()){refresh();inspect()}});$("redo")?.addEventListener("click",()=>{if(engine.redo()){refresh();inspect()}});
+$("delete").onclick=()=>{engine.delete();refresh();inspect()};$("focus")?.addEventListener("click",()=>engine.focus());$("focusViewport")?.addEventListener("click",()=>engine.focus());$("frame").onclick=()=>engine.frame();$("reset")?.addEventListener("click",()=>location.reload());
+const previewButton=$("play"),previewGlyph=previewButton?.querySelector("[data-run-icon]"),previewLabel=previewButton?.querySelector("[data-run-label]");
+previewButton.onclick=()=>{
+  engine.running=!engine.running;
+  if(previewGlyph)previewGlyph.textContent=engine.running?"■":"▷";
+  if(previewLabel)previewLabel.textContent=engine.running?"Stop preview":"Preview";
+  previewButton.setAttribute("aria-pressed",String(engine.running));
+  previewButton.setAttribute("aria-label",engine.running?"Stop scene preview":"Preview scene");
+  previewButton.classList.toggle("is-running",engine.running);
+  engine.timelinePlaying=engine.running;
+  window.dispatchEvent(new CustomEvent("forge-play-state",{detail:{running:engine.running}}));
+};
+$("timelinePlay").title="Play animation timeline";
+$("timelinePlay").setAttribute("aria-label","Play animation timeline");
+$("timelinePlay").setAttribute("aria-pressed","false");
+$("timelinePlay").onclick=()=>{
+  engine.timelinePlaying=!engine.timelinePlaying;
+  const playing=engine.timelinePlaying===true;
+  $("timelinePlay").textContent=playing?"Ⅱ":"▶";
+  $("timelinePlay").title=playing?"Pause animation timeline":"Play animation timeline";
+  $("timelinePlay").setAttribute("aria-label",playing?"Pause animation timeline":"Play animation timeline");
+  $("timelinePlay").setAttribute("aria-pressed",String(playing));
+};
+
+const editorWorkspaceCopy={
+  layout:["SCENE EDITING","Selection, transforms and hierarchy"],
+  modeling:["MODELING","Primitive creation and object transforms"],
+  animation:["ANIMATION","Timeline, keyframes and playback"],
+  assets:["ASSET WORKFLOW","Import, inspect and organize content"],
+  review:["VALIDATION","Asset metrics, QA and diagnostics"]
+};
+let workspaceOpenedTimeline=false;
+function setEditorWorkspace(name){
+  const key=editorWorkspaceCopy[name]?name:"layout";
+  document.documentElement.dataset.editorWorkspace=key;
+  document.querySelectorAll("[data-workspace-target]").forEach(tab=>{
+    const active=tab.dataset.workspaceTarget===key;
+    tab.classList.toggle("is-active",active);
+    tab.setAttribute("aria-selected",String(active));
+  });
+  const mobileAnimation=$("mobileAnimation");
+  if(mobileAnimation){
+    const active=key==="animation";
+    mobileAnimation.classList.toggle("active",active);
+    mobileAnimation.setAttribute("aria-pressed",String(active));
+  }
+  const context=$("workspaceContext");
+  if(context){
+    const [heading,description]=editorWorkspaceCopy[key];
+    const spans=context.querySelectorAll("span");
+    if(spans[1])spans[1].textContent=heading;
+    const detail=spans[2];
+    if(detail)detail.textContent=description;
+  }
+  const timeline=document.querySelector(".timeline-shell");
+  if(key==="animation"&&timeline){if(!timeline.open)workspaceOpenedTimeline=true;timeline.open=true}
+  else if(timeline&&workspaceOpenedTimeline){timeline.open=false;workspaceOpenedTimeline=false}
+  if(key==="assets"){
+    const panel=document.querySelector(".assets-section");
+    if(panel){panel.open=true;panel.scrollIntoView({block:"nearest",behavior:"smooth"})}
+    if(innerWidth<=850)openMobilePanel("assets");
+  }
+  if(key==="modeling"){
+    const scene=document.querySelector(".scene-section");
+    scene?.scrollIntoView({block:"nearest",behavior:"smooth"});
+    if(innerWidth<=850)openMobilePanel("scene");
+  }
+  if(key==="review"){
+    [".asset-tools-section",".spatial-section",".vision-section",".console-section"].forEach(selector=>{
+      const section=document.querySelector(selector);
+      if(section?.tagName==="DETAILS")section.open=true;
+    });
+    const tools=document.querySelector(".asset-tools-section");
+    tools?.scrollIntoView({block:"nearest",behavior:"smooth"});
+    if(innerWidth<=850)openMobilePanel("scene");
+  }
+}
+document.querySelectorAll("[data-workspace-target]").forEach(tab=>tab.addEventListener("click",()=>setEditorWorkspace(tab.dataset.workspaceTarget)));
+setEditorWorkspace("layout");
+$("rewind").onclick=()=>{engine.timelineTime=0;$("time").value=0;engine.evalAnimation(0);inspect()};$("time").oninput=e=>{engine.timelineTime=+e.target.value||0;engine.evalAnimation(engine.timelineTime);$("playhead").style.left=(engine.timelineTime*60)+"px";inspect()};$("key").onclick=()=>{engine.key();toast("Keyframe added")};
+$("projectName")?.addEventListener("change",()=>{const n=$("projectName").value.trim()||"Untitled Project";document.title=n+" — Forge Studio";localStorage.setItem("forge.projectName",n);$("projectName").value=n;});
+const storedProjectName=localStorage.getItem("forge.projectName");if(storedProjectName&&$("projectName"))$("projectName").value=storedProjectName;
+$("newProject")?.addEventListener("click",()=>{if(confirm("Start a new Forge scene?")){engine.resetScene(true);refresh();inspect();toast("New scene created")}});
+$("importCar")?.addEventListener("click",async()=>{try{const url="https://assets.macaly-user-data.dev/krejgsf8oalserz1lhd45fy0/r06pdypbhojqest3cylj93hy/wVK1ftf-ULse2N7EQTYgz/car-concept-qaTX70WS.glb";toast("Loading Car Concept…");const res=await fetch(url);if(!res.ok)throw new Error("Car asset HTTP "+res.status);const blob=await res.blob();await engine.importFile(new File([blob],"Car-Concept.glb",{type:"model/gltf-binary"}));refresh();inspect();engine.focus();toast("Car Concept imported") }catch(e){write("Car import failed: "+e.message,"error");toast("Car import failed")}});
+
+document.querySelectorAll("[data-import-assets]").forEach(b=>b.addEventListener("click",()=>$("assetInput").click()));$("assetInput").onchange=e=>loadFiles([...e.target.files]);
+async function loadFiles(files){for(const f of files)try{await window.ForgeProduction?.assets?.storeFile?.(f);const r=await engine.importFile(f);if(r.type==="project")await engine.load(r.data);write("Imported "+f.name)}catch(e){write("Import failed "+f.name+": "+e.message,"error")}refresh();inspect()}
+document.addEventListener("dragover",e=>{e.preventDefault();$("dropOverlay").classList.remove("hidden")});document.addEventListener("drop",e=>{e.preventDefault();$("dropOverlay").classList.add("hidden");if(e.dataTransfer?.files?.length)loadFiles([...e.dataTransfer.files])});
+$("saveProject").onclick=()=>{const n=(($("projectName")?.value||"ForgeProject").trim().replace(/[^a-z0-9_-]+/gi,"-").replace(/^-+|-+$/g,"")||"ForgeProject");window.ForgeProject.download(n+".forge.json");toast("Project saved")};$("openProject").onclick=()=>$("projectInput").click();$("projectInput").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{await window.ForgeProject.load(JSON.parse(await f.text()));refresh();inspect();toast("Complete Forge project loaded")}catch(err){write("Project load failed: "+err.message,"error")}};
+$("build").onclick=async()=>{if(window.ForgeProduction?.build){try{const r=await window.ForgeProduction.build();if(r?.url){location.href=r.url;return}}catch(e){write("Build failed: "+e.message,"error")}}const n=(($("projectName")?.value||"ForgeProject").trim().replace(/[^a-z0-9_-]+/gi,"-").replace(/^-+|-+$/g,"")||"ForgeProject");window.ForgeProject.download(n+"-forge.json");toast("Portable Forge project exported")};
+async function assetAction(fn,label){try{const r=await fn();$("assetReport").textContent=JSON.stringify(r,null,2);$("assetBadge").textContent=r.ok?"PASS":"CHECK";$("assetBadge").className="qa-badge "+(r.ok?"pass":"warn");toast(label+(r.ok?" — PASS":" — inspect report"))}catch(e){$("assetBadge").textContent="FAIL";$("assetBadge").className="qa-badge fail";$("assetReport").textContent=JSON.stringify({ok:false,error:e.message},null,2);toast(label+" — "+e.message)}}
+$("exportSource")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.exportSource(),"Source export"));
+$("exportGLB")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.exportSceneGLB(),"GLB export"));
+$("exportPreview")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.exportPreview(),"Viewport PNG"));
+$("exportManifest")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.exportManifest(),"Asset manifest"));
+$("validateAsset")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.validateSelected(),"Asset validation"));
+$("assetQA")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.runExportQA(),"Export round-trip QA"));
+$("treeFilter")?.addEventListener("input",refresh);
+$("assetSearch")?.addEventListener("input",updateAssetBrowser);
+$("quickFocus")?.addEventListener("click",()=>engine.focus());
+$("quickFrame")?.addEventListener("click",()=>engine.frame());
+$("quickVision")?.addEventListener("click",()=>$("visionOpen")?.click());
+document.querySelectorAll("[data-gizmo]")?.forEach(b=>b.addEventListener("click",()=>{
+  const mode=b.dataset.gizmo;
+  if(window.ForgeGizmo?.setMode(mode)){
+    document.querySelectorAll("[data-gizmo]").forEach(x=>x.classList.toggle("active",x===b));
+    write("Gizmo: "+mode);
+    requestAnimationFrame(()=>ensureForgeGizmo().then(g=>g?.init?.()));
+  }
+}));
+$("spaceToggle")?.addEventListener("click",()=>{
+  const next=window.ForgeGizmo?.state?.space==="local"?"world":"local";
+  window.ForgeGizmo?.setSpace(next);
+  if($("spaceToggle"))$("spaceToggle").textContent=next==="local"?"Local":"World";
+});
+window.addEventListener("forge-gizmo-transform",()=>{refresh();inspect()});
+window.addEventListener("keydown",e=>{
+  if(e.target?.matches?.("input,textarea,select"))return;
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){e.preventDefault();if(engine.undo()){refresh();inspect()}return}
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="y"){e.preventDefault();if(engine.redo()){refresh();inspect()}return}
+
+  const key=e.key.toLowerCase();
+  if(key==="f"){engine.focus();return}
+  if(key==="q"||key==="1")document.querySelector('[data-gizmo="select"]')?.click();
+  else if(key==="w"||key==="2")document.querySelector('[data-gizmo="translate"]')?.click();
+  else if(key==="e"||key==="3")document.querySelector('[data-gizmo="rotate"]')?.click();
+  else if(key==="r"||key==="4")document.querySelector('[data-gizmo="scale"]')?.click();
+});
+$("mImport")?.addEventListener("click",()=>$("assetInput")?.click());
+$("mUndo")?.addEventListener("click",()=>{if(engine.undo()){refresh();inspect()}});
+$("mPlay")?.addEventListener("click",()=>$("play")?.click());
+$("mExport")?.addEventListener("click",()=>assetAction(()=>window.ForgeExport.exportSource(),"Source export"));
+
+function smoke(){
+  const d=engine.diagnostics(),v=window.AssetForgeLiveVision?.visualHealth?.()||null,viewport=window.ForgeViewport?.status?.()||null;
+  const vision={camera:!!engine.camera(),objects:[...engine.entities.values()].filter(x=>x.entity.render?.meshInstances?.length).map(x=>({id:x.id,name:x.name,kind:x.kind}))};
+  const checks=[["renderer",d.renderer==="WebGPU"||d.renderer==="WebGL2"],["scene",d.entities>0],["camera",[...engine.entities.values()].some(x=>x.kind==="camera")],["ground",[...engine.entities.values()].some(x=>x.name==="Ground")],["physics",d.physics>0],["spatialCore",!!d.spatial],["renderLoop",d.fps>=0],["sceneVision",!!vision],["true3DViewport",viewport?.ok===true],["3DNavigation",viewport?.navigation?.orbit===true&&viewport?.navigation?.pan===true&&viewport?.navigation?.zoom===true]];
+  return{ok:checks.every(x=>x[1])&&(v?.ok!==false),checks,diagnostics:d,vision,visualHealth:v,viewport3d:viewport}
+}
+$("qa").onclick=()=>{$("qaReport").textContent=JSON.stringify(smoke(),null,2);$("qaDialog").showModal()};$("runQA").onclick=()=>{$("qaReport").textContent=JSON.stringify(smoke(),null,2)};$("grid")?.addEventListener("click",()=>{const on=window.ForgeViewport?.toggleGrid?.()??false;$("grid")?.classList.toggle("active",on);});
+$("script").onclick=()=>{const r=engine.selected();if(!r)return toast("Select an entity");$("scriptDialog").showModal();$("code").value=engine.scripts.get(r.id)||$("code").value};$("saveScript").onclick=()=>{const r=engine.selected();if(r){engine.attachScript(r.id,$("code").value);$("scriptDialog").close();toast("Script attached")}};
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>$(b.dataset.close).close());$("clear").onclick=()=>out.textContent="";
+document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-view]").forEach(x=>x.classList.remove("active"));b.classList.add("active");engine.setView(b.dataset.view);refresh();inspect()});
+$("snapToggle")?.addEventListener("click",()=>{engine.snapEnabled=!engine.snapEnabled;$("snapToggle").classList.toggle("active",!!engine.snapEnabled);$("snapToggle").textContent=engine.snapEnabled?"Snap On":"Snap Off";window.ForgeSpatial?.setSnap(engine.snapSize);write("Snap: "+(engine.snapEnabled?"On":"Off"))});
+$("snapSize")?.addEventListener("change",e=>{engine.snapSize=Math.max(.001,+e.target.value||.25);window.ForgeSpatial?.setSnap(engine.snapSize)});
+$("boundsToggle")?.addEventListener("change",e=>{if(window.ForgeSpatial)window.ForgeSpatial.showBounds=e.target.checked});
+$("visionRefresh")?.addEventListener("click",()=>{$("visionReport").textContent=JSON.stringify(window.ForgeSpatial?.sceneVision?.()||{},null,2)});
+$("visionCenter")?.addEventListener("click",()=>{engine.frame();$("visionReport").textContent=JSON.stringify(window.ForgeSpatial?.sceneVision?.()||{},null,2)});
+$("visionMove")?.addEventListener("click",()=>{const r=engine.selected(),rect=$("viewport").getBoundingClientRect();if(!r||!window.ForgeSpatial)return;window.ForgeSpatial.moveToScreen(r.id,rect.left+rect.width/2,rect.top+rect.height/2,.5,0);refresh();inspect()});
+$("visionOpen")?.addEventListener("click",()=>{if(!window.ForgeSpatial)return;$("visionReport").textContent=JSON.stringify(window.ForgeSpatial.sceneVision(),null,2);$("visionDialog").showModal()});
+async function initLiveVision(){
+  const b=$("liveVisionOpen");
+  if(!b)return;
+  const localHost=location.hostname==="localhost"||location.hostname==="127.0.0.1";
+  const githubPages=/\.github\.io$/i.test(location.hostname);
+  const statusUrl=window.ForgeServerBridge?.visionStatusUrl||(localHost||githubPages||location.protocol==="file:"?null:"./api/vision/status");
+  const unavailable=()=>{
+    b.disabled=true;
+    b.classList.remove("primary");
+    b.title="Live Vision needs a configured Forge server bridge; this static browser build is available without that service.";
+    b.textContent="◉ Live Vision — Server";
+  };
+  if(!statusUrl){unavailable();return;}
+  try{
+    const r=await fetch(statusUrl,{cache:"no-store"});
+    if(!r.ok)throw new Error("vision bridge unavailable");
+    const j=await r.json();
+    if(j?.ok===false)throw new Error("vision bridge unavailable");
+    b.disabled=false;
+    b.onclick=()=>window.open(window.ForgeServerBridge?.visionUrl||"./vision.html","_blank","noopener");
+    b.textContent="◉ Live Vision — Open";
+  }catch{unavailable()}
+}
+initLiveVision();
+
+function openMobilePanel(which){
+  const left=$("leftPanel"),right=$("rightPanel");
+  left?.classList.remove("mobile-open");right?.classList.remove("mobile-open");
+  if(which==="scene"||which==="assets"){
+    left?.classList.add("mobile-open");
+    if(which==="assets"){const d=document.querySelector(".assets-section");if(d){d.open=true;d.scrollIntoView({block:"nearest"})}}
+  }else if(which==="inspector"){
+    right?.classList.add("mobile-open");
+  }
+}
+$("mobileScene")?.addEventListener("click",()=>{setEditorWorkspace("layout");openMobilePanel("scene")});
+$("mobileAnimation")?.addEventListener("click",()=>{
+  document.querySelectorAll(".mobile-open").forEach(panel=>panel.classList.remove("mobile-open"));
+  setEditorWorkspace("animation");
+});
+$("mobileAssets")?.addEventListener("click",()=>openMobilePanel("assets"));
+$("mobileInspector")?.addEventListener("click",()=>{setEditorWorkspace("layout");openMobilePanel("inspector")});
+$("mobileAdd")?.addEventListener("click",()=>openMobilePanel("scene"));
+$("mobilePlay")?.addEventListener("click",()=>$("play")?.click());
+$("viewport")?.addEventListener("pointerdown",()=>{document.querySelectorAll(".mobile-open").forEach(x=>x.classList.remove("mobile-open"))});
+
+if($("standaloneMode"))$("standaloneMode").textContent=location.protocol==="file:"?"Local file":(/macaly\.dev$/i.test(location.hostname)?"Macaly Preview":(/github\.io$/i.test(location.hostname)?"Standalone PWA":"Forge Server"));
+engine.canvas.addEventListener("pointerdown",()=>{
+  requestAnimationFrame(()=>ensureForgeGizmo().then(g=>g?.init?.()));
+  setTimeout(()=>{refresh();inspect()},0)
+});
+window.addEventListener("forge-selection",()=>{try{refresh()}catch(e){write("Selection event refresh failed: "+e.message,"error")}try{inspect()}catch(e){write("Selection event inspect failed: "+e.message,"error")}});
+window.addEventListener("forge-assets-changed",()=>{try{refresh()}catch(e){write("Asset event refresh failed: "+e.message,"error")}try{inspect()}catch(e){write("Asset event inspect failed: "+e.message,"error")}});
+window.ForgeRefreshUI=()=>{refresh();inspect();};
+window.ForgeVision={scan:()=>window.ForgeSpatial?.sceneVision?.()||{},inspect:id=>{const r=engine.entities.get(id);return r?window.ForgeSpatial?.inspect?.(r):null},selectAt:(x,y)=>engine.pick({clientX:x,clientY:y})};
+function stats(){const d=engine.diagnostics();if($("renderer"))$("renderer").textContent=d.renderer;if($("rendererSide"))$("rendererSide").textContent=d.renderer;if($("fps"))$("fps").textContent=d.fps;if($("physics"))$("physics").textContent=d.physics;requestAnimationFrame(stats)}
+const waitForPublicAPIs=async()=>{
+  const required={
+    ForgeViewport:["status","toggleGrid","setGridVisible"],
+    ForgeGameplay:["createThirdPersonTemplate","createRacingTemplate","createShowcaseGame","status"],
+    Forge2D:["createPlatformerTemplate","status"],
+    ForgeProject:["serialize","load"],
+    ForgeRender:["apply","quality","serialize"],
+    ForgeVFX:["spawn","status"],
+    ForgeRuntime:["snapshot","input"],
+    ForgeQAPro:["audit","saveBaseline","diff"],
+    ForgeTerrain:["generate","status"],
+    ForgeData:["actor","quests"],
+    ForgeReplay:["startRecord","recordStep","stopRecord","play","status"],
+    ForgeSession:["addPlayer","start","serialize","end","load"],
+    ForgeShaders:["applyPreset"],
+    ForgeAI:["status","createAgent"],
+    ForgeAnimation:["status"]
+  };
+  for(let i=0;i<120;i++){
+    let ok=true;
+    for(const[k,methods] of Object.entries(required)){
+      const api=window[k];
+      if(!api||methods.some(m=>typeof api[m]!=="function"&&typeof api[m]!=="object")){ok=false;break}
+    }
+    if(ok)return true;
+    await new Promise(r=>requestAnimationFrame(r));
+  }
+  return false;
+};
+await waitForPublicAPIs();
+window.ForgeReady=true;
+loadForgeRuntime().catch(error=>{window.ForgeRuntime.__runtimeLoadError=error?.message||String(error);write("Deferred runtime load failed: "+window.ForgeRuntime.__runtimeLoadError,"error")});
+window.ForgeBootState="ready";
+document.documentElement.dataset.forgeReady="1";
+bootEl?.classList.add("hidden");
+write("Forge Studio ready flag set");
+setTimeout(()=>{
+  try{
+    const initialDiagnostics={
+      renderer:/webgpu/i.test(engine.app?.graphicsDevice?.constructor?.name||"")?"WebGPU":"WebGL2",
+      physics:engine.physics?.size||0
+    };
+    if($("renderer"))$("renderer").textContent=initialDiagnostics.renderer;
+    if($("fps"))$("fps").textContent=String(engine.fps||0);
+    $("physics").textContent=String(initialDiagnostics.physics);
+    $("sceneCount").textContent=engine.entities.size+" entities";
+    $("selected").textContent=engine.selected()?.name||"None";
+    if($("standaloneMode"))$("standaloneMode").textContent=location.protocol==="file:"?"Local file":(/github\\.io$/i.test(location.hostname)?"Standalone PWA":"Server + WebSocket");
+    refresh();inspect();
+    requestAnimationFrame(()=>{try{stats()}catch(e){write("Deferred stats failed: "+e.message,"error")}});
+    setTimeout(()=>{try{window.dispatchEvent(new Event("forge-ready"))}catch(e){write("Deferred forge-ready dispatch failed: "+e.message,"error")}},0);
+  }catch(e){window.ForgeBootState="ui-error";write("Deferred boot UI failed: "+(e?.message||String(e)),"error");console.error(e)}
+},0);
+write("Forge Studio 3.9 ready");

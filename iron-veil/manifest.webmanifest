@@ -1,0 +1,19 @@
+{
+  "name": "IRON VEIL — Tactical Command",
+  "short_name": "IRON VEIL",
+  "description": "Original mobile pixel-art Cold War tactical real-time strategy game.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#101512",
+  "theme_color": "#111714",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
