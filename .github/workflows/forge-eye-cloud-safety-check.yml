@@ -66,13 +66,13 @@ jobs:
           NODE
       - name: Install browser smoke-test dependencies
         run: npm install --prefix mcp --no-package-lock
-      - name: Start production preview
+      - name: Start the production Nitro server
         run: |
-          npm run preview -- --host 127.0.0.1 --port 4173 --strictPort > /tmp/forge-preview.log 2>&1 &
+          PORT=4173 HOST=127.0.0.1 NITRO_PORT=4173 NITRO_HOST=127.0.0.1 node .output/server/index.mjs > /tmp/forge-preview.log 2>&1 &
           echo $! > /tmp/forge-preview.pid
           for attempt in $(seq 1 45); do
             if curl --fail --silent http://127.0.0.1:4173/ > /dev/null; then
-              echo "Production preview is responding."
+              echo "Production Nitro server is responding."
               exit 0
             fi
             sleep 2
