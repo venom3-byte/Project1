@@ -369,3 +369,46 @@ html[data-editor-workspace="animation"] .timeline{box-shadow:inset 0 1px 0 #2137
   .mobile-bar{height:44px}
 }
 @media(prefers-reduced-motion:reduce){.workspace-tab, .preview-button{transition:none}}
+
+/* Forge Eye mobile header regression: keep core actions visible on narrow screens. */
+@media(max-width:850px){
+  #hunyuanStudio,#forgeAiStudio{
+    flex:0 0 29px!important;
+    width:29px!important;
+    min-width:29px!important;
+    padding:0!important;
+    gap:0!important;
+    justify-content:center;
+  }
+  #hunyuanStudio>span:last-child,#forgeAiStudio>span:last-child{
+    display:none!important;
+  }
+  #hunyuanStudio .button-symbol,#forgeAiStudio .button-symbol{
+    display:inline!important;
+    font-size:14px!important;
+  }
+  #importAssets,#productionTools{
+    flex:0 0 29px;
+    width:29px;
+    min-width:29px;
+    padding:0;
+    justify-content:center;
+  }
+  #importAssets>span:last-child,#productionTools>span:last-child{
+    display:none!important;
+  }
+  #importAssets .button-symbol,#productionTools .button-symbol{
+    display:inline!important;
+  }
+}
+@media(max-width:520px){
+  .appbar{gap:2px!important;padding-left:5px!important;padding-right:5px!important}
+  .brand-lockup{flex:0 0 26px!important;width:26px!important;min-width:26px!important;padding:0!important}
+  .brand-name{display:none!important}
+  .project-field{flex:0 1 58px!important;min-width:44px!important;max-width:66px!important}
+  .file-actions{flex:0 0 auto!important}
+  .file-actions #saveProject{min-width:31px!important;padding:0 5px!important;gap:3px!important}
+  #importAssets,#hunyuanStudio,#forgeAiStudio,#productionTools{flex-basis:27px!important;width:27px!important;min-width:27px!important}
+  .build-button,.preview-button{flex:0 0 29px!important;width:29px!important;min-width:29px!important;padding:0!important}
+  .app-spacer{display:none!important;flex:0 0 0!important;min-width:0!important}
+}

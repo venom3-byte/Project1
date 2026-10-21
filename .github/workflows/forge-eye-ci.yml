@@ -1,0 +1,51 @@
+name: Forge Eye cloud-first checks
+
+on:
+  push:
+    branches:
+      - forge-eye-cloud-first
+    paths:
+      - "public/forge/**"
+      - "src/routes/api/**"
+      - "src/lib/forge-eye-api.ts"
+      - "server/api/forge-eye/**"
+      - "scripts/check-forge-eye.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/forge-eye-ci.yml"
+  pull_request:
+    paths:
+      - "public/forge/**"
+      - "server/api/forge-eye/**"
+      - "scripts/check-forge-eye.mjs"
+      - ".github/workflows/forge-eye-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Check API route syntax
+        run: |
+          node --check server/api/forge-eye/chat.post.mjs
+          node --check server/api/forge-eye/gemini.post.mjs
+          node --check server/api/forge-eye/status.get.mjs
+      - name: Check AI Studio client
+        run: node scripts/check-forge-eye.mjs
+      - name: Run unit tests
+        run: npm test
+      - name: Build web app
+        run: npm run build
