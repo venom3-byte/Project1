@@ -64,4 +64,16 @@ The active Forge static editor at `public/forge/index.html` loads `public/forge/
 - Rendering and the editor's custom update work are paused while the document is hidden; rendering is re-enabled when the user returns.
 - A GitHub Actions workflow installs the locked dependencies, builds the full web app, runs the existing unit tests, parses the Forge engine JavaScript, and checks that the mobile safeguards remain present.
 
-Verification: the latest `Forge Eye cloud-first safety checks` workflow completed successfully for commit `56fd95a429b533cdbd2f6b02f0eb496ae1928172`. Dependency installation, full application build, existing unit tests, JavaScript syntax check, and mobile-safeguard checks all passed. This still does not replace a real-device thermal/FPS test, and the separate Forge Eye AI chat app is not yet confirmed live.
+Verification history: the earlier mobile-safeguard checks passed, and the full production/browser checks have now completed successfully on commit `1fa4c73b11ed00c62b470a6b09d1a3fdbb333379`.
+
+## Verified end-to-end checks — 2026-10-21
+
+- GitHub Actions `Forge Eye cloud-first checks`: success. Dependency install, all **41 unit tests** (5 test files), and production build passed.
+- GitHub Actions `Forge Eye cloud-first safety checks`: success. It built the app, started the actual production Nitro server, and ran Chromium desktop/mobile checks against both the Forge editor and AI Studio.
+- Main Forge editor: desktop/mobile browser smoke passed, including the narrow-screen toolbar regression check.
+- AI Studio: Chromium verified Arabic RTL, a live Three.js scene, adding a primitive, switching to the glass material, selecting transform mode, saving/loading scene JSON in browser storage, successful status route, persisted chat, mobile tabs with no horizontal overflow, capped mobile canvas pixel ratio, and no uncaught JavaScript/console errors.
+- The API behavior is intentionally honest: with no provider secret configured in CI, the status endpoint reports setup required and DeepSeek chat returns `503 AI_NOT_CONFIGURED`; no fake answer is generated.
+- Higgsfield remains `not-connected`. No authenticated Higgsfield operation has been demonstrated, so the app does not claim external control.
+- The GitHub branch is verified, but **a publicly hosted, user-ready web deployment is not yet verified**. Real AI replies require `DEEPSEEK_API_KEY` or `GEMINI_API_KEY` to be added as a server secret by the eventual hosting provider. Do not put API keys in the browser or GitHub files.
+- CI uses cloud runners; no build, model weights, or AI inference was run on the user's phone. Browser rendering still uses some phone resources. A real-device temperature/FPS test has not been performed.
+
