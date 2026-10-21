@@ -15,13 +15,13 @@ const required = [
   ["pause while hidden", /visibilitychange/],
   ["local project save", /forge-eye-scene-v1/],
   ["server-side provider key", /process\.env\.DEEPSEEK_API_KEY/],
-  ["Gemini server-side key", /process\\.env\\.GEMINI_API_KEY/],
+  ["Gemini server-side key", /process\.env\.GEMINI_API_KEY/],
   ["Gemini official model endpoint", /generateContent/],
   ["provider selector", /providerSelect/],
   ["truthful unconfigured status", /AI_NOT_CONFIGURED/]
 ];
 for (const [label, pattern] of required) {
-  if (!pattern.test(label === "server-side provider key" ? chat + status : label === "Gemini server-side key" || label === "Gemini official model endpoint" ? gemini : html + chat + status + gemini)) {
+  ["Gemini server-side key", /process\.env\.GEMINI_API_KEY/],
     throw new Error("Forge Eye check failed: " + label);
   }
 }
