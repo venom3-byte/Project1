@@ -19,6 +19,7 @@ public class SubtitleOverlayService extends Service {
     private TextView subtitle;
     private WindowManager.LayoutParams params;
     private boolean shown = false;
+    private String latestText = "";
 
     @Override public void onCreate() {
         super.onCreate();
@@ -31,14 +32,16 @@ public class SubtitleOverlayService extends Service {
             if (shown) removeOverlay(); else showOverlay();
         } else if (ACTION_UPDATE.equals(action)) {
             String text = intent.getStringExtra("text");
-            if (subtitle != null && text != null) subtitle.setText(text);
-            else if (text != null && Settings.canDrawOverlays(this)) showOverlayWithText(text);
+            if (text != null) {
+                latestText = text;
+                if (shown && subtitle != null) subtitle.setText(text);
+            }
         }
         return START_NOT_STICKY;
     }
 
     private void showOverlay() {
-        showOverlayWithText(subtitle == null ? "ستظهر الترجمة العربية هنا" : subtitle.getText().toString());
+        showOverlayWithText(latestText.isEmpty() ? "ستظهر الترجمة العربية هنا" : latestText);
     }
 
     private void showOverlayWithText(String text) {
