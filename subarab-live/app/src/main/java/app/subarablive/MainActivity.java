@@ -42,6 +42,7 @@ public class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        endpoint = getPreferences(MODE_PRIVATE).getString("translation_endpoint", endpoint);
         buildUi();
         openUrl("https://www.youtube.com/");
     }
@@ -80,6 +81,9 @@ public class MainActivity extends Activity {
         controls.addView(forward, new LinearLayout.LayoutParams(0, 46, 1f));
         controls.addView(reload, new LinearLayout.LayoutParams(0, 46, 1f));
         controls.addView(overlayButton, new LinearLayout.LayoutParams(0, 46, 1.4f));
+        Button serverButton = new Button(this); serverButton.setText("الخادم");
+        controls.addView(serverButton, new LinearLayout.LayoutParams(0, 46, 1f));
+        serverButton.setOnClickListener(v -> showEndpointDialog());
 
         back.setOnClickListener(v -> { if (webView.canGoBack()) webView.goBack(); });
         forward.setOnClickListener(v -> { if (webView.canGoForward()) webView.goForward(); });
@@ -143,6 +147,28 @@ public class MainActivity extends Activity {
           "var cs=tr.activeCues;if(cs&&cs.length){var t=cs[0].text||'';if(t&&t!==last){last=t;SubArab.onCue(t);}" +
           "break;}}}}}catch(e){}},250);})();";
         webView.evaluateJavascript(js, null);
+    }
+
+    private void showEndpointDialog() {
+        EditText field = new EditText(this);
+        field.setSingleLine(true);
+        field.setInputType(android.text.InputType.TYPE_TEXT_VARIATION_URI);
+        field.setText(endpoint);
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("خادم الترجمة")
+            .setMessage("أدخل عنوان خدمة متوافقة مع LibreTranslate. لا تستخدم خادمًا لا تثق به.")
+            .setView(field)
+            .setNegativeButton("إلغاء", null)
+            .setPositiveButton("حفظ", (dialog, which) -> {
+                String value = field.getText().toString().trim();
+                if (value.startsWith("https://") && value.endsWith("/translate")) {
+                    endpoint = value;
+                    getPreferences(MODE_PRIVATE).edit().putString("translation_endpoint", endpoint).apply();
+                    Toast.makeText(this, "تم حفظ عنوان الخادم", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(this, "استخدم رابط HTTPS ينتهي بـ /translate", Toast.LENGTH_LONG).show();
+                }
+            }).show();
     }
 
     private void toggleOverlay() {
